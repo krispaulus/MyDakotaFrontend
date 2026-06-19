@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Hapus semua :root, body, #root, h1, dll yang ada di bawah ini */
+/* Biarkan Tailwind yang mengatur semuanya melalui className di App.jsx */
+
+/* Reset total agar tidak ada ukuran raksasa */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body, html, #root {
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+}

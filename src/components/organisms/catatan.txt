@@ -1,0 +1,5 @@
+Penjelasan :
+px-4: Menambah padding horizontal (kiri-kanan) agar teks dan avatar tidak mepet ke pinggir kotak.
+py-3: Menambah padding vertikal (atas-bawah) supaya kotaknya terlihat lebih proporsional dan tinggi.
+mx-2: Memberikan sedikit jarak (margin) dari dinding sidebar agar kotak hitam 10% tersebut terlihat seperti "melayang" di tengah.
+gap-4: Memperlebar jarak antara avatar dan teks nama user.
