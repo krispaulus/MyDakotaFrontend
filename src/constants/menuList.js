@@ -1,7 +1,7 @@
 export const MENU_LIST = [
   { id: 'dashboard', name: 'Dashboard' },
-  { 
-    id: 'gl', 
+  {
+    id: 'gl',
     name: 'General Ledger',
     // Kita tambahkan array subMenus di sini bro
     subMenus: [
@@ -21,14 +21,14 @@ export const MENU_LIST = [
     ]
   },
 
-  { 
-    id: 'hrd', 
+  {
+    id: 'hrd',
     name: 'HRD',
     // Kita tambahkan array subMenus di sini bro
     subMenus: [
-	    { id: 'hrd_proses_piutang_karyawan', name: 'Proses Piutang Karyawan' },
+      { id: 'hrd_proses_piutang_karyawan', name: 'Proses Piutang Karyawan' },
       { id: 'hrd_hari_libur_periodik', name: 'Hari Libur Periodik' },
-      { id: 'hrd_periksa_absensi', name: 'Periksa Absensi' },	  
+      { id: 'hrd_periksa_absensi', name: 'Periksa Absensi' },
       { id: 'hrd_laporan_absensi', name: 'Laporan Absensi' },
       { id: 'hrd_transaksi_pembayaran_karyawan', name: 'Transaksi Pembayaran Karyawan' },
       { id: 'hrd_hari_kerja_khusus', name: 'Hari Kerja Khusus' },
@@ -36,7 +36,7 @@ export const MENU_LIST = [
       { id: 'hrd_hari_libur_khusus', name: 'Hari Libur Khusus' },
       { id: 'hrd_perizinan', name: 'Perizinan' },
       { id: 'hrd_hari_libur_umum', name: 'Hari Libur Umum' },
-      { id: 'hrd_laporan_status_kerja_karyawan', name: 'Laporan Status Kerja Karyawan' },	  
+      { id: 'hrd_laporan_status_kerja_karyawan', name: 'Laporan Status Kerja Karyawan' },
       { id: 'hrd_mutasi_piutang_karyawan', name: 'Mutasi Piutang Karyawan' },
       { id: 'hrd_saldo_awal_piutang_karyawan', name: 'Saldo Awal Piutang Karyawan' },
       { id: 'hrd_laporan_jumlah_izincutisakitalpa', name: 'Laporan Jumlah Izin/Cuti/sakit/alpa' },
@@ -45,8 +45,8 @@ export const MENU_LIST = [
     ]
   },
 
-  { 
-    id: 'marketing', 
+  {
+    id: 'marketing',
     name: 'Marketing',
     subMenus: [
       { id: 'marketing_dashboard', name: 'Marketing Dashboard' },
@@ -56,9 +56,9 @@ export const MENU_LIST = [
       { id: 'marketing_cetak_btt_resi', name: 'Cetak Btt' },
       { id: 'marketing_cetak_barcode_koli', name: 'Cetak Barcode Koli' },
       { id: 'marketing_closing_harian_agen', name: 'Closing Harian Agen' },
-      
-      { 
-        id: 'marketing_laporan', 
+
+      {
+        id: 'marketing_laporan',
         name: 'Laporan',
         subMenus: [
           { id: 'marketing_laporan_hasil_penjualan', name: 'Hasil Penjualan Btt Counter / Agen' },
@@ -77,75 +77,75 @@ export const MENU_LIST = [
       { id: 'marketing_bebas_dari_biaya_pengiriman', name: 'Bebas Dari Biaya' },
       { id: 'marketing_cetak_btt_resi', name: 'Cetak Btt' },
       { id: 'marketing_cetak_barcode_koli', name: 'Cetak Barcode Koli' },
-      { id: 'marketing_closing_harian_agen', name: 'Closing Harian Agen' },      
+      { id: 'marketing_closing_harian_agen', name: 'Closing Harian Agen' },
     ]
   },
 
-  { 
-    id: 'master', 
+  {
+    id: 'master',
     name: 'Master',
     subMenus: [
-        { id: 'master_agen', name: 'Master Customer' },
-        { id: 'master_area_loper', name: 'Bukti Tanda Terima' },
-        { id: 'master_area_tidak_dilayani', name: 'Bebas Dari Biaya' },
-        { id: 'master_device_karyawan', name: 'Cetak Btt' },
-        { id: 'master_kendaraan', name: 'Cetak Barcode Koli' },
-        { id: 'master_sewa_kendaraan', name: 'Closing Harian Agen' },
-        { id: 'master_kodepos', name: 'Closing Harian Agen' },
-        { id: 'master_koordinator_wilayah', name: 'Closing Harian Agen' },
-        { id: 'master_sopir', name: 'Closing Harian Agen' },
-        { id: 'master_trayek', name: 'Closing Harian Agen' },
-        { 
-          id: 'master_tarif', 
-          name: 'Closing Harian Agen', 
-              subMenus: [
-                  { id: 'tarif_carter', name: 'Closing Harian Agen' },
-                  { id: 'tarif_handling', name: 'Closing Harian Agen' },
-                  { id: 'tarif_paket_customer', name: 'Closing Harian Agen' },
-                  { id: 'tarif_paket_kurir', name: 'Closing Harian Agen' },
-                  { id: 'tarif_paket_ekonomis', name: 'Closing Harian Agen' },
-                  { id: 'tarif_paket_umum', name: 'Tarif Paket Umum' },
-                  { id: 'tarif_transit', name: 'Tarif Transit' },
-                  { id: 'tarif_unit', name: 'Tarif Unit' },
-              ]
-        },        
+      { id: 'master_agen', name: 'Master Agen' },
+      { id: 'master_area_loper', name: 'Area Loper' },
+      { id: 'master_area_tidak_dilayani', name: 'Area Tidak Dilayani' },
+      { id: 'master_device_karyawan', name: 'Device Karyawan' },
+      { id: 'master_kendaraan', name: 'Master Kendaraan' },
+      { id: 'master_sewa_kendaraan', name: 'Master Sewa Kendaraan' },
+      { id: 'master_kodepos', name: 'Master Kode Pos' },
+      { id: 'master_koordinator_wilayah', name: 'Koordinator Wilayah' },
+      { id: 'master_sopir', name: 'Master Sopir' },
+      { id: 'master_trayek', name: 'Master Trayek' },
+      {
+        id: 'master_tarif',
+        name: 'Master Tarif',
+        subMenus: [
+          { id: 'tarif_carter', name: 'Tarif Carter' },
+          { id: 'tarif_handling', name: 'Closing Harian Agen' },
+          { id: 'tarif_paket_customer', name: 'Closing Harian Agen' },
+          { id: 'tarif_paket_kurir', name: 'Closing Harian Agen' },
+          { id: 'tarif_paket_ekonomis', name: 'Closing Harian Agen' },
+          { id: 'tarif_paket_umum', name: 'Tarif Paket Umum' },
+          { id: 'tarif_transit', name: 'Tarif Transit' },
+          { id: 'tarif_unit', name: 'Tarif Unit' },
+        ]
+      },
     ]
   },
 
 
 
-  { 
-    id: 'operasional', 
+  {
+    id: 'operasional',
     name: 'Operasional',
     subMenus: [
-    { id: 'operasional', name: 'Operasional' },
-    { id: 'operasional_dashboard', name: 'Dashboard' },
-    { id: 'operasional_btt_gagalberhasil_loper', name: 'Btt Gagal berhasil Loper' },
-    { id: 'operasional_komisi_borongan', name: 'Komisi Borongan' },
-    { 
-      id: 'operasional_laporan', 
-      name: 'Laporan',
-            subMenus: [
-                { id: 'operasional_insentif_loper', name: 'Insentif Loper' },
-                { id: 'operasional_laporan_barang_kurang', name: 'Laporan Barang Kurang' },
-                { id: 'operasional_laporan_barang_dalam_perjalanan', name: 'Laporan Barang Dalam Perjalanan' },
-                { id: 'operasional_laporan_barang_naik', name: 'Laporan Barang Naik' },
-                { id: 'operasional_laporan_barang_turun', name: 'Laporan Barang Turun' },
-                { id: 'operasional_laporan_handling_barang_naik', name: 'Laporan Handling Barang Naik' },
-                { id: 'operasional_laporan_handling_by_pengembalian_btt', name: 'Laporan Handling By Pengembalian Btt' },
-                { id: 'operasional_laporan_insentif_gudang', name: 'Laporan Insentif Gudang' },
-                { id: 'operasional_laporan_leadtime', name: 'Laporan Leadtime' },
-                { id: 'operasional_laporan_loading_kendaraan', name: 'Laporan Loading Kendaraan' },
-                { id: 'operasional_laporan_perjalanan_kendaraan', name: 'Laporan Perjalanan Kendaraan' },
-                { id: 'operasional_laporan_total_barang_naik_dan_turun', name: 'Laporan Total Barang Naik Dan Turun' },
-                { id: 'operasional_laporan_bplk', name: 'Laporan Bplk' },
-              ]
-    },
+      { id: 'operasional', name: 'Operasional' },
+      { id: 'operasional_dashboard', name: 'Dashboard' },
+      { id: 'operasional_btt_gagalberhasil_loper', name: 'Btt Gagal berhasil Loper' },
+      { id: 'operasional_komisi_borongan', name: 'Komisi Borongan' },
+      {
+        id: 'operasional_laporan',
+        name: 'Laporan',
+        subMenus: [
+          { id: 'operasional_insentif_loper', name: 'Insentif Loper' },
+          { id: 'operasional_laporan_barang_kurang', name: 'Laporan Barang Kurang' },
+          { id: 'operasional_laporan_barang_dalam_perjalanan', name: 'Laporan Barang Dalam Perjalanan' },
+          { id: 'operasional_laporan_barang_naik', name: 'Laporan Barang Naik' },
+          { id: 'operasional_laporan_barang_turun', name: 'Laporan Barang Turun' },
+          { id: 'operasional_laporan_handling_barang_naik', name: 'Laporan Handling Barang Naik' },
+          { id: 'operasional_laporan_handling_by_pengembalian_btt', name: 'Laporan Handling By Pengembalian Btt' },
+          { id: 'operasional_laporan_insentif_gudang', name: 'Laporan Insentif Gudang' },
+          { id: 'operasional_laporan_leadtime', name: 'Laporan Leadtime' },
+          { id: 'operasional_laporan_loading_kendaraan', name: 'Laporan Loading Kendaraan' },
+          { id: 'operasional_laporan_perjalanan_kendaraan', name: 'Laporan Perjalanan Kendaraan' },
+          { id: 'operasional_laporan_total_barang_naik_dan_turun', name: 'Laporan Total Barang Naik Dan Turun' },
+          { id: 'operasional_laporan_bplk', name: 'Laporan Bplk' },
+        ]
+      },
     ]
   },
 
-  { 
-    id: 'piutang', 
+  {
+    id: 'piutang',
     name: 'Piutang',
     subMenus: [
       { id: 'piutang_approval_customer', name: 'Approval Customer' },
@@ -156,7 +156,7 @@ export const MENU_LIST = [
       { id: 'piutang_kpi', name: 'KPI' },
       { id: 'piutang_laporan_piutang_usaha', name: 'Laporan Piutang Usaha' },
       { id: 'piutang_rekap_piutang_usaha', name: 'Rekap Piutang Usaha' },
-      { id: 'piutang_lock_penjualan_cabang_agen_counter', name: 'Lock Penjualan Cabang agen counter' },	  
+      { id: 'piutang_lock_penjualan_cabang_agen_counter', name: 'Lock Penjualan Cabang agen counter' },
       { id: 'piutang_monitoring_setoran_agen_counter', name: 'Monitoring Setoran Agen counter' },
       { id: 'piutang_mutasi_piutang', name: 'Mutasi Piutang' },
       { id: 'piutang_penagihan_invoice_oleh_kolektor', name: 'Penagihan Invoice Oleh Kolektor' },
@@ -169,8 +169,8 @@ export const MENU_LIST = [
     ]
   },
 
-  { 
-    id: 'settings', 
+  {
+    id: 'settings',
     name: 'Settings',
     subMenus: [
       { id: 'settings_user', name: 'User' },

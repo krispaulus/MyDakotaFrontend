@@ -3,7 +3,8 @@ import axios from 'axios';
 import { Plus, UserPlus, X, Save, RefreshCw } from 'lucide-react';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
-import Swal from 'sweetalert2'; 
+import Swal from 'sweetalert2';
+import api from '../api/axios';
 
 const MasterCustomer = () => {
     const [rekomendasiKota, setRekomendasiKota] = useState([]); // Penampung hasil query glb_m_kota
@@ -12,10 +13,8 @@ const MasterCustomer = () => {
     const [loading, setLoading] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
     const [emailError, setEmailError] = useState('');
-
-    // 🏢 States penampung data untuk tabel dinamis
-    const [customers, setCustomers] = useState([]);
-    const [loadingTable, setLoadingTable] = useState(false);
+    const [data, setData] = useState([]);
+    const token = localStorage.getItem('token');
 
     const [formData, setFormData] = useState({
         cust_id: '',
@@ -33,25 +32,81 @@ const MasterCustomer = () => {
         cust_kredithari: 0
     });
 
+    // =========================================================================
+    // 🟢 DYNAMIC TENANT COMPASS: Ambil Data Mengikuti Pergerakan Dropdown Header
+    // =========================================================================
+    const fetchCustomers = async (targetAgenParam) => {
+        setLoading(true);
+        try {
+            const currentToken = localStorage.getItem('token');
+            const roleUserFix = localStorage.getItem('role_akses') || 'AGEN';
+
+            // 🧠 AMBIL SECARA LIVE: Ambil parameter input, atau intip semua kemungkinan key session storage browser
+            let cleanAgenKode = String(
+                targetAgenParam ||
+                localStorage.getItem('active_agen_id') ||
+                localStorage.getItem('active_agen_kode') ||
+                localStorage.getItem('active_agen_nama') ||
+                'ALL'
+            ).trim();
+
+            // Jika bernilai undefined bawaan browser, paksa amankan ke ALL
+            if (cleanAgenKode === "undefined" || cleanAgenKode === "") {
+                cleanAgenKode = "ALL";
+            }
+
+            const upperRole = roleUserFix.toUpperCase();
+            console.log(`📡 [Nusantara Engine Front-End] Mengirim Saringan: "${cleanAgenKode}", Otoritas: ${upperRole}`);
+
+            // Tembak murni ke endpoint get master customer list
+            const res = await axios.get(`http://localhost:8080/api/customer?search=&agen_id=${encodeURIComponent(cleanAgenKode)}&role_akses=${upperRole}`, {
+                headers: {
+                    'Authorization': `Bearer ${currentToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (res.data && res.data.status === "success") {
+                setData(res.data.data || []);
+            } else if (Array.isArray(res.data)) {
+                setData(res.data);
+            } else if (res.data && Array.isArray(res.data.data)) {
+                setData(res.data.data);
+            }
+        } catch (err) {
+            console.error("❌ Gagal menarik data master customer:", err);
+            setData([]);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // =========================================================================
-    // 🔄 EFFECT WATCHER: AUTO-REFRESH TABEL SAAT DROPDOWN HEADER ATAS BERUBAH
+    // 🟢 AUTOMATIC SYNC INTERCEPTOR: Sinkronisasi Dropdown Secara Live Tanpa Reload
     // =========================================================================
-    const currentStorageAgenId = localStorage.getItem('active_agen_id');
-    
-    useEffect(() => {
-        fetchCustomers();
-        
-        // 🛡️ RE-FETCH INTERCEPTOR: Dengar perubahan storage jika user mengubah dropdown loket atas
-        const handleStorageChange = () => fetchCustomers();
-        window.addEventListener('storage', handleStorageChange);
-        return () => window.removeEventListener('storage', handleStorageChange);
-    }, [currentStorageAgenId]); // 🔄 Pantau variabel secara live agar tabel langsung terpotong otomatis!
+    const [filterAgenId, setFilterAgenId] = useState(
+        localStorage.getItem('active_agen_id') || localStorage.getItem('active_agen_nama') || 'ALL'
+    );
 
-    // ============================ Jalankan fetch otomatis saat halaman pertama kali dibuka
     useEffect(() => {
-        fetchCustomers();
-    }, []);
+        if (token) {
+            fetchCustomers(filterAgenId);
+        }
+
+        // Interval checker membaca mutasi session dropdown secara live per 1 detik
+        const intervalCheck = setInterval(() => {
+            const latestAgenId = localStorage.getItem('active_agen_id') || localStorage.getItem('active_agen_nama') || 'ALL';
+
+            if (latestAgenId && latestAgenId !== filterAgenId && latestAgenId !== "undefined") {
+                console.log(`🔄 [Nusantara Interceptor] Deteksi Perpindahan Loket Dropdown ke: ${latestAgenId}`);
+                setFilterAgenId(latestAgenId); // Trigger React re-render
+                fetchCustomers(latestAgenId);  // Paksa fetch ulang membawa string nama loket baru seketika!
+            }
+        }, 1000);
+
+        return () => clearInterval(intervalCheck);
+    }, [token, filterAgenId]);
+
 
     // --- 🔍 EFFECT AUTOCOMPLETE KOTA (Membaca live dari tabel glb_m_kota) ---
     useEffect(() => {
@@ -61,56 +116,102 @@ const MasterCustomer = () => {
             const token = localStorage.getItem('token');
             fetch(`http://localhost:8080/api/customer/search-kota?search=${encodeURIComponent(kataKunciKota.trim())}`, {
                 method: 'GET',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 }
             })
-            .then(res => res.json())
-            .then(response => {
-                if (response && response.status === "success") {
-                    setRekomendasiKota(response.data);
-                }
-            })
-            .catch(err => {
-                console.warn("Gagal fetch data kota:", err);
-                setRekomendasiKota([]);
-            });
+                .then(res => res.json())
+                .then(response => {
+                    if (response && response.status === "success") {
+                        setRekomendasiKota(response.data);
+                    }
+                })
+                .catch(err => {
+                    console.warn("Gagal fetch data kota:", err);
+                    setRekomendasiKota([]);
+                });
         } else {
             setRekomendasiKota([]);
         }
-    }, [formData.cust_kotaid]); 
+    }, [formData.cust_kotaid]);
 
     // ==============================================================
     // ⚡ EVENT HANDLERS AKSI TEMPLATE
     // ==============================================================
-    const handleAdd = () => {
-        const currentActiveAgen = localStorage.getItem('active_agen_id') || 'PUSAT DAKOTA';
-        
-        // 🌟 VALIDASI SAKTI: Jika posisi dropdown di header masih set ke PUSAT DAKOTA, BLOKIR TOTAL!
-        if (currentActiveAgen === 'PUSAT DAKOTA' || currentActiveAgen === '000') {
+
+    const handleAdd = async () => {
+        const currentActiveAgen = localStorage.getItem('active_agen_id') || localStorage.getItem('active_agen_nama') || 'PUSAT DAKOTA';
+
+        // 🛡️ VALIDASI SAKTI: Jika posisi dropdown masih di holding pusat, blokir!
+        if (currentActiveAgen === 'PUSAT DAKOTA' || currentActiveAgen === '000' || currentActiveAgen.toUpperCase().includes("PUSAT")) {
             Swal.fire({
                 icon: 'warning',
                 title: 'AKSES DITOLAK!',
-                text: 'Cabang PUSAT DAKOTA bertindak sebagai Holding dan tidak boleh menerbitkan master customer. Silakan beralih ke unit agen operasional terlebih dahulu pada dropdown menu di atas!',
+                text: 'Cabang PUSAT DAKOTA bertindak sebagai Holding dan tidak boleh menerbitkan master customer baru. Silakan beralih ke unit agen operasional terlebih dahulu pada dropdown menu di atas!',
                 confirmButtonColor: '#4f46e5'
             });
             return;
         }
 
         setIsEditMode(false);
-        setFormData({ 
-            cust_name: '', cust_alamat1: '', cust_alamat2: '', cust_kotaid: '', 
-            cust_telp1: '', cust_telp2: '', cust_email: '', cust_npwp: '',
-            cust_jenisusaha: '', cust_contactperson: '', cust_kreditlimit: 0, cust_kredithari: 0
-        });
+        setLoading(true);
 
-        // Jika lolos (posisi sudah di unit cabang operasional agen), buka modal input-nya!
-        setIsModalOpen(true); 
+        try {
+            const currentToken = localStorage.getItem('token');
+            const roleUserFix = localStorage.getItem('role_akses') || 'AGEN';
+            const upperRole = roleUserFix.toUpperCase();
+
+            // 🧠 AMBIL SECARA LIVE: Ambil string nama loket aktif (e.g., "PURWOREJO AGEN")
+            let searchKeyword = currentActiveAgen;
+
+            // 🎯 LINTAS NUSANTARA QUERY: Panggil endpoint utama index customer untuk meminta resolusi agen_id asli dari database
+            const resAgen = await fetch(`http://localhost:8080/api/customer?search=&agen_id=${encodeURIComponent(searchKeyword)}&role_akses=${upperRole}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${currentToken}`
+                }
+            });
+
+            // Tangkap response data yang dikirim oleh backend
+            const responseData = await resAgen.json();
+
+            let autoFilledKotaID = "";
+
+            if (responseData && responseData.status === "success" && responseData.data.length > 0) {
+                // 🎯 AMBIL MURNI DARI DB: Ambil kota_id asli hasil relasi tabel (Misal: URW002, GTO001, UPG004)
+                autoFilledKotaID = responseData.data[0].kota_id;
+            } else {
+                // 🛡️ REVISI NUSANTARA ENTERPRISE (100% BEBAS HARDCODE):
+                // Jika relasi gagal/kosong, ambil 3 huruf depan nama dropdown secara dinamis murni!
+                autoFilledKotaID = searchKeyword.substring(0, 3).toUpperCase();
+            }
+
+            // Set Form Data baru dengan field Kode Kota ID yang terisi otomatis secara akurat!
+            setFormData({
+                cust_name: '', cust_alamat1: '', cust_alamat2: '',
+                cust_kotaid: autoFilledKotaID, // 👈 OTOMATIS TERISI SECARA AKURAT!
+                cust_telp1: '', cust_telp2: '', cust_email: '', cust_npwp: '',
+                cust_jenisusaha: '', cust_contactperson: '', cust_kreditlimit: 0, cust_kredithari: 0
+            });
+
+            setIsModalOpen(true);
+        } catch (error) {
+            console.error("Gagal melakukan autofill Kode Kota ID:", error);
+            setFormData({
+                cust_name: '', cust_alamat1: '', cust_alamat2: '', cust_kotaid: '',
+                cust_telp1: '', cust_telp2: '', cust_email: '', cust_npwp: '',
+                cust_jenisusaha: '', cust_contactperson: '', cust_kreditlimit: 0, cust_kredithari: 0
+            });
+            setIsModalOpen(true);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleEdit = (row) => {
-       console.log("🎯 Lolos saringan! Menyiapkan Autofill Data untuk Customer ID:", row.cust_id);
+        console.log("🎯 Lolos saringan! Menyiapkan Autofill Data untuk Customer ID:", row.cust_id);
         setIsEditMode(true);
         setFormData({
             cust_id: row.cust_id, // Simpan ID untuk kebutuhan primary key WHERE klausa update
@@ -126,7 +227,7 @@ const MasterCustomer = () => {
             cust_contactperson: row.cust_contactperson || "",
             cust_kreditlimit: parseFloat(row.cust_kreditlimit) || 0,
             cust_kredithari: parseInt(row.cust_kredithari) || 0
-        });     
+        });
         setIsModalOpen(true);
     };
 
@@ -160,7 +261,7 @@ const MasterCustomer = () => {
             if (result.isConfirmed) {
                 try {
                     const token = localStorage.getItem('token');
-                    
+
                     // Tembak endpoint delete di backend Go
                     const response = await fetch('http://localhost:8080/api/customer/delete', {
                         method: 'POST',
@@ -191,7 +292,7 @@ const MasterCustomer = () => {
                         });
 
                         // 🔄 Refresh baris tabel di belakang secara live tanpa reload halaman!
-                        fetchCustomers();
+                        fetchCustomers(filterAgenId);
                     } else {
                         throw new Error(resData.message || "Gagal menghapus data dari server");
                     }
@@ -201,8 +302,8 @@ const MasterCustomer = () => {
                     Swal.fire({
                         icon: 'error',
                         title: 'Gagal Menghapus, Bro!',
-                        text: err.message.includes("404") 
-                            ? "Rute 'POST /api/customer/delete' belum didaftarkan di router Golang main.go lu!" 
+                        text: err.message.includes("404")
+                            ? "Rute 'POST /api/customer/delete' belum didaftarkan di router Golang main.go lu!"
                             : err.message,
                         confirmButtonColor: '#4f46e5'
                     });
@@ -213,11 +314,11 @@ const MasterCustomer = () => {
 
     const handleChange = (e) => {
         const { name, value, type } = e.target;
-        
+
         // 🌟 KUNCI SAKTI: Jika tipe input adalah number, paksa konversi teks menjadi integer/float angka murni
-        setFormData({ 
-            ...formData, 
-            [name]: type === 'number' ? (parseFloat(value) || 0) : value 
+        setFormData({
+            ...formData,
+            [name]: type === 'number' ? (parseFloat(value) || 0) : value
         });
 
         if (name === 'cust_email') {
@@ -229,29 +330,29 @@ const MasterCustomer = () => {
     // 📊 SETTING STRUKTUR KOLOM UNTUK DATATABLETEMPLATE (MULTI-FAILBACK)
     // ==============================================================
     const columns = [
-        { 
-            header: 'CUST ID', 
-            accessor: 'cust_id', 
-            render: row => <span className="font-mono font-bold text-indigo-600">{row.cust_id || row.CustID}</span> 
+        {
+            header: 'CUST ID',
+            accessor: 'cust_id',
+            render: row => <span className="font-mono font-bold text-indigo-600">{row.cust_id || row.CustID}</span>
         },
-        { 
-            header: 'NAMA CUSTOMER', 
-            accessor: 'cust_name', 
+        {
+            header: 'NAMA CUSTOMER',
+            accessor: 'cust_name',
             render: row => row.cust_name || row.CustName || row.cust_nama
         },
-        { 
-            header: 'ALAMAT LENGKAP', 
-            accessor: 'cust_alamat1', 
+        {
+            header: 'ALAMAT LENGKAP',
+            accessor: 'cust_alamat1',
             render: row => row.cust_alamat1 || row.CustAlamat1
         },
-        { 
-            header: 'TELEPON', 
-            accessor: 'cust_telp1', 
+        {
+            header: 'TELEPON',
+            accessor: 'cust_telp1',
             render: row => row.cust_telp1 || row.CustTelp1
         },
-        { 
-            header: 'KOTA', 
-            accessor: 'cust_kotaid', 
+        {
+            header: 'KOTA',
+            accessor: 'cust_kotaid',
             render: row => row.cust_kotaid || row.CustKotaID
         }
     ];
@@ -267,7 +368,7 @@ const MasterCustomer = () => {
 
         // Rumus Regex International Email pattern
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        
+
         if (!emailRegex.test(emailVal)) {
             setEmailError("Format email tidak valid! Harus mengandung '@' dan domain (contoh: corp@dakota.com)");
             return false;
@@ -298,13 +399,13 @@ const MasterCustomer = () => {
         }
 
         if (loading) return;
-        
+
         setLoading(true);
 
         try {
             const token = localStorage.getItem('token');
 
-            const targetUrl = isEditMode 
+            const targetUrl = isEditMode
                 ? 'http://localhost:8080/api/customer/update'
                 : 'http://localhost:8080/api/customer/create';
 
@@ -342,21 +443,21 @@ const MasterCustomer = () => {
                 Swal.fire({
                     icon: 'success',
                     title: isEditMode ? 'BERHASIL DIUPDATE!' : 'BERHASIL TERSIMPAN!',
-                    text: isEditMode 
-                        ? `Data Customer ID: ${formData.cust_id} Berhasil Diperbarui!` 
+                    text: isEditMode
+                        ? `Data Customer ID: ${formData.cust_id} Berhasil Diperbarui!`
                         : `Customer Baru Sukses Disimpan dengan ID: ${resData.cust_id}`,
                     confirmButtonColor: '#4f46e5'
                 });
 
                 // Reset form input total secara bersih termasuk parameter baru
-                setFormData({ 
+                setFormData({
                     cust_id: '',
-                    cust_name: '', 
-                    cust_alamat1: '', 
-                    cust_alamat2: '', 
-                    cust_kotaid: '', 
-                    cust_telp1: '', 
-                    cust_telp2: '', 
+                    cust_name: '',
+                    cust_alamat1: '',
+                    cust_alamat2: '',
+                    cust_kotaid: '',
+                    cust_telp1: '',
+                    cust_telp2: '',
                     cust_email: '',
                     cust_npwp: '',
                     cust_jenisusaha: '',
@@ -365,11 +466,11 @@ const MasterCustomer = () => {
                     cust_kredithari: 0
                 });
                 // setIsModalOpen(false);
-                
+
                 // // 🔄 Ambil data ulang biar row tabel di belakang langsung nambah live!
                 // fetchCustomers();
                 setTimeout(() => {
-                    fetchCustomers();
+                    fetchCustomers(filterAgenId);
                 }, 100);
             } else {
                 throw new Error(resData.message || "Gagal memproses master data customer");
@@ -394,13 +495,13 @@ const MasterCustomer = () => {
     return (
         <>
             {/* 1. RENDER UTAMA: Memanggil Template Bawaan Dakota */}
-            <DataTableTemplate 
+            <DataTableTemplate
                 title="MASTER CUSTOMER"
                 columns={columns}
-                data={customers} 
-                loading={loadingTable}
+                data={data}
+                loading={loading}
                 isDarkMode={isDarkMode}
-                onAdd={handleAdd} 
+                onAdd={handleAdd}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
             />
@@ -411,7 +512,7 @@ const MasterCustomer = () => {
             {isModalOpen && (
                 <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-white text-slate-800 w-full max-w-2xl rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-slate-100">
-                        
+
                         {/* HEADER MODAL */}
                         <div className="p-5 flex items-center justify-between border-b border-slate-200 bg-slate-100">
                             <div className="flex items-center gap-3">
@@ -422,9 +523,9 @@ const MasterCustomer = () => {
                                     {isEditMode ? `Ubah Data Master Customer [ID: ${formData.cust_id}]` : 'Form Entri Master Customer Baru'}
                                 </h2>
                             </div>
-                            <button 
-                                type="button" 
-                                onClick={() => setIsModalOpen(false)} 
+                            <button
+                                type="button"
+                                onClick={() => setIsModalOpen(false)}
                                 className="p-2 text-slate-500 hover:bg-slate-200 rounded-full transition-colors font-bold"
                             >
                                 <X size={20} />
@@ -434,65 +535,68 @@ const MasterCustomer = () => {
                         {/* FORM INPUT BODY */}
                         <form onSubmit={handleSubmit} className="p-6 space-y-4 bg-white">
                             <div className="grid grid-cols-2 gap-4">
-                                
+
                                 {/* INPUT 1: NAMA */}
                                 <div className="col-span-2 flex flex-col">
                                     <label className="text-xs font-black text-slate-600 uppercase">Nama Lengkap Customer / PT / CV *</label>
-                                    <input 
-                                        type="text" 
-                                        name="cust_name" 
-                                        required 
-                                        value={formData.cust_name || ""} 
-                                        onChange={handleChange} 
-                                        className="w-full mt-1 p-3 border border-slate-300 bg-white text-slate-900 rounded-xl outline-none uppercase font-bold focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all" 
-                                        placeholder="Contoh: PT INDOFOOD SUKSES MAKMUR" 
+                                    <input
+                                        type="text"
+                                        name="cust_name"
+                                        required
+                                        value={formData.cust_name || ""}
+                                        onChange={handleChange}
+                                        className="w-full mt-1 p-3 border border-slate-300 bg-white text-slate-900 rounded-xl outline-none uppercase font-bold focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all"
+                                        placeholder="Contoh: PT INDOFOOD SUKSES MAKMUR"
                                     />
                                 </div>
 
                                 {/* INPUT 2: ALAMAT 1 */}
                                 <div className="col-span-2 flex flex-col">
                                     <label className="text-xs font-black text-slate-600 uppercase">Alamat Utama *</label>
-                                    <input 
-                                        type="text" 
-                                        name="cust_alamat1" 
-                                        required 
-                                        value={formData.cust_alamat1 || ""} 
-                                        onChange={handleChange} 
-                                        className="w-full mt-1 p-3 border border-slate-300 bg-white text-slate-900 rounded-xl outline-none uppercase font-medium focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all" 
-                                        placeholder="Nama Jalan, Blok, Nomor..." 
+                                    <input
+                                        type="text"
+                                        name="cust_alamat1"
+                                        required
+                                        value={formData.cust_alamat1 || ""}
+                                        onChange={handleChange}
+                                        className="w-full mt-1 p-3 border border-slate-300 bg-white text-slate-900 rounded-xl outline-none uppercase font-medium focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all"
+                                        placeholder="Nama Jalan, Blok, Nomor..."
                                     />
                                 </div>
 
                                 {/* INPUT 3: ALAMAT 2 */}
                                 <div className="col-span-2 flex flex-col">
                                     <label className="text-xs font-black text-slate-600 uppercase">Alamat Tambahan (Baris 2)</label>
-                                    <input 
-                                        type="text" 
-                                        name="cust_alamat2" 
-                                        value={formData.cust_alamat2 || ""} 
-                                        onChange={handleChange} 
-                                        className="w-full mt-1 p-3 border border-slate-300 bg-white text-slate-900 rounded-xl outline-none uppercase focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all" 
-                                        placeholder="Kecamatan, Kelurahan..." 
+                                    <input
+                                        type="text"
+                                        name="cust_alamat2"
+                                        value={formData.cust_alamat2 || ""}
+                                        onChange={handleChange}
+                                        className="w-full mt-1 p-3 border border-slate-300 bg-white text-slate-900 rounded-xl outline-none uppercase focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all"
+                                        placeholder="Kecamatan, Kelurahan..."
                                     />
                                 </div>
 
                                 {/* INPUT 4: KOTA ID DENGAN DROPDOWN POSITION LOCK */}
                                 <div className="flex flex-col" style={{ position: 'relative' }}>
-                                    <label className="text-xs font-black text-slate-600 uppercase">Kode Kota ID (3-4 Huruf) *</label>
-                                    <input 
-                                        type="text" 
-                                        name="cust_kotaid" 
-                                        required 
-                                        value={formData.cust_kotaid || ""} 
-                                        onChange={handleChange} 
-                                        className="w-full mt-1 p-3 border border-slate-300 bg-white text-indigo-600 rounded-xl outline-none uppercase font-black focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all" 
-                                        placeholder="Ketik JKT / JAKARTA..." 
+                                    <label className="text-xs font-black text-slate-600 uppercase">Kode Kota ID (Otomatis Lock) *</label>
+                                    <input
+                                        type="text"
+                                        name="cust_kotaid"
+                                        required
+                                        readOnly // 🔒 KUNCI MATI ANTI-HALUSINASI USER!
+                                        value={formData.cust_kotaid || ""}
+                                        className="w-full mt-1 p-3 border border-slate-200 bg-slate-100 text-indigo-600 rounded-xl outline-none uppercase font-black cursor-not-allowed select-none transition-all"
+                                        placeholder="Memuat Kode Cabang..."
                                         autoComplete="off"
                                     />
-                                    
+                                    <span className="text-[10px] text-indigo-500 font-bold mt-1">
+                                        🔒 Terkunci otomatis mengikuti Loket Dropdown aktif.
+                                    </span>
+
                                     {/* Dropdown List Hasil Query tabel glb_m_kota */}
                                     {Array.isArray(rekomendasiKota) && rekomendasiKota.length > 0 && (
-                                        <div 
+                                        <div
                                             className="absolute left-0 bg-white border-2 border-slate-200 rounded-xl shadow-2xl z-[999999] max-h-40 overflow-y-auto text-sm"
                                             style={{ top: '100%', width: '100%' }}
                                         >
@@ -516,22 +620,21 @@ const MasterCustomer = () => {
                                 {/* INPUT 5: EMAIL DENGAN INTERAKTIF VALIDASI KELAS PREMIUN */}
                                 <div className="flex flex-col">
                                     <label className="text-xs font-black text-slate-600 uppercase tracking-wider">Email Perusahaan</label>
-                                    <input 
+                                    <input
                                         type="text" // 🌟 Ubah ke text agar tooltip native bawaan browser tidak menginterupsi UI premium lu
-                                        name="cust_email" 
-                                        value={formData.cust_email || ""} 
-                                        onChange={handleChange} 
+                                        name="cust_email"
+                                        value={formData.cust_email || ""}
+                                        onChange={handleChange}
                                         // 🌟 WARNA BORDER AKAN BERUBAH MERAH JIKA EROR, DAN INDIGO JIKA AMAN!
-                                        className={`w-full mt-1 p-3 border rounded-xl outline-none font-medium transition-all duration-300 ${
-                                            emailError 
-                                                ? 'border-red-500 bg-red-50/30 text-red-900 focus:ring-4 focus:ring-red-100 focus:border-red-500' 
-                                                : formData.cust_email && !emailError 
-                                                    ? 'border-emerald-500 bg-emerald-50/20 text-emerald-900 focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500'
-                                                    : 'border-slate-300 bg-white text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100'
-                                        }`} 
-                                        placeholder="contoh: corp@dakota.com" 
+                                        className={`w-full mt-1 p-3 border rounded-xl outline-none font-medium transition-all duration-300 ${emailError
+                                            ? 'border-red-500 bg-red-50/30 text-red-900 focus:ring-4 focus:ring-red-100 focus:border-red-500'
+                                            : formData.cust_email && !emailError
+                                                ? 'border-emerald-500 bg-emerald-50/20 text-emerald-900 focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500'
+                                                : 'border-slate-300 bg-white text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100'
+                                            }`}
+                                        placeholder="contoh: corp@dakota.com"
                                     />
-                                    
+
                                     {/* 🌟 TEKS PERINGATAN MEWAH DI BAWAH KOTAK INPUT */}
                                     {emailError && (
                                         <span className="text-[11px] font-bold text-red-500 mt-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
@@ -543,27 +646,27 @@ const MasterCustomer = () => {
                                 {/* INPUT 6: TELP 1 */}
                                 <div className="flex flex-col">
                                     <label className="text-xs font-black text-slate-600 uppercase">Telepon Utama *</label>
-                                    <input 
-                                        type="text" 
-                                        name="cust_telp1" 
-                                        required 
-                                        value={formData.cust_telp1 || ""} 
-                                        onChange={handleChange} 
-                                        className="w-full mt-1 p-3 border border-slate-300 bg-white text-slate-900 rounded-xl outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all" 
-                                        placeholder="021xxxxxxxx" 
+                                    <input
+                                        type="text"
+                                        name="cust_telp1"
+                                        required
+                                        value={formData.cust_telp1 || ""}
+                                        onChange={handleChange}
+                                        className="w-full mt-1 p-3 border border-slate-300 bg-white text-slate-900 rounded-xl outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all"
+                                        placeholder="021xxxxxxxx"
                                     />
                                 </div>
 
                                 {/* INPUT 7: TELP 2 */}
                                 <div className="flex flex-col">
                                     <label className="text-xs font-black text-slate-600 uppercase">Telepon Cadangan</label>
-                                    <input 
-                                        type="text" 
-                                        name="cust_telp2" 
-                                        value={formData.cust_telp2 || ""} 
-                                        onChange={handleChange} 
-                                        className="w-full mt-1 p-3 border border-slate-300 bg-white text-slate-900 rounded-xl outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all" 
-                                        placeholder="08xxxxxxxx" 
+                                    <input
+                                        type="text"
+                                        name="cust_telp2"
+                                        value={formData.cust_telp2 || ""}
+                                        onChange={handleChange}
+                                        className="w-full mt-1 p-3 border border-slate-300 bg-white text-slate-900 rounded-xl outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all"
+                                        placeholder="08xxxxxxxx"
                                     />
                                 </div>
 
@@ -601,9 +704,9 @@ const MasterCustomer = () => {
 
                             {/* ACTION FOOTER BUTTONS */}
                             <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 mt-6 bg-white">
-                                <button 
-                                    type="button" 
-                                    onClick={() => setIsModalOpen(false)} 
+                                <button
+                                    type="button"
+                                    onClick={() => setIsModalOpen(false)}
                                     className="px-5 py-2.5 rounded-xl font-bold border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 transition-colors"
                                 >
                                     Batal

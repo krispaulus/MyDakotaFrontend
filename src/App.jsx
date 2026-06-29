@@ -8,7 +8,7 @@ import logo from './assets/logo.png'
 import MainLayout from './layouts/MainLayout'
 import Account from './pages/Account';
 import UnderConstruction from './components/organisms/UnderConstruction';
-import UserManagement from './pages/UserManagement'; 
+import UserManagement from './pages/UserManagement';
 import MasterAgen from './pages/MasterAgen';
 import MasterKodePos from './pages/MasterKodePos';
 import MasterTarifEkonomis from './pages/MasterTarifEkonomis';
@@ -19,6 +19,9 @@ import SecuritySettings from './pages/SecuritySettings';
 import MasterCustomer from './pages/MasterCustomer';
 import BttPrintPage from './pages/BttPrintPage';
 import BttClosingHarianDashboard from './components/organisms/BttClosingHarianDashboard';
+import MasterAreaLoper from './pages/MasterAreaLoper';
+import SuratPengantarPengiriman from './pages/SuratPengantarPengiriman';
+import SuratPengantarTurun from './pages/SuratPengantarTurun';
 
 
 const getCompanyName = (pt) => {
@@ -112,7 +115,7 @@ function LoginPage() {
         pt_id: selectedPT
       };
       console.log("%c📨 Payload yang dikirim:", "color: #FF9800; font-weight: bold;", loginPayload);
-      
+
       const response = await api.post('/login', loginPayload)
       console.log("✅ [Frontend] Berhasil!", response.data);
       localStorage.setItem('token', response.data.token)
@@ -422,194 +425,215 @@ function App() {
       />
 
       {/* 3. Halaman Account: Di dalam MainLayout */}
-      <Route 
-        path="/account" 
+      <Route
+        path="/account"
         element={
           <MainLayout>
             <Account />
           </MainLayout>
-        } 
+        }
       />
 
       {/* SEMUA MENU LAIN DIARAHKAN KE SINI */}
-        <Route path="/hrd" 
+      <Route path="/hrd"
         element={
           <MainLayout>
-            <UnderConstruction menuName="HRD"/>
+            <UnderConstruction menuName="HRD" />
           </MainLayout>
-        } 
-         />
-        <Route path="/marketing" 
+        }
+      />
+      <Route path="/marketing"
         element={
           <MainLayout>
-            <UnderConstruction menuName="Marketing"/>
+            <UnderConstruction menuName="Marketing" />
           </MainLayout>
-        } 
-         />
+        }
+      />
 
-        <Route path="/marketing/dashboard" 
+      <Route path="/marketing/dashboard"
         element={
           <MainLayout>
-            <UnderConstruction menuName="Marketing"/>
+            <UnderConstruction menuName="Marketing" />
           </MainLayout>
-        } 
-         />  
+        }
+      />
 
-        <Route path="/marketing/master-customer" 
+      <Route path="/marketing/master-customer"
         element={
           <MainLayout>
-            <MasterCustomer/>
+            <MasterCustomer />
           </MainLayout>
-        } 
-         />                  
+        }
+      />
 
-        <Route path="/marketing/btt" 
+      <Route path="/marketing/btt"
         element={
           <MainLayout>
             <MarketingBTT />
           </MainLayout>
-        } 
-         />
+        }
+      />
 
-         <Route path="/marketing/btt/print" element={<BttPrintPage />} />       
+      <Route path="/marketing/btt/print" element={<BttPrintPage />} />
 
-        <Route path="/marketing/bdb" 
+      <Route path="/marketing/bdb"
         element={
           <MainLayout>
             <UnderConstruction />
           </MainLayout>
-        } 
-         />         
+        }
+      />
 
-        {/* 🚀 VARIASI 1: Rute polosan sesuai link klik sidebar browser lu */}
-        <Route path="/marketing/closing-harian" 
+      {/* 🚀 VARIASI 1: Rute polosan sesuai link klik sidebar browser lu */}
+      <Route path="/marketing/closing-harian"
         element={
           <MainLayout>
             <BttClosingHarianDashboard />
           </MainLayout>
-        } 
-         />              
+        }
+      />
 
-        {/* 🚀 VARIASI 2: Jaga-jaga kalau ada tombol lama yang mengarah ke path komplit */}
-        <Route path="/marketing/closing-harian-agen" 
+      {/* 🚀 VARIASI 2: Jaga-jaga kalau ada tombol lama yang mengarah ke path komplit */}
+      <Route path="/marketing/closing-harian-agen"
         element={
           <MainLayout>
             <BttClosingHarianDashboard />
           </MainLayout>
-        } 
-         />             
+        }
+      />
 
 
-        <Route path="/operasional" 
+      <Route path="/operasional"
         element={
           <MainLayout>
-            <UnderConstruction menuName="Operasional"/>
+            <UnderConstruction menuName="Operasional" />
           </MainLayout>
-        } 
-         />
-         
-
-        <Route path="/general-ledger" 
+        }
+      />
+      <Route path="/operasional/surat-pengantar-pengiriman"
         element={
           <MainLayout>
-            <UnderConstruction menuName="General Ledger"/>
+            <SuratPengantarPengiriman />
           </MainLayout>
-        } 
-         />
-
-        <Route path="/Master" 
+        }
+      />
+      <Route path="/operasional/surat-pengantar-turun"
         element={
           <MainLayout>
-            <UnderConstruction menuName="Master Data"/>
+            <SuratPengantarTurun />
           </MainLayout>
-        } 
-         />
+        }
+      />
 
-        <Route path="/Master/master-agen" 
+      <Route path="/general-ledger"
         element={
           <MainLayout>
-            <MasterAgen menuName="master-agen"/>
+            <UnderConstruction menuName="General Ledger" />
           </MainLayout>
-        } 
-         />
+        }
+      />
 
-        <Route path="/Master/master-kodepos" 
+      <Route path="/Master"
         element={
           <MainLayout>
-            <MasterKodePos menuName="master-kodepos"/>
+            <UnderConstruction menuName="Master Data" />
           </MainLayout>
-        } 
-         />         
+        }
+      />
 
-        <Route path="/master/tarif-ekonomis" 
+      <Route path="/Master/master-agen"
         element={
           <MainLayout>
-            <MasterTarifEkonomis menuName="MasterTarifEkonomis"/>
+            <MasterAgen menuName="master-agen" />
           </MainLayout>
-        } 
-         />      
+        }
+      />
 
-        <Route path="/master/tarif-umum" 
+      <Route path="/Master/master-area-loper"
         element={
           <MainLayout>
-            <MasterTarifReguler menuName="MasterTarifReguler"/>
+            <MasterAreaLoper menuName="master-area-loper" />
           </MainLayout>
-        } 
-         />
+        }
+      />
 
-        <Route path="/master/tarif-unit" 
+      <Route path="/Master/master-kodepos"
         element={
           <MainLayout>
-            <MasterTarifUnit menuName="MasterTarifUnit"/>
+            <MasterKodePos menuName="master-kodepos" />
           </MainLayout>
-        } 
-         />                 
+        }
+      />
 
-         
-
-        <Route path="/Piutang" 
+      <Route path="/master/tarif-ekonomis"
         element={
           <MainLayout>
-            <UnderConstruction menuName="Piutang"/>
+            <MasterTarifEkonomis menuName="MasterTarifEkonomis" />
           </MainLayout>
-        } 
-         />
+        }
+      />
 
-        <Route path="/Settings" 
+      <Route path="/master/tarif-umum"
         element={
           <MainLayout>
-            <UnderConstruction menuName="Settings"/>
+            <MasterTarifReguler menuName="MasterTarifReguler" />
           </MainLayout>
-        } 
-         />
+        }
+      />
 
-         <Route path="/settings/users" 
-         element={
+      <Route path="/master/tarif-unit"
+        element={
           <MainLayout>
-            <UserManagement menuName="UserManagement"/>
+            <MasterTarifUnit menuName="MasterTarifUnit" />
           </MainLayout>
-        } 
-        />
+        }
+      />
 
 
-        <Route path="/settings/configurasi" 
-         element={
+
+      <Route path="/Piutang"
+        element={
           <MainLayout>
-            <UnderConstruction menuName="configurasi"/>
+            <UnderConstruction menuName="Piutang" />
           </MainLayout>
-        } 
-        
-        />
-   
+        }
+      />
 
-        <Route path="/settings/security" 
-         element={
+      <Route path="/Settings"
+        element={
           <MainLayout>
-            <SecuritySettings menuName="SecuritySettings"/>
+            <UnderConstruction menuName="Settings" />
           </MainLayout>
-        } 
-        
-        />        
+        }
+      />
+
+      <Route path="/settings/users"
+        element={
+          <MainLayout>
+            <UserManagement menuName="UserManagement" />
+          </MainLayout>
+        }
+      />
+
+
+      <Route path="/settings/configurasi"
+        element={
+          <MainLayout>
+            <UnderConstruction menuName="configurasi" />
+          </MainLayout>
+        }
+
+      />
+
+
+      <Route path="/settings/security"
+        element={
+          <MainLayout>
+            <SecuritySettings menuName="SecuritySettings" />
+          </MainLayout>
+        }
+
+      />
 
 
 
