@@ -19,6 +19,17 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState({ name: '', email: '', role: '', division: '', profileimage: '' });
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [modalNoSP, setModalNoSP] = useState('');
+  const printInputRef = React.useRef(null);
+
+  const [showBttPrintModal, setShowBttPrintModal] = useState(false);
+  const [modalNoBTT, setModalNoBTT] = useState('');
+  const bttInputRef = React.useRef(null);
+
+  const [showBarcodePrintModal, setShowBarcodePrintModal] = useState(false);
+  const [modalNoBarcode, setModalNoBarcode] = useState('');
+  const barcodeInputRef = React.useRef(null);
 
   // 3. Fungsi handle juga di dalam sini supaya bisa akses set-state
   const handleConfirmLogout = () => {
@@ -154,6 +165,62 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
     });
   };
 
+  // Auto-focus kursor saat modal pop-up cetak SP menyala terbuka
+  useEffect(() => {
+    if (showPrintModal && printInputRef.current) {
+      setTimeout(() => printInputRef.current.focus(), 100);
+    }
+  }, [showPrintModal]);
+
+  const executeQuickPrint = (e) => {
+    if (e) e.preventDefault();
+    if (!modalNoSP.trim()) return;
+
+    // Buka tab baru khusus pencetakan agar halaman utama tidak hilang!
+    window.open(`/operasional/sp-terima/print-nota/${modalNoSP.trim().toUpperCase()}`, '_blank');
+    setShowPrintModal(false);
+    setModalNoSP('');
+  };
+
+  // ✅ Tambahkan fungsi handler ini agar form onSubmit punya mesin penggerak:
+  const executeQuickPrintBTT = (e) => {
+    if (e) e.preventDefault();
+    if (!modalNoBTT.trim()) return;
+
+    // Membuka tab baru mengarah langsung ke engine cetak bawaan Go lu bray!
+    window.open(`/marketing/btt/print?id=${modalNoBTT.trim().toUpperCase()}`, '_blank');
+
+    // Reset state dan tutup modal
+    setShowBttPrintModal(false);
+    setModalNoBTT('');
+  };
+
+  // Auto-focus kursor saat modal BTT dinyalakan operator
+  useEffect(() => {
+    if (showBttPrintModal && bttInputRef.current) {
+      setTimeout(() => bttInputRef.current.focus(), 100);
+    }
+  }, [showBttPrintModal]);
+
+  const executeQuickPrintBarcode = (e) => {
+    if (e) e.preventDefault();
+    if (!modalNoBarcode.trim()) return;
+
+    // 🚀 Buka tab baru murni langsung mengarah ke rute cetak barcode koli backend bawaan lu!
+    window.open(`/marketing/btt/print-barcode?id=${modalNoBarcode.trim().toUpperCase()}`, '_blank');
+
+    // Reset state dan tutup gerbang modal
+    setShowBarcodePrintModal(false);
+    setModalNoBarcode('');
+  };
+
+  // Efek auto-focus instan begitu laser scanner siap bekerja
+  useEffect(() => {
+    if (showBarcodePrintModal && barcodeInputRef.current) {
+      setTimeout(() => barcodeInputRef.current.focus(), 100);
+    }
+  }, [showBarcodePrintModal]);
+
 
   const allMenus = [
     { name: 'Dashboard', icon: <LayoutDashboard size={20} />, roles: ['S', 'A', 'SPV', 'U'] },
@@ -166,13 +233,14 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
       roles: ['S', 'A'],
       division: 'Marketing',
       children: [
-        { name: 'Dasboard', path: '/marketing/dashboard', roles: ['S'] },
+        // { name: 'Dasboard', path: '/marketing/dashboard', roles: ['S'] },
         { name: 'Master Customer', path: '/marketing/master-customer', roles: ['S'] },
         { name: 'Bukti Tanda Terima(BTT)', path: '/marketing/btt', roles: ['S'] },
         { name: 'Bebas Dari Biaya (Bdb) - Pengiriman', path: '/marketing/bdb' },
-        { name: 'Cetak Btt / Resi', path: '/marketing/cetak-btt', roles: ['S'] },
-        { name: 'Cetak Barcode Koli', path: '/marketing/cetak-barcode' },
+        { name: 'Cetak BTT / Resi', path: '#print-btt', roles: ['S'] },
+        { name: 'Cetak Barcode Koli', path: '#print-barcode', roles: ['S'] },
         { name: 'Closing Harian Agen', path: '/marketing/closing-harian', roles: ['S'] },
+        { name: 'Monitoring BTT', path: '/marketing/monitoring-btt', roles: ['S'] },
         {
           name: 'Laporan',
           icon: <Backpack size={18} />,
@@ -259,11 +327,11 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
       icon: <HandCoins size={20} />,
       roles: ['S', 'A'],
       children: [
-        { name: 'BTT Gagal Berhasil Loper', path: '/operasional/btt-gagal-berhasil-loper', roles: ['S', 'A'] },
+        { name: 'BTT Gagal Berhasil Loper', path: '/operasional/surat-kembali-btt', roles: ['S', 'A'] },
         { name: 'Komisi Borongan', path: '/operasional/master-area-loper', roles: ['S', 'A'] },
         { name: 'Laporan', path: '/operasional/area-tidak-dilayani', roles: ['S', 'A'] },
         { name: 'Loading Unloading Barang', path: '/operasional/divice-karyawan', roles: ['S', 'A'] },
-        { name: 'Loper', path: '/operasional/kendaraan', roles: ['S', 'A'] },
+        { name: 'Loper', path: '/operasional/loper', roles: ['S', 'A'] },
         { name: 'Pengambilan ', path: '/operasional/sewa-kendaraan', roles: ['S', 'A'] },
         { name: 'Pengembalian', path: '/operasional/kode-pos', roles: ['S', 'A'] },
         { name: 'Pengisian BBM', path: '/operasional/account', roles: ['S', 'A'] },
@@ -275,9 +343,9 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
           name: 'Surat Pengantar',
           icon: <ClipboardPen size={18} />,
           children: [
-            { name: 'Cetak Surat Pengiriman', path: '/master/master-agen', roles: ['S', 'A'] },
+            { name: 'Cetak Surat Pengiriman', path: '#', roles: ['S', 'A'] },
             { name: 'Surat Pengantar - Pengiriman', path: '/operasional/surat-pengantar-pengiriman', roles: ['S', 'A'] },
-            { name: 'Surat Pengantar - SP PAD', path: '/operasional/hrd', roles: ['S', 'A'] },
+            { name: 'Surat Pengantar - SP PAD', path: '/operasional/surat-pengantar-sp-padx`', roles: ['S', 'A'] },
             { name: 'Surat Pengantar - Turun`', path: '/operasional/surat-pengantar-turun', roles: ['S', 'A'] },
           ]
         },
@@ -392,73 +460,129 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
                     const hasSubChildren = child.children && child.children.length > 0;
                     const isSubOpen = openMenus[child.name];
 
+                    // 🛑 JIKA LEVEL 2 ADALAH TOMBOL INTERSEPT POP-UP POLOS (Kunci Utama!)
+                    if (child.path && child.path.includes('#print-btt')) {
+                      return (
+                        <button
+                          key={`child-btn-btt-${idx}`}
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+
+                            console.log("🔥 [INTERCEPT] Menyalakan modal BTT secara paksa!");
+                            setShowBttPrintModal(true); // 👑 Ini saklar utama penyala modal bray!
+                          }}
+                          className="w-full text-left block py-2 px-3 text-sm rounded-lg transition-all font-medium text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-sans"
+                        >
+                          {child.name}
+                        </button>
+                      );
+                    }
+
+                    // 🚨 INTERSEPT 3: LOGIKA PENCEGATAN MENU CETAK BARCODE KOLI MURNI
+                    if (child.path && child.path.includes('#print-barcode')) {
+                      return (
+                        <button
+                          key={`child-btn-barcode-${idx}`}
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+
+                            console.log("🔥 [INTERCEPT] Menyalakan modal Barcode Koli secara paksa!");
+                            setShowBarcodePrintModal(true); // 👑 Nyalakan saklar modal barcode!
+                          }}
+                          className="w-full text-left block py-2 px-3 text-sm rounded-lg transition-all font-medium text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-sans"
+                        >
+                          {child.name}
+                        </button>
+                      );
+                    }
+
                     return (
-                      <div key={idx} className="flex flex-col">
+                      <div key={`child-group-${idx}`} className="flex flex-col">
                         {hasSubChildren ? (
-                          // Render Label untuk Sub-Sub-Menu (Level 2 yang punya anak)
+                          /* =========================================================================
+                             📂 LEVEL 2 YANG MEMILIKI ANAK LAGI (Contoh: Surat Pengantar)
+                             ========================================================================= */
                           <>
                             <div
                               onClick={(e) => {
-                                e.stopPropagation(); // Biar kliknya nggak nembus ke Master Data
+                                e.stopPropagation();
                                 toggleMenu(child.name, 2);
                               }}
                               className={`flex items-center justify-between py-2 px-3 text-sm rounded-lg cursor-pointer transition-all font-medium
-                              ${isSubOpen
+                ${isSubOpen
                                   ? (isDarkMode ? 'text-indigo-400 font-bold bg-gray-700/50' : 'text-indigo-600 font-black bg-indigo-50/50')
                                   : (isDarkMode ? 'text-gray-300 hover:text-indigo-400 hover:bg-gray-700/30' : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-50')
                                 }`}
                             >
-
                               <div className="flex items-center gap-2">
-                                {/* Render icon sub-menu kalau ada */}
                                 {child.icon ? <div className="flex-shrink-0">{child.icon}</div> : <div className="w-1.5 h-1.5 rounded-full bg-current opacity-40 ml-1" />}
                                 <span>{child.name}</span>
                               </div>
-
-                              {/* PANAH BARU UNTUK LEVEL 2 */}
                               <ChevronRight
                                 size={14}
                                 className={`transition-transform duration-200 ${isSubOpen ? 'rotate-90 text-indigo-600' : 'opacity-40'}`}
                               />
                             </div>
 
-                            {/* RENDER LEVEL 3 (Cucu) (Tarif Carter, dll) */}
+                            {/* 📂 LEVEL 3: LOOPING UTK CUCU MENU DI DALAM SUB-MENU */}
                             {isSubOpen && (
                               <div className="ml-4 mt-1 space-y-1 border-l border-dashed pl-4">
-                                {child.children.map((subChild, subIdx) => (
+                                {child.children.map((subChild, subIdx) => {
+                                  // 🔥 BERIKAN PROTEKSI INTERSEPT LEVEL 3 JIKA ADA JALUR '#' DI DALAM SUB-CHILDREN
+                                  if (subChild.path === '#') {
+                                    return (
+                                      <button
+                                        key={`sub-child-btn-${subIdx}`}
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setShowPrintModal(true); // Amankan pemicu modal pop-up dari dalam grup!
+                                        }}
+                                        className="w-full text-left block py-1.5 px-3 text-[13px] rounded-md transition-all font-medium text-slate-600 hover:text-indigo-600 hover:bg-slate-100 font-sans"
+                                      >
+                                        {subChild.name}
+                                      </button>
+                                    );
+                                  }
 
-                                  <NavLink
-                                    key={subIdx}
-                                    to={subChild.path}
-                                    className={({ isActive }) => `
-                                      block py-1.5 px-3 text-[13px] rounded-md transition-all font-medium
-                                      ${isActive
-                                        ? (isDarkMode ? 'text-indigo-400 bg-gray-700/60 font-bold' : 'text-indigo-600 bg-indigo-50/60 font-black')
-                                        : (isDarkMode ? 'text-gray-300 hover:text-indigo-400 hover:bg-gray-700/30' : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-100')
-                                      }
-                                    `}
-                                  >
-
-
-                                    {subChild.name}
-                                  </NavLink>
-                                ))}
+                                  return (
+                                    <NavLink
+                                      key={`sub-child-nav-${subIdx}`}
+                                      to={subChild.path}
+                                      className={({ isActive }) => `
+                          block py-1.5 px-3 text-[13px] rounded-md transition-all font-medium
+                          ${isActive
+                                          ? (isDarkMode ? 'text-indigo-400 bg-gray-700/60 font-bold' : 'text-indigo-600 bg-indigo-50/60 font-black')
+                                          : (isDarkMode ? 'text-gray-300 hover:text-indigo-400 hover:bg-gray-700/30' : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-100')
+                                        }
+                        `}
+                                    >
+                                      {subChild.name}
+                                    </NavLink>
+                                  );
+                                })}
                               </div>
                             )}
                           </>
                         ) : (
-                          // Render NavLink biasa (Level 2 standar)
+                          /* =========================================================================
+                             🔗 LEVEL 2 STANDAR (NavLink Biasa Tanpa Anak)
+                             ========================================================================= */
                           <NavLink
                             to={child.path}
                             className={({ isActive }) => `
-                      block py-2 px-3 text-sm rounded-lg transition-all font-medium
-                      ${isActive
+                block py-2 px-3 text-sm rounded-lg transition-all font-medium
+                ${isActive
                                 ? (isDarkMode ? 'text-indigo-400 font-bold bg-gray-700/60' : 'text-indigo-600 font-black bg-indigo-50')
                                 : (isDarkMode ? 'text-gray-300 hover:text-indigo-400 hover:bg-gray-700/30' : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-50')
                               } 
-                    `} // 🎯 REVISI SAKTI: text-slate-400 dinaikkan ke text-slate-600 (jauh lebih gelap & terbaca!)
+              `}
                           >
-
                             {child.name}
                           </NavLink>
                         )}
@@ -467,16 +591,14 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
                   })}
                 </div>
               )}
-
-
               {/* END RENDER CHILD MENU (Level 2 & Level 3) */}
             </div> // Penutup <div key={index}>
           ); // Penutup return
         })}
-      </nav>
+      </nav >
 
       {/* User Profile Section */}
-      <div className={`p-4 border-t transition-colors ${isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-slate-50/50 border-gray-100'}`}>
+      < div className={`p-4 border-t transition-colors ${isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-slate-50/50 border-gray-100'}`}>
         <NavLink to="/account" className="no-underline">
           {({ isActive }) => (
             <div className={`flex items-center gap-3 rounded-2xl border transition-all p-2
@@ -524,14 +646,200 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
             </div>
           )}
         </NavLink>
-      </div>
+      </div >
+
+      {/* =========================================================================
+          🏙️ MODAL POP-UP QUICK SCANNER PRINTER MANIFEST SP (LIGHT MODE HIGH QUALITY)
+          ========================================================================= */}
+      {
+        showPrintModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden border border-gray-100 p-6 flex flex-col relative">
+
+              {/* Tombol Close Silang */}
+              <button
+                onClick={() => { setShowPrintModal(false); setModalNoSP(''); }}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 font-bold text-sm"
+              >
+                ✕
+              </button>
+
+              <div className="text-center mb-5">
+                <span className="bg-blue-600 text-white px-5 py-1.5 font-black text-xs rounded shadow-sm tracking-widest uppercase">
+                  QUICK PRINT SCANNER SP
+                </span>
+              </div>
+
+              <form onSubmit={executeQuickPrint} className="space-y-4 text-xs font-semibold">
+                <div className="space-y-2">
+                  <label className="block text-gray-400 uppercase tracking-wider text-[11px] font-bold text-center">
+                    Tembak Barcode / Input Nomor SP:
+                  </label>
+                  <input
+                    ref={printInputRef}
+                    type="text"
+                    maxLength={15}
+                    placeholder="BZZZTT! Scan Barcode..."
+                    value={modalNoSP}
+                    onChange={(e) => setModalNoSP(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && executeQuickPrint()}
+                    className="w-full p-3 border border-gray-300 rounded-xl bg-transparent outline-none uppercase font-black text-center text-sm tracking-widest text-blue-600 focus:border-blue-500 shadow-inner"
+                  />
+                  <p className="text-[9px] text-gray-400 italic text-center leading-relaxed">
+                    Sistem otomatis membuka tab cetak baru tanpa menutup dashboard kerja aktif lu.
+                  </p>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => { setShowPrintModal(false); setModalNoSP(''); }}
+                    className="w-1/3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition uppercase tracking-wider text-[10px]"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="w-2/3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow transition uppercase tracking-wider text-[10px]"
+                  >
+                    Cetak Nota SP
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )
+      }
+
+      {/* =========================================================================
+          🏙️ MODAL 2: KONFIRMASI CETAK RESI BTT MARKETING (PERSIS IMAGE_DBBD6B.PNG)
+          ========================================================================= */}
+      {showBttPrintModal && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-gray-100 p-7 flex flex-col font-sans tracking-normal text-xs font-semibold text-slate-700">
+
+            {/* Judul Modal Tegas */}
+            <div className="text-center mb-5 border-b border-gray-100 pb-3">
+              <h3 className="text-slate-900 font-black text-sm uppercase tracking-wider">
+                KONFIRMASI CETAK RESI
+              </h3>
+            </div>
+
+            <form onSubmit={executeQuickPrintBTT} className="space-y-4">
+              <div className="flex flex-col gap-2 text-center">
+                <label className="text-gray-400 text-[10px] uppercase font-bold tracking-widest">
+                  NOMOR RESI / BTT TERDETEKSI:
+                </label>
+
+                {/* Input Box yang Aktif & Bisa Diketik / Scan Laser Barcode */}
+                <input
+                  ref={bttInputRef}
+                  type="text"
+                  placeholder="Ketik / Scan Nomor BTT di sini..."
+                  value={modalNoBTT}
+                  onChange={(e) => setModalNoBTT(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && executeQuickPrintBTT()}
+                  className="w-full p-3 border border-blue-200 rounded-xl bg-blue-50/30 text-center font-black text-blue-600 text-sm tracking-widest uppercase outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all shadow-inner"
+                />
+
+                <p className="text-[10px] text-gray-400 font-normal italic leading-relaxed px-4 mt-1">
+                  Pastikan kertas thermal printer kasir counter Dakota sudah terpasang rapi sebelum menekan tombol print.
+                </p>
+              </div>
+
+              {/* Action Button: CANCEL & PRINT NOW */}
+              <div className="flex gap-3 pt-3 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBttPrintModal(false);
+                    setModalNoBTT('');
+                  }}
+                  className="w-1/3 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-500 font-bold rounded-xl transition uppercase tracking-wider shadow-sm"
+                >
+                  CANCEL
+                </button>
+                <button
+                  type="submit"
+                  className="w-2/3 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition uppercase tracking-wider flex items-center justify-center gap-1.5"
+                >
+                  🖨️ PRINT NOW
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          🏙️ MODAL 3: KONFIRMASI CETAK BARCODE KOLI (KEMBAR SIAM PREMIUM STYLE)
+          ========================================================================= */}
+      {showBarcodePrintModal && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-gray-100 p-7 flex flex-col font-sans tracking-normal text-xs font-semibold text-slate-700">
+
+            {/* Judul Modal Sesuai Mandat, Master! */}
+            <div className="text-center mb-5 border-b border-gray-100 pb-3">
+              <h3 className="text-slate-900 font-black text-sm uppercase tracking-wider">
+                CETAK BARCODE KOLI
+              </h3>
+            </div>
+
+            <form onSubmit={executeQuickPrintBarcode} className="space-y-4">
+              <div className="flex flex-col gap-2 text-center">
+                <label className="text-gray-400 text-[10px] uppercase font-bold tracking-widest">
+                  NOMOR RESI / BTT TERDETEKSI:
+                </label>
+
+                {/* Input Box Laser Scanner Koli */}
+                <input
+                  ref={barcodeInputRef}
+                  type="text"
+                  placeholder="Ketik / Scan Nomor BTT di sini..."
+                  value={modalNoBarcode}
+                  onChange={(e) => setModalNoBarcode(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && executeQuickPrintBarcode()}
+                  className="w-full p-3 border border-blue-200 rounded-xl bg-blue-50/30 text-center font-black text-blue-600 text-sm tracking-widest uppercase outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all shadow-inner"
+                />
+
+                <p className="text-[10px] text-gray-400 font-normal italic leading-relaxed px-4 mt-1">
+                  Pastikan kertas thermal printer kasir counter Dakota sudah terpasang rapi sebelum menekan tombol print.
+                </p>
+              </div>
+
+              {/* Action Button */}
+              <div className="flex gap-3 pt-3 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBarcodePrintModal(false);
+                    setModalNoBarcode('');
+                  }}
+                  className="w-1/3 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-500 font-bold rounded-xl transition uppercase tracking-wider shadow-sm"
+                >
+                  CANCEL
+                </button>
+                <button
+                  type="submit"
+                  className="w-2/3 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition uppercase tracking-wider flex items-center justify-center gap-1.5"
+                >
+                  🖨️ PRINT NOW
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
       {/* MODAL HARUS DI LUAR DIV SIDEBAR TAPI MASIH DI DALAM RETURN UTAMA */}
       <LogoutModal
         isOpen={showLogoutModal}
         onClose={() => setShowLogoutModal(false)}
         onConfirm={handleConfirmLogout}
       />
-    </div>
+    </div >
   );
 };
 

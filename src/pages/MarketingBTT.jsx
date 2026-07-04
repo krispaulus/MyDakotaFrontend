@@ -17,34 +17,27 @@ const MarketingBTT = () => {
     const [selectedKecamatan, setSelectedKecamatan] = useState('');
     const [kodePosTujuan, setKodePosTujuan] = useState('');
     const token = localStorage.getItem('token');
+    const [showBttPrintModal, setShowBttPrintModal] = useState(false);
+    const [modalNoBTT, setModalNoBTT] = useState('');
+    const bttInputRef = React.useRef(null);
 
+    useEffect(() => {
+        if (showBttPrintModal && bttInputRef.current) {
+            setTimeout(() => bttInputRef.current.focus(), 100);
+        }
+    }, [showBttPrintModal]);
 
-    // useEffect(() => {
-    //     if (token) {
-    //         setLoading(true);
-    //         fetch('http://localhost:8080/api/marketing/btt', {
-    //             method: 'GET',
-    //             headers: {
-    //                 'Authorization': `Bearer ${token}`,
-    //                 'Content-Type': 'application/json'
-    //             }
-    //         })
-    //             .then(res => res.json())
-    //             .then(resData => {
-    //                 // Sesuaikan jika response backend kamu dibungkus objek lagi
-    //                 if (Array.isArray(resData)) {
-    //                     setData(resData);
-    //                 } else if (resData && Array.isArray(resData.data)) {
-    //                     setData(resData.data);
-    //                 }
-    //                 setLoading(false);
-    //             })
-    //             .catch(err => {
-    //                 console.error("Gagal load list BTT:", err);
-    //                 setLoading(false);
-    //             });
-    //     }
-    // }, [token]);
+    const executeQuickPrintBTT = (e) => {
+        if (e) e.preventDefault();
+        if (!modalNoBTT.trim()) return;
+
+        // 🚀 Buka tab baru murni langsung mengarah ke halaman cetak nota rangkap 3 bawaan Go lu!
+        window.open(`/marketing/btt/print?id=${modalNoBTT.trim().toUpperCase()}`, '_blank');
+
+        // Bersihkan state dan tutup modal
+        setShowBttPrintModal(false);
+        setModalNoBTT('');
+    };
 
     const columns = [
         { header: 'NO. BTT', accessor: 'id' },

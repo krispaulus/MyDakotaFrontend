@@ -22,10 +22,15 @@ import BttClosingHarianDashboard from './components/organisms/BttClosingHarianDa
 import MasterAreaLoper from './pages/MasterAreaLoper';
 import SuratPengantarPengiriman from './pages/SuratPengantarPengiriman';
 import SuratPengantarTurun from './pages/SuratPengantarTurun';
-
+import Loper from './pages/SuratLoper';
+import SuratKembaliBTT from './pages/SuratKembaliBTT';
+import SuratPengantarPrint from './pages/SuratPengantarPrint';
+import SuratPengantarPAD from './pages/SuratPengantarPAD';
+import MarketingBDB from './pages/MarketingBDB';
+import MarketingMonitoringBTT from './pages/MarketingMonitoringBTT';
 
 const getCompanyName = (pt) => {
-  if (pt === 'A') return 'Dakota Buana Sarana';
+  if (pt === 'A') return 'Dakota Buana Sarana'; ``
   if (pt === 'B') return 'Dakota Lintas Buana';
   if (pt === 'C') return 'Dakota Logistik Indonesia';
   return pt;
@@ -450,13 +455,13 @@ function App() {
         }
       />
 
-      <Route path="/marketing/dashboard"
+      {/* <Route path="/marketing/dashboard"
         element={
           <MainLayout>
             <UnderConstruction menuName="Marketing" />
           </MainLayout>
         }
-      />
+      /> */}
 
       <Route path="/marketing/master-customer"
         element={
@@ -474,12 +479,28 @@ function App() {
         }
       />
 
-      <Route path="/marketing/btt/print" element={<BttPrintPage />} />
+      {/* <Route path="/marketing/btt/print" element={<BttPrintPage />} /> */}
 
       <Route path="/marketing/bdb"
         element={
           <MainLayout>
-            <UnderConstruction />
+            <MarketingBDB />
+          </MainLayout>
+        }
+      />
+
+      <Route path="/marketing/cetak-btt"
+        element={
+          <MainLayout>
+            <MarketingBTT />
+          </MainLayout>
+        }
+      />
+
+      <Route path="/marketing/monitoring-btt"
+        element={
+          <MainLayout>
+            <MarketingMonitoringBTT />
           </MainLayout>
         }
       />
@@ -502,7 +523,6 @@ function App() {
         }
       />
 
-
       <Route path="/operasional"
         element={
           <MainLayout>
@@ -510,6 +530,21 @@ function App() {
           </MainLayout>
         }
       />
+
+      <Route path="/operasional/pengembalian"
+        element={
+          <MainLayout>
+            <SuratKembaliBTT />
+          </MainLayout>
+        }
+      />
+
+      <Route path="/operasional/sp-terima/print-nota/:id"
+        element={
+          <SuratPengantarPrint />
+        }
+      />
+
       <Route path="/operasional/surat-pengantar-pengiriman"
         element={
           <MainLayout>
@@ -517,10 +552,34 @@ function App() {
           </MainLayout>
         }
       />
+
+      <Route path="/operasional/surat-pengantar-sp-pad"
+        element={
+          <MainLayout>
+            <SuratPengantarPAD />
+          </MainLayout>
+        }
+      />
+
+      <Route path="/operasional/surat-kembali-btt"
+        element={
+          <MainLayout>
+            <SuratKembaliBTT />
+          </MainLayout>
+        }
+      />
+
       <Route path="/operasional/surat-pengantar-turun"
         element={
           <MainLayout>
             <SuratPengantarTurun />
+          </MainLayout>
+        }
+      />
+      <Route path="/operasional/loper"
+        element={
+          <MainLayout>
+            <Loper />
           </MainLayout>
         }
       />
