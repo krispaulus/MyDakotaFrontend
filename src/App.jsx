@@ -123,23 +123,44 @@ function LoginPage() {
 
       const response = await api.post('/login', loginPayload)
       console.log("✅ [Frontend] Berhasil!", response.data);
+
+      // =========================================================================
+      // 👑 PROSES LOCK & PENYIMPANAN AGEN ID YANG BERSIH DAN ANTI-OVERWRITE
+      // =========================================================================
+      if (response.data.user && response.data.user.agent_code) {
+        localStorage.setItem('active_agen_id', response.data.user.agent_code);
+        console.log("🔥 Menyimpan active_agen_id dari agent_code:", response.data.user.agent_code);
+      } else if (response.data.user && response.data.user.agen_id) {
+        localStorage.setItem('active_agen_id', response.data.user.agen_id);
+      } else if (response.data.user && response.data.user.AgenID) {
+        localStorage.setItem('active_agen_id', response.data.user.AgenID);
+      } else {
+        localStorage.setItem('active_agen_id', 'PUSAT DAKOTA');
+      }
+
+      // 👑 PROSES PENYIMPANAN CABANG ID
+      if (response.data.user && response.data.user.agen_cabangid) {
+        localStorage.setItem('active_cabang_id', response.data.user.agen_cabangid);
+      } else if (response.data.user && response.data.user.AgenCabangID) {
+        localStorage.setItem('active_cabang_id', response.data.user.AgenCabangID);
+      }
+
+      // KUNCI SISA DATA TOKEN & PROFILE USER
       localStorage.setItem('token', response.data.token)
       localStorage.setItem('user_name', response.data.user.real_name)
       localStorage.setItem('selected_pt', selectedPT)
       localStorage.setItem('pt_ID', selectedPT)
-      // Contoh saat handling sukses login di App.jsx lu kemarin:
-      localStorage.setItem('active_agen_id', response.data.user.agen_id);
-      localStorage.setItem('active_cabang_id', response.data.user.agen_cabangid); // 🚀 Simpan ini dari database glb_m_agen
-      console.log("🔥 selected_pt disimpan:", selectedPT)
-      console.log("🔥 pt_ID disimpan:", selectedPT)
+
+      console.log("🔥 Data PT & Agen berhasil dikunci di LocalStorage!");
       window.dispatchEvent(new Event('pt_changed'))
 
-      // Sukses login -> hapus hukuman
+      // Hapus hukuman percobaan login
       localStorage.removeItem('failedAttempts');
       localStorage.removeItem('lockedUntil');
       localStorage.removeItem('isBlocked');
 
       navigate('/dashboard')
+
     } catch (error) {
       console.error("%c❌ [Frontend] Login GAGAL!", "color: #FF0000; font-weight: bold;");
       console.error("Error Status:", error.response?.status);
@@ -479,7 +500,7 @@ function App() {
         }
       />
 
-      {/* <Route path="/marketing/btt/print" element={<BttPrintPage />} /> */}
+      <Route path="/marketing/btt/print" element={<BttPrintPage />} />
 
       <Route path="/marketing/bdb"
         element={

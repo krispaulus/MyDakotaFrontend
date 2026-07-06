@@ -145,7 +145,7 @@ const MarketingMonitoringBTT = () => {
     ];
 
     return (
-        <div className="p-6 space-y-6 bg-slate-50 min-h-screen text-xs font-semibold text-slate-700 antialiased font-sans">
+        <div className="p-6 space-y-4 bg-slate-50 min-h-screen text-xs font-semibold text-slate-700 antialiased font-sans">
 
             {/* HEADER UTAMA */}
             <div className="flex items-center justify-between border-b border-gray-200 pb-4">
@@ -190,117 +190,156 @@ const MarketingMonitoringBTT = () => {
             </div>
 
             {/* =========================================================================
-                🏙️ 1. BARIS KONTROL UTAMA (TOMBOL FILTER BERDIRI BEBAS DI LUAR GERBANG)
+                👑 PUSAT KENDALI LAYOUT CUSTOM KOTAK TABEL + FLOATING FILTER (MATCH REVOLUSI VISUAL)
                 ========================================================================= */}
-            <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
-                <div className="flex items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
-                        className={`px-4 py-2 border rounded-xl font-bold flex items-center gap-2 transition-all shadow-sm ${showAdvancedFilter
-                            ? 'bg-blue-600 border-blue-600 text-white hover:bg-blue-700'
-                            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-                            }`}
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
-                        {showAdvancedFilter ? 'TUTUP PANEL FILTER' : 'BUKA PANEL FILTER'}
-                    </button>
-                </div>
+            <div className="bg-white p-5 pt-4 rounded-2xl border border-gray-200 shadow-sm transition-all duration-300 relative">
 
-                <button
-                    type="button"
-                    onClick={handleExportExcel}
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-gray-200 font-bold rounded-xl shadow-sm uppercase tracking-wider transition flex items-center gap-1.5"
-                >
-                    <FileSpreadsheet size={14} className="text-emerald-600" /> Export To Excel
-                </button>
-            </div>
+                {/* BARIS JUDUL + AKSI TOMBOL (PERSIS SEPERTI GAMBAR 1 & 2 LU) */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                    <div className="flex items-center gap-3 flex-wrap">
+                        <h2 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                            TABEL LOGISTIK TRACKING MONITORING
+                        </h2>
 
-            {/* =========================================================================
-                🏙️ 2. ADVANCED FILTER PANEL (AKAN DIKENDALIKAN PENUH OLEH TOMBOL DI ATAS)
-                ========================================================================= */}
-            {showAdvancedFilter && (
-                <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-5 animate-in slide-in-from-top-4 duration-200">
+                        {/* 🔘 TOMBOL PICU FILTER (DENGAN REFRESH TOGGLE LOGIC) */}
+                        <button
+                            type="button"
+                            onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
+                            className={`px-3 py-1.5 border rounded-xl text-[9px] font-black tracking-wide uppercase flex items-center gap-1.5 transition-all shadow-sm ${showAdvancedFilter
+                                ? 'bg-blue-600 border-blue-600 text-white'
+                                : 'bg-slate-50 border-gray-200 text-gray-600 hover:bg-slate-100'
+                                }`}
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+                            {showAdvancedFilter ? 'TUTUP PANEL FILTER' : 'BUKA PANEL FILTER'}
+                        </button>
 
-                    {/* BARIS 1: TANGGAL, SAMPAI, CUSTOMER, NO BTT, PACKAGEID */}
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                        <div className="flex flex-col gap-1.5">
-                            <div className="flex items-center gap-1.5"><input type="checkbox" checked={chkTanggal} onChange={(e) => setChkTanggal(e.target.checked)} id="tgl" className="rounded text-blue-600" /><label htmlFor="tgl" className="uppercase font-bold tracking-wider text-[10px]">1. Tanggal</label></div>
-                            <input type="date" value={tanggalStart} onChange={(e) => setTanggalStart(e.target.value)} disabled={!chkTanggal} className="w-full p-2 border border-gray-200 rounded-xl bg-slate-50 font-bold outline-none disabled:opacity-50 text-center" />
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <label className="uppercase font-bold tracking-wider text-[10px] pl-5">2. Sampai</label>
-                            <input type="date" value={tanggalEnd} onChange={(e) => setTanggalEnd(e.target.value)} disabled={!chkTanggal} className="w-full p-2 border border-gray-200 rounded-xl bg-slate-50 font-bold outline-none disabled:opacity-50 text-center" />
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <div className="flex items-center gap-1.5"><input type="checkbox" checked={chkCustomer} onChange={(e) => setChkCustomer(e.target.checked)} id="cust" className="rounded text-blue-600" /><label htmlFor="cust" className="uppercase font-bold tracking-wider text-[10px]">3. Customer</label></div>
-                            <input type="text" placeholder="Nama Customer" value={customerName} onChange={(e) => setCustomerName(e.target.value)} disabled={!chkCustomer} className="w-full p-2 border border-gray-200 rounded-xl bg-slate-50 font-bold outline-none disabled:opacity-50 px-3" />
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <div className="flex items-center gap-1.5"><input type="checkbox" checked={chkBtt} onChange={(e) => setChkBtt(e.target.checked)} id="nobtt" className="rounded text-blue-600" /><label htmlFor="nobtt" className="uppercase font-bold tracking-wider text-[10px]">4. No. BTT</label></div>
-                            <input type="text" placeholder="No BTT" value={noBtt} onChange={(e) => setNoBtt(e.target.value)} disabled={!chkBtt} className="w-full p-2 border border-gray-200 rounded-xl bg-slate-50 font-bold outline-none disabled:opacity-50 px-3" />
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <div className="flex items-center gap-1.5"><input type="checkbox" checked={chkPackage} onChange={(e) => setChkPackage(e.target.checked)} id="pkg" className="rounded text-blue-600" /><label htmlFor="pkg" className="uppercase font-bold tracking-wider text-[10px]">5. PackageID</label></div>
-                            <input type="text" placeholder="PackageID" value={packageId} onChange={(e) => setPackageId(e.target.value)} disabled={!chkPackage} className="w-full p-2 border border-gray-200 rounded-xl bg-slate-50 font-bold outline-none disabled:opacity-50 px-3" />
-                        </div>
-                    </div>
-
-                    {/* BARIS 2: LAYANAN, KOTA TUJUAN, STATUS PENGIRIMAN, AGEN CABANG ASAL */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div className="flex flex-col gap-1.5">
-                            <div className="flex items-center gap-1.5"><input type="checkbox" checked={chkLayanan} onChange={(e) => setChkLayanan(e.target.checked)} id="lay" className="rounded text-blue-600" /><label htmlFor="lay" className="uppercase font-bold tracking-wider text-[10px]">6. Layanan</label></div>
-                            <select value={layanan} onChange={(e) => setLayanan(e.target.value)} disabled={!chkLayanan} className="w-full p-2 border border-gray-200 rounded-xl bg-slate-50 font-bold outline-none disabled:opacity-50">
-                                <option value="K">KURIR</option>
-                                <option value="R">REGULER</option>
-                            </select>
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <div className="flex items-center gap-1.5"><input type="checkbox" checked={chkKota} onChange={(e) => setChkKota(e.target.checked)} id="kt" className="rounded text-blue-600" /><label htmlFor="kt" className="uppercase font-bold tracking-wider text-[10px]">7. Kota Tujuan</label></div>
-                            <select value={kotaTujuan} onChange={(e) => setKotaTujuan(e.target.value)} disabled={!chkKota} className="w-full p-2 border border-gray-200 rounded-xl bg-slate-50 font-bold outline-none disabled:opacity-50">
-                                {listKota.map((k, i) => <option key={i} value={k}>{k}</option>)}
-                            </select>
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <div className="flex items-center gap-1.5"><input type="checkbox" checked={chkStatus} onChange={(e) => setChkStatus(e.target.checked)} id="st" className="rounded text-blue-600" /><label htmlFor="st" className="uppercase font-bold tracking-wider text-[10px]">8. Status Pengiriman</label></div>
-                            <select value={statusPengiriman} onChange={(e) => setStatusPengiriman(e.target.value)} disabled={!chkStatus} className="w-full p-2 border border-gray-200 rounded-xl bg-slate-50 font-bold outline-none disabled:opacity-50">
-                                <option value="Diterima">Diterima</option>
-                                <option value="Gagal Diantar">Gagal Diantar</option>
-                                <option value="Dalam Proses">Dalam Proses</option>
-                                <option value="Belum Diberangkatkan">Belum Diberangkatkan</option>
-                            </select>
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <label className="uppercase font-bold tracking-wider text-[10px] text-gray-400">9. Agen / Cabang Asal</label>
-                            <select value={cbasal} onChange={(e) => setCbasal(e.target.value)} className="w-full p-2 border border-yellow-300 rounded-xl bg-yellow-50/50 font-black text-slate-800 outline-none shadow-sm">
-                                {listCabang.map((c, i) => <option key={i} value={c.id}>{c.name}</option>)}
-                            </select>
-                        </div>
-                    </div>
-
-                    {/* BUTTON ACTIONS REFRESH GREEN */}
-                    <div className="border-t border-gray-100 pt-4">
-                        <button type="button" onClick={fetchMonitoringData} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow-md uppercase tracking-wider transition flex items-center gap-2">
-                            <RefreshCw size={14} /> REFRESH
+                        {/* 🔘 TOMBOL EXPORT TO EXCEL */}
+                        <button
+                            type="button"
+                            onClick={handleExportExcel}
+                            className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-[9px] font-black tracking-wide uppercase flex items-center gap-1 transition shadow-sm"
+                        >
+                            <FileSpreadsheet size={11} className="text-emerald-600" /> EXPORT TO EXCEL
                         </button>
                     </div>
                 </div>
-            )}
 
-            {/* BOX UTAMA KOTAK PREMIUM TABEL */}
-            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm overflow-hidden transition-all duration-300 [&_button]:!hidden">
-                <DataTableTemplate
-                    title="TABEL LOGISTIK TRACKING MONITORING"
-                    columns={columns}
-                    data={data}
-                    loading={loading}
-                    isDarkMode={isDarkMode}
-                    showAdd={false}
-                    onAdd={null}
-                    onEdit={null}
-                    onDelete={null}
-                    actionMode="none"
-                />
+                {/* =========================================================================
+                    🏙️ FLOATING FILTER PANEL MENUJU IMAGE_67302a.jpg (MELAYANG DI ATAS DATA TABEL)
+                    ========================================================================= */}
+                {showAdvancedFilter && (
+                    <div className="absolute left-5 right-5 top-[52px] z-[50] bg-white p-5 rounded-2xl border border-slate-200 shadow-xl space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+
+                        {/* BARIS SAKTI 1: TANGGAL, SAMPAI, CUSTOMER, NO BTT, PACKAGEID */}
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 text-[10px]">
+                            <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-1.5">
+                                    <input type="checkbox" checked={chkTanggal} onChange={(e) => setChkTanggal(e.target.checked)} id="tgl" className="rounded text-blue-600 focus:ring-0 w-3 h-3" />
+                                    <label htmlFor="tgl" className="uppercase font-bold tracking-wider text-[9px] text-slate-700">1. Tanggal</label>
+                                </div>
+                                <input type="date" value={tanggalStart} onChange={(e) => setTanggalStart(e.target.value)} disabled={!chkTanggal} className="w-full p-2 border border-gray-200 rounded-xl bg-slate-50 font-bold outline-none disabled:opacity-50 text-center" />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="uppercase font-bold tracking-wider text-[9px] text-slate-400 pl-4">2. Sampai</label>
+                                <input type="date" value={tanggalEnd} onChange={(e) => setTanggalEnd(e.target.value)} disabled={!chkTanggal} className="w-full p-2 border border-gray-200 rounded-xl bg-slate-50 font-bold outline-none disabled:opacity-50 text-center" />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-1.5">
+                                    <input type="checkbox" checked={chkCustomer} onChange={(e) => setChkCustomer(e.target.checked)} id="cust" className="rounded text-blue-600 focus:ring-0 w-3 h-3" />
+                                    <label htmlFor="cust" className="uppercase font-bold tracking-wider text-[9px] text-slate-700">3. Customer</label>
+                                </div>
+                                <input type="text" placeholder="Nama Customer" value={customerName} onChange={(e) => setCustomerName(e.target.value)} disabled={!chkCustomer} className="w-full p-2 border border-gray-200 rounded-xl bg-slate-50 font-bold outline-none disabled:opacity-50 px-3" />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-1.5">
+                                    <input type="checkbox" checked={chkBtt} onChange={(e) => setChkBtt(e.target.checked)} id="nobtt" className="rounded text-blue-600 focus:ring-0 w-3 h-3" />
+                                    <label htmlFor="nobtt" className="uppercase font-bold tracking-wider text-[9px] text-slate-700">4. No. BTT</label>
+                                </div>
+                                <input type="text" placeholder="No BTT" value={noBtt} onChange={(e) => setNoBtt(e.target.value)} disabled={!chkBtt} className="w-full p-2 border border-gray-200 rounded-xl bg-slate-50 font-bold outline-none disabled:opacity-50 px-3" />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-1.5">
+                                    <input type="checkbox" checked={chkPackage} onChange={(e) => setChkPackage(e.target.checked)} id="pkg" className="rounded text-blue-600 focus:ring-0 w-3 h-3" />
+                                    <label htmlFor="pkg" className="uppercase font-bold tracking-wider text-[9px] text-slate-700">5. PackageID</label>
+                                </div>
+                                <input type="text" placeholder="PackageID" value={packageId} onChange={(e) => setPackageId(e.target.value)} disabled={!chkPackage} className="w-full p-2 border border-gray-200 rounded-xl bg-slate-50 font-bold outline-none disabled:opacity-50 px-3" />
+                            </div>
+                        </div>
+
+                        {/* BARIS SAKTI 2: LAYANAN, KOTA TUJUAN, STATUS PENGIRIMAN, AGEN CABANG ASAL */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-[10px]">
+                            <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-1.5">
+                                    <input type="checkbox" checked={chkLayanan} onChange={(e) => setChkLayanan(e.target.checked)} id="lay" className="rounded text-blue-600 focus:ring-0 w-3 h-3" />
+                                    <label htmlFor="lay" className="uppercase font-bold tracking-wider text-[9px] text-slate-700">6. Layanan</label>
+                                </div>
+                                <select value={layanan} onChange={(e) => setLayanan(e.target.value)} disabled={!chkLayanan} className="w-full p-2 border border-gray-200 rounded-xl bg-slate-50 font-bold outline-none disabled:opacity-50">
+                                    <option value="K">KURIR</option>
+                                    <option value="R">REGULER</option>
+                                </select>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-1.5">
+                                    <input type="checkbox" checked={chkKota} onChange={(e) => setChkKota(e.target.checked)} id="kt" className="rounded text-blue-600 focus:ring-0 w-3 h-3" />
+                                    <label htmlFor="kt" className="uppercase font-bold tracking-wider text-[9px] text-slate-700">7. Kota Tujuan</label>
+                                </div>
+                                <select value={kotaTujuan} onChange={(e) => setKotaTujuan(e.target.value)} disabled={!chkKota} className="w-full p-2 border border-gray-200 rounded-xl bg-slate-50 font-bold outline-none disabled:opacity-50">
+                                    {listKota.map((k, i) => <option key={i} value={k}>{k}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-1.5">
+                                    <input type="checkbox" checked={chkStatus} onChange={(e) => setChkStatus(e.target.checked)} id="st" className="rounded text-blue-600 focus:ring-0 w-3 h-3" />
+                                    <label htmlFor="st" className="uppercase font-bold tracking-wider text-[9px] text-slate-700">8. Status Pengiriman</label>
+                                </div>
+                                <select value={statusPengiriman} onChange={(e) => setStatusPengiriman(e.target.value)} disabled={!chkStatus} className="w-full p-2 border border-gray-200 rounded-xl bg-slate-50 font-bold outline-none disabled:opacity-50">
+                                    <option value="Diterima">Diterima</option>
+                                    <option value="Gagal Diantar">Gagal Diantar</option>
+                                    <option value="Dalam Proses">Dalam Proses</option>
+                                    <option value="Belum Diberangkatkan">Belum Diberangkatkan</option>
+                                </select>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="uppercase font-bold tracking-wider text-[9px] text-slate-400 pl-1">9. Agen / Cabang Asal</label>
+                                <select value={cbasal} onChange={(e) => setCbasal(e.target.value)} className="w-full p-2 border border-yellow-300 rounded-xl bg-yellow-50/40 font-black text-slate-800 outline-none shadow-sm">
+                                    {listCabang.map((c, i) => <option key={i} value={c.id}>{c.name}</option>)}
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* TOMBOL HIJAU REFRESH DI BAWAH UNIT FILTER */}
+                        <div className="border-t border-gray-100 pt-3 flex justify-start">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    fetchMonitoringData();
+                                    setShowAdvancedFilter(false); // Otomatis menutup panel setelah loading data bray
+                                }}
+                                className="px-5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow-md uppercase tracking-wider transition flex items-center gap-1.5 text-[10px]"
+                            >
+                                <RefreshCw size={12} /> REFRESH
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* TABEL UTAMA READ-ONLY DENGAN OVERRIDE TOTAL (KOMPRES JARAK & ANTI-ACTION) */}
+                <div className="[&_button]:!hidden [&_th:last-child]:!hidden">
+                    <DataTableTemplate
+                        title=""
+                        columns={columns}
+                        data={data}
+                        loading={loading}
+                        isDarkMode={isDarkMode}
+                        showAdd={false}
+                        onAdd={null}
+                        onEdit={null}
+                        onDelete={null}
+                        actionMode="none"
+                    />
+                </div>
+
             </div>
         </div>
     );

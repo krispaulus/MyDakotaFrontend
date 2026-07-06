@@ -195,6 +195,29 @@ const MarketingBTT = () => {
         }
     };
 
+    const fetchBttData = async () => {
+        const agenId = localStorage.getItem('active_agen_id');
+
+        // 👑 SELEWENGKAN REQUEST JIKA AGEN_ID GAIB / UNDEFINED
+        if (!agenId || agenId === 'undefined' || agenId === 'null') {
+            console.warn("⏳ [MarketingBTT] Menunda fetch karena active_agen_id belum siap / undefined.");
+            return; // Bantai proses di sini, jangan lanjut axios.get!
+        }
+
+        try {
+            setLoading(true);
+            console.log(`[Filter Agen] Memuat list BTT khusus untuk Agen ID: ${agenId}`);
+
+            // Pemanggilan API lu yang aman bray
+            const response = await api.get(`/marketing/btt?agen_id=${agenId}`);
+            setData(response.data);
+        } catch (error) {
+            console.error("❌ Gagal menarik data spesifik BTT Agen:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="relative">
             <DataTableTemplate

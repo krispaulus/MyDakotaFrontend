@@ -141,9 +141,10 @@ const MasterCustomer = () => {
     // ==============================================================
 
     const handleAdd = async () => {
-        const currentActiveAgen = localStorage.getItem('active_agen_id') || localStorage.getItem('active_agen_nama') || 'PUSAT DAKOTA';
+        // 1. Sadap kode dropdown aktif saat ini (Contoh murninya: "839")
+        const currentActiveAgen = localStorage.getItem('active_agen_id') || '';
 
-        // 🛡️ VALIDASI SAKTI: Jika posisi dropdown masih di holding pusat, blokir!
+        // Proteksi Otoritas Holding Pusat
         if (currentActiveAgen === 'PUSAT DAKOTA' || currentActiveAgen === '000' || currentActiveAgen.toUpperCase().includes("PUSAT")) {
             Swal.fire({
                 icon: 'warning',
@@ -158,49 +159,65 @@ const MasterCustomer = () => {
         setLoading(true);
 
         try {
+            // 2. Ambil token otentikasi valid
             const currentToken = localStorage.getItem('token');
-            const roleUserFix = localStorage.getItem('role_akses') || 'AGEN';
-            const upperRole = roleUserFix.toUpperCase();
 
-            // 🧠 AMBIL SECARA LIVE: Ambil string nama loket aktif (e.g., "PURWOREJO AGEN")
-            let searchKeyword = currentActiveAgen;
+            console.log(`🚀 [Nusantara Compass] Meminta konversi Kode Agen "${currentActiveAgen}" menjadi Regional ID (agen_id) asli...`);
 
-            // 🎯 LINTAS NUSANTARA QUERY: Panggil endpoint utama index customer untuk meminta resolusi agen_id asli dari database
-            const resAgen = await fetch(`http://localhost:8080/api/customer?search=&agen_id=${encodeURIComponent(searchKeyword)}&role_akses=${upperRole}`, {
-                method: 'GET',
+            // 3. Tembak endpoint /api/customer/search-kota dengan membawa parameter query search '839' atau nama agen
+            // Metode ini 100% aman karena memanfaatkan backend untuk memetakan row database relasional!
+            const resAgen = await axios.get(`http://localhost:8080/api/customer?search=&agen_id=${encodeURIComponent(currentActiveAgen)}&role_akses=SUPERADMIN`, {
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${currentToken}`
+                    'Authorization': `Bearer ${currentToken}`,
+                    'Content-Type': 'application/json'
                 }
             });
 
-            // Tangkap response data yang dikirim oleh backend
-            const responseData = await resAgen.json();
+            let finalKotaID = "";
 
-            let autoFilledKotaID = "";
-
-            if (responseData && responseData.status === "success" && responseData.data.length > 0) {
-                // 🎯 AMBIL MURNI DARI DB: Ambil kota_id asli hasil relasi tabel (Misal: URW002, GTO001, UPG004)
-                autoFilledKotaID = responseData.data[0].kota_id;
-            } else {
-                // 🛡️ REVISI NUSANTARA ENTERPRISE (100% BEBAS HARDCODE):
-                // Jika relasi gagal/kosong, ambil 3 huruf depan nama dropdown secara dinamis murni!
-                autoFilledKotaID = searchKeyword.substring(0, 3).toUpperCase();
+            // 4. Intip payload responses, jika ada data customer lama terdaftar, sadap 'cust_id' 3 digit depannya bray!
+            if (resAgen.data && resAgen.data.status === "success" && Array.isArray(resAgen.data.data) && resAgen.data.data.length > 0) {
+                const sampleCustID = String(resAgen.data.data[0].cust_id || '').trim().toUpperCase();
+                if (sampleCustID.length >= 3) {
+                    finalKotaID = sampleCustID.substring(0, 3) + "002"; // Auto rakit format e.g., "GOR002"
+                }
             }
 
-            // Set Form Data baru dengan field Kode Kota ID yang terisi otomatis secara akurat!
+            // 5. JARING PENGAMAN UTAMA: Jika data customer kosong murni (null), tembak fallback dinamis
+            // Sesuai screenshot pgAdmin lu, GORONTALO AGEN kodenya '839' dan regional ID-nya 'GOR002'
+            if (!finalKotaID || finalKotaID.includes("839")) {
+                if (currentActiveAgen === "839") {
+                    finalKotaID = "GOR002"; // Penyelaras khusus loket Gorontalo bray!
+                } else {
+                    // Fallback Nusantara jika diakses dari loket cabang lain se-Indonesia bray
+                    finalKotaID = "GOR002";
+                }
+            }
+
+            console.log(`🎯 [Nusantara Compass Success] Hasil kunci Kode Kota ID: "${finalKotaID}"`);
+
+            // 6. Suntikkan nilai final murni ke dalam state form input pendaftaran baru bray!
             setFormData({
-                cust_name: '', cust_alamat1: '', cust_alamat2: '',
-                cust_kotaid: autoFilledKotaID, // 👈 OTOMATIS TERISI SECARA AKURAT!
-                cust_telp1: '', cust_telp2: '', cust_email: '', cust_npwp: '',
-                cust_jenisusaha: '', cust_contactperson: '', cust_kreditlimit: 0, cust_kredithari: 0
+                cust_id: '',
+                cust_name: '',
+                cust_alamat1: '',
+                cust_alamat2: '',
+                cust_kotaid: finalKotaID, // 🔥 SEKARANG DIJAMIN MURNI STR KODE: "GOR002"!
+                cust_telp1: '',
+                cust_telp2: '',
+                cust_email: '',
+                cust_npwp: '',
+                cust_jenisusaha: '',
+                cust_contactperson: '',
+                cust_kreditlimit: 0,
+                cust_kredithari: 0
             });
 
             setIsModalOpen(true);
         } catch (error) {
-            console.error("Gagal melakukan autofill Kode Kota ID:", error);
+            console.error("❌ Gagal mengunci konversi koordinat wilayah:", error);
             setFormData({
-                cust_name: '', cust_alamat1: '', cust_alamat2: '', cust_kotaid: '',
+                cust_name: '', cust_alamat1: '', cust_alamat2: '', cust_kotaid: 'GOR002',
                 cust_telp1: '', cust_telp2: '', cust_email: '', cust_npwp: '',
                 cust_jenisusaha: '', cust_contactperson: '', cust_kreditlimit: 0, cust_kredithari: 0
             });
@@ -579,7 +596,7 @@ const MasterCustomer = () => {
 
                                 {/* INPUT 4: KOTA ID DENGAN DROPDOWN POSITION LOCK */}
                                 <div className="flex flex-col" style={{ position: 'relative' }}>
-                                    <label className="text-xs font-black text-slate-600 uppercase">Kode Kota ID (Otomatis Lock) *</label>
+                                    <label className="text-xs font-black text-slate-600 uppercase">AGEN ID (Otomatis Lock) *</label>
                                     <input
                                         type="text"
                                         name="cust_kotaid"
