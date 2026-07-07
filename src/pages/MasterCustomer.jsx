@@ -151,8 +151,10 @@ const MasterCustomer = () => {
     // ==============================================================
 
     const handleAdd = async () => {
-        // 1. Sadap kode dropdown aktif saat ini (Contoh murninya: "839")
+        // 1. Sadap kode dropdown aktif saat ini (Contoh murninya: "839" atau nama agen)
         const currentActiveAgen = localStorage.getItem('active_agen_id') || '';
+        // 👑 SOLUSI SAKTI: Ambil nama agen secara live dari localStorage agar tidak memicu ReferenceError!
+        const currentActiveAgenName = localStorage.getItem('active_agen_nama') || '';
 
         // Proteksi Otoritas Holding Pusat
         if (currentActiveAgen === 'PUSAT DAKOTA' || currentActiveAgen === '000' || currentActiveAgen.toUpperCase().includes("PUSAT")) {
@@ -172,34 +174,45 @@ const MasterCustomer = () => {
             // 2. Ambil token otentikasi valid
             const currentToken = localStorage.getItem('token');
 
+            // Nilai currentActiveAgenName sekarang sudah dijamin terdefinisi dengan aman bray!
             let searchKeyword = String(currentActiveAgenName).trim();
             if (searchKeyword.toUpperCase().endsWith(" AGEN")) {
                 searchKeyword = searchKeyword.substring(0, searchKeyword.toUpperCase().lastIndexOf(" AGEN")).trim();
             }
 
-            console.log(`🚀 [Nusantara Compass] Meminta konversi Kode Agen "${currentActiveAgen}" menjadi Regional ID (agen_id) asli...`);
-            console.log(`🚀 [Nusantara SQL Engine] Mencari agen_id via ILIKE '%${searchKeyword}%' sesuai skema pgAdmin...`);
-
-            // 3. Tembak endpoint /api/customer/search-kota dengan membawa parameter query search '839' atau nama agen
-            // Metode ini 100% aman karena memanfaatkan backend untuk memetakan row database relasional!
-            const responseProfil = await api.get(`/api/agens/detail-name/${encodeURIComponent(searchKeyword)}`, {
-                headers: {
-                    'Authorization': `Bearer ${currentToken}`
-                }
-            });
-
-            const resData = responseProfil.data;
-
             let finalKotaID = "";
 
-            // 4. AMBIL KOLOM AGEN_ID MURNI LANGSUNG DARI POSTGRESQL!
-            if (resData && resData.status === "success" && resData.data && resData.data.agen_id) {
-                // ✅ BERHASIL: Menyadap nilai "GOR002" langsung dari hasil Query SQL ILIKE!
-                finalKotaID = String(resData.data.agen_id).trim().toUpperCase();
-                console.log(`🎯 [Query Match Success] Berhasil mengambil agen_id database: "${finalKotaID}"`);
-            } else {
-                // Saringan darurat jika koneksi server rongsok bray (Anti-Hardcode)
-                finalKotaID = searchKeyword.substring(0, 3).toUpperCase() + "002";
+            if (searchKeyword) {
+                console.log(`🚀 [Nusantara Compass] Meminta konversi Kode Agen "${currentActiveAgen}" menjadi Regional ID (agen_id) asli...`);
+                console.log(`🚀 [Nusantara SQL Engine] Mencari agen_id via ILIKE '%${searchKeyword}%' sesuai skema pgAdmin...`);
+
+                try {
+                    // 3. ✅ FIX JALUR: Buang prefix /api di depan router karena sudah di-handle oleh baseURL instance api bray!
+                    const responseProfil = await api.get(`/agens/detail-name/${encodeURIComponent(searchKeyword)}`, {
+                        headers: {
+                            'Authorization': `Bearer ${currentToken}`
+                        }
+                    });
+
+                    const resData = responseProfil.data;
+                    const dbAgenId = resData?.data?.agen_id || resData?.data?.AgenID;
+
+                    // 4. AMBIL KOLOM AGEN_ID MURNI LANGSUNG DARI POSTGRESQL!
+                    if (resData && resData.status === "success" && dbAgenId) {
+                        // ✅ BERHASIL: Menyadap nilai "GOR002" langsung dari hasil Query SQL ILIKE!
+                        finalKotaID = String(dbAgenId).trim().toUpperCase();
+                        console.log(`🎯 [Query Match Success] Berhasil mengambil agen_id database: "${finalKotaID}"`);
+                    }
+                } catch (apiError) {
+                    console.warn("⚠️ [Detail Agen API] Gagal mengonversi nama agen via query ILIKE:", apiError);
+                }
+            }
+
+            if (!finalKotaID) {
+                // Saringan darurat jika koneksi server rongsok / keyword kosong bray (Anti-Hardcode)
+                const fallbackKeyword = searchKeyword || currentActiveAgen || "GOR";
+                finalKotaID = fallbackKeyword.substring(0, 3).toUpperCase() + "002";
+                console.log(`🎯 [Query Match Fallback] Menggunakan fallback agen_id: "${finalKotaID}"`);
             }
 
             // 5. Suntikkan nilai final murni ke Form Input pendaftaran baru bray!
@@ -221,8 +234,9 @@ const MasterCustomer = () => {
 
             setIsModalOpen(true);
         } catch (error) {
-            console.error("❌ Gagal mengonversi nama agen via query ILIKE:", error);
+            console.error("❌ Gagal memproses data tambah customer:", error);
             setFormData({
+                cust_id: '',
                 cust_name: '', cust_alamat1: '', cust_alamat2: '', cust_kotaid: '',
                 cust_telp1: '', cust_telp2: '', cust_email: '', cust_npwp: '',
                 cust_jenisusaha: '', cust_contactperson: '', cust_kreditlimit: 0, cust_kredithari: 0
@@ -400,9 +414,6 @@ const MasterCustomer = () => {
     };
 
     // ==============================================================
-    // 💾 PROSES SIMPAN DATA (POST)
-    // ==============================================================
-    // ==============================================================
     // 💾 PROSES SIMPAN DATA (POST) - DINAMIS & PRODUCTION READY
     // ==============================================================
     const handleSubmit = async (e) => {
@@ -431,8 +442,8 @@ const MasterCustomer = () => {
 
             // 👑 SOLUSI SAKTI: Gunakan endpoint relatif tanpa embel-embel "http://localhost:8080" bray!
             const endpointUrl = isEditMode //
-                ? '/api/customer/update'
-                : '/api/customer/create';
+                ? '/customer/update'
+                : '/customer/create';
 
             console.log(`🛸 [Security Engine] Menembak rute dinamis: ${endpointUrl}`);
 

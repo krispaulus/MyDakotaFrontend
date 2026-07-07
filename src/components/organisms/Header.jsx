@@ -4,6 +4,7 @@ import { Search, Bell, MessageSquare, ChevronDown } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
 import { useDarkMode } from '../../context/DarkModeContext';
 import Swal from 'sweetalert2';
+import api from '../../api/axios';
 
 const Header = () => {
     const { isDarkMode } = useDarkMode();
@@ -62,20 +63,14 @@ const Header = () => {
                 }
 
                 const ptId = localStorage.getItem('selected_pt') || 'A';
-                fetch('http://localhost:8080/api/agens', {
-                    method: 'GET',
+                api.get('/agens', {
                     headers: {
-                        'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                     }
                 })
 
                     .then(res => {
-                        if (!res.ok) throw new Error("Server error " + res.status);
-                        return res.json();
-                    })
-
-                    .then(response => {
+                        const response = res.data;
                         const finalData = response.data || response;
                         if (Array.isArray(finalData)) {
 
@@ -116,6 +111,21 @@ const Header = () => {
                                     const defaultId = userAllowedCabangs.length > 0 ? userAllowedCabangs[0].trim() : (finalData[0]?.agen_kode || '');
                                     setSelectedAgen(defaultId);
                                     localStorage.setItem('active_agen_id', defaultId);
+                                }
+                            }
+
+                            // 🌟 SINKRONISASI NAMA AGEN AKTIF KE LOCAL STORAGE KARENA DIBUTUHKAN DI HALAMAN LAIN (CUST & BTT)
+                            const currentActiveId = localStorage.getItem('active_agen_id');
+                            if (currentActiveId === 'PUSAT DAKOTA') {
+                                localStorage.setItem('active_agen_nama', 'PUSAT DAKOTA');
+                            } else if (currentActiveId && currentActiveId !== 'null') {
+                                const queryTarget = currentActiveId.toString().trim().toUpperCase();
+                                const matchedAgen = finalData.find(a =>
+                                    a.agen_kode?.toString().trim().toUpperCase() === queryTarget ||
+                                    a.agen_id?.toString().trim().toUpperCase() === queryTarget
+                                );
+                                if (matchedAgen) {
+                                    localStorage.setItem('active_agen_nama', matchedAgen.agen_nama);
                                 }
                             }
 
@@ -180,6 +190,7 @@ const Header = () => {
                 // Simpan permanen ke memori local storage agar system tahu agen yang sedang memproses saat ini!
                 setSelectedAgen(agenTujuanKode);
                 localStorage.setItem('active_agen_id', agenTujuanKode);
+                localStorage.setItem('active_agen_nama', namaAgenTujuan);
 
                 // Beri notifikasi sukses singkat sebelum refresh halaman operasional
                 Swal.fire({
