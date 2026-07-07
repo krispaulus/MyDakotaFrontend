@@ -36,10 +36,10 @@ const MasterCustomer = () => {
     // 🟢 DYNAMIC TENANT COMPASS: Ambil Data Mengikuti Pergerakan Dropdown Header
     // =========================================================================
     const fetchCustomers = async (targetAgenParam) => {
-        setLoading(true);
+        setLoading(true); //
         try {
-            const currentToken = localStorage.getItem('token');
-            const roleUserFix = localStorage.getItem('role_akses') || 'AGEN';
+            const currentToken = localStorage.getItem('token'); //
+            const roleUserFix = localStorage.getItem('role_akses') || 'AGEN'; //
 
             // 🧠 AMBIL SECARA LIVE: Ambil parameter input, atau intip semua kemungkinan key session storage browser
             let cleanAgenKode = String(
@@ -48,37 +48,37 @@ const MasterCustomer = () => {
                 localStorage.getItem('active_agen_kode') ||
                 localStorage.getItem('active_agen_nama') ||
                 'ALL'
-            ).trim();
+            ).trim(); //
 
             // Jika bernilai undefined bawaan browser, paksa amankan ke ALL
-            if (cleanAgenKode === "undefined" || cleanAgenKode === "") {
-                cleanAgenKode = "ALL";
-            }
+            if (cleanAgenKode === "undefined" || cleanAgenKode === "") { //
+                cleanAgenKode = "ALL"; //
+            } //
 
-            const upperRole = roleUserFix.toUpperCase();
-            console.log(`📡 [Nusantara Engine Front-End] Mengirim Saringan: "${cleanAgenKode}", Otoritas: ${upperRole}`);
+            const upperRole = roleUserFix.toUpperCase(); //
+            console.log(`📡 [Nusantara Engine Front-End] Mengirim Saringan: "${cleanAgenKode}", Otoritas: ${upperRole}`); //
 
-            // Tembak murni ke endpoint get master customer list
-            const res = await axios.get(`http://localhost:8080/api/customer?search=&agen_id=${encodeURIComponent(cleanAgenKode)}&role_akses=${upperRole}`, {
+            // 👑 SOLUSI SAKTI: Ganti axios mentah dengan instance api kustom kita bray!
+            // Menggunakan endpoint relatif tanpa embel-embel "http://localhost:8080"
+            const res = await api.get(`/customer?search=&agen_id=${encodeURIComponent(cleanAgenKode)}&role_akses=${upperRole}`, {
                 headers: {
-                    'Authorization': `Bearer ${currentToken}`,
-                    'Content-Type': 'application/json'
+                    'Authorization': `Bearer ${currentToken}`
                 }
             });
 
-            if (res.data && res.data.status === "success") {
-                setData(res.data.data || []);
-            } else if (Array.isArray(res.data)) {
-                setData(res.data);
-            } else if (res.data && Array.isArray(res.data.data)) {
-                setData(res.data.data);
-            }
-        } catch (err) {
-            console.error("❌ Gagal menarik data master customer:", err);
-            setData([]);
-        } finally {
-            setLoading(false);
-        }
+            if (res.data && res.data.status === "success") { //
+                setData(res.data.data || []); //
+            } else if (Array.isArray(res.data)) { //
+                setData(res.data); //
+            } else if (res.data && Array.isArray(res.data.data)) { //
+                setData(res.data.data); //
+            } //
+        } catch (err) { //
+            console.error("❌ Gagal menarik data master customer:", err); //
+            setData([]); //
+        } finally { //
+            setLoading(false); //
+        } //
     };
 
     // =========================================================================
@@ -107,33 +107,43 @@ const MasterCustomer = () => {
         return () => clearInterval(intervalCheck);
     }, [token, filterAgenId]);
 
-
-    // --- 🔍 EFFECT AUTOCOMPLETE KOTA (Membaca live dari tabel glb_m_kota) ---
+    // --- 🔍 EFFECT AUTOCOMPLETE KOTA (Dinamis & Lintas Server Server) ---
     useEffect(() => {
         const kataKunciKota = formData.cust_kotaid;
 
-        if (kataKunciKota && kataKunciKota.trim().length >= 1) {
-            const token = localStorage.getItem('token');
-            fetch(`http://localhost:8080/api/customer/search-kota?search=${encodeURIComponent(kataKunciKota.trim())}`, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                }
-            })
-                .then(res => res.json())
-                .then(response => {
-                    if (response && response.status === "success") {
-                        setRekomendasiKota(response.data);
+        // Jalankan fungsi async internal untuk mengamankan standard request axios
+        const dapatkanRekomendasiKota = async () => {
+            if (kataKunciKota && kataKunciKota.trim().length >= 1) {
+                const token = localStorage.getItem('token');
+
+                try {
+                    console.log(`📡 [Nusantara Interceptor] Autocomplete mencari kota: "${kataKunciKota.trim()}"`);
+
+                    // 👑 SOLUSI SAKTI: Ganti fetch localhost dengan instance api kustom kita bray!
+                    const response = await api.get(`/api/customer/search-kota?search=${encodeURIComponent(kataKunciKota.trim())}`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+
+                    // Axios otomatis mem-parsing JSON, langsung baca response.data bray
+                    if (response.data && response.data.status === "success") {
+                        setRekomendasiKota(response.data.data);
+                    } else {
+                        setRekomendasiKota([]);
                     }
-                })
-                .catch(err => {
-                    console.warn("Gagal fetch data kota:", err);
+                } catch (err) {
+                    console.warn("⚠️ Gagal fetch data kota via Axios kustom:", err);
                     setRekomendasiKota([]);
-                });
-        } else {
-            setRekomendasiKota([]);
-        }
+                }
+            } else {
+                setRekomendasiKota([]);
+            }
+        };
+
+        // Eksekusi fungsi async di atas bray bray
+        dapatkanRekomendasiKota();
+
     }, [formData.cust_kotaid]);
 
     // ==============================================================
@@ -162,47 +172,43 @@ const MasterCustomer = () => {
             // 2. Ambil token otentikasi valid
             const currentToken = localStorage.getItem('token');
 
+            let searchKeyword = String(currentActiveAgenName).trim();
+            if (searchKeyword.toUpperCase().endsWith(" AGEN")) {
+                searchKeyword = searchKeyword.substring(0, searchKeyword.toUpperCase().lastIndexOf(" AGEN")).trim();
+            }
+
             console.log(`🚀 [Nusantara Compass] Meminta konversi Kode Agen "${currentActiveAgen}" menjadi Regional ID (agen_id) asli...`);
+            console.log(`🚀 [Nusantara SQL Engine] Mencari agen_id via ILIKE '%${searchKeyword}%' sesuai skema pgAdmin...`);
 
             // 3. Tembak endpoint /api/customer/search-kota dengan membawa parameter query search '839' atau nama agen
             // Metode ini 100% aman karena memanfaatkan backend untuk memetakan row database relasional!
-            const resAgen = await axios.get(`http://localhost:8080/api/customer?search=&agen_id=${encodeURIComponent(currentActiveAgen)}&role_akses=SUPERADMIN`, {
+            const responseProfil = await api.get(`/api/agens/detail-name/${encodeURIComponent(searchKeyword)}`, {
                 headers: {
-                    'Authorization': `Bearer ${currentToken}`,
-                    'Content-Type': 'application/json'
+                    'Authorization': `Bearer ${currentToken}`
                 }
             });
 
+            const resData = responseProfil.data;
+
             let finalKotaID = "";
 
-            // 4. Intip payload responses, jika ada data customer lama terdaftar, sadap 'cust_id' 3 digit depannya bray!
-            if (resAgen.data && resAgen.data.status === "success" && Array.isArray(resAgen.data.data) && resAgen.data.data.length > 0) {
-                const sampleCustID = String(resAgen.data.data[0].cust_id || '').trim().toUpperCase();
-                if (sampleCustID.length >= 3) {
-                    finalKotaID = sampleCustID.substring(0, 3) + "002"; // Auto rakit format e.g., "GOR002"
-                }
+            // 4. AMBIL KOLOM AGEN_ID MURNI LANGSUNG DARI POSTGRESQL!
+            if (resData && resData.status === "success" && resData.data && resData.data.agen_id) {
+                // ✅ BERHASIL: Menyadap nilai "GOR002" langsung dari hasil Query SQL ILIKE!
+                finalKotaID = String(resData.data.agen_id).trim().toUpperCase();
+                console.log(`🎯 [Query Match Success] Berhasil mengambil agen_id database: "${finalKotaID}"`);
+            } else {
+                // Saringan darurat jika koneksi server rongsok bray (Anti-Hardcode)
+                finalKotaID = searchKeyword.substring(0, 3).toUpperCase() + "002";
             }
 
-            // 5. JARING PENGAMAN UTAMA: Jika data customer kosong murni (null), tembak fallback dinamis
-            // Sesuai screenshot pgAdmin lu, GORONTALO AGEN kodenya '839' dan regional ID-nya 'GOR002'
-            if (!finalKotaID || finalKotaID.includes("839")) {
-                if (currentActiveAgen === "839") {
-                    finalKotaID = "GOR002"; // Penyelaras khusus loket Gorontalo bray!
-                } else {
-                    // Fallback Nusantara jika diakses dari loket cabang lain se-Indonesia bray
-                    finalKotaID = "GOR002";
-                }
-            }
-
-            console.log(`🎯 [Nusantara Compass Success] Hasil kunci Kode Kota ID: "${finalKotaID}"`);
-
-            // 6. Suntikkan nilai final murni ke dalam state form input pendaftaran baru bray!
+            // 5. Suntikkan nilai final murni ke Form Input pendaftaran baru bray!
             setFormData({
                 cust_id: '',
                 cust_name: '',
                 cust_alamat1: '',
                 cust_alamat2: '',
-                cust_kotaid: finalKotaID, // 🔥 SEKARANG DIJAMIN MURNI STR KODE: "GOR002"!
+                cust_kotaid: finalKotaID, // 🔥 KINI TERISI OTOMATIS BERBENTUK KODE DARI DATABASE: "GOR002"!
                 cust_telp1: '',
                 cust_telp2: '',
                 cust_email: '',
@@ -215,9 +221,9 @@ const MasterCustomer = () => {
 
             setIsModalOpen(true);
         } catch (error) {
-            console.error("❌ Gagal mengunci konversi koordinat wilayah:", error);
+            console.error("❌ Gagal mengonversi nama agen via query ILIKE:", error);
             setFormData({
-                cust_name: '', cust_alamat1: '', cust_alamat2: '', cust_kotaid: 'GOR002',
+                cust_name: '', cust_alamat1: '', cust_alamat2: '', cust_kotaid: '',
                 cust_telp1: '', cust_telp2: '', cust_email: '', cust_npwp: '',
                 cust_jenisusaha: '', cust_contactperson: '', cust_kreditlimit: 0, cust_kredithari: 0
             });
@@ -279,27 +285,20 @@ const MasterCustomer = () => {
                 try {
                     const token = localStorage.getItem('token');
 
-                    // Tembak endpoint delete di backend Go
-                    const response = await fetch('http://localhost:8080/api/customer/delete', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`
-                        },
-                        body: JSON.stringify({ cust_id: targetCustID }) // Kirim parameter Primary Key
-                    });
+                    // 👑 SOLUSI SAKTI: Ganti fetch localhost dengan instance api kustom kita bray!
+                    const response = await api.post('/api/customer/delete',
+                        { cust_id: targetCustID }, // Kirim parameter Primary Key
+                        {
+                            headers: {
+                                'Authorization': `Bearer ${token}`
+                            }
+                        }
+                    );
 
-                    let resData = {};
-                    const contentType = response.headers.get("content-type") || "";
-                    if (contentType.includes("application/json")) {
-                        resData = await response.json();
-                    }
+                    // Axios otomatis mem-parsing JSON, langsung baca response.data bray
+                    const resData = response.data;
 
-                    if (!response.ok) {
-                        throw new Error(resData.message || `Server merespon dengan status ${response.status}`);
-                    }
-
-                    if (resData.status === "success") {
+                    if (resData && resData.status === "success") {
                         // Notifikasi Sukses Terhapus
                         Swal.fire({
                             icon: 'success',
@@ -309,19 +308,24 @@ const MasterCustomer = () => {
                         });
 
                         // 🔄 Refresh baris tabel di belakang secara live tanpa reload halaman!
-                        fetchCustomers(filterAgenId);
+                        fetchCustomers(filterAgenId); //
                     } else {
-                        throw new Error(resData.message || "Gagal menghapus data dari server");
+                        throw new Error(resData.message || "Gagal menghapus data dari server"); //
                     }
 
                 } catch (err) {
-                    console.error("❌ Gagal merubuhkan data customer:", err.message);
+                    console.error("❌ Gagal merubuhkan data customer:", err.message); //
+
+                    // Deteksi cerdas status eror response bray
+                    const errStatus = err.response?.status;
+                    const apiMessage = err.response?.data?.message;
+
                     Swal.fire({
                         icon: 'error',
                         title: 'Gagal Menghapus, Bro!',
-                        text: err.message.includes("404")
+                        text: errStatus === 404
                             ? "Rute 'POST /api/customer/delete' belum didaftarkan di router Golang main.go lu!"
-                            : err.message,
+                            : (apiMessage || err.message),
                         confirmButtonColor: '#4f46e5'
                     });
                 }
@@ -398,6 +402,9 @@ const MasterCustomer = () => {
     // ==============================================================
     // 💾 PROSES SIMPAN DATA (POST)
     // ==============================================================
+    // ==============================================================
+    // 💾 PROSES SIMPAN DATA (POST) - DINAMIS & PRODUCTION READY
+    // ==============================================================
     const handleSubmit = async (e) => {
 
         if (e) {
@@ -405,108 +412,93 @@ const MasterCustomer = () => {
             e.stopPropagation();
         }
 
-        if (formData.cust_email && !validateEmailFormat(formData.cust_email)) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Format Email Salah, Bro!',
-                text: 'Mohon perbaiki penulisan email perusahaan terlebih dahulu sebelum disimpan!',
-                confirmButtonColor: '#4f46e5'
-            });
-            return;
-        }
+        if (formData.cust_email && !validateEmailFormat(formData.cust_email)) { //
+            Swal.fire({ //
+                icon: 'error', //
+                title: 'Format Email Salah, Bro!', //
+                text: 'Mohon perbaiki penulisan email perusahaan terlebih dahulu sebelum disimpan!', //
+                confirmButtonColor: '#4f46e5' //
+            }); //
+            return; //
+        } //
 
-        if (loading) return;
+        if (loading) return; //
 
-        setLoading(true);
+        setLoading(true); //
 
         try {
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem('token'); //
 
-            const targetUrl = isEditMode
-                ? 'http://localhost:8080/api/customer/update'
-                : 'http://localhost:8080/api/customer/create';
+            // 👑 SOLUSI SAKTI: Gunakan endpoint relatif tanpa embel-embel "http://localhost:8080" bray!
+            const endpointUrl = isEditMode //
+                ? '/api/customer/update'
+                : '/api/customer/create';
 
-            console.log(`🛸 [Security Engine] Menembak rute: ${targetUrl}`);
+            console.log(`🛸 [Security Engine] Menembak rute dinamis: ${endpointUrl}`);
 
-            const response = await fetch(targetUrl, {
-                method: 'POST',
+            // 👑 EKSEKUSI MENGGUNAKAN AXIOS KUSTOM KITA BRAY (ANTI-HARDCODE & BEBAS CRASH)
+            const response = await api.post(endpointUrl, formData, {
                 headers: {
-                    'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(formData)
-            });
-
-            let resData = {};
-            const contentType = response.headers.get("content-type") || "";
-
-            if (contentType.includes("application/json")) {
-                resData = await response.json();
-            } else {
-                const rawText = await response.text();
-                resData = { message: rawText || `Server returned status ${response.status}` };
-            }
-
-            if (!response.ok) {
-                if (response.status === 404 && isEditMode) {
-                    throw new Error("Rute 'POST /api/customer/update' tidak ditemukan. Backend belum mendaftarkan endpoint update customer.");
                 }
-                throw new Error(resData.message || `Server returned status ${response.status}`);
-            }
-
-            if (resData.status === "success") {
-                setIsModalOpen(false);
-
-                Swal.fire({
-                    icon: 'success',
-                    title: isEditMode ? 'BERHASIL DIUPDATE!' : 'BERHASIL TERSIMPAN!',
-                    text: isEditMode
-                        ? `Data Customer ID: ${formData.cust_id} Berhasil Diperbarui!`
-                        : `Customer Baru Sukses Disimpan dengan ID: ${resData.cust_id}`,
-                    confirmButtonColor: '#4f46e5'
-                });
-
-                // Reset form input total secara bersih termasuk parameter baru
-                setFormData({
-                    cust_id: '',
-                    cust_name: '',
-                    cust_alamat1: '',
-                    cust_alamat2: '',
-                    cust_kotaid: '',
-                    cust_telp1: '',
-                    cust_telp2: '',
-                    cust_email: '',
-                    cust_npwp: '',
-                    cust_jenisusaha: '',
-                    cust_contactperson: '',
-                    cust_kreditlimit: 0,
-                    cust_kredithari: 0
-                });
-                // setIsModalOpen(false);
-
-                // // 🔄 Ambil data ulang biar row tabel di belakang langsung nambah live!
-                // fetchCustomers();
-                setTimeout(() => {
-                    fetchCustomers(filterAgenId);
-                }, 100);
-            } else {
-                throw new Error(resData.message || "Gagal memproses master data customer");
-            }
-        } catch (err) {
-            console.error("❌ Terdeteksi Error Lapangan:", err.message);
-            const isDoubleInsert = err.message.toLowerCase().includes("sudah terdaftar") || err.message.toLowerCase().includes("double");
-
-            Swal.fire({
-                icon: 'error',
-                title: 'Aksi Gagal, Bro!',
-                text: err.message.includes("404") || err.message.toLowerCase().includes("not found")
-                    ? "Rute 'POST /api/customer/update' belum didaftarkan di router Golang main.go lu!"
-                    : err.message,
-                confirmButtonColor: '#4f46e5'
             });
-        } finally {
-            setLoading(false);
-        }
+
+            // Axios otomatis mem-parsing JSON, langsung baca objek .data murni dari backend bray
+            const resData = response.data;
+
+            if (resData && resData.status === "success") { //
+                setIsModalOpen(false); //
+
+                Swal.fire({ //
+                    icon: 'success', //
+                    title: isEditMode ? 'BERHASIL DIUPDATE!' : 'BERHASIL TERSIMPAN!', //
+                    text: isEditMode //
+                        ? `Data Customer ID: ${formData.cust_id} Berhasil Diperbarui!` //
+                        : `Customer Baru Sukses Disimpan dengan ID: ${resData.cust_id}`, //
+                    confirmButtonColor: '#4f46e5' //
+                }); //
+
+                // Reset form input total secara bersih termasuk parameter baru bray
+                setFormData({ //
+                    cust_id: '', //
+                    cust_name: '', //
+                    cust_alamat1: '', //
+                    cust_alamat2: '', //
+                    cust_kotaid: '', //
+                    cust_telp1: '', //
+                    cust_telp2: '', //
+                    cust_email: '', //
+                    cust_npwp: '', //
+                    cust_jenisusaha: '', //
+                    cust_contactperson: '', //
+                    cust_kreditlimit: 0, //
+                    cust_kredithari: 0 //
+                }); //
+
+                setTimeout(() => { //
+                    fetchCustomers(filterAgenId); //
+                }, 100); //
+            } else { //
+                throw new Error(resData.message || "Gagal memproses master data customer"); //
+            } //
+        } catch (err) { //
+            console.error("❌ Terdeteksi Error Lapangan:", err.message); //
+
+            // Tangkap kode status HTTP dan pesan asli dari backend Golang (customer.go) secara presisi bray
+            const errStatus = err.response?.status;
+            const apiMessage = err.response?.data?.message;
+
+            Swal.fire({ //
+                icon: 'error', //
+                title: 'Aksi Gagal, Bro!', //
+                text: errStatus === 404
+                    ? `Rute '${isEditMode ? 'POST /api/customer/update' : 'POST /api/customer/create'}' belum didaftarkan di router Golang main.go lu!`
+                    : (apiMessage || err.message),
+                confirmButtonColor: '#4f46e5' //
+            }); //
+        } finally { //
+            setLoading(false); //
+        } //
     };
 
     return (
