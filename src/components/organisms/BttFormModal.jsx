@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Package, MapPin, Layers, Calculator, FileText, Search } from 'lucide-react';
-import axios from 'axios';
+import api from '../../api/axios';
 
 const Swal = window.Swal || {
     fire: (options) => {
@@ -289,23 +289,21 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
         setLoadingTarif(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await api.get('/btt/calculate-tarif', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    asal_kota: String(formData.bttt_asalagenid || "").trim(),
-                    tujuan_kecamatan: formData.bttt_tujuankecamatan,
-                    agen_id: String(formData.bttt_asalagenid || "").trim(),
-                    berat_asli: parseFloat(formData.bttt_berat) || 1,
-                    panjang: parseFloat(formData.bttt_panjang) || 0,
-                    lebar: parseFloat(formData.bttt_lebar) || 0,
-                    tinggi: parseFloat(formData.bttt_tinggi) || 0,
-                    jenis_layanan: formData.bttt_paketyn === 'Y' ? 'REGULER' : 'EKONOMIS'
-                })
+            const response = await api.post('/btt/calculate-tarif', {
+                asal_kota: String(formData.bttt_asalagenid || "").trim(),
+                tujuan_kecamatan: formData.bttt_tujuankecamatan,
+                agen_id: String(formData.bttt_asalagenid || "").trim(),
+                berat_asli: parseFloat(formData.bttt_berat) || 1,
+                panjang: parseFloat(formData.bttt_panjang) || 0,
+                lebar: parseFloat(formData.bttt_lebar) || 0,
+                tinggi: parseFloat(formData.bttt_tinggi) || 0,
+                jenis_layanan: formData.bttt_paketyn === 'Y' ? 'REGULER' : 'EKONOMIS'
+            }, {
+                headers: { 'Authorization': `Bearer ${token}` }
             });
 
-            const data = await res.json();
-            if (res.ok) {
+            const data = response.data;
+            if (response.status === 200) {
                 const hargaFinal = data.grand_total || 0;
                 setTarifRegulerData(data.reguler_row || null);
                 setTarifEkonomisData(data.ekonomis_row || null);
@@ -336,6 +334,13 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
             }
         } catch (err) {
             console.error("Gagal hitung tarif:", err);
+            Swal.fire({
+                title: 'Gagal Hitung',
+                text: err.response?.data?.error || 'Terjadi kesalahan jaringan atau rute tidak terdaftar, bro...',
+                icon: 'error',
+                confirmButtonColor: '#4f46e5',
+                customClass: { container: 'z-[999999] font-sans' }
+            });
         } finally {
             setLoadingTarif(false);
         }
@@ -351,19 +356,15 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
 
             console.log(`📡 [DYNAMIC API ROUTE] Menembak Kode Agen: "${cleanAgenID}" ➡️ Kecamatan: "${tujuanKecamatan}"`);
 
-            const response = await axios.post(
-                ,
-                {
-                    asal_kota: cleanAgenID,
-                    tujuan_kecamatan: tujuanKecamatan,
-                    agen_id: cleanAgenID,
-                    berat_asli: parseFloat(formData.bttt_berat) || 1,
-                    jenis_layanan: formData.bttt_paketyn === 'Y' ? 'REGULER' : 'EKONOMIS'
-                },
-                {
-                    headers: { Authorization: `Bearer ${token}` }
-                }
-            );
+            const response = await api.post('/btt/calculate-tarif', {
+                asal_kota: cleanAgenID,
+                tujuan_kecamatan: tujuanKecamatan,
+                agen_id: cleanAgenID,
+                berat_asli: parseFloat(formData.bttt_berat) || 1,
+                jenis_layanan: formData.bttt_paketyn === 'Y' ? 'REGULER' : 'EKONOMIS'
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
 
             if (response.data && response.data.status === "success") {
                 const d = response.data;
@@ -475,49 +476,46 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
 
             console.log("🚀 Data sukses melewati asuransi flow, menembak database Go:", payloadKargo);
 
-            const response = await axios.post(
-                ,
-                {
-                    id: finalResiID,
-                    bttt_tanggal: payloadKargo.bttt_tanggal,
-                    bttt_asalagenid: parseInt(sessionAgenId),
-
-                    bttt_nosuratjalan: payloadKargo.bttt_nosuratjalan,
-                    bttt_ket: payloadKargo.bttt_ket,
-                    bttt_nobttmanual: payloadKargo.bttt_nobttmanual,
-                    bttt_dliexpryn: payloadKargo.bttt_dliexpryn,
-                    bttt_promoid: payloadKargo.bttt_promoid,
-                    bttt_asalcustid: payloadKargo.bttt_asalcustid,
-                    bttt_asalname: payloadKargo.bttt_asalname,
-                    bttt_asalalamat: payloadKargo.bttt_asalalamat,
-                    bttt_asalkota: payloadKargo.bttt_asalkota,
-                    bttt_asaltelp: payloadKargo.bttt_asaltelp,
-                    bttt_tujuannama: payloadKargo.bttt_tujuannama,
-                    bttt_up: payloadKargo.bttt_up,
-                    bttt_tujuanalamat: payloadKargo.bttt_tujuanalamat,
-                    bttt_tujuankota: payloadKargo.bttt_tujuankota,
-                    bttt_tujuankelurahan: payloadKargo.bttt_tujuankelurahan,
-                    bttt_tujuankecamatan: payloadKargo.bttt_tujuankecamatan,
-                    bttt_tujuankodepos: payloadKargo.bttt_tujuankodepos,
-                    bttt_tujuanemail: payloadKargo.bttt_tujuanemail,
-                    bttt_tujuantelp: payloadKargo.bttt_tujuantelp,
-                    bttt_tujuanpropinsi: payloadKargo.bttt_tujuanpropinsi,
-                    bttt_tujuanagenid: payloadKargo.bttt_tujuanagenid,
-                    bttt_kodecabangagen: payloadKargo.bttt_kodecabangagen,
-                    bttt_paketyn: payloadKargo.bttt_paketyn,
-                    bttt_pilihcarter: payloadKargo.bttt_pilihcarter,
-                    bttt_jenisharga: payloadKargo.bttt_jenisharga,
-                    bttt_isikiriman: payloadKargo.bttt_isikiriman,
-                    bttt_jmlkoli: parseInt(payloadKargo.bttt_jmlkoli) || 1,
-                    bttt_berat: parseFloat(payloadKargo.bttt_berat) || 1,
-                    bttt_beratvol: parseFloat(payloadKargo.bttt_beratvol) || 0,
-                    bttt_ukuran: parseFloat(payloadKargo.bttt_ukuran) || 0,
-                    bttt_harga: parseFloat(payloadKargo.bttt_harga) || 0,
-                    bttt_biayatambahan: parseFloat(payloadKargo.bttt_biayapenerus) || 0,
-                    bttt_biayapacking: parseFloat(payloadKargo.bttt_biayapacking) || 0
-                },
-                { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } }
-            );
+            const response = await api.post('/btt/add', {
+                id: finalResiID,
+                bttt_tanggal: payloadKargo.bttt_tanggal,
+                bttt_asalagenid: parseInt(sessionAgenId),
+                bttt_nosuratjalan: payloadKargo.bttt_nosuratjalan,
+                bttt_ket: payloadKargo.bttt_ket,
+                bttt_nobttmanual: payloadKargo.bttt_nobttmanual,
+                bttt_dliexpryn: payloadKargo.bttt_dliexpryn,
+                bttt_promoid: payloadKargo.bttt_promoid,
+                bttt_asalcustid: payloadKargo.bttt_asalcustid,
+                bttt_asalname: payloadKargo.bttt_asalname,
+                bttt_asalalamat: payloadKargo.bttt_asalalamat,
+                bttt_asalkota: payloadKargo.bttt_asalkota,
+                bttt_asaltelp: payloadKargo.bttt_asaltelp,
+                bttt_tujuannama: payloadKargo.bttt_tujuannama,
+                bttt_up: payloadKargo.bttt_up,
+                bttt_tujuanalamat: payloadKargo.bttt_tujuanalamat,
+                bttt_tujuankota: payloadKargo.bttt_tujuankota,
+                bttt_tujuankelurahan: payloadKargo.bttt_tujuankelurahan,
+                bttt_tujuankecamatan: payloadKargo.bttt_tujuankecamatan,
+                bttt_tujuankodepos: payloadKargo.bttt_tujuankodepos,
+                bttt_tujuanemail: payloadKargo.bttt_tujuanemail,
+                bttt_tujuantelp: payloadKargo.bttt_tujuantelp,
+                bttt_tujuanpropinsi: payloadKargo.bttt_tujuanpropinsi,
+                bttt_tujuanagenid: payloadKargo.bttt_tujuanagenid,
+                bttt_kodecabangagen: payloadKargo.bttt_kodecabangagen,
+                bttt_paketyn: payloadKargo.bttt_paketyn,
+                bttt_pilihcarter: payloadKargo.bttt_pilihcarter,
+                bttt_jenisharga: payloadKargo.bttt_jenisharga,
+                bttt_isikiriman: payloadKargo.bttt_isikiriman,
+                bttt_jmlkoli: parseInt(payloadKargo.bttt_jmlkoli) || 1,
+                bttt_berat: parseFloat(payloadKargo.bttt_berat) || 1,
+                bttt_beratvol: parseFloat(payloadKargo.bttt_beratvol) || 0,
+                bttt_ukuran: parseFloat(payloadKargo.bttt_ukuran) || 0,
+                bttt_harga: parseFloat(payloadKargo.bttt_harga) || 0,
+                bttt_biayatambahan: parseFloat(payloadKargo.bttt_biayapenerus) || 0,
+                bttt_biayapacking: parseFloat(payloadKargo.bttt_biayapacking) || 0
+            }, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
 
             if (response.data && response.data.status === "success") {
                 const nomorBttResmiDariGo = response.data.btt_no || finalResiID;
@@ -531,12 +529,12 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                 Swal.fire({
                     title: 'SUKSES SIMPAN DATABASE!',
                     html: `
-            <div style="font-family: sans-serif; padding: 5px;">
-                <p style="color: #4b5563; margin-bottom: 8px;">Data transaksi BTT logistik berhasil disimpan dengan nomor resi sah:</p>
-                <h2 style="font-size: 24px; font-weight: 900; color: #059669; background-color: #ecfdf5; padding: 10px; border-radius: 8px; border: 1px solid #a7f3d0; tracking-spacing: 1px;">${nomorBttResmiDariGo}</h2>
-                <p style="font-size: 13px; color: #6b7280; margin-top: 5px;">Membuka dokumen layout cetak resi kargo 3 rangkap...</p>
-            </div>
-          `,
+                    <div style="font-family: sans-serif; padding: 5px;">
+                        <p style="color: #4b5563; margin-bottom: 8px;">Data transaksi BTT logistik berhasil disimpan dengan nomor resi sah:</p>
+                        <h2 style="font-size: 24px; font-weight: 900; color: #059669; background-color: #ecfdf5; padding: 10px; border-radius: 8px; border: 1px solid #a7f3d0; tracking-spacing: 1px;">${nomorBttResmiDariGo}</h2>
+                        <p style="font-size: 13px; color: #6b7280; margin-top: 5px;">Membuka dokumen layout cetak resi kargo 3 rangkap...</p>
+                    </div>
+                  `,
                     icon: 'success',
                     confirmButtonColor: '#4f46e5',
                     confirmButtonText: 'OK, CETAK RESI!',

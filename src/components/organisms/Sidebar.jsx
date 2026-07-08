@@ -9,7 +9,7 @@ import {
 import DakotaLogo from '../../assets/new_logo 2.png';
 import LogoutModal from './LogoutModal';
 import { useDarkMode } from '../../context/DarkModeContext';
-import api from '../api/axios';
+import api from '../../api/axios';
 
 const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
   // Tambahkan state ini di bawah state user kamu

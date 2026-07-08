@@ -1,15 +1,16 @@
 import axios from 'axios';
 
-// const api = axios.create({
-//     baseURL: 'http://localhost:8080/api', //ini alamat Backend Docker kita
-// });
+const currentHost = window.location.hostname;
+const backendPort = "9090";
 
 const api = axios.create({
-    baseURL: (import.meta.env.VITE_API_URL || 'http://localhost:8080') + '/api',
+    baseURL: `http://${currentHost}:${backendPort}/api`,
     headers: {
         'Content-Type': 'application/json'
     }
 });
+
+
 
 // 🔍 REQUEST INTERCEPTOR - Log semua request yang dikirim
 api.interceptors.request.use(
