@@ -74,7 +74,7 @@ const MarketingMonitoringBTT = () => {
                 status: chkStatus ? statusPengiriman : ''
             };
 
-            const res = await axios.get(`http://localhost:8080/api/marketing/monitoring-btt`, {
+            const res = await api.get(`/marketing/monitoring-btt`, {
                 params,
                 headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
             });
@@ -117,7 +117,7 @@ const MarketingMonitoringBTT = () => {
 
     // Handler Export Excel Menembak Endpoint Warisan Master
     const handleExportExcel = () => {
-        const exportUrl = `http://localhost:8080/api/marketing/monitoring-btt/export?cbasal=${cbasal}&cktgl=${chkTanggal}&tgla=${tanggalStart}&tglk=${tanggalEnd}&ckkota=${chkKota}&tujuan=${kotaTujuan}&ckbtt=${chkBtt}&mbtt=${noBtt}&ckPackage=${chkPackage}&sj=${packageId}&ckcust=${chkCustomer}&mcust=${customerName}&ckstatus=${chkStatus}&mstatus=${statusPengiriman}`;
+        const exportUrl = `/api/marketing/monitoring-btt/export?cbasal=${cbasal}&cktgl=${chkTanggal}&tgla=${tanggalStart}&tglk=${tanggalEnd}&ckkota=${chkKota}&tujuan=${kotaTujuan}&ckbtt=${chkBtt}&mbtt=${noBtt}&ckPackage=${chkPackage}&sj=${packageId}&ckcust=${chkCustomer}&mcust=${customerName}&ckstatus=${chkStatus}&mstatus=${statusPengiriman}`;
         window.open(exportUrl, '_blank');
     };
 

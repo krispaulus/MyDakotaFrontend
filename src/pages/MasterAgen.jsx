@@ -77,7 +77,7 @@ const MasterAgen = () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get('http://localhost:8080/api/agens', {
+            const res = await api.get('/agens', {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setAgens(res.data.data);
@@ -141,7 +141,7 @@ const MasterAgen = () => {
 
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:8080/api/agens/detail/${item.agen_kode}`, {
+            const res = await api.get(`/agens/detail/${item.agen_kode}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
@@ -188,12 +188,12 @@ const MasterAgen = () => {
         try {
             const token = localStorage.getItem('token');
             if (editData) {
-                await axios.put(`http://localhost:8080/api/agens/${editData.agen_id}`, formData, {
+                await api.put(`/agens/${editData.agen_id}`, formData, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 Swal.fire('Sukses!', 'Data agen berhasil diperbarui.', 'success');
             } else {
-                await axios.post('http://localhost:8080/api/agens', formData, {
+                await api.post('/agens', formData, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 Swal.fire('Sukses!', 'Agen baru berhasil ditambahkan.', 'success');
@@ -215,7 +215,7 @@ const MasterAgen = () => {
         }).then(async (res) => {
             if (res.isConfirmed) {
                 const token = localStorage.getItem('token');
-                await axios.delete(`http://localhost:8080/api/agens/${item.agen_id}`, {
+                await api.delete(`/agens/${item.agen_id}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 Swal.fire('Updated', 'Status agen dinonaktifkan.', 'success');

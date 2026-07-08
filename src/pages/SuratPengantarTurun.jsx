@@ -32,7 +32,7 @@ const SuratPengantarTurun = () => {
         const fetchMasterAgen = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const res = await axios.get('http://localhost:8080/api/agens', {
+                const res = await api.get('/agens', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 if (Array.isArray(res.data)) {
@@ -65,7 +65,7 @@ const SuratPengantarTurun = () => {
             if (filterParams.use_no_btt) queryParams.no_btt = filterParams.no_btt;
             if (filterParams.use_no_sp) queryParams.no_sp = filterParams.no_sp;
 
-            const res = await axios.get(`http://localhost:8080/api/operasional/sp-turun/history`, {
+            const res = await api.get(`/operasional/sp-turun/history`, {
                 params: queryParams,
                 headers: { Authorization: `Bearer ${token}` }
             });

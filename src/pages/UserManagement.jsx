@@ -8,7 +8,7 @@ import { MENU_LIST } from '../constants/menuList';
 
 // 1. DEFINISI KOLOM (Di luar komponen supaya rapi)
 
-const API_BASE_URL = 'http://localhost:8080/api';
+const API_BASE_URL = '/api';
 const columns = [
   {
     header: 'Photo',
@@ -17,14 +17,14 @@ const columns = [
           const rawPath = user.profileimage || user.profile_image || "";
           
           // 2. Buat Base URL Backend kamu (taruh di atas lebih bagus)
-          const BASE_URL = "http://localhost:8080"; 
+          const BASE_URL = window.location.origin; 
 
           // 3. Tentukan Source Gambar
           let imgSrc = "";
           if (rawPath) {
             if (rawPath.startsWith('http')) {
               // Jika sudah URL lengkap, ganti localhostnya saja jika perlu
-              imgSrc = rawPath.replace('192.168.22.25:9090', 'localhost:8080');
+              imgSrc = rawPath.replace('192.168.22.25:9090', window.location.host);
             } else {
               // Jika cuma nama file (misal: "gambar.png"), gabungkan dengan BASE_URL
               imgSrc = `${BASE_URL}/uploads/${rawPath}`;
@@ -148,7 +148,7 @@ const handleOpenRoleAccess = async (user) => {
     try {
               const token = localStorage.getItem('token');
               // 3. Tembak API GET yang barusan kita buat di Go
-              const response = await axios.get(`http://localhost:8080/api/users/access/${user.username}`, {
+              const response = await api.get(`/users/access/${user.username}`, {
                   headers: { Authorization: `Bearer ${token}` }
               });
 
@@ -233,7 +233,7 @@ const handleOpenRoleAccess = async (user) => {
 
           console.log("🚀 Menyimpan Role ke DB:", payload);
 
-          const response = await axios.post('http://localhost:8080/api/users/update-access', payload, {
+          const response = await api.post('/users/update-access', payload, {
               headers: { Authorization: `Bearer ${token}` }
           });
 
@@ -383,7 +383,7 @@ const handleOpenRoleAccess = async (user) => {
         }).then((result) => {
             if (result.isConfirmed) {
                 // 2. Jika klik DELETE, panggil API Backend
-                fetch(`http://localhost:8080/api/users/${username.trim()}`, {
+                fetch(`/users/${username.trim()}`, {
                     method: 'DELETE',
                     headers: {
                         // Tambahkan ini supaya Backend tahu kamu admin yang sah
@@ -424,8 +424,8 @@ const handleOpenRoleAccess = async (user) => {
         const headers = { Authorization: `Bearer ${token}` };
 
         const [resAgens, resUsers] = await Promise.all([
-            axios.get('http://localhost:8080/api/agens', { headers }),
-            axios.get('http://localhost:8080/api/users', { headers })
+            api.get('/agens', { headers }),
+            api.get('/users', { headers })
         ]);
 
         console.log("Struktur data Agens:", resAgens.data);
@@ -442,7 +442,7 @@ const handleOpenRoleAccess = async (user) => {
     const fetchUsers = async () => {
         try {
         const token = localStorage.getItem('token');
-        const res = await axios.get('http://localhost:8080/api/users', {
+        const res = await api.get('/users', {
             headers: { Authorization: `Bearer ${token}` }
         });
         setUsers(res.data?.data || res.data || []);
@@ -489,7 +489,7 @@ const handleOpenRoleAccess = async (user) => {
         try {
             const token = localStorage.getItem('token');
             // Sesuaikan endpoint API backend kamu untuk pengecekan ini
-            const res = await axios.get(`http://localhost:8080/api/users/check/${username}`, {
+            const res = await api.get(`/users/check/${username}`, {
             headers: { Authorization: `Bearer ${token}` }
             });
 
@@ -723,8 +723,8 @@ const handleOpenRoleAccess = async (user) => {
         try {
         setLoading(true);
         const url = showAddModal
-            ? 'http://localhost:8080/api/users/add'
-            : 'http://localhost:8080/api/users/update';
+            : '/users/add'
+            : '/users/update';
         const method = showAddModal ? 'post' : 'put';
 
         const response = await axios[method](url, payload, {
@@ -769,7 +769,7 @@ const handleOpenRoleAccess = async (user) => {
 
         try {
             setLoading(true);
-            const response = await axios.put('http://localhost:8080/api/users/update', payload, {
+            const response = await api.put('/users/update', payload, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 

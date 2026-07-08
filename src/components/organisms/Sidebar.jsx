@@ -7,9 +7,9 @@ import {
   Settings, LogOut, ChevronRight, Menu, Backpack, ClipboardPen, HandCoins
 } from 'lucide-react';
 import DakotaLogo from '../../assets/new_logo 2.png';
-import axios from 'axios';
 import LogoutModal from './LogoutModal';
 import { useDarkMode } from '../../context/DarkModeContext';
+import api from '../api/axios';
 
 const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
   // Tambahkan state ini di bawah state user kamu
@@ -86,7 +86,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
       if (!token) return;
 
       const ptId = localStorage.getItem('selected_pt') || 'A';
-      const response = await axios.get(`http://localhost:8080/api/profile?pt_id=${ptId}`, {
+      const response = await api.get(`/profile?pt_id=${ptId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 

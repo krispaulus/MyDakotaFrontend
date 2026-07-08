@@ -36,7 +36,7 @@ const SuratKembaliBTT = () => {
             if (filterParams.use_no_kembali) queryParams.no_kembali = filterParams.no_kembali;
             if (filterParams.use_no_btt) queryParams.no_btt = filterParams.no_btt;
 
-            const res = await axios.get(`http://localhost:8080/api/operasional/kembali-btt/history`, {
+            const res = await api.get(`/operasional/kembali-btt/history`, {
                 params: queryParams,
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -65,7 +65,7 @@ const SuratKembaliBTT = () => {
         setModalType(type);
 
         try {
-            const res = await axios.get(`http://localhost:8080/api/operasional/kembali-btt/${endpoint}`, {
+            const res = await api.get(`/operasional/kembali-btt/${endpoint}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setMonitorData(res.data || []);

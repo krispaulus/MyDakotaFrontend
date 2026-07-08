@@ -36,7 +36,7 @@ import { useDarkMode } from '../../context/DarkModeContext';
       const token = localStorage.getItem('token');
       if (!token) return;
       
-      const res = await axios.get('http://localhost:8080/api/profile', {
+      const res = await api.get('/profile', {
         headers: { Authorization: `Bearer ${token}` }
       });
       

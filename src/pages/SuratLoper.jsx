@@ -43,7 +43,7 @@ const SuratLoper = () => {
             if (filterParams.use_sopir) queryParams.sopir = filterParams.sopir;
             if (filterParams.use_no_btt) queryParams.no_btt = filterParams.no_btt;
 
-            const res = await axios.get(`http://localhost:8080/api/operasional/loper/history`, {
+            const res = await api.get(`/operasional/loper/history`, {
                 params: queryParams,
                 headers: { Authorization: `Bearer ${token}` }
             });

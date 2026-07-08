@@ -266,8 +266,8 @@ useEffect(() => {
       const headers = { Authorization: `Bearer ${token}` };
 
       const [resAgens, resUsers] = await Promise.all([
-        axios.get('http://localhost:8080/api/agens', { headers }),
-        axios.get('http://localhost:8080/api/users', { headers })
+        api.get('/agens', { headers }),
+        api.get('/users', { headers })
       ]);
 
       console.log("Struktur data Agens:", resAgens.data);
@@ -284,7 +284,7 @@ useEffect(() => {
   const fetchUsers = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get('http://localhost:8080/api/users', {
+      const res = await api.get('/users', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setUsers(res.data?.data || res.data || []);
@@ -331,7 +331,7 @@ useEffect(() => {
       try {
         const token = localStorage.getItem('token');
         // Sesuaikan endpoint API backend kamu untuk pengecekan ini
-        const res = await axios.get(`http://localhost:8080/api/users/check/${username}`, {
+        const res = await api.get(`/users/check/${username}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
 

@@ -16,7 +16,7 @@ const MasterTarifUnit = () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:8080/api/tarif/unit`, {
+            const res = await api.get(`/tarif/unit`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setData(res.data);

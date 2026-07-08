@@ -68,7 +68,7 @@ const MarketingBTT = () => {
 
             // 🟢 JALUR AMAN: Gunakan axios mentah dengan full URL + Headers eksplisit
             // Cara ini 100% melompati bug interseptor kaku di file kustom axios lu!
-            const res = await axios.get(`http://localhost:8080/api/marketing/btt?agen_id=${agenIdFix}`, {
+            const res = await api.get(`/marketing/btt?agen_id=${agenIdFix}`, {
                 headers: {
                     'Authorization': `Bearer ${currentToken}`,
                     'Content-Type': 'application/json'
@@ -129,7 +129,7 @@ const MarketingBTT = () => {
 
         console.log("Mengirim payload transaksi BTT ke Golang:", payload);
 
-        fetch('http://localhost:8080/api/btt/add', {
+        api.post('/btt/add', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -160,7 +160,7 @@ const MarketingBTT = () => {
         try {
             const token = localStorage.getItem('token');
             // Tembak API pengecekan gerbang closing kemarin
-            const response = await axios.get(`http://localhost:8080/api/btt/check-closing-gate?agen_id=${sessionAgenId}`, {
+            const response = await api.get(`/btt/check-closing-gate?agen_id=${sessionAgenId}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 

@@ -16,7 +16,7 @@ const MasterKodePos = () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:8080/api/kodepos`, {
+            const res = await api.get(`/kodepos`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setData(res.data);

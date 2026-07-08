@@ -85,14 +85,14 @@ const SuratPengantarPengiriman = () => {
         const fetchMasterData = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const resFleet = await axios.get('http://localhost:8080/api/operasional/fleet-drivers', {
+                const resFleet = await api.get('/operasional/fleet-drivers', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 if (resFleet.data.status === 'success') {
                     setFleet(resFleet.data.fleet || []);
                     setDrivers(resFleet.data.drivers || []);
                 }
-                const resAgens = await axios.get('http://localhost:8080/api/agens', {
+                const resAgens = await api.get('/agens', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 if (Array.isArray(resAgens.data)) {
@@ -113,7 +113,7 @@ const SuratPengantarPengiriman = () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.get('http://localhost:8080/api/operasional/pool-btt', {
+            const response = await api.get('/operasional/pool-btt', {
                 params: {
                     agen_id: currentActiveAgen,
                     ...filterParams
@@ -197,7 +197,7 @@ const SuratPengantarPengiriman = () => {
                 daftar_btt: manifestData.map(item => item.btt_id)
             };
 
-            const response = await axios.post('http://localhost:8080/api/operasional/sp-naik', payload, {
+            const response = await api.post('/operasional/sp-naik', payload, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 

@@ -44,7 +44,7 @@ const BttClosingHarianDashboard = () => {
       if (activeFilters.no_jurnal && filter.no_jurnal) queryParams.append('no_jurnal', filter.no_jurnal);
       if (filter.posting_status) queryParams.append('posting_status', filter.posting_status);
 
-      const response = await axios.get(`http://localhost:8080/api/closing-agen/list?${queryParams.toString()}`, {
+      const response = await api.get(`/closing-agen/list?${queryParams.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setListClosing(response.data || []);
@@ -60,7 +60,7 @@ const BttClosingHarianDashboard = () => {
   const fetchDropdownMasterAgen = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:8080/api/agens', { 
+      const response = await api.get('/agens', { 
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -142,7 +142,7 @@ const BttClosingHarianDashboard = () => {
 
         try {
           const token = localStorage.getItem('token');
-          const response = await axios.post('http://localhost:8080/api/closing-agen/process', {
+          const response = await api.post('/closing-agen/process', {
             tanggal_closing: tglClosingInput,
             cabang_agen: cabangAgenInput,
             update_id: loggedInUser

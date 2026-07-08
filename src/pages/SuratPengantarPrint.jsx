@@ -13,7 +13,7 @@ const SuratPengantarPrint = () => {
         const fetchPrintDetail = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const res = await axios.get(`http://localhost:8080/api/operasional/sp-terima/print-detail/${id}`, {
+                const res = await api.get(`/operasional/sp-terima/print-detail/${id}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setPrintData(res.data);

@@ -32,7 +32,7 @@ function AccountPage() {
   const fetchProfile = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:8080/api/profile', {
+      const response = await api.get('/profile', {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = response.data;
@@ -98,7 +98,7 @@ function AccountPage() {
       // Ambil PTID dari local storage untuk query string parameter Go
       const ptID = localStorage.getItem('selected_pt') || 'A';      
 
-      const response = await axios.put(`http://localhost:8080/api/profile/update?pt_id=${ptID}`, multipartData, {
+      const response = await api.put(`/profile/update?pt_id=${ptID}`, multipartData, {
         headers: { 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data' 
@@ -187,7 +187,7 @@ function AccountPage() {
         newPasswordLength: newPasswordTrimmed.length
       });
       
-      const response = await axios.post('http://localhost:8080/api/profile/change-password', 
+      const response = await api.post('/profile/change-password', 
         { 
           oldPassword: oldPasswordTrimmed, 
           newPassword: newPasswordTrimmed 

@@ -26,7 +26,7 @@ const BttSuratPengantarDashboard = () => {
     try {
       const token = localStorage.getItem('token');
       const params = new URLSearchParams(filter).toString();
-      const res = await axios.get(`http://localhost:8080/api/sp/list?${params}`, {
+      const res = await api.get(`/sp/list?${params}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setListSP(res.data || []);

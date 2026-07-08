@@ -13,7 +13,7 @@ const MasterTarifEkonomis = () => {
         try {
             const token = localStorage.getItem('token');
             // Kita tarik 200-500 data saja biar pagination template kamu tetap enak dipakai
-            const res = await axios.get(`http://localhost:8080/api/tarif/ekonomis`, {
+            const res = await api.get(`/tarif/ekonomis`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setData(res.data);

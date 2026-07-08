@@ -22,7 +22,7 @@ const BttClosingHarianDashboard = () => {
     try {
       const token = localStorage.getItem('token');
       const params = new URLSearchParams(filter).toString();
-      const res = await axios.get(`http://localhost:8080/api/closing-agen/list?${params}`, {
+      const res = await api.get(`/closing-agen/list?${params}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setListClosing(res.data || []);
@@ -74,7 +74,7 @@ const BttClosingHarianDashboard = () => {
 
         try {
           const token = localStorage.getItem('token');
-          const response = await axios.post('http://localhost:8080/api/closing-agen/process', {
+          const response = await api.post('/closing-agen/process', {
             tanggal_closing: tglClosingVal,
             cabang_agen: cabangAgenVal
           }, {

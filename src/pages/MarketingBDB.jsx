@@ -32,7 +32,7 @@ const MarketingBDB = () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get('http://localhost:8080/api/marketing/bdb/list', {
+            const res = await api.get('/marketing/bdb/list', {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setBdbList(res.data || []);
@@ -64,7 +64,7 @@ const MarketingBDB = () => {
 
         try {
             const token = localStorage.getItem('token');
-            await axios.post('http://localhost:8080/api/marketing/bdb/create', formData, {
+            await api.post('/marketing/bdb/create', formData, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 

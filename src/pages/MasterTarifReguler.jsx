@@ -16,7 +16,7 @@ const MasterTarifReguler = () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:8080/api/tarif/reguler`, {
+            const res = await api.get(`/tarif/reguler`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setData(res.data);

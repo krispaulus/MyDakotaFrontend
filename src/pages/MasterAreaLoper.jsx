@@ -52,7 +52,7 @@ const MasterAreaLoper = () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:8080/api/area-loper?search=${q}`, {
+            const res = await api.get(`/area-loper?search=${q}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setData(res.data.data);
@@ -64,7 +64,7 @@ const MasterAreaLoper = () => {
     const fetchUnregistered = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get('http://localhost:8080/api/area-loper/unregistered', {
+            const res = await api.get('/area-loper/unregistered', {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setUnregistered(res.data.data);
@@ -90,7 +90,7 @@ const MasterAreaLoper = () => {
         if (!agencyCode) return;
         try {
             const token = localStorage.getItem('token');
-            const resProfil = await axios.get(`http://localhost:8080/api/agens/detail/${agencyCode}`, {
+            const resProfil = await api.get(`/agens/detail/${agencyCode}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const d = resProfil.data.data;
@@ -98,7 +98,7 @@ const MasterAreaLoper = () => {
                 kode: d.agen_kode || agencyCode, nama: d.agen_nama || '', alamat: d.agen_alamat || '', kota: d.agen_kota || '', telp: d.agen_phone || '-'
             });
 
-            const resArea = await axios.get(`http://localhost:8080/api/area-loper/terpilih/${agencyCode}`, {
+            const resArea = await api.get(`/area-loper/terpilih/${agencyCode}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setAreaTerpilih(resArea.data.data || []);
@@ -124,7 +124,7 @@ const MasterAreaLoper = () => {
         setIsModalOpen(true);
         try {
             const token = localStorage.getItem('token');
-            axios.get('http://localhost:8080/api/area-loper', { headers: { Authorization: `Bearer ${token}` } })
+            api.get('/area-loper', { headers: { Authorization: `Bearer ${token}` } })
                 .then(res => setListAllAgenOptions(res.data.data || []));
         } catch (e) { console.error(e); }
     };
@@ -141,7 +141,7 @@ const MasterAreaLoper = () => {
 
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:8080/api/area-loper/suggest-wilayah`, {
+            const res = await api.get(`/area-loper/suggest-wilayah`, {
                 params: updatedInput,
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -188,7 +188,7 @@ const MasterAreaLoper = () => {
         }
         try {
             const token = localStorage.getItem('token');
-            await axios.post(`http://localhost:8080/api/area-loper/assign-wilayah-massal`, {
+            await api.post(`/area-loper/assign-wilayah-massal`, {
                 agen_kode: agenProfil.kode.toString().trim(),
                 wilayahs: selectedMasterRows
             }, {
@@ -240,7 +240,7 @@ const MasterAreaLoper = () => {
         }
         try {
             const token = localStorage.getItem('token');
-            await axios.post(`http://localhost:8080/api/area-loper/batch-update`, {
+            await api.post(`/area-loper/batch-update`, {
                 level: batchPayload.level,
                 propinsi: batchActiveItem.propinsi,
                 kabupaten: batchActiveItem.kabupaten,
@@ -298,7 +298,7 @@ const MasterAreaLoper = () => {
                     const token = localStorage.getItem('token');
 
                     // Tembak endpoint delete massal ke Golang
-                    await axios.delete(`http://localhost:8080/api/area-loper/remove-wilayah-massal`, {
+                    await api.delete(`/area-loper/remove-wilayah-massal`, {
                         headers: { Authorization: `Bearer ${token}` },
                         data: { ids: selectedRows } // Kirim array ID yang dicentang
                     });
@@ -337,7 +337,7 @@ const MasterAreaLoper = () => {
     const handleSaveGantiAtribut = async () => {
         try {
             const token = localStorage.getItem('token');
-            await axios.put(`http://localhost:8080/api/area-loper/update-single-atribut`, gantiPayload, {
+            await api.put(`/area-loper/update-single-atribut`, gantiPayload, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 

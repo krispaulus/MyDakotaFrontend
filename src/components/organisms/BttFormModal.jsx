@@ -122,7 +122,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
         const token = localStorage.getItem('token');
         const kodeAgenAktif = localStorage.getItem('active_agen_id') || '';
 
-        fetch(`http://localhost:8080/api/btt/generate-custid?kode_agen=${kodeAgenAktif}`, {
+        api.get(`/btt/generate-custid?kode_agen=${kodeAgenAktif}`, {
             method: 'GET',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
         })
@@ -169,7 +169,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
 
             console.log("⚙️ [BTT Engine] Kolom kosong, mengunci ke mode retail UMUM...");
 
-            axios.get(`http://localhost:8080/api/btt/generate-custid?kode_agen=${kodeAgenAktif}`, {
+            api.get(`/btt/generate-custid?kode_agen=${kodeAgenAktif}`, {
                 headers: { Authorization: `Bearer ${token}` }
             })
                 .then(res => {
@@ -182,7 +182,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
 
         if (keywordCustomer && keywordCustomer.length >= 1) {
             const token = localStorage.getItem('token');
-            fetch(`http://localhost:8080/api/btt/search-customer?search=${encodeURIComponent(keywordCustomer)}`, {
+            api.get(`/btt/search-customer?search=${encodeURIComponent(keywordCustomer)}`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -209,7 +209,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
 
         if (keywordKecamatan && keywordKecamatan.length >= 3) {
             const token = localStorage.getItem('token');
-            fetch(`http://localhost:8080/api/btt/search-area?search=${encodeURIComponent(keywordKecamatan)}`, {
+            api.get(`/btt/search-area?search=${encodeURIComponent(keywordKecamatan)}`, {
                 method: 'GET',
                 headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
             })
@@ -289,7 +289,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
         setLoadingTarif(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch('http://localhost:8080/api/btt/calculate-tarif', {
+            const res = await api.get('/btt/calculate-tarif', {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -352,7 +352,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
             console.log(`📡 [DYNAMIC API ROUTE] Menembak Kode Agen: "${cleanAgenID}" ➡️ Kecamatan: "${tujuanKecamatan}"`);
 
             const response = await axios.post(
-                'http://localhost:8080/api/btt/calculate-tarif',
+                ,
                 {
                     asal_kota: cleanAgenID,
                     tujuan_kecamatan: tujuanKecamatan,
@@ -394,7 +394,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
 
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:8080/api/btt/search-geo?q=${encodeURIComponent(value)}`, {
+            const res = await api.get(`/btt/search-geo?q=${encodeURIComponent(value)}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             if (res.data && res.data.status === "success") {
@@ -427,7 +427,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
         if (item.kecamatan) {
             try {
                 const token = localStorage.getItem('token');
-                const res = await axios.get(`http://localhost:8080/api/btt/get-kelurahan?kecamatan=${encodeURIComponent(item.kecamatan)}`, {
+                const res = await api.get(`/btt/get-kelurahan?kecamatan=${encodeURIComponent(item.kecamatan)}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 if (res.data && res.data.status === "success") {
@@ -476,7 +476,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
             console.log("🚀 Data sukses melewati asuransi flow, menembak database Go:", payloadKargo);
 
             const response = await axios.post(
-                'http://localhost:8080/api/btt/add',
+                ,
                 {
                     id: finalResiID,
                     bttt_tanggal: payloadKargo.bttt_tanggal,
