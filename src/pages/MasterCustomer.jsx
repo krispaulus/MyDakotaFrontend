@@ -120,7 +120,7 @@ const MasterCustomer = () => {
                     console.log(`📡 [Nusantara Interceptor] Autocomplete mencari kota: "${kataKunciKota.trim()}"`);
 
                     // 👑 SOLUSI SAKTI: Ganti fetch localhost dengan instance api kustom kita bray!
-                    const response = await api.get(`/api/customer/search-kota?search=${encodeURIComponent(kataKunciKota.trim())}`, {
+                    const response = await api.get(`/customer/search-kota?search=${encodeURIComponent(kataKunciKota.trim())}`, {
                         headers: {
                             'Authorization': `Bearer ${token}`
                         }
@@ -300,7 +300,7 @@ const MasterCustomer = () => {
                     const token = localStorage.getItem('token');
 
                     // 👑 SOLUSI SAKTI: Ganti fetch localhost dengan instance api kustom kita bray!
-                    const response = await api.post('/api/customer/delete',
+                    const response = await api.post('/customer/delete',
                         { cust_id: targetCustID }, // Kirim parameter Primary Key
                         {
                             headers: {
@@ -338,7 +338,7 @@ const MasterCustomer = () => {
                         icon: 'error',
                         title: 'Gagal Menghapus, Bro!',
                         text: errStatus === 404
-                            ? "Rute 'POST /api/customer/delete' belum didaftarkan di router Golang main.go lu!"
+                            ? "Rute 'POST /customer/delete' belum didaftarkan di router Golang main.go lu!"
                             : (apiMessage || err.message),
                         confirmButtonColor: '#4f46e5'
                     });
@@ -503,7 +503,7 @@ const MasterCustomer = () => {
                 icon: 'error', //
                 title: 'Aksi Gagal, Bro!', //
                 text: errStatus === 404
-                    ? `Rute '${isEditMode ? 'POST /api/customer/update' : 'POST /api/customer/create'}' belum didaftarkan di router Golang main.go lu!`
+                    ? `Rute '${isEditMode ? 'POST /customer/update' : 'POST /customer/create'}' belum didaftarkan di router Golang main.go lu!`
                     : (apiMessage || err.message),
                 confirmButtonColor: '#4f46e5' //
             }); //
