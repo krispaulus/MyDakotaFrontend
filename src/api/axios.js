@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const currentHost = window.location.hostname;
-const backendPort = "9090";
+const backendPort = "8080";
 
 const api = axios.create({
     baseURL: `http://${currentHost}:${backendPort}/api`,

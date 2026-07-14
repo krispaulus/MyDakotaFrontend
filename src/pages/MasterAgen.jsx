@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import { MapPin, Building2, Edit, Trash2, Save, X as XIcon, Phone, DollarSign, Layers, Shield } from 'lucide-react';
 import { useDarkMode } from '../context/DarkModeContext';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
@@ -80,8 +80,10 @@ const MasterAgen = () => {
             const res = await api.get('/agens', {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setAgens(res.data.data);
+            const dataFisik = res.data?.data || res.data || [];
+            setAgens(dataFisik);
         } catch (err) {
+            console.error("Detail error load agen:", err);
             Swal.fire('Error', 'Gagal memuat data fisik agen', 'error');
         } finally { setLoading(false); }
     };

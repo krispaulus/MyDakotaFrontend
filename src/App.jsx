@@ -28,6 +28,11 @@ import SuratPengantarPrint from './pages/SuratPengantarPrint';
 import SuratPengantarPAD from './pages/SuratPengantarPAD';
 import MarketingBDB from './pages/MarketingBDB';
 import MarketingMonitoringBTT from './pages/MarketingMonitoringBTT';
+import PengembalianSuratJalanCustomer from './pages/PengembalianSuratJalanCustomer';
+import TambahPengembalianSuratJalan from './pages/TambahPengembalianSuratJalan';
+import ProsesPacking from './pages/ProsesPacking';
+import MasterAreaTidakDilayani from './pages/MasterAreaTidakDilayani';
+import MasterDeviceKaryawan from './pages/MasterDeviceKaryawan';
 
 const getCompanyName = (pt) => {
   if (pt === 'A') return 'Dakota Buana Sarana'; ``
@@ -526,6 +531,17 @@ function App() {
         }
       />
 
+      <Route path="/marketing/pengembalian-surat-jalan-customer"
+        element={<MainLayout><PengembalianSuratJalanCustomer menuName="Pengembalian SJ" /></MainLayout>} />
+
+      {/* 👑 SUNTIKKAN PATH BARU TAMBAH DATA DI SINI MASTER! */}
+      <Route
+        path="/marketing/pengembalian-surat-jalan-customer/add"
+        element={<MainLayout><TambahPengembalianSuratJalan /></MainLayout>}
+      />
+
+
+
       {/* 🚀 VARIASI 1: Rute polosan sesuai link klik sidebar browser lu */}
       <Route path="/marketing/closing-harian"
         element={
@@ -543,6 +559,33 @@ function App() {
           </MainLayout>
         }
       />
+
+      <Route path="/marketing/upload-csv"
+        element={
+          <MainLayout>
+            <UnderConstruction menuName="Upload CSV" />
+          </MainLayout>
+        }
+      />
+
+      <Route path="/marketing/pengemasan-barang-kurir"
+        element={
+          <MainLayout>
+            <UnderConstruction menuName="Pengemasan Barang Kurir" />
+          </MainLayout>
+        }
+      />
+
+      <Route path="/marketing/customer-upload-csv"
+        element={
+          <MainLayout>
+            <UnderConstruction menuName="Customer Upload CSV" />
+          </MainLayout>
+        }
+      />
+
+      <Route path="/marketing/proses-packing"
+        element={<MainLayout><ProsesPacking /></MainLayout>} />
 
       <Route path="/operasional"
         element={
@@ -633,6 +676,22 @@ function App() {
         element={
           <MainLayout>
             <MasterAreaLoper menuName="master-area-loper" />
+          </MainLayout>
+        }
+      />
+
+      <Route path="/Master/master-area-tidak-dilayani"
+        element={
+          <MainLayout>
+            <MasterAreaTidakDilayani />
+          </MainLayout>
+        }
+      />
+
+      <Route path="/Master/master-device-karyawan"
+        element={
+          <MainLayout>
+            <MasterDeviceKaryawan />
           </MainLayout>
         }
       />

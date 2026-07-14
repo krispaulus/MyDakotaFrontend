@@ -278,13 +278,11 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
             { name: 'Setoran Penjualan Tunai', path: '/penerimaan/setoran-penjualan' },
           ]
         },
-
-        {
-          name: 'Upload CSV', path: '/upload-csv'
-        },
-        { name: 'Proses Packing', path: '/proses-packing', roles: ['S'] },
-        { name: 'Pengemasan Barang Kurir', path: '/pengemasan-barang-kurir' },
-        { name: 'Customer - Upload CSV', path: '/customer/upload-csv', roles: ['S'] },
+        { name: 'Pengembalian Surat Jalan Customer', path: '/marketing/pengembalian-surat-jalan-customer', roles: ['S'] },
+        { name: 'Upload CSV', path: '/marketing/upload-csv' },
+        { name: 'Proses Packing', path: '/marketing/proses-packing', roles: ['S'] },
+        { name: 'Pengemasan Barang Kurir', path: '/marketing/pengemasan-barang-kurir' },
+        { name: 'Customer - Upload CSV', path: '/marketing/customer-upload-csv', roles: ['S'] },
       ]
 
     },
@@ -295,12 +293,12 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
       children: [
         { name: 'Agen', path: '/master/master-agen', roles: ['S', 'A'] },
         { name: 'Area Loper', path: '/master/master-area-loper', roles: ['S', 'A'] },
-        { name: 'Area Tidak Dilayani', path: '/settings/hrd' },
-        { name: 'Divice Karyawan', path: '/settings/marketing' },
-        { name: 'Kendaraan', path: '/settings/operasional' },
-        { name: 'Sewa Kendaraan', path: '/settings/piutang' },
+        { name: 'Area Tidak Dilayani', path: '/master/master-area-tidak-dilayani', roles: ['S', 'A'] },
+        { name: 'Divice Karyawan', path: '/master/master-device-karyawan', roles: ['S', 'A'] },
+        { name: 'Kendaraan', path: '/master/master-kendaraan', roles: ['S', 'A'] },
+        { name: 'Sewa Kendaraan', path: '/master/master-sewa-kendaraan', roles: ['S', 'A'] },
         { name: 'Kode Pos', path: '/master/master-kodepos' },
-        { name: 'Koordinator Wilayah', path: '/settings/account' },
+        { name: 'Koordinator Wilayah', path: '/master/master-koordinator-wilayah', roles: ['S', 'A'] },
         { name: 'Sopir', path: '/settings/account' },
         { name: 'Trayek', path: '/settings/account' },
         {

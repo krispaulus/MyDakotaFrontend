@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import { Save, X as XIcon, Search, AlertCircle, MapPin, Plus, FolderPlus } from 'lucide-react';
 import { useDarkMode } from '../context/DarkModeContext';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
@@ -55,8 +55,10 @@ const MasterAreaLoper = () => {
             const res = await api.get(`/area-loper?search=${q}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setData(res.data.data);
+            const dataWilayah = res.data?.data || res.data || [];
+            setData(dataWilayah);
         } catch (err) {
+            console.error("Detail error load area loper:", err);
             Swal.fire('Error', 'Gagal memuat data wilayah', 'error');
         } finally { setLoading(false); }
     };
