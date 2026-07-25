@@ -1,22 +1,18 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import axios from 'axios';
-import { Plus, Filter, Search, Copy, MapPin, Building2, ShieldCheck, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Edit, Printer } from 'lucide-react'; // 🌟 FIX: Import Edit & Printer dari lucide-react!
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import Swal from 'sweetalert2';
-import { MENU_LIST } from '../constants/menuList';
 import { useDarkMode } from "../context/DarkModeContext";
 import BttFormModal from '../components/organisms/BttFormModal';
-import api from '../api/axios' // 🚀 Instance ini sudah siap pakai, Master!
+import api from '../api/axios'; // 🚀 Instance axios terintegrasi
 
 const MarketingBTT = () => {
     const { isDarkMode } = useDarkMode();
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [listKecamatanTujuan, setListKecamatanTujuan] = useState([]); // Menampung data dari backend
-    const [selectedKecamatan, setSelectedKecamatan] = useState('');
-    const [kodePosTujuan, setKodePosTujuan] = useState('');
     const token = localStorage.getItem('token');
+
     const [showBttPrintModal, setShowBttPrintModal] = useState(false);
     const [modalNoBTT, setModalNoBTT] = useState('');
     const bttInputRef = React.useRef(null);
@@ -26,18 +22,6 @@ const MarketingBTT = () => {
             setTimeout(() => bttInputRef.current.focus(), 100);
         }
     }, [showBttPrintModal]);
-
-    const executeQuickPrintBTT = (e) => {
-        if (e) e.preventDefault();
-        if (!modalNoBTT.trim()) return;
-
-        // 🚀 Buka tab baru murni langsung mengarah ke halaman cetak nota rangkap 3 bawaan Go lu!
-        window.open(`/marketing/btt/print?id=${modalNoBTT.trim().toUpperCase()}`, '_blank');
-
-        // Bersihkan state dan tutup modal
-        setShowBttPrintModal(false);
-        setModalNoBTT('');
-    };
 
     const columns = [
         { header: 'NO. BTT', accessor: 'id' },
@@ -54,20 +38,20 @@ const MarketingBTT = () => {
     ];
 
     // =========================================================================
-    // 🟢 SINKRONISASI UTAMU: Filter Multi-Tenant Dropdown Agen (Baris 20)
+    // 🟢 SINKRONISASI FILTER AGEN REAL-TIME (SOLUSI DLI CIKARANG & PUSAT)
     // =========================================================================
-    const [filterAgenId, setFilterAgenId] = useState(localStorage.getItem('active_agen_id') || '839');
+    const [filterAgenId, setFilterAgenId] = useState(
+        localStorage.getItem('active_agen_id') || sessionStorage.getItem('active_agen_id') || ''
+    );
 
     const fetchBTT = async (targetAgenId) => {
         setLoading(true);
         try {
-            const agenIdFix = targetAgenId || localStorage.getItem('active_agen_id') || '839';
-            const currentToken = localStorage.getItem('token'); // 🟢 Ambil token ter-update secara real-time
+            const currentToken = localStorage.getItem('token');
+            const agenIdFix = targetAgenId || localStorage.getItem('active_agen_id') || '';
 
-            console.log(`📡 [Filter Agen] Memuat list BTT khusus untuk Agen ID: ${agenIdFix}`);
+            console.log(`📡 [Filter Agen] Memuat BTT khusus Agen ID: ${agenIdFix}`);
 
-            // 🟢 JALUR AMAN: Gunakan axios mentah dengan full URL + Headers eksplisit
-            // Cara ini 100% melompati bug interseptor kaku di file kustom axios lu!
             const res = await api.get(`/marketing/btt?agen_id=${agenIdFix}`, {
                 headers: {
                     'Authorization': `Bearer ${currentToken}`,
@@ -79,144 +63,45 @@ const MarketingBTT = () => {
                 setData(res.data);
             } else if (res.data && Array.isArray(res.data.data)) {
                 setData(res.data.data);
+            } else {
+                setData([]);
             }
         } catch (err) {
-            console.error("Gagal menarik data spesifik BTT Agen:", err);
-            setData([]); // Kosongkan tabel jika terjadi gangguan otentikasi
+            console.error("Gagal menarik data BTT Spesifik Agen:", err);
+            setData([]);
         } finally {
             setLoading(false);
         }
     };
 
-    // 🟢 LISTEN PERUBAHAN DROPDOWN REAL-TIME
+    // 🟢 MONITORING DROPDOWN REAL-TIME
     useEffect(() => {
-        if (token) {
-            // Ambil data pertama kali mengikuti agen aktif di dropdown
-            fetchBTT(filterAgenId);
-        }
+        const initialAgen = localStorage.getItem('active_agen_id') || '';
+        fetchBTT(initialAgen);
 
-        // Interval checker untuk membaca perubahan dropdown antar-komponen layout luar
-        const intervalCheck = setInterval(() => {
-            const latestAgenId = localStorage.getItem('active_agen_id');
-            if (latestAgenId !== filterAgenId) {
-                setFilterAgenId(latestAgenId); // Trigger React re-render komponen
-                fetchBTT(latestAgenId);        // Saring data baru dari Postgres seketika!
-            }
-        }, 1000);
-
-        return () => clearInterval(intervalCheck);
-    }, [token, filterAgenId]);
-
-    const handleSimpanBTT = () => {
-        const token = localStorage.getItem('token');
-
-        // Ambil kode agen penugasan aktif dari dropdown header atas kamu
-        const activeAgenId = localStorage.getItem('active_agen_id') || '';
-
-        // Bungkus payload data mengikuti tag json file btt.go kamu bro!
-        const payload = {
-            asal_name: namaPengirim,       // Cocok dengan json:"id" / json:"asal_name" di btt.go
-            asal_kota: asalKotaState,
-            tujuan_nama: namaPenerima,
-            tujuan_kota: tujuanKotaState,
-            tujuan_kecamatan: tujuanKecState,
-            nama_barang: namaBarangState,
-            jml_pck: parseInt(jumlahPckState) || 0,
-            berat: parseFloat(beratFinalState) || 0, // Ambil berat chargeable/final hitungan tarif
-            harga: parseFloat(grandTotalHargaState) || 0, // Ambil harga total ongkir rupiah
-            biaya_penerus: parseFloat(biayaPenerusState) || 0
+        const handleAgenChange = () => {
+            const latestAgenId = localStorage.getItem('active_agen_id') || '';
+            setFilterAgenId(latestAgenId);
+            fetchBTT(latestAgenId);
         };
 
-        console.log("Mengirim payload transaksi BTT ke Golang:", payload);
+        window.addEventListener('storage', handleAgenChange);
+        window.addEventListener('agen_changed', handleAgenChange);
 
-        api.post('/btt/add', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(payload)
-        })
-            .then(res => {
-                if (!res.ok) throw new Error("Gagal menyimpan transaksi kargo");
-                return res.json();
-            })
-            .then(result => {
-                if (result.status === "success") {
-                    alert(`🎉 JEDERRR! Transaksi Berhasil! Nomor Seri BTT: ${result.btt_no}`);
-                    window.location.reload(); // Refresh halaman biar list datatable utamamu ter-update!
-                }
-            })
-            .catch(err => {
-                console.error("Gagal insert data BTT:", err);
-                alert("Mogok! Gagal melakukan simpan transaksi ke PostgreSQL.");
-            });
-    };
-
-    // 🚀 INTERSEPTOR VALIDASI GERBANG LOKET HARIAN (SINKRON OPERASIONAL PUSAT)
-    const handleKlikTambahBttDuaArah = async () => {
-        const sessionAgenId = localStorage.getItem('active_agen_id') || sessionStorage.getItem('active_agen_id') || '839';
-
-        try {
-            const token = localStorage.getItem('token');
-            // Tembak API pengecekan gerbang closing kemarin
-            const response = await api.get(`/btt/check-closing-gate?agen_id=${sessionAgenId}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            if (response.data && response.data.status === "blocked") {
-                // 🛑 JEDERRR!!! BLOKIR TRANSKASI JALUR DARAT NASIONAL!
-                Swal.fire({
-                    title: '🚨 GERBANG LOKET TERKUNCI!',
-                    html: `
-                <div style="font-family: sans-serif; text-align: left; font-size: 13px; padding: 5px;">
-                <p style="color: #ef4444; font-weight: 800; font-size: 14px; margin-bottom: 8px;">TRANSAKSI BTT BARU DITOLAK SISTEM!</p>
-                <p style="color: #4b5563; leading: 1.5;">${response.data.message}</p>
-                <div style="background-color: #fff7ed; border-left: 4px solid #f97316; padding: 8px; margin-top: 10px; border-radius: 4px; color: #c2410c; font-weight: bold;">
-                    💡 Solusi: Masuk ke menu Marketing ➡️ Closing Harian Agen, lalu lakukan proses tutup buku untuk transaksi hari kemarin terlebih dahulu!
-                </div>
-                </div>
-            `,
-                    icon: 'error',
-                    confirmButtonColor: '#ef4444',
-                    confirmButtonText: 'SIAP, SAYA CLOSING DAHULU',
-                    customClass: { container: 'z-[999999]' }
-                });
-                return; // 🛑 KUNCI MATI JALUR: Batalkan pembukaan modal form input BTT!
+        const intervalCheck = setInterval(() => {
+            const latestAgenId = localStorage.getItem('active_agen_id') || '';
+            if (latestAgenId !== filterAgenId) {
+                setFilterAgenId(latestAgenId);
+                fetchBTT(latestAgenId);
             }
+        }, 500);
 
-            // 🟢 JALUR AMAN: Jika allowed, silakan buka modal input BTT baru seperti biasa, Master!
-            setIsModalBttOpen(true); // Ganti dengan nama state pengontrol buka modal BTT di file lu
-
-        } catch (err) {
-            console.error("Gagal verifikasi gerbang closing harian:", err);
-            // Fallback aman: jika koneksi server gangguan, biarkan masuk atau kunci sesuai kebijakan audit
-            setIsModalBttOpen(true);
-        }
-    };
-
-    const fetchBttData = async () => {
-        const agenId = localStorage.getItem('active_agen_id');
-
-        // 👑 SELEWENGKAN REQUEST JIKA AGEN_ID GAIB / UNDEFINED
-        if (!agenId || agenId === 'undefined' || agenId === 'null') {
-            console.warn("⏳ [MarketingBTT] Menunda fetch karena active_agen_id belum siap / undefined.");
-            return; // Bantai proses di sini, jangan lanjut axios.get!
-        }
-
-        try {
-            setLoading(true);
-            console.log(`[Filter Agen] Memuat list BTT khusus untuk Agen ID: ${agenId}`);
-
-            // Pemanggilan API lu yang aman bray
-            const response = await api.get(`/marketing/btt?agen_id=${agenId}`);
-            setData(response.data);
-        } catch (error) {
-            console.error("❌ Gagal menarik data spesifik BTT Agen:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
+        return () => {
+            window.removeEventListener('storage', handleAgenChange);
+            window.removeEventListener('agen_changed', handleAgenChange);
+            clearInterval(intervalCheck);
+        };
+    }, [filterAgenId]);
 
     return (
         <div className="relative">
@@ -228,38 +113,50 @@ const MarketingBTT = () => {
                 isDarkMode={isDarkMode}
                 actionMode="readonly_print"
                 onAdd={async () => {
-                    // 1. Tarik parameter kasta role akses, identitas agen aktif, dan id cabang induk dari storage
-                    const currentRole = localStorage.getItem('role_akses');
-                    const activeAgenId = localStorage.getItem('active_agen_id');
-                    const activeCabangId = localStorage.getItem('active_cabang_id'); // 🚀 Ambil Cabang ID dari session (e.g., 'PST001', 'HO')
-                    const token = localStorage.getItem('token');
+                    const activeAgenId = localStorage.getItem('active_agen_id') || '';
+                    const activeAgenNama = localStorage.getItem('active_agen_nama') || '';
+                    const activeCabangId = localStorage.getItem('active_cabang_id') || '';
 
-                    // =========================================================================
-                    // 🛡️ INTERCEPTOR MURNI 1: VALIDASI HOLDING SECARA DINAMIS (ANTI-HARDCODE)
-                    // =========================================================================
-                    // Cek secara dinamis: Jika cabang ID admin adalah holding pusat, blokir input BTT!
-                    if (!activeAgenId || activeAgenId === activeCabangId) {
+                    // 🛡️ INTERCEPTOR PUSAT DAKOTA / HOLDING ELEGAN
+                    const isPusat =
+                        activeAgenId === '839' ||
+                        activeAgenId === '1' ||
+                        !activeAgenId ||
+                        activeAgenId === activeCabangId ||
+                        activeAgenNama.toUpperCase().includes('PUSAT') ||
+                        activeAgenNama.toUpperCase().includes('HOLDING');
+
+                    if (isPusat) {
                         Swal.fire({
-                            title: 'SOP Kantor Pusat Terdeteksi!',
-                            text: 'Mohon maaf, otoritas Kantor Pusat (Holding) tidak diperbolehkan menerbitkan atau membuat transaksi BTT baru secara langsung. Silakan pilih unit Agen atau Cabang operasional terlebih dahulu pada menu dropdown di pojok kanan atas untuk melanjutkan.',
-                            icon: 'warning',
-                            confirmButtonColor: '#4f46e5',
-                            confirmButtonText: 'SIAP, SAYA PAHAM',
-                            allowOutsideClick: false
+                            title: 'Akses Dibatasi',
+                            html: `
+                                <div style="font-family: 'Inter', sans-serif; text-align: left; font-size: 13px; padding: 4px;">
+                                    <p style="color: #1e293b; font-weight: 700; font-size: 14px; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">
+                                        Kebijakan Operasional Kantor Pusat
+                                    </p>
+                                    <p style="color: #475569; line-height: 1.6; margin-bottom: 12px;">
+                                        Unit <b>PUSAT DAKOTA (HOLDING)</b> dikhususkan untuk fungsi pengawasan dan manajemen internal. Penerbitan Bukti Tanda Terima (BTT) hanya dapat dilakukan melalui unit <b>Agen / Cabang Operasional</b>.
+                                    </p>
+                                    <div style="background-color: #f8fafc; border-left: 4px solid #3b82f6; padding: 10px; border-radius: 6px; color: #334155; font-size: 12px;">
+                                        💡 <b>Petunjuk:</b> Silakan beralih ke lokasi Agen atau Cabang Operasional melalui pemilih lokasi di pojok kanan atas.
+                                    </div>
+                                </div>
+                            `,
+                            icon: 'info',
+                            iconColor: '#3b82f6',
+                            confirmButtonColor: '#2563eb',
+                            confirmButtonText: 'Paham & Lanjutkan',
+                            customClass: { container: 'z-[999999]' }
                         });
-                        return; // 🛑 KUNCI MATI JALUR!
+                        return;
                     }
 
-                    // =========================================================================
-                    // 🛡️ INTERCEPTOR MURNI 2: CEGAT GERBANG CLOSING HARIAN H-1 DENGAN DYNAMIC ID
-                    // =========================================================================
+                    // 🛡️ INTERCEPTOR GERBANG CLOSING HARIAN H-1
                     try {
                         setLoading(true);
-                        // Gunakan axios instance 'api' agar token JWT otomatis menempel di header
                         const response = await api.get(`/btt/check-closing-gate?agen_id=${activeAgenId}`);
 
                         if (response.data && response.data.status === "blocked") {
-                            // 🛑 BLOKIR JALUR JALAN: Hari kemarin belum closing harian!
                             Swal.fire({
                                 title: '🚨 GERBANG LOKET TERKUNCI!',
                                 html: `
@@ -276,28 +173,35 @@ const MarketingBTT = () => {
                                 confirmButtonText: 'SIAP, SAYA CLOSING DAHULU',
                                 customClass: { container: 'z-[999999]' }
                             });
-                            setLoading(false);
-                            return; // 🛑 KUNCI MATI JALUR BTT BARU!
+                            return;
                         }
-
                     } catch (err) {
-                        console.error("Gagal melakukan verifikasi gerbang closing harian:", err);
-                        // Fallback aman jika koneksi terputus: izinkan buka modal demi kelancaran loket darurat
-                        setIsModalOpen(true);
+                        console.error("Gagal verifikasi gerbang closing harian:", err);
                     } finally {
                         setLoading(false);
                     }
 
-                    // 🟢 Jika lolos seluruh rangkaian validasi dinamis, izinkan membuka modal form input data baru
-                    console.log("[MarketingBTT] Lolos seluruh saringan SOP dinamis untuk agen:", activeAgenId);
                     setIsModalOpen(true);
                 }}
 
                 onEdit={(item) => {
                     const targetResiID = item.id || "";
-                    console.log("🚀 [BTT Printer Compass] Membuka lembaran layout resi secara aman untuk ID:", targetResiID);
 
+                    const activePtFromStorage =
+                        localStorage.getItem('active_pt_nama') ||
+                        localStorage.getItem('pt_nama') ||
+                        localStorage.getItem('company_name');
+
+                    const headerTitleElement = document.querySelector('h1, .page-title, header');
+                    const headerText = headerTitleElement ? headerTitleElement.innerText : "";
+
+                    const ptNamaFix = activePtFromStorage || (headerText.includes("Dakota") ? headerText.split('\n')[0] : "");
+
+                    // 🌟 PAYLOAD PURE DYNAMIC NUSANTARA MULTI-TENANT (BEBAS HARDCODE)
                     const payloadFormatPrint = {
+                        // PT Nama dijamin terisi nama Corporate aktif!
+                        pt_nama: item.pt_nama || ptNamaFix || localStorage.getItem('active_agen_nama') || "",
+
                         bttt_tanggal: item.tanggal,
                         bttt_nosuratjalan: item.no_surat_jalan || item.nosuratjalan || "",
                         bttt_ket: item.keterangan || item.ket || "",
@@ -312,14 +216,14 @@ const MarketingBTT = () => {
                         bttt_paketyn: item.jenis_layanan === 'REGULER' || item.paketyn === 'Y' ? 'Y' : 'N',
                         bttt_jenisharga: item.metode_pembayaran === 'TUNAI' ? '0' : item.metode_pembayaran === 'KREDIT' ? '2' : '1',
 
-                        // Alamat Pengirim
-                        bttt_asalname: item.asal_name || "UMUM",
+                        // Identitas Agen Operasional Pengirim
+                        bttt_asalname: item.asal_name || "",
                         bttt_asaltelp: item.asal_telp || "",
                         bttt_asalalamat: item.asal_alamat || "",
                         bttt_asalkota: item.asal_kota || "",
-                        bttt_inisial_asal: item.inisial_asal || "GORONTALO",
+                        bttt_inisial_asal: item.agen_nama || item.inisial_asal || localStorage.getItem('active_agen_nama') || "",
 
-                        // Alamat Penerima
+                        // Identitas Penerima
                         bttt_tujuannama: item.tujuan_nama || "",
                         bttt_tujuantelp: item.tujuan_telp || "",
                         bttt_tujuanalamat: item.tujuan_alamat || "",
@@ -330,11 +234,13 @@ const MarketingBTT = () => {
                         bttt_tujuanpropinsi: item.tujuan_propinsi || ""
                     };
 
-                    // 💾 INJECT DATA KE STORAGE: Pasok data ke dalam dua key penampung utama BttPrintPage!
+                    console.log("🖨️ [Print Interceptor] Mengirim Payload ke Print Page:", payloadFormatPrint);
+
+                    // Simpan payload dan nomor BTT ke LocalStorage
                     localStorage.setItem('print_btt_payload', JSON.stringify(payloadFormatPrint));
                     localStorage.setItem('print_btt_number', targetResiID);
 
-                    // Buka tab baru langsung mengarah ke halaman cetak nota rangkap 3 bawaan Go lu!
+                    // Buka halaman print di tab baru
                     window.open(`/marketing/btt/print?id=${targetResiID}`, '_blank');
                 }}
             />

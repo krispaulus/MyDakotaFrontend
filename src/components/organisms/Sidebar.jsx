@@ -4,7 +4,7 @@ import { jwtDecode } from 'jwt-decode';
 import {
   LayoutDashboard, Users, Book, Briefcase,
   Database, TrendingUp, Truck, DollarSign,
-  Settings, LogOut, ChevronRight, Menu, Backpack, ClipboardPen, HandCoins
+  Settings, LogOut, ChevronRight, Menu, Backpack, ClipboardPen, HandCoins, Route, GitCompareArrows
 } from 'lucide-react';
 import DakotaLogo from '../../assets/new_logo 2.png';
 import LogoutModal from './LogoutModal';
@@ -291,21 +291,25 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
       icon: <Database size={20} />,
       roles: ['S', 'A'],
       children: [
+        { name: 'Area Customer', path: '/master/area-customer', roles: ['S', 'A'] },
         { name: 'Agen', path: '/master/master-agen', roles: ['S', 'A'] },
         { name: 'Area Loper', path: '/master/master-area-loper', roles: ['S', 'A'] },
         { name: 'Area Tidak Dilayani', path: '/master/master-area-tidak-dilayani', roles: ['S', 'A'] },
+        { name: 'Harga Perwilayah', path: '/master/master-harga-perwilayah', roles: ['S', 'A'] },
         { name: 'Divice Karyawan', path: '/master/master-device-karyawan', roles: ['S', 'A'] },
+        { name: 'Monitoring Lokasi Karyawan', path: '/master/monitoring-karyawan', roles: ['S', 'A'] },
         { name: 'Kendaraan', path: '/master/master-kendaraan', roles: ['S', 'A'] },
+        { name: 'Perawatan Kendaraan', path: '/master/perawatan-kendaraan', roles: ['S', 'A'] },
         { name: 'Sewa Kendaraan', path: '/master/master-sewa-kendaraan', roles: ['S', 'A'] },
         { name: 'Kode Pos', path: '/master/master-kodepos' },
-        { name: 'Koordinator Wilayah', path: '/master/master-koordinator-wilayah', roles: ['S', 'A'] },
-        { name: 'Sopir', path: '/settings/account' },
-        { name: 'Trayek', path: '/settings/account' },
+        { name: 'Koordinator Wilayah', path: '/master/master-korwil', roles: ['S', 'A'] },
+        { name: 'Sopir', path: '/master/master-sopir' },
+        { name: 'Trayek', path: '/master/master-trayek', roles: ['S', 'A'] },
         {
           name: 'Tarif',
           icon: <Truck size={18} />,
           children: [
-            { name: 'Tarif Carter', path: '/master/master-agen', roles: ['S', 'A'] },
+            { name: 'Tarif Carter', path: '/master/tarif-carter' },
             { name: 'Tarif Handling', path: '/settings/general-ledger' },
             { name: 'Tarif Paket Customer', path: '/settings/hrd' },
             { name: 'Tarif Paket Kurir', path: '/settings/marketing' },
@@ -330,13 +334,28 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
         { name: 'Laporan', path: '/operasional/area-tidak-dilayani', roles: ['S', 'A'] },
         { name: 'Loading Unloading Barang', path: '/operasional/divice-karyawan', roles: ['S', 'A'] },
         { name: 'Loper', path: '/operasional/loper', roles: ['S', 'A'] },
-        { name: 'Pengambilan ', path: '/operasional/sewa-kendaraan', roles: ['S', 'A'] },
-        { name: 'Pengembalian', path: '/operasional/kode-pos', roles: ['S', 'A'] },
-        { name: 'Pengisian BBM', path: '/operasional/account', roles: ['S', 'A'] },
-        { name: 'Sewa Kendaraan', path: '/operasional/account', roles: ['S', 'A'] },
-        { name: 'Setok Barang Gudang', path: '/operasional/account', roles: ['S', 'A'] },
-        { name: 'Rekap Stok Barang Gudang', path: '/operasional/account', roles: ['S', 'A'] },
-        { name: 'Surat Muatan Udara', path: '/operasional/account', roles: ['S', 'A'] },
+        { name: 'Pengambilan ', path: '/operasional/pengambilan', roles: ['S', 'A'] },
+        {
+          name: 'Pengambilan ',
+          icon: <Route size={18} />,
+          children: [
+            { name: 'Barang Sendiri', path: '/pengambilan/barang-sendiri', roles: ['S', 'A'] },
+            { name: 'Pengambilan Retur', path: '/pengambilan/pengambilan-retur', roles: ['S', 'A'] },
+          ]
+        },
+        {
+          name: 'Pengembalian',
+          icon: <GitCompareArrows size={18} />,
+          children: [
+            { name: 'BTT', path: '/pengembalian/pengembalianbtt', roles: ['S', 'A'] },
+            { name: 'Barang Retur', path: '/pengembalian/barang-retur', roles: ['S', 'A'] },
+          ]
+        },
+        { name: 'Pengisian BBM', path: '/operasional/pengisian-bbm', roles: ['S', 'A'] },
+        { name: 'Sewa Kendaraan', path: '/operasional/sewa-kendaraan', roles: ['S', 'A'] },
+        { name: 'Setok Barang Gudang', path: '/operasional/setok-barang-gudang', roles: ['S', 'A'] },
+        { name: 'Rekap Stok Barang Gudang', path: '/operasional/rekap-stok-barang-gudang', roles: ['S', 'A'] },
+        { name: 'Surat Muatan Udara', path: '/operasional/surat-muatan-udara', roles: ['S', 'A'] },
         {
           name: 'Surat Pengantar',
           icon: <ClipboardPen size={18} />,
@@ -347,9 +366,9 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
             { name: 'Surat Pengantar - Turun`', path: '/operasional/surat-pengantar-turun', roles: ['S', 'A'] },
           ]
         },
-        { name: 'Surat Tugas', path: '/operasional/account', roles: ['S', 'A'] },
-        { name: 'Tarif Komisi Super', path: '/operasional/account', roles: ['S', 'A'] },
-        { name: 'Voucher BBM', path: '/operasional/account', roles: ['S', 'A'] },
+        { name: 'Surat Tugas', path: '/operasional/surat-tugas', roles: ['S', 'A'] },
+        { name: 'Tarif Komisi Super', path: '/operasional/tarif-komisi-super', roles: ['S', 'A'] },
+        { name: 'Voucher BBM', path: '/operasional/voucher-bbm', roles: ['S', 'A'] },
       ]
     },
 

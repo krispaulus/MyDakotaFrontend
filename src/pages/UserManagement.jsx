@@ -711,7 +711,9 @@ const UserManagement = () => {
   const handleFinalSubmit = async () => {
     console.log("KLIK TOMBOL SAVE BERHASIL!");
     const token = localStorage.getItem('token');
-    const pt_id = localStorage.getItem('pt_ID') || localStorage.getItem('selected_pt');
+
+    // Ambil PT ID dengan fallback yang aman ('C' untuk DLI, 'A' untuk DBS)
+    const pt_id = localStorage.getItem('pt_ID') || localStorage.getItem('selected_pt') || 'C';
     const activeData = showAddModal ? addUser : editUser;
     const password = newPassword.trim() !== '' ? newPassword : '';
 
@@ -721,12 +723,11 @@ const UserManagement = () => {
 
     try {
       setLoading(true);
-      const url = showAddModal
-        ? '/users/add'
-        : '/users/update';
+      // 🌟 PERBAIKAN SAKTI: Gunakan instance `api` (BUKAN `axios`), URL sesuaikan dengan base API
+      const url = showAddModal ? '/users/add' : '/users/update';
       const method = showAddModal ? 'post' : 'put';
 
-      const response = await axios[method](url, payload, {
+      const response = await api[method](url, payload, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -740,9 +741,12 @@ const UserManagement = () => {
         await fetchUsers();
       }
     } catch (error) {
+      console.error("Detail Error API Add User:", error);
+      const errMsg = error.response?.data?.message || error.message || "Terjadi kesalahan pada server";
+
       Swal.fire({
         title: 'ERROR',
-        text: "❌ Gagal: " + (error.response?.data?.message || "Terjadi kesalahan"),
+        text: "❌ Gagal: " + errMsg,
         icon: 'error',
         confirmButtonText: 'Back',
         confirmButtonColor: '#ff2c2c',

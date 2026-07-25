@@ -363,7 +363,9 @@ const MasterAreaLoper = () => {
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className={`w-full max-w-6xl p-6 rounded-2xl shadow-2xl h-[95vh] flex flex-col ${isDarkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900'}`}>
                         <div className="flex justify-between items-center pb-2 border-b dark:border-slate-700">
-                            <h3 className="text-lg font-bold text-emerald-600 dark:text-emerald-400">EDIT MASTER AREA LOPER</h3>
+                            <h3 className="text-lg font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
+                                {editData ? 'EDIT MASTER AREA LOPER' : 'TAMBAH MASTER AREA LOPER'}
+                            </h3>
                             <button onClick={() => setIsModalOpen(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full"><XIcon size={20} /></button>
                         </div>
 
