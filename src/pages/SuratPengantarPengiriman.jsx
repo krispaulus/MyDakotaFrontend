@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import Swal from 'sweetalert2';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
@@ -13,17 +13,7 @@ const SuratPengantarPengiriman = () => {
         const liveAgenId = localStorage.getItem('active_agen_id');
         const liveKodeCabang = localStorage.getItem('kode_cabang') || localStorage.getItem('profile_kode_cabang');
 
-        if (liveAgenNama || liveAgenId || liveKodeCabang) {
-            return liveAgenNama || liveAgenId || liveKodeCabang;
-        }
-
-        // Emergency Fallback: Ambil paksa teks dari header dropdown yang tertulis di layar
-        if (document.body && document.body.innerText.includes('AGEN')) {
-            const match = document.body.innerText.match(/[A-Z\s]+AGEN/);
-            if (match) return match[0].trim();
-        }
-
-        return '';
+        return liveAgenNama || liveKodeCabang || liveAgenId || '';
     });
 
     // 📊 State Management Data Dropdown & Loading
@@ -32,16 +22,17 @@ const SuratPengantarPengiriman = () => {
     const [drivers, setDrivers] = useState([]);
     const [agens, setAgens] = useState([]);
 
-    // 📝 State Rincian Data Manifest yang di-scan (Bentuk Array Object untuk DataTableTemplate)
+    // 📝 State Rincian Data Manifest yang di-scan
     const [manifestData, setManifestData] = useState([]);
     const [barcodeInput, setBarcodeInput] = useState('');
     const [filterParams, setFilterParams] = useState({
-        tanggal_awal: new Date().toISOString().split('T')[0], // Default tanggal hari ini
+        tanggal_awal: new Date().toISOString().split('T')[0],
+        //tanggal_awal: '2017-01-01',
         tanggal_akhir: new Date().toISOString().split('T')[0],
         no_sp: '',
         no_btt: '',
-        no_loading: '',
-        no_surat_tugas: ''
+        no_surat_tugas: '',
+        transit: ''
     });
 
     // State Form Manifest Header
@@ -58,25 +49,31 @@ const SuratPengantarPengiriman = () => {
     // =========================================================================
     // 🔍 ULTIMATE DOM SNIFFER: Pemantau Dropdown Navigasi Global
     // =========================================================================
+    // useEffect(() => {
+    //     const interval = setInterval(() => {
+    //         let detectedAgen = '';
+    //         const navElements = document.querySelectorAll('button, select, span, div');
+    //         for (let el of navElements) {
+    //             if (el.innerText && el.innerText.includes('AGEN') && !el.innerText.includes('LOKET')) {
+    //                 detectedAgen = el.innerText.trim();
+    //                 break;
+    //             }
+    //         }
+    //         if (!detectedAgen) {
+    //             detectedAgen = localStorage.getItem('active_agen_nama') || '';
+    //         }
+    //         if (detectedAgen && detectedAgen !== currentActiveAgen) {
+    //             setCurrentActiveAgen(detectedAgen);
+    //         }
+    //     }, 500);
+    //     return () => clearInterval(interval);
+    // }, [currentActiveAgen]);
     useEffect(() => {
-        const interval = setInterval(() => {
-            let detectedAgen = '';
-            const navElements = document.querySelectorAll('button, select, span, div');
-            for (let el of navElements) {
-                if (el.innerText && el.innerText.includes('AGEN') && !el.innerText.includes('LOKET')) {
-                    detectedAgen = el.innerText.trim();
-                    break;
-                }
-            }
-            if (!detectedAgen) {
-                detectedAgen = localStorage.getItem('active_agen_nama') || '';
-            }
-            if (detectedAgen && detectedAgen !== currentActiveAgen) {
-                setCurrentActiveAgen(detectedAgen);
-            }
-        }, 500);
-        return () => clearInterval(interval);
-    }, [currentActiveAgen]);
+        const liveAgenNama = localStorage.getItem('active_agen_nama') || localStorage.getItem('kode_cabang');
+        if (liveAgenNama && liveAgenNama !== currentActiveAgen) {
+            setCurrentActiveAgen(liveAgenNama);
+        }
+    }, []);
 
     // =========================================================================
     // 🔄 FETCH MASTER DATA DROPDOWN
@@ -97,6 +94,8 @@ const SuratPengantarPengiriman = () => {
                 });
                 if (Array.isArray(resAgens.data)) {
                     setAgens(resAgens.data);
+                } else if (resAgens.data?.data) {
+                    setAgens(resAgens.data.data);
                 }
             } catch (error) {
                 console.error("Gagal sinkronisasi data master:", error);
@@ -106,7 +105,7 @@ const SuratPengantarPengiriman = () => {
     }, [currentActiveAgen]);
 
     // =========================================================================
-    // 🔍 TRIGGER SEARCH: Tarik Data Histori Manifes Dokumen Berdasarkan Filter
+    // 🔍 TRIGGER SEARCH: Tarik Data Histori Surat Pengantar
     // =========================================================================
     const handleSearchHistory = async (e) => {
         if (e) e.preventDefault();
@@ -121,20 +120,20 @@ const SuratPengantarPengiriman = () => {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            if (response.data.status === 'success' && Array.isArray(response.data.data)) {
-                // Konversi format response backend ke baris manifest DataTableTemplate
-                const mappedData = response.data.data.map((item, idx) => ({
+            const resData = response.data?.data || response.data || [];
+            if (Array.isArray(resData)) {
+                const mappedData = resData.map((item, idx) => ({
                     no_urut: idx + 1,
-                    btt_id: item.btt_id,
-                    scan_time: item.btt_tanggal || '-',
-                    status_muat: 'POSTED'
+                    btt_id: item.no_sp || item.spt_eid || item.btt_id || '-',
+                    scan_time: item.tanggal || item.spt_tanggal || item.btt_tanggal || '-',
+                    status_muat: item.spt_transityn === 'Y' ? 'TRANSIT' : 'LANGSUNG'
                 }));
                 setManifestData(mappedData);
-                Swal.fire('PENCARIAN SELESAI', `Berhasil menemukan ${mappedData.length} manifes data resi!`, 'success');
+                Swal.fire('PENCARIAN SELESAI', `Berhasil menemukan ${mappedData.length} data Surat Pengantar!`, 'success');
             }
         } catch (error) {
             console.error("Gagal menarik histori manifest:", error);
-            Swal.fire('PENCARIAN KOSONG', 'Tidak ada data manifes yang cocok dengan parameter filter.', 'info');
+            Swal.fire('PENCARIAN KOSONG', 'Tidak ada data yang cocok dengan parameter filter.', 'info');
         } finally {
             setLoading(false);
         }
@@ -144,7 +143,7 @@ const SuratPengantarPengiriman = () => {
     // 🛒 SCANNER HANDLER
     // =========================================================================
     const handleAddBTT = (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
         const cleanBTT = barcodeInput.trim().toUpperCase();
         if (!cleanBTT) return;
 
@@ -193,7 +192,7 @@ const SuratPengantarPengiriman = () => {
                 spt_nomobil: formData.spt_nomobil,
                 spt_surattugas: formData.spt_surattugas,
                 spt_boronganyn: formData.spt_boronganyn,
-                spt_service: parseInt(formData.spt_service),
+                spt_service: parseInt(formData.spt_service, 10) || 1,
                 daftar_btt: manifestData.map(item => item.btt_id)
             };
 
@@ -202,11 +201,11 @@ const SuratPengantarPengiriman = () => {
             });
 
             if (response.data.status === 'success') {
-                Swal.fire('SUKSES!', `Surat Pengantar Nomor ${response.data.spt_eid} Berhasil Terbit!`, 'success');
+                Swal.fire('SUKSES!', `Surat Pengantar Nomor ${response.data.spt_eid || response.data.no_sp} Berhasil Terbit!`, 'success');
                 setManifestData([]);
             }
         } catch (err) {
-            Swal.fire('TRANSAKSI GAGAL', err.response?.data?.message || 'Server error', 'error');
+            Swal.fire('TRANSAKSI GAGAL', err.response?.data?.message || err.response?.data?.error || 'Server error', 'error');
         } finally {
             setLoading(false);
         }
@@ -234,7 +233,7 @@ const SuratPengantarPengiriman = () => {
     return (
         <div className={`p-6 space-y-6 min-h-screen ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-slate-50 text-slate-800'}`}>
 
-            {/* 🛠️ PANEL FILTER PARAMETER ADVANCED PENCARIAN (Poin 1 - 5) */}
+            {/* 🛠️ PANEL FILTER PARAMETER ADVANCED PENCARIAN */}
             <div className={`p-6 rounded-3xl border shadow-sm ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-slate-100'}`}>
                 <h2 className="text-md font-bold uppercase tracking-wider text-indigo-500 mb-4">🔍 Panel Filter & Pencarian Dokumen Operasional</h2>
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -255,12 +254,16 @@ const SuratPengantarPengiriman = () => {
                         <input type="text" placeholder="Cari No BTT..." value={filterParams.no_btt} onChange={e => setFilterParams({ ...filterParams, no_btt: e.target.value })} className="w-full mt-1 p-2 border rounded-lg bg-transparent" />
                     </div>
                     <div>
-                        <label className="text-xs font-bold text-slate-400">NO. LOADING / SURAT TUGAS</label>
-                        <input type="text" placeholder="Cari Surat Tugas..." value={filterParams.no_surat_tugas} onChange={e => setFilterParams({ ...filterParams, no_surat_tugas: e.target.value, no_loading: e.target.value })} className="w-full mt-1 p-2 border rounded-lg bg-transparent" />
+                        <label className="text-xs font-bold text-slate-400">PENGIRIMAN (TRANSIT)</label>
+                        <select value={filterParams.transit} onChange={e => setFilterParams({ ...filterParams, transit: e.target.value })} className="w-full mt-1 p-2 border rounded-lg bg-transparent">
+                            <option value="">-- SEMUA --</option>
+                            <option value="N">LANGSUNG</option>
+                            <option value="Y">TRANSIT</option>
+                        </select>
                     </div>
                 </div>
                 <div className="mt-4 flex justify-end">
-                    <button type="button" onClick={handleSearchHistory} className="px-6 py-2 bg-indigo-600 text-white font-bold rounded-xl text-xs hover:bg-indigo-700 uppercase tracking-wider shadow-sm">
+                    <button type="button" onClick={handleSearchHistory} className="px-6 py-2 bg-indigo-600 text-white font-bold rounded-xl text-xs hover:bg-indigo-700 uppercase tracking-wider shadow-sm cursor-pointer">
                         🔎 Jalankan Filter Data
                     </button>
                 </div>
@@ -279,7 +282,7 @@ const SuratPengantarPengiriman = () => {
                         <select required value={formData.spt_tujuan_agen_nama} onChange={e => setFormData({ ...formData, spt_tujuan_agen_nama: e.target.value })} className="w-full mt-1 p-2.5 border rounded-lg bg-transparent">
                             <option value="">-- PILIH TUJUAN --</option>
                             {agens.map((item, idx) => (
-                                <option key={idx} value={item.agen_nama}>{item.agen_nama}</option>
+                                <option key={idx} value={item.agen_nama || item.Agen_Nama}>{item.agen_nama || item.Agen_Nama}</option>
                             ))}
                         </select>
                     </div>
@@ -288,7 +291,7 @@ const SuratPengantarPengiriman = () => {
                         <select required value={formData.spt_nomobil} onChange={e => setFormData({ ...formData, spt_nomobil: e.target.value })} className="w-full mt-1 p-2.5 border rounded-lg bg-transparent">
                             <option value="">-- PILIH ARMADA --</option>
                             {fleet.map((item, idx) => (
-                                <option key={idx} value={item.nopol}>{item.nopol} ({item.kend_merk})</option>
+                                <option key={idx} value={item.nopol || item.kend_id}>{item.nopol || item.kend_id}</option>
                             ))}
                         </select>
                     </div>
@@ -297,7 +300,7 @@ const SuratPengantarPengiriman = () => {
                         <select required value={formData.spt_namasopir} onChange={e => setFormData({ ...formData, spt_namasopir: e.target.value })} className="w-full mt-1 p-2.5 border rounded-lg bg-transparent">
                             <option value="">-- PILIH DRIVER --</option>
                             {drivers.map((item, idx) => (
-                                <option key={idx} value={item.nama}>{item.nama}</option>
+                                <option key={idx} value={item.nama || item.kry_nama}>{item.nama || item.kry_nama}</option>
                             ))}
                         </select>
                     </div>
@@ -308,7 +311,7 @@ const SuratPengantarPengiriman = () => {
                         <label className="text-xs font-bold text-indigo-500 uppercase tracking-widest">Entry Barcode Scanner Muat Barang</label>
                         <input type="text" placeholder="Ketik nomor resi lalu tekan Enter..." value={barcodeInput} onChange={e => setBarcodeInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddBTT(e)} className="w-full mt-1 p-3 border border-indigo-300 dark:border-indigo-500 rounded-xl font-black tracking-widest text-indigo-600 bg-indigo-50/10 outline-none" />
                     </div>
-                    <button type="button" onClick={handleAddBTT} className="p-3.5 px-6 bg-indigo-600 text-white font-bold rounded-xl text-sm hover:bg-indigo-700 uppercase">Scan Muat</button>
+                    <button type="button" onClick={handleAddBTT} className="p-3.5 px-6 bg-indigo-600 text-white font-bold rounded-xl text-sm hover:bg-indigo-700 uppercase cursor-pointer">Scan Muat</button>
                 </div>
             </div>
 

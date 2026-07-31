@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import Swal from 'sweetalert2';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 

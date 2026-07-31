@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, UserPlus, X, Save, RefreshCw } from 'lucide-react';
+import { Plus, UserPlus, X, Save, RefreshCw, CheckSquare, Square } from 'lucide-react';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
 import Swal from 'sweetalert2';
@@ -509,6 +509,39 @@ const MasterCustomer = () => {
         } finally { //
             setLoading(false); //
         } //
+    };
+
+    // 🟢 FITUR HARI KERJA REALTIME (SABTU / MINGGU / LIBUR)
+    const handleToggleWorkDays = async (custId, field, currentValue, e) => {
+        e.stopPropagation(); // Biar gak memicu click event baris/row
+        const newValue = currentValue === 'Y' ? 'N' : 'Y';
+
+        // Update tampilan UI lokal terlebih dahulu (Optimistic UI)
+        setData(prevData => prevData.map(item => {
+            if (item.cust_id === custId) {
+                const updatedWorkDays = {
+                    ...(item.work_days || { cust_id: custId, sabtuyn: 'N', mingguyn: 'N', liburyn: 'N' }),
+                    [field]: newValue
+                };
+                return { ...item, work_days: updatedWorkDays };
+            }
+            return item;
+        }));
+
+        try {
+            const token = localStorage.getItem('token');
+            await api.post('/customer/workdays/update', {
+                cust_id: custId,
+                field: field,
+                value: newValue
+            }, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+        } catch (err) {
+            console.error("❌ Gagal update hari kerja:", err);
+            Swal.fire('Error', 'Gagal memperbarui status hari kerja', 'error');
+            fetchCustomers(filterAgenId); // Reload jika gagal
+        }
     };
 
     return (

@@ -40,6 +40,7 @@ import MasterSopir from './pages/MasterSopir';
 import MasterTrayek from './pages/MasterTrayek';
 import TarifCarter from './pages/TarifCarter';
 import SuratLoper from './pages/SuratLoper';
+import LoperDeadline from './pages/LoperDeadline';
 import Pengambilan from './pages/Pengambilan';
 import PengambilanRetur from './pages/PengambilanRetur';
 import MasterConfigParam from './pages/MasterConfig';
@@ -47,6 +48,29 @@ import AreaCustomer from './pages/AreaCustomer';
 import MasterHargaPerwilayah from './pages/MasterHargaPerwilayah';
 import MonitoringLokasiKaryawan from "./pages/MonitoringLokasiKaryawan";
 import PerawatanKendaraan from "./pages/PerawatanKendaraan";
+import MasterLeadTimeCustomer from "./pages/MasterLeadTimeCustomer";
+import MasterCustomerNew from "./pages/MasterCustomerNew";
+import MasterTarifCustomer from './pages/MasterTarifCustomer';
+import TarifHandlingPropinsi from './pages/TarifHandlingPropinsi';
+import TarifPaket from './pages/TarifPaket';
+import JenisKendaraanCarter from './pages/JenisKendaraanCarter';
+import MasterVendor from './pages/MasterVendor';
+import LaporanLSBP from './pages/LaporanLSBP';
+import LaporanLSBPV2 from './pages/LaporanLSBPV2';
+import LaporanBarangTurun from './pages/LaporanBarangTurun';
+import LaporanBTTBelumKembali from './pages/LaporanBTTBelumKembali';
+import LaporanDataPenerimaCustomer from './pages/LaporanDataPenerimaCustomer';
+import LaporanPendapatanOperasional from './pages/LaporanPendapatanOperasional';
+import LoadingBarang from './pages/LoadingBarang';
+import PembongkaranBarang from './pages/PembongkaranBarang';
+import InventoryCustomer from './pages/InventoryCustomer';
+import PengeluaranInventoryCustomer from './pages/PengeluaranInventoryCustomer';
+import PengembalianBTT from './pages/PengembalianBTT';
+import BarangRetur from './pages/BarangRetur';
+import PengisianBBM from './pages/PengisianBBM';
+import SuratTugas from './pages/SuratTugas';
+import SuratMuatanUdara from './pages/SuratMuatanUdara';
+import HasilLoper from './pages/HasilLoper';
 
 const getCompanyName = (pt) => {
   if (pt === 'A') return 'Dakota Buana Sarana';
@@ -479,12 +503,32 @@ function App() {
       <Route path="/operasional" element={<MainLayout>            <UnderConstruction menuName="Operasional" />          </MainLayout>} />
       <Route path="/operasional/pengembalian" element={<MainLayout><UnderConstruction /></MainLayout>} />
       <Route path="/operasional/sp-terima/print-nota/:id" element={<SuratPengantarPrint />} />
+
       <Route path="/operasional/surat-pengantar-pengiriman" element={<MainLayout><SuratPengantarPengiriman /></MainLayout>} />
       <Route path="/operasional/surat-pengantar-sp-pad" element={<MainLayout><SuratPengantarPAD /></MainLayout>} />
       <Route path="/operasional/surat-kembali-btt" element={<MainLayout><SuratKembaliBTT /></MainLayout>} />
       <Route path="/operasional/surat-pengantar-turun" element={<MainLayout><SuratPengantarTurun /></MainLayout>} />
-      <Route path="/operasional/loper" element={<MainLayout><Loper /></MainLayout>} />
+      <Route path="/operasional/hasil-loper" element={<MainLayout><HasilLoper menuName="HasilLoper" /></MainLayout>} />
 
+      <Route path="/operasional/laporan-lsbp" element={<MainLayout><LaporanLSBP menuName="LaporanLSBP" /></MainLayout>} />
+      <Route path="/operasional/laporan-lsbp-v2" element={<MainLayout><LaporanLSBPV2 menuName="LaporanLSBPV2" /></MainLayout>} />
+      <Route path="/operasional/laporan-barang-turun" element={<MainLayout><LaporanBarangTurun menuName="LaporanBarangTurun" /></MainLayout>} />
+      <Route path="/operasional/laporan-btt-belum-kembali" element={<MainLayout><LaporanBTTBelumKembali menuName="LaporanBTTBelumKembali" /></MainLayout>} />
+      <Route path="/operasional/laporan-data-penerima-customer" element={<MainLayout><LaporanDataPenerimaCustomer menuName="LaporanDataPenerimaCustomer" /></MainLayout>} />
+      <Route path="/operasional/laporan-pendapatan-operasional" element={<MainLayout><LaporanPendapatanOperasional menuName="LaporanPendapatanOperasional" /></MainLayout>} />
+      <Route path="/operasional/inventory-customer" element={<MainLayout><InventoryCustomer menuName="InventoryCustomer" /></MainLayout>} />
+      <Route path="/operasional/pengeluaran-inventory-customer" element={<MainLayout><PengeluaranInventoryCustomer menuName="PengeluaranInventoryCustomer" /></MainLayout>} />
+      <Route path="/operasional/pengembalian-btt" element={<MainLayout><PengembalianBTT menuName="PengembalianBTT" /></MainLayout>} />
+      <Route path="/operasional/pengembalian/barang-retur" element={<MainLayout><BarangRetur menuName="BarangRetur" /></MainLayout>} />
+
+      <Route path="/operasional/pengisian-bbm" element={<MainLayout><PengisianBBM menuName="PengisianBBM" /></MainLayout>} />
+      <Route path="/operasional/surat-tugas" element={<MainLayout><SuratTugas menuName="SuratTugas" /></MainLayout>} />
+      <Route path="/operasional/surat-muatan-udara" element={<MainLayout><SuratMuatanUdara menuName="SuratMuatanUdara" /></MainLayout>} />
+
+      <Route path="/operasional/loading-barang" element={<MainLayout><LoadingBarang menuName="LoadingBarang" /></MainLayout>} />
+      <Route path="/operasional/loper" element={<MainLayout><Loper /></MainLayout>} />
+      <Route path="/operasional/loper-deadline" element={<MainLayout><LoperDeadline menuName="LoperDeadline" /></MainLayout>} />
+      <Route path="/operasional/pembongkaran-barang" element={<MainLayout><PembongkaranBarang menuName="PembongkaranBarang" /></MainLayout>} />
       <Route path="/general-ledger" element={<MainLayout><UnderConstruction menuName="General Ledger" /></MainLayout>} />
 
       <Route path="/Master" element={<MainLayout><UnderConstruction menuName="Master Data" /></MainLayout>} />
@@ -500,12 +544,20 @@ function App() {
       <Route path="/master/master-sewa-kendaraan" element={<MainLayout><MasterSewaKendaraan /></MainLayout>} />
       <Route path="/master/master-kodepos" element={<MainLayout><MasterKodePos menuName="master-kodepos" /></MainLayout>} />
       <Route path="/master/master-korwil" element={<MainLayout><MasterKorwil menuName="master-korwil" /></MainLayout>} />
+      <Route path="/master/master-leadtime-customer" element={<MainLayout><MasterLeadTimeCustomer menuName="master-leadtime-customer" /></MainLayout>} />
+      <Route path="/master/master-customer-new" element={<MainLayout><MasterCustomerNew menuName="master-customer-new" /></MainLayout>} />
+
       <Route path="/master/master-sopir" element={<MainLayout><MasterSopir menuName="master-sopir" /></MainLayout>} />
       <Route path="/master/master-trayek" element={<MainLayout><MasterTrayek menuName="master-trayek" /></MainLayout>} />
       <Route path="/master/tarif-carter" element={<MainLayout><TarifCarter menuName="TarifCarter" /></MainLayout>} />
       <Route path="/master/tarif-ekonomis" element={<MainLayout><MasterTarifEkonomis menuName="MasterTarifEkonomis" /></MainLayout>} />
       <Route path="/master/tarif-umum" element={<MainLayout><MasterTarifReguler menuName="MasterTarifReguler" /></MainLayout>} />
       <Route path="/master/tarif-unit" element={<MainLayout><MasterTarifUnit menuName="MasterTarifUnit" /></MainLayout>} />
+      <Route path="/master/tarif-customer" element={<MainLayout><MasterTarifCustomer menuName="MasterTarifCustomer" /></MainLayout>} />
+      <Route path="/master/tarif-handling-propinsi" element={<MainLayout><TarifHandlingPropinsi menuName="TarifHandlingPropinsi" /></MainLayout>} />
+      <Route path="/master/tarif-paket" element={<MainLayout><TarifPaket menuName="TarifPaket" /></MainLayout>} />
+      <Route path="/master/jenis-kendaraan-carter" element={<MainLayout><JenisKendaraanCarter menuName="JenisKendaraanCarter" /></MainLayout>} />
+      <Route path="/master/master-vendor" element={<MainLayout><MasterVendor menuName="MasterVendor" /></MainLayout>} />
 
       <Route path="/Piutang" element={<MainLayout><UnderConstruction menuName="Piutang" /></MainLayout>} />
 

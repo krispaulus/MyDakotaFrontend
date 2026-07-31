@@ -3,8 +3,8 @@ import { useNavigate, useLocation, NavLink } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
 import {
   LayoutDashboard, Users, Book, Briefcase,
-  Database, TrendingUp, Truck, DollarSign,
-  Settings, LogOut, ChevronRight, Menu, Backpack, ClipboardPen, HandCoins, Route, GitCompareArrows
+  Database, TrendingUp, Truck, DollarSign, LayersPlus,
+  Settings, LogOut, ChevronRight, Menu, Backpack, ClipboardPen, HandCoins, Route, GitCompareArrows, FileArchive
 } from 'lucide-react';
 import DakotaLogo from '../../assets/new_logo 2.png';
 import LogoutModal from './LogoutModal';
@@ -303,6 +303,8 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
         { name: 'Sewa Kendaraan', path: '/master/master-sewa-kendaraan', roles: ['S', 'A'] },
         { name: 'Kode Pos', path: '/master/master-kodepos' },
         { name: 'Koordinator Wilayah', path: '/master/master-korwil', roles: ['S', 'A'] },
+        { name: 'Lead Time Customer', path: '/master/master-leadtime-customer', roles: ['S', 'A'] },
+        { name: 'Master Customer New', path: '/master/master-customer-new', roles: ['S', 'A'] },
         { name: 'Sopir', path: '/master/master-sopir' },
         { name: 'Trayek', path: '/master/master-trayek', roles: ['S', 'A'] },
         {
@@ -310,13 +312,17 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
           icon: <Truck size={18} />,
           children: [
             { name: 'Tarif Carter', path: '/master/tarif-carter' },
-            { name: 'Tarif Handling', path: '/settings/general-ledger' },
-            { name: 'Tarif Paket Customer', path: '/settings/hrd' },
-            { name: 'Tarif Paket Kurir', path: '/settings/marketing' },
+            // { name: 'Tarif Handling', path: '/settings/general-ledger' },
+            { name: 'Tarif Paket Customer', path: '/master/tarif-customer' },
+            { name: 'Tarif Handling Propinsi', path: '/master/tarif-handling-propinsi' },
+            { name: 'Tarif Paket', path: '/master/tarif-paket' },
+            // { name: 'Tarif Paket Kurir', path: '/settings/marketing' },
             { name: 'Tarif Paket Ekonomis', path: '/master/tarif-ekonomis' },
             { name: 'Tarif Paket Umum', path: '/master/tarif-umum' },
-            { name: 'Tarif Transit', path: '/settings/account' },
+            // { name: 'Tarif Transit', path: '/settings/account' },
             { name: 'Tarif Unit', path: '/master/tarif-unit' },
+            { name: 'Jenis Kendaraan Carter', path: '/master/jenis-kendaraan-carter' },
+            { name: 'Master Vendor', path: '/master/master-vendor' },
           ]
 
         },
@@ -329,12 +335,31 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
       icon: <HandCoins size={20} />,
       roles: ['S', 'A'],
       children: [
-        { name: 'BTT Gagal Berhasil Loper', path: '/operasional/surat-kembali-btt', roles: ['S', 'A'] },
-        { name: 'Komisi Borongan', path: '/operasional/master-area-loper', roles: ['S', 'A'] },
-        { name: 'Laporan', path: '/operasional/area-tidak-dilayani', roles: ['S', 'A'] },
-        { name: 'Loading Unloading Barang', path: '/operasional/divice-karyawan', roles: ['S', 'A'] },
+        { name: 'BTT Gagal Berhasil Loper - Admin', path: '/operasional/surat-kembali-btt', roles: ['S', 'A'] },
+        { name: 'BTT Gagal Berhasil Loper', path: '/operasional/hasil-loper', roles: ['S', 'A'] },
+        // { name: 'Komisi Borongan', path: '/operasional/master-area-loper', roles: ['S', 'A'] },
+        { name: 'Inventory Barang Customer', path: '/operasional/inventory-customer', roles: ['S', 'A'] },
+        {
+          name: 'Laporan',
+          icon: <FileArchive size={20} />,
+          roles: ['S', 'A'],
+          children: [
+            { name: 'Laporan LSBP', path: '/operasional/laporan-lsbp', roles: ['S', 'A'] },
+            { name: 'Laporan LSBP V2', path: '/operasional/laporan-lsbp-v2', roles: ['S', 'A'] },
+            { name: 'Laporan Barang Turun', path: '/operasional/laporan-barang-turun', roles: ['S', 'A'] },
+            { name: 'Laporan BTT Belum Kembali', path: '/operasional/laporan-btt-belum-kembali', roles: ['S', 'A'] },
+            { name: 'Laporan Data Penerima Customer', path: '/operasional/laporan-data-penerima-customer', roles: ['S', 'A'] },
+            { name: 'Laporan Pendapatan Operasional', path: '/operasional/laporan-pendapatan-operasional', roles: ['S', 'A'] }
+          ]
+        },
+        { name: 'Loading Barang', path: '/operasional/loading-barang', roles: ['S', 'A'] },
+        // { name: 'Loading Unloading Barang', path: '/operasional/divice-karyawan', roles: ['S', 'A'] },
         { name: 'Loper', path: '/operasional/loper', roles: ['S', 'A'] },
-        { name: 'Pengambilan ', path: '/operasional/pengambilan', roles: ['S', 'A'] },
+        { name: 'BTT Melewati Tengat Waktu', path: '/operasional/loper-deadline', roles: ['S', 'A'] },
+        { name: 'Pembongkaran Barang', path: '/operasional/pembongkaran-barang', roles: ['S', 'A'] },
+
+        { name: 'Pengeluaran Inventory Customer', path: '/operasional/pengeluaran-inventory-customer', roles: ['S', 'A'] },
+
         {
           name: 'Pengambilan ',
           icon: <Route size={18} />,
@@ -347,14 +372,12 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
           name: 'Pengembalian',
           icon: <GitCompareArrows size={18} />,
           children: [
-            { name: 'BTT', path: '/pengembalian/pengembalianbtt', roles: ['S', 'A'] },
-            { name: 'Barang Retur', path: '/pengembalian/barang-retur', roles: ['S', 'A'] },
+            { name: 'Pengembalian BTT', path: '/operasional/pengembalian-btt', roles: ['S', 'A'] },
+            { name: 'Pengembalian Barang Retur', path: '/operasional/pengembalian/barang-retur', roles: ['S', 'A'] },
           ]
         },
         { name: 'Pengisian BBM', path: '/operasional/pengisian-bbm', roles: ['S', 'A'] },
-        { name: 'Sewa Kendaraan', path: '/operasional/sewa-kendaraan', roles: ['S', 'A'] },
-        { name: 'Setok Barang Gudang', path: '/operasional/setok-barang-gudang', roles: ['S', 'A'] },
-        { name: 'Rekap Stok Barang Gudang', path: '/operasional/rekap-stok-barang-gudang', roles: ['S', 'A'] },
+        { name: 'Surat Tugas Supir', path: '/operasional/surat-tugas', roles: ['S', 'A'] },
         { name: 'Surat Muatan Udara', path: '/operasional/surat-muatan-udara', roles: ['S', 'A'] },
         {
           name: 'Surat Pengantar',
@@ -366,8 +389,14 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
             { name: 'Surat Pengantar - Turun`', path: '/operasional/surat-pengantar-turun', roles: ['S', 'A'] },
           ]
         },
-        { name: 'Surat Tugas', path: '/operasional/surat-tugas', roles: ['S', 'A'] },
-        { name: 'Tarif Komisi Super', path: '/operasional/tarif-komisi-super', roles: ['S', 'A'] },
+        {
+          name: 'Stok',
+          icon: <LayersPlus size={18} />,
+          children: [
+            { name: 'Stok Barang Gudang', path: '/operasional/surat-pengantar-pengiriman', roles: ['S', 'A'] },
+            { name: 'Stok Inventory Barang Customer', path: '/operasional/surat-pengantar-sp-padx`', roles: ['S', 'A'] },
+          ]
+        },
         { name: 'Voucher BBM', path: '/operasional/voucher-bbm', roles: ['S', 'A'] },
       ]
     },
