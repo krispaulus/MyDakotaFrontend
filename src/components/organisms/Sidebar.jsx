@@ -383,18 +383,18 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
           name: 'Surat Pengantar',
           icon: <ClipboardPen size={18} />,
           children: [
-            { name: 'Cetak Surat Pengiriman', path: '#', roles: ['S', 'A'] },
+            { name: 'Cetak Surat Pengiriman', path: '/operasional/cetak-surat-pengiriman', roles: ['S', 'A'] },
             { name: 'Surat Pengantar - Pengiriman', path: '/operasional/surat-pengantar-pengiriman', roles: ['S', 'A'] },
-            { name: 'Surat Pengantar - SP PAD', path: '/operasional/surat-pengantar-sp-padx`', roles: ['S', 'A'] },
-            { name: 'Surat Pengantar - Turun`', path: '/operasional/surat-pengantar-turun', roles: ['S', 'A'] },
+            { name: 'Surat Pengantar - SP PAD', path: '/operasional/surat-pengantar-sp-pad', roles: ['S', 'A'] },
+            { name: 'Surat Pengantar - Turun', path: '/operasional/surat-pengantar-turun', roles: ['S', 'A'] },
           ]
         },
         {
           name: 'Stok',
           icon: <LayersPlus size={18} />,
           children: [
-            { name: 'Stok Barang Gudang', path: '/operasional/surat-pengantar-pengiriman', roles: ['S', 'A'] },
-            { name: 'Stok Inventory Barang Customer', path: '/operasional/surat-pengantar-sp-padx`', roles: ['S', 'A'] },
+            { name: 'Stok Barang Gudang', path: '/operasional/stok/stok-barang-gudang', roles: ['S', 'A'] },
+            { name: 'Stok Inventory Barang Customer', path: '/operasional/surat-pengantar-sp-pad', roles: ['S', 'A'] },
           ]
         },
         { name: 'Voucher BBM', path: '/operasional/voucher-bbm', roles: ['S', 'A'] },

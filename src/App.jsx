@@ -71,6 +71,9 @@ import PengisianBBM from './pages/PengisianBBM';
 import SuratTugas from './pages/SuratTugas';
 import SuratMuatanUdara from './pages/SuratMuatanUdara';
 import HasilLoper from './pages/HasilLoper';
+import CetakSuratPengiriman from './pages/CetakSuratPengiriman';
+import StokBarangGudang from './pages/StokBarangGudang';
+import VoucherBBM from './pages/VoucherBBM';
 
 const getCompanyName = (pt) => {
   if (pt === 'A') return 'Dakota Buana Sarana';
@@ -524,11 +527,15 @@ function App() {
       <Route path="/operasional/pengisian-bbm" element={<MainLayout><PengisianBBM menuName="PengisianBBM" /></MainLayout>} />
       <Route path="/operasional/surat-tugas" element={<MainLayout><SuratTugas menuName="SuratTugas" /></MainLayout>} />
       <Route path="/operasional/surat-muatan-udara" element={<MainLayout><SuratMuatanUdara menuName="SuratMuatanUdara" /></MainLayout>} />
+      <Route path="/operasional/cetak-surat-pengiriman" element={<MainLayout><CetakSuratPengiriman menuName="CetakSuratPengiriman" /></MainLayout>} />
 
       <Route path="/operasional/loading-barang" element={<MainLayout><LoadingBarang menuName="LoadingBarang" /></MainLayout>} />
       <Route path="/operasional/loper" element={<MainLayout><Loper /></MainLayout>} />
       <Route path="/operasional/loper-deadline" element={<MainLayout><LoperDeadline menuName="LoperDeadline" /></MainLayout>} />
       <Route path="/operasional/pembongkaran-barang" element={<MainLayout><PembongkaranBarang menuName="PembongkaranBarang" /></MainLayout>} />
+      <Route path="/operasional/stok/stok-barang-gudang" element={<MainLayout><StokBarangGudang /></MainLayout>} />
+      <Route path="/operasional/voucher-bbm" element={<MainLayout><VoucherBBM /></MainLayout>} />
+
       <Route path="/general-ledger" element={<MainLayout><UnderConstruction menuName="General Ledger" /></MainLayout>} />
 
       <Route path="/Master" element={<MainLayout><UnderConstruction menuName="Master Data" /></MainLayout>} />

@@ -2,13 +2,19 @@ import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
-import { FileText, RefreshCw, X as XIcon, Plus, Trash2, Truck } from 'lucide-react';
+import { RefreshCw, X as XIcon, Truck, Save, LogOut } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 const SuratTugas = () => {
     const { isDarkMode } = useDarkMode();
     const [stList, setStList] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    // Master Dropdown List States
+    const [kendaraanList, setKendaraanList] = useState([]);
+    const [sopirList, setSopirList] = useState([]);
+    const [agenList, setAgenList] = useState([]);
+    const [tugasList, setTugasList] = useState([]);
 
     // Filter States
     const today = new Date().toISOString().split('T')[0];
@@ -25,25 +31,57 @@ const SuratTugas = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
 
+    // Default Form Data Sesuai Aplikasi Lawas
     const defaultForm = {
         sjh_id: '',
-        sjh_tanggal: today + ' 08:00:00',
-        sjh_tanggalkembali: today + ' 18:00:00',
+        tgl_berangkat: today,
+        jam_berangkat: '11:00:00',
+        tgl_kembali: today,
+        jam_kembali: '12:00:00',
+        by_loading: 'Tidak', // 'Ya' / 'Tidak'
         sjh_kendid: '',
         sjh_sopir1_nip: '',
         sjh_sopir2_nip: '',
-        sjh_assid: 'AS001',
-        sjh_trayekid: '',
-        sjh_startagenid: '1',
-        sjh_endagenid: '1',
-        sjh_keterangan: 'Pengiriman Kargo Reguler',
-        nominal_um: 0
+        sjh_startagenid: '',
+        sjh_endagenid: '',
+        sjh_assid: '',
+        nominal_um: 0,
+        sjh_keterangan: ''
     };
     const [formData, setFormData] = useState(defaultForm);
 
     useEffect(() => {
+        fetchMasterData();
         fetchSuratTugasData();
     }, []);
+
+    // Fetch Master Data (Kendaraan, Sopir, Agen, Assignment)
+    const fetchMasterData = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const headers = { Authorization: `Bearer ${token}` };
+
+            // Panggil endpoint /sopir-list dan /sopir/list sebagai fallback
+            const [resKend, resSopir, resAgen, resTugas] = await Promise.all([
+                api.get('/master/kendaraan', { headers }).catch(() => ({ data: [] })),
+                api.get('/sopir-list', { headers }).catch(() => api.get('/sopir/list', { headers })).catch(() => ({ data: [] })),
+                api.get('/agens', { headers }).catch(() => ({ data: [] })),
+                api.get('/master/assignment', { headers }).catch(() => ({ data: [] }))
+            ]);
+
+            const kends = resKend.data?.data || resKend.data || [];
+            const sopirs = resSopir.data?.data || resSopir.data || [];
+            const agens = resAgen.data?.data || resAgen.data || [];
+            const tugas = resTugas.data?.data || resTugas.data || [];
+
+            setKendaraanList(Array.isArray(kends) ? kends : []);
+            setSopirList(Array.isArray(sopirs) ? sopirs : []);
+            setAgenList(Array.isArray(agens) ? agens : []);
+            setTugasList(Array.isArray(tugas) ? tugas : []);
+        } catch (err) {
+            console.error("Gagal memuat master data:", err);
+        }
+    };
 
     const fetchSuratTugasData = async () => {
         setLoading(true);
@@ -80,19 +118,26 @@ const SuratTugas = () => {
 
     const handleEdit = (item) => {
         setIsEditMode(true);
+        const tglBerangkat = item.sjh_tanggal ? item.sjh_tanggal.split(' ')[0] : today;
+        const jamBerangkat = item.sjh_tanggal && item.sjh_tanggal.includes(' ') ? item.sjh_tanggal.split(' ')[1] : '11:00:00';
+        const tglKembali = item.sjh_tanggalkembali ? item.sjh_tanggalkembali.split(' ')[0] : today;
+        const jamKembali = item.sjh_tanggalkembali && item.sjh_tanggalkembali.includes(' ') ? item.sjh_tanggalkembali.split(' ')[1] : '12:00:00';
+
         setFormData({
             sjh_id: item.sjh_id || '',
-            sjh_tanggal: item.sjh_tanggal || today + ' 08:00:00',
-            sjh_tanggalkembali: item.sjh_tanggalkembali || today + ' 18:00:00',
+            tgl_berangkat: tglBerangkat,
+            jam_berangkat: jamBerangkat,
+            tgl_kembali: tglKembali,
+            jam_kembali: jamKembali,
+            by_loading: item.sjh_byloading || 'Tidak',
             sjh_kendid: item.sjh_kendid || '',
             sjh_sopir1_nip: item.sjh_sopir1_nip !== '-' ? item.sjh_sopir1_nip : '',
             sjh_sopir2_nip: item.sjh_sopir2_nip !== '-' ? item.sjh_sopir2_nip : '',
-            sjh_assid: item.sjh_assid !== '-' ? item.sjh_assid : 'AS001',
-            sjh_trayekid: '',
-            sjh_startagenid: '1',
-            sjh_endagenid: '1',
-            sjh_keterangan: item.sjh_keterangan !== '-' ? item.sjh_keterangan : '',
-            nominal_um: item.nominal_um || 0
+            sjh_startagenid: item.sjh_startagenid || '',
+            sjh_endagenid: item.sjh_endagenid || '',
+            sjh_assid: item.sjh_assid !== '-' ? item.sjh_assid : '',
+            nominal_um: item.nominal_um || 0,
+            sjh_keterangan: item.sjh_keterangan !== '-' ? item.sjh_keterangan : ''
         });
         setIsModalOpen(true);
     };
@@ -126,20 +171,27 @@ const SuratTugas = () => {
 
     const handleSubmitForm = async (e) => {
         e.preventDefault();
-        if (!formData.sjh_id || !formData.sjh_kendid) {
-            Swal.fire('Peringatan', 'No. Surat Tugas dan No. Kendaraan Wajib Diisi!', 'warning');
+        if (!formData.sjh_kendid) {
+            Swal.fire('Peringatan', 'Nomor Kendaraan wajib dipilih!', 'warning');
             return;
         }
+
+        const fullTglBerangkat = `${formData.tgl_berangkat} ${formData.jam_berangkat}`;
+        const fullTglKembali = `${formData.tgl_kembali} ${formData.jam_kembali}`;
+
+        const payload = {
+            ...formData,
+            sjh_tanggal: fullTglBerangkat,
+            sjh_tanggalkembali: fullTglKembali,
+            nominal_um: parseFloat(formData.nominal_um) || 0
+        };
 
         try {
             const token = localStorage.getItem('token');
             const endpoint = isEditMode ? '/operasional/surattugas-update' : '/operasional/surattugas-create';
             const method = isEditMode ? api.put : api.post;
 
-            await method(endpoint, {
-                ...formData,
-                nominal_um: parseFloat(formData.nominal_um) || 0
-            }, {
+            await method(endpoint, payload, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
@@ -299,105 +351,244 @@ const SuratTugas = () => {
                 onDelete={handleDelete}
             />
 
+            {/* ========================================================================= */}
+            {/* 📝 MODAL POP-UP PEMBUATAN SURAT TUGAS PRESISI SAMA APLIKASI LAWAS        */}
+            {/* ========================================================================= */}
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-                    <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
-                        <div className="px-8 pt-8 pb-4 flex justify-between items-center border-b border-slate-100">
-                            <h2 className="text-xl font-bold font-['Inter'] text-slate-900 tracking-wide uppercase flex items-center gap-2">
-                                <Truck size={20} className="text-indigo-600" />
-                                {isEditMode ? `EDIT SURAT TUGAS: ${formData.sjh_id}` : 'ADD SURAT TUGAS INFO'}
-                            </h2>
-                            <button onClick={() => setIsModalOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 text-slate-500 transition-colors cursor-pointer">
-                                <XIcon size={16} strokeWidth={2.5} />
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+                    <div className="w-full max-w-5xl bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 max-h-[92vh]">
+
+                        {/* Header Modal */}
+                        <div className="px-8 py-5 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 bg-emerald-600 text-white rounded-2xl shadow-md">
+                                    <Truck size={22} />
+                                </div>
+                                <h2 className="text-lg font-black text-emerald-700 tracking-wide uppercase">
+                                    PEMBUATAN SURAT TUGAS
+                                </h2>
+                            </div>
+                            <button onClick={() => setIsModalOpen(false)} className="w-8 h-8 rounded-full bg-slate-200/70 hover:bg-slate-300 text-slate-600 flex items-center justify-center transition font-bold cursor-pointer">
+                                <XIcon size={18} />
                             </button>
                         </div>
 
-                        <form onSubmit={handleSubmitForm} className="p-8 space-y-6 text-sm font-medium text-slate-700">
-                            <div className="grid grid-cols-2 gap-x-8 gap-y-5">
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="text-slate-600 font-semibold">NO. SURAT TUGAS / SURAT JALAN</label>
+                        {/* Form Body Layout Sesuai Aplikasi Lawas */}
+                        <form onSubmit={handleSubmitForm} className="p-8 space-y-5 text-xs font-bold text-slate-700 overflow-y-auto flex-1">
+
+                            {/* Baris 1: Tanggal Berangkat, Jam Berangkat, By Loading */}
+                            <div className="grid grid-cols-12 gap-4">
+                                <div className="col-span-4">
+                                    <label className="block mb-1 text-slate-600 uppercase">TANGGAL BERANGKAT :</label>
                                     <input
-                                        type="text"
-                                        disabled={isEditMode}
-                                        className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-600 transition-all font-mono uppercase bg-white disabled:bg-slate-100"
-                                        placeholder="Contoh: ST/2026/07/001"
-                                        value={formData.sjh_id}
-                                        onChange={e => setFormData({ ...formData, sjh_id: e.target.value.toUpperCase() })}
+                                        type="date"
+                                        className="w-full p-3 border border-slate-300 rounded-xl outline-none focus:border-emerald-600 bg-emerald-50/50 font-medium"
+                                        value={formData.tgl_berangkat}
+                                        onChange={e => setFormData({ ...formData, tgl_berangkat: e.target.value })}
                                         required
                                     />
                                 </div>
-
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="text-slate-600 font-semibold">NO. KENDARAAN / PLAT MOBIL</label>
+                                <div className="col-span-4">
+                                    <label className="block mb-1 text-slate-600 uppercase">JAM BERANGKAT :</label>
                                     <input
                                         type="text"
-                                        className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-600 transition-all uppercase bg-white font-mono"
-                                        placeholder="Contoh: B 9123 UXT"
-                                        value={formData.sjh_kendid}
-                                        onChange={e => setFormData({ ...formData, sjh_kendid: e.target.value.toUpperCase() })}
+                                        className="w-full p-3 border border-slate-300 rounded-xl outline-none focus:border-emerald-600 font-mono bg-white"
+                                        placeholder="HH:MM:SS (contoh: 11:00:00)"
+                                        value={formData.jam_berangkat}
+                                        onChange={e => setFormData({ ...formData, jam_berangkat: e.target.value })}
                                         required
                                     />
                                 </div>
+                                <div className="col-span-4">
+                                    <label className="block mb-1 text-slate-600 uppercase">BY LOADING :</label>
+                                    <div className="flex items-center gap-6 pt-2.5 font-bold">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="radio"
+                                                name="by_loading"
+                                                value="Ya"
+                                                checked={formData.by_loading === 'Ya'}
+                                                onChange={e => setFormData({ ...formData, by_loading: e.target.value })}
+                                                className="w-4 h-4 text-emerald-600 cursor-pointer"
+                                            />
+                                            <span>Ya</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="radio"
+                                                name="by_loading"
+                                                value="Tidak"
+                                                checked={formData.by_loading === 'Tidak'}
+                                                onChange={e => setFormData({ ...formData, by_loading: e.target.value })}
+                                                className="w-4 h-4 text-emerald-600 cursor-pointer"
+                                            />
+                                            <span>Tidak</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
 
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="text-slate-600 font-semibold">PENGEMUDI / SOPIR 1 (NIP)</label>
+                            {/* Baris 2: Tanggal Kembali, Jam Kembali */}
+                            <div className="grid grid-cols-12 gap-4">
+                                <div className="col-span-4">
+                                    <label className="block mb-1 text-slate-600 uppercase">TANGGAL KEMBALI :</label>
+                                    <input
+                                        type="date"
+                                        className="w-full p-3 border border-slate-300 rounded-xl outline-none focus:border-emerald-600 bg-white font-medium"
+                                        value={formData.tgl_kembali}
+                                        onChange={e => setFormData({ ...formData, tgl_kembali: e.target.value })}
+                                    />
+                                </div>
+                                <div className="col-span-4">
+                                    <label className="block mb-1 text-slate-600 uppercase">JAM KEMBALI :</label>
                                     <input
                                         type="text"
-                                        className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-600 bg-white font-mono uppercase"
-                                        placeholder="NIP Sopir 1..."
-                                        value={formData.sjh_sopir1_nip}
-                                        onChange={e => setFormData({ ...formData, sjh_sopir1_nip: e.target.value.toUpperCase() })}
-                                    />
-                                </div>
-
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="text-slate-600 font-semibold">PENGEMUDI / SOPIR 2 (NIP - OPSIONAL)</label>
-                                    <input
-                                        type="text"
-                                        className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-600 bg-white font-mono uppercase"
-                                        placeholder="NIP Sopir 2..."
-                                        value={formData.sjh_sopir2_nip}
-                                        onChange={e => setFormData({ ...formData, sjh_sopir2_nip: e.target.value.toUpperCase() })}
-                                    />
-                                </div>
-
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="text-slate-600 font-semibold">ASSIGNMENT / TUGAS OPERASIONAL</label>
-                                    <select
-                                        className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-600 bg-white cursor-pointer"
-                                        value={formData.sjh_assid}
-                                        onChange={e => setFormData({ ...formData, sjh_assid: e.target.value })}
-                                    >
-                                        <option value="AS001">PENGIRIMAN REGULER LINTAS</option>
-                                        <option value="AS002">PENGIRIMAN EKSPRES PRIORITAS</option>
-                                        <option value="AS003">LANGGANAN KHUSUS / CHARTER</option>
-                                    </select>
-                                </div>
-
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="text-slate-600 font-semibold">UANG MUKA BIAYA OPERASIONAL (RP)</label>
-                                    <input
-                                        type="number"
-                                        step="any"
-                                        className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-600 bg-white font-mono"
-                                        placeholder="Nominal Uang Muka..."
-                                        value={formData.nominal_um}
-                                        onChange={e => setFormData({ ...formData, nominal_um: e.target.value })}
-                                    />
-                                </div>
-
-                                <div className="flex flex-col gap-1.5 col-span-2">
-                                    <label className="text-slate-600 font-semibold">KETERANGAN TUGAS</label>
-                                    <textarea
-                                        rows={2}
-                                        className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-600 bg-white resize-none"
-                                        placeholder="Keterangan rincian tugas..."
-                                        value={formData.sjh_keterangan}
-                                        onChange={e => setFormData({ ...formData, sjh_keterangan: e.target.value })}
+                                        className="w-full p-3 border border-slate-300 rounded-xl outline-none focus:border-emerald-600 font-mono bg-white"
+                                        placeholder="HH:MM:SS (contoh: 12:00:00)"
+                                        value={formData.jam_kembali}
+                                        onChange={e => setFormData({ ...formData, jam_kembali: e.target.value })}
                                     />
                                 </div>
                             </div>
 
+                            {/* Baris 3: Nomor Kendaraan, Pengemudi 1, Pengemudi 2 */}
+                            <div className="grid grid-cols-12 gap-4">
+                                <div className="col-span-4">
+                                    <label className="block mb-1 text-slate-600 uppercase">NOMOR KENDARAAN :</label>
+                                    <select
+                                        className="w-full p-3 border border-slate-300 rounded-xl outline-none focus:border-emerald-600 bg-white cursor-pointer uppercase font-bold text-slate-800"
+                                        value={formData.sjh_kendid}
+                                        onChange={e => setFormData({ ...formData, sjh_kendid: e.target.value })}
+                                        required
+                                    >
+                                        <option value="">-- PILIH ARMADA --</option>
+                                        {kendaraanList.map((k, i) => (
+                                            <option key={i} value={k.kend_id || k.kend_identid}>{k.kend_identid || k.kend_id}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                {/* PENGEMUDI 1 */}
+                                <div className="col-span-4">
+                                    <label className="block mb-1 text-slate-600 uppercase">PENGEMUDI 1 :</label>
+                                    <select
+                                        className="w-full p-3 border border-slate-300 rounded-xl outline-none focus:border-emerald-600 bg-white cursor-pointer uppercase text-xs font-bold text-slate-800"
+                                        value={formData.sjh_sopir1_nip}
+                                        onChange={e => setFormData({ ...formData, sjh_sopir1_nip: e.target.value })}
+                                        disabled={formData.by_loading === 'Ya'}
+                                    >
+                                        <option value="">-- PILIH PENGEMUDI 1 --</option>
+                                        {formData.by_loading === 'Ya' ? (
+                                            <option value="">DAFTAR NAMA PENGEMUDI 1 DIKOSONGKAN TERLEBIH DAHULU</option>
+                                        ) : (
+                                            sopirList.map((s, i) => (
+                                                <option key={i} value={s.kry_nip}>
+                                                    {s.kry_nama} [{s.kry_nip}]
+                                                </option>
+                                            ))
+                                        )}
+                                    </select>
+                                </div>
+
+                                {/* PENGEMUDI 2 */}
+                                <div className="col-span-4">
+                                    <label className="block mb-1 text-slate-600 uppercase">PENGEMUDI 2 :</label>
+                                    <select
+                                        className="w-full p-3 border border-slate-300 rounded-xl outline-none focus:border-emerald-600 bg-white cursor-pointer uppercase text-xs font-bold text-slate-800"
+                                        value={formData.sjh_sopir2_nip}
+                                        onChange={e => setFormData({ ...formData, sjh_sopir2_nip: e.target.value })}
+                                        disabled={formData.by_loading === 'Ya'}
+                                    >
+                                        <option value="">-- PILIH PENGEMUDI 2 (OPSIONAL) --</option>
+                                        {formData.by_loading === 'Ya' ? (
+                                            <option value="">DAFTAR NAMA PENGEMUDI 2 DIKOSONGKAN TERLEBIH DAHULU</option>
+                                        ) : (
+                                            sopirList.map((s, i) => (
+                                                <option key={i} value={s.kry_nip}>
+                                                    {s.kry_nama} [{s.kry_nip}]
+                                                </option>
+                                            ))
+                                        )}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Baris 4: Berangkat Dari, Pulang Ke, Tugas */}
+                            <div className="grid grid-cols-12 gap-4">
+                                <div className="col-span-4">
+                                    <label className="block mb-1 text-slate-600 uppercase">BERANGKAT DARI :</label>
+                                    <select
+                                        className="w-full p-3 border border-slate-300 rounded-xl outline-none focus:border-emerald-600 bg-white cursor-pointer uppercase"
+                                        value={formData.sjh_startagenid}
+                                        onChange={e => setFormData({ ...formData, sjh_startagenid: e.target.value })}
+                                    >
+                                        <option value="">-- PILIH AGEN ASAL --</option>
+                                        {agenList.map((a, i) => (
+                                            <option key={i} value={a.agen_id}>{a.agen_nama}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="col-span-4">
+                                    <label className="block mb-1 text-slate-600 uppercase">PULANG KE :</label>
+                                    <select
+                                        className="w-full p-3 border border-slate-300 rounded-xl outline-none focus:border-emerald-600 bg-white cursor-pointer uppercase"
+                                        value={formData.sjh_endagenid}
+                                        onChange={e => setFormData({ ...formData, sjh_endagenid: e.target.value })}
+                                    >
+                                        <option value="">-- PILIH AGEN TUJUAN --</option>
+                                        {agenList.map((a, i) => (
+                                            <option key={i} value={a.agen_id}>{a.agen_nama}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="col-span-4">
+                                    <label className="block mb-1 text-slate-600 uppercase">TUGAS :</label>
+                                    <select
+                                        className="w-full p-3 border border-slate-300 rounded-xl outline-none focus:border-emerald-600 bg-white cursor-pointer uppercase font-bold text-indigo-900"
+                                        value={formData.sjh_assid}
+                                        onChange={e => setFormData({ ...formData, sjh_assid: e.target.value })}
+                                    >
+                                        <option value="">-- PILIH TUGAS --</option>
+                                        {tugasList.length > 0 ? (
+                                            tugasList.map((t, i) => (
+                                                <option key={i} value={t.ass_id}>{t.ass_nama}</option>
+                                            ))
+                                        ) : (
+                                            <>
+                                                <option value="AS001">PENGIRIMAN REGULER LINTAS</option>
+                                                <option value="AS002">PENGIRIMAN EKSPRES PRIORITAS</option>
+                                                <option value="AS003">LANGGANAN KHUSUS / CHARTER</option>
+                                            </>
+                                        )}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Baris 5: Uang Muka Biaya Operasional */}
+                            <div>
+                                <label className="block mb-1 text-slate-600 uppercase">UANG MUKA BIAYA OPERASIONAL :</label>
+                                <input
+                                    type="number"
+                                    step="any"
+                                    className="w-full p-3 border border-slate-300 rounded-xl outline-none focus:border-emerald-600 bg-white font-mono font-bold text-emerald-800 text-sm"
+                                    placeholder="Masukkan Uang Muka Biaya Operasional"
+                                    value={formData.nominal_um}
+                                    onChange={e => setFormData({ ...formData, nominal_um: e.target.value })}
+                                />
+                            </div>
+
+                            {/* Baris 6: Keterangan */}
+                            <div>
+                                <label className="block mb-1 text-slate-600 uppercase">KETERANGAN :</label>
+                                <input
+                                    type="text"
+                                    className="w-full p-3 border border-slate-300 rounded-xl outline-none focus:border-emerald-600 bg-white font-medium"
+                                    placeholder="Masukkan Keterangan"
+                                    value={formData.sjh_keterangan}
+                                    onChange={e => setFormData({ ...formData, sjh_keterangan: e.target.value })}
+                                />
+                            </div>
+
+                            {/* Button Actions Footer Standard Aplikasi Baru (Persis Gambar 2) */}
                             <div className="flex justify-center items-center gap-4 pt-6 border-t border-slate-100 mt-6">
                                 <button
                                     type="button"
@@ -410,7 +601,7 @@ const SuratTugas = () => {
                                     type="submit"
                                     className="w-[160px] py-3 bg-[#1e1b4b] hover:opacity-90 active:scale-98 text-white font-bold rounded-xl transition-all uppercase tracking-wide cursor-pointer text-center text-xs shadow-md"
                                 >
-                                    {isEditMode ? 'UPDATE ST' : 'ADD ST'}
+                                    {isEditMode ? 'UPDATE ST' : 'ADD SURAT TUGAS'}
                                 </button>
                             </div>
                         </form>

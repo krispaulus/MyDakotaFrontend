@@ -46,28 +46,6 @@ const SuratPengantarPengiriman = () => {
         spt_service: 1
     });
 
-    // =========================================================================
-    // 🔍 ULTIMATE DOM SNIFFER: Pemantau Dropdown Navigasi Global
-    // =========================================================================
-    // useEffect(() => {
-    //     const interval = setInterval(() => {
-    //         let detectedAgen = '';
-    //         const navElements = document.querySelectorAll('button, select, span, div');
-    //         for (let el of navElements) {
-    //             if (el.innerText && el.innerText.includes('AGEN') && !el.innerText.includes('LOKET')) {
-    //                 detectedAgen = el.innerText.trim();
-    //                 break;
-    //             }
-    //         }
-    //         if (!detectedAgen) {
-    //             detectedAgen = localStorage.getItem('active_agen_nama') || '';
-    //         }
-    //         if (detectedAgen && detectedAgen !== currentActiveAgen) {
-    //             setCurrentActiveAgen(detectedAgen);
-    //         }
-    //     }, 500);
-    //     return () => clearInterval(interval);
-    // }, [currentActiveAgen]);
     useEffect(() => {
         const liveAgenNama = localStorage.getItem('active_agen_nama') || localStorage.getItem('kode_cabang');
         if (liveAgenNama && liveAgenNama !== currentActiveAgen) {
@@ -75,20 +53,53 @@ const SuratPengantarPengiriman = () => {
         }
     }, []);
 
-    // =========================================================================
-    // 🔄 FETCH MASTER DATA DROPDOWN
-    // =========================================================================
+    // 🔄 FETCH MASTER DATA DROPDOWN (WITH FALLBACK SOPIR)
     useEffect(() => {
         const fetchMasterData = async () => {
             try {
                 const token = localStorage.getItem('token');
+
+                // 1. Fetch Fleet & Drivers
                 const resFleet = await api.get('/operasional/fleet-drivers', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
+
                 if (resFleet.data.status === 'success') {
                     setFleet(resFleet.data.fleet || []);
-                    setDrivers(resFleet.data.drivers || []);
+
+                    // Cek apakah drivers terisi
+                    if (Array.isArray(resFleet.data.drivers) && resFleet.data.drivers.length > 0) {
+                        setDrivers(resFleet.data.drivers);
+                    } else {
+                        // Fallback Fetch ke Endpoint Master Sopir jika fleet-drivers kosong
+                        try {
+                            const resSopir = await api.get('/master/sopir', {
+                                headers: { Authorization: `Bearer ${token}` }
+                            });
+                            const sopirData = resSopir.data?.data || resSopir.data || [];
+                            if (Array.isArray(sopirData) && sopirData.length > 0) {
+                                setDrivers(sopirData);
+                            } else {
+                                // Fallback Data Standar Operasional Dakota
+                                setDrivers([
+                                    { kry_nama: 'A. HIDAYAT' },
+                                    { kry_nama: 'MUHTAMI' },
+                                    { kry_nama: 'SUPARDI' },
+                                    { kry_nama: 'SOPIR OPERASIONAL' }
+                                ]);
+                            }
+                        } catch (e) {
+                            setDrivers([
+                                { kry_nama: 'A. HIDAYAT' },
+                                { kry_nama: 'MUHTAMI' },
+                                { kry_nama: 'SUPARDI' },
+                                { kry_nama: 'SOPIR OPERASIONAL' }
+                            ]);
+                        }
+                    }
                 }
+
+                // 2. Fetch Agen
                 const resAgens = await api.get('/agens', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
@@ -97,10 +108,19 @@ const SuratPengantarPengiriman = () => {
                 } else if (resAgens.data?.data) {
                     setAgens(resAgens.data.data);
                 }
+
             } catch (error) {
                 console.error("Gagal sinkronisasi data master:", error);
+                // Default Fallback
+                setDrivers([
+                    { kry_nama: 'A. HIDAYAT' },
+                    { kry_nama: 'MUHTAMI' },
+                    { kry_nama: 'SUPARDI' },
+                    { kry_nama: 'SOPIR OPERASIONAL' }
+                ]);
             }
         };
+
         fetchMasterData();
     }, [currentActiveAgen]);
 
@@ -297,11 +317,24 @@ const SuratPengantarPengiriman = () => {
                     </div>
                     <div>
                         <label className="text-xs font-bold text-slate-400">PENGEMUDI / SOPIR *</label>
-                        <select required value={formData.spt_namasopir} onChange={e => setFormData({ ...formData, spt_namasopir: e.target.value })} className="w-full mt-1 p-2.5 border rounded-lg bg-transparent">
+                        <select
+                            required
+                            value={formData.spt_namasopir}
+                            onChange={e => setFormData({ ...formData, spt_namasopir: e.target.value })}
+                            className="w-full mt-1 p-2.5 border rounded-lg bg-transparent font-bold text-slate-800"
+                        >
                             <option value="">-- PILIH DRIVER --</option>
-                            {drivers.map((item, idx) => (
-                                <option key={idx} value={item.nama || item.kry_nama}>{item.nama || item.kry_nama}</option>
-                            ))}
+                            {drivers && drivers.map((item, idx) => {
+                                // Ambil nama sopir dari berbagai kemungkinan nama properti backend
+                                const driverName = item.nama || item.kry_nama || item.nama_sopir || item.sopir_nama || item.kry_nip || item.name || '';
+                                const driverVal = item.nama || item.kry_nama || item.nama_sopir || item.kry_nip || driverName;
+
+                                return (
+                                    <option key={idx} value={driverVal}>
+                                        {driverName || `SOPIR #${idx + 1}`}
+                                    </option>
+                                );
+                            })}
                         </select>
                     </div>
                 </div>
