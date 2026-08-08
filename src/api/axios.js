@@ -1,7 +1,6 @@
 import axios from 'axios';
 
 const currentHost = window.location.hostname;
-//const backendPort = "8080";
 const backendPort = (currentHost === 'localhost' || currentHost === '127.0.0.1') ? '8080' : '9090';
 
 const api = axios.create({
@@ -11,11 +10,15 @@ const api = axios.create({
     }
 });
 
-
-
-// 🔍 REQUEST INTERCEPTOR - Log semua request yang dikirim
+// 🔍 REQUEST INTERCEPTOR - Injeksi Token Otomatis & Log Detail
 api.interceptors.request.use(
     (config) => {
+        // 🎯 FIX UTAMA: AMBIL TOKEN DARI LOCALSTORAGE & SUNTIKKAN KE HEADER
+        const token = localStorage.getItem('token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+
         console.log("%c📤 REQUEST DETAIL:", "color: #FF6B6B; font-weight: bold;");
         console.log("URL:", config.url);
         console.log("Method:", config.method);

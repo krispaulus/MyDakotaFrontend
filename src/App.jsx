@@ -74,6 +74,22 @@ import HasilLoper from './pages/HasilLoper';
 import CetakSuratPengiriman from './pages/CetakSuratPengiriman';
 import StokBarangGudang from './pages/StokBarangGudang';
 import VoucherBBM from './pages/VoucherBBM';
+import JurnalTidakSeimbang from './pages/JurnalTidakSeimbang';
+import CetakBukuBesar from './pages/CetakBukuBesar';
+import CetakNeracaSaldo from './pages/CetakNeracaSaldo';
+import CetakNeraca from './pages/CetakNeraca';
+import CetakRugiLaba from './pages/CetakRugiLaba';
+import CetakPosisiKeuangan from './pages/CetakPosisiKeuangan';
+import CetakLabaRugiKomprehensif from './pages/CetakLabaRugiKomprehensif';
+import DaftarBank from './pages/DaftarBank';
+import DaftarPemasukanPengeluaran from './pages/DaftarPemasukanPengeluaran';
+import DaftarKelompokPerkiraan from './pages/DaftarKelompokPerkiraan';
+import DaftarKodePerkiraan from './pages/DaftarKodePerkiraan';
+import DaftarSGU from './pages/DaftarSGU';
+import DaftarAkunPiutangSetoran from './pages/DaftarAkunPiutangSetoran';
+import InsentifLoper from './pages/InsentifLoper';
+import Jurnal from './pages/Jurnal';
+import KalkulasiKomisiSopir from "./pages/KalkulasiKomisiSopir";
 
 const getCompanyName = (pt) => {
   if (pt === 'A') return 'Dakota Buana Sarana';
@@ -576,7 +592,24 @@ function App() {
       <Route path="/pengambilan/barang-sendiri" element={<MainLayout><Pengambilan /></MainLayout>} />
       <Route path="/pengambilan/pengambilan-retur" element={<MainLayout><PengambilanRetur /></MainLayout>} />
 
+      <Route path="/general-ledger/jurnal-tidak-seimbang" element={<MainLayout><JurnalTidakSeimbang /></MainLayout>} />
+      <Route path="/general-ledger/cetak-buku-besar" element={<MainLayout><CetakBukuBesar /></MainLayout>} />
+      <Route path="/general-ledger/cetak-neraca-saldo" element={<MainLayout><CetakNeracaSaldo /></MainLayout>} />
+      <Route path="/general-ledger/cetak-neraca" element={<MainLayout><CetakNeraca /></MainLayout>} />
+      <Route path="/general-ledger/cetak-rugi-laba" element={<MainLayout><CetakRugiLaba /></MainLayout>} />
+      <Route path="/general-ledger/cetak-posisi-keuangan" element={<MainLayout><CetakPosisiKeuangan /></MainLayout>} />
+      <Route path="/general-ledger/cetak-rugi-laba-komprehensif" element={<MainLayout><CetakLabaRugiKomprehensif /></MainLayout>} />
 
+      <Route path="/general-ledger/daftar-bank" element={<MainLayout><DaftarBank /></MainLayout>} />
+      <Route path="/general-ledger/daftar-pemasukan-pengeluaran" element={<MainLayout><DaftarPemasukanPengeluaran /></MainLayout>} />
+      <Route path="/general-ledger/daftar-kelompok-perkiraan" element={<MainLayout><DaftarKelompokPerkiraan /></MainLayout>} />
+      <Route path="/general-ledger/daftar-kode-perkiraan" element={<MainLayout><DaftarKodePerkiraan /></MainLayout>} />
+      <Route path="/general-ledger/daftar-sgu" element={<MainLayout><DaftarSGU /></MainLayout>} />
+      <Route path="/general-ledger/daftar-akun-piutang-setoran" element={<MainLayout><DaftarAkunPiutangSetoran /></MainLayout>} />
+
+      <Route path="/general-ledger/insentif-loper" element={<MainLayout><InsentifLoper /></MainLayout>} />
+      <Route path="/general-ledger/jurnal" element={<MainLayout><Jurnal /></MainLayout>} />
+      <Route path="/general-ledger/komisi-sopir" element={<MainLayout><KalkulasiKomisiSopir /></MainLayout>} />
 
       {/* Jika nanti ada halaman lain, tinggal bungkus lagi pakai MainLayout 
       <Route

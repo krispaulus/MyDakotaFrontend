@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, NavLink } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
 import {
-  LayoutDashboard, Users, Book, Briefcase,
-  Database, TrendingUp, Truck, DollarSign, LayersPlus,
+  LayoutDashboard, Users, Book, Briefcase, List,
+  Database, TrendingUp, Truck, DollarSign, LayersPlus, Printer, ReceiptPoundSterling, WalletMinimal,
   Settings, LogOut, ChevronRight, Menu, Backpack, ClipboardPen, HandCoins, Route, GitCompareArrows, FileArchive
 } from 'lucide-react';
 import DakotaLogo from '../../assets/new_logo 2.png';
@@ -225,67 +225,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
   const allMenus = [
     { name: 'Dashboard', icon: <LayoutDashboard size={20} />, roles: ['S', 'A', 'SPV', 'U'] },
     // { name: 'Akun', icon: <Users size={20} />, roles: ['S', 'A'], division: 'Finance' },
-    { name: 'General Ledger', icon: <Book size={20} />, roles: ['S', 'A'], division: 'Finance' },
-    { name: 'HRD', icon: <Briefcase size={20} />, roles: ['S', 'A'], division: 'HRD' },
-    {
-      name: 'Marketing',
-      icon: <TrendingUp size={20} />,
-      roles: ['S', 'A'],
-      division: 'Marketing',
-      children: [
-        // { name: 'Dasboard', path: '/marketing/dashboard', roles: ['S'] },
-        { name: 'Master Customer', path: '/marketing/master-customer', roles: ['S'] },
-        { name: 'Bukti Tanda Terima(BTT)', path: '/marketing/btt', roles: ['S'] },
-        { name: 'Bebas Dari Biaya (Bdb) - Pengiriman', path: '/marketing/bdb' },
-        { name: 'Cetak BTT / Resi', path: '#print-btt', roles: ['S'] },
-        { name: 'Cetak Barcode Koli', path: '#print-barcode', roles: ['S'] },
-        { name: 'Closing Harian Agen', path: '/marketing/closing-harian', roles: ['S'] },
-        { name: 'Monitoring BTT', path: '/marketing/monitoring-btt', roles: ['S'] },
-        {
-          name: 'Laporan',
-          icon: <Backpack size={18} />,
-          children: [
-            { name: 'Hasil Penjualan Btt Counter / Agen', path: '/laporan/hasil-penjualan', roles: ['S'] },
-            { name: 'Penjualan Btt Harian', path: '/laporan/penjualan-harian' },
-            { name: 'Btt Belum Dibuat Laporan Penjualan', path: '/laporan/btt-belum-dibuat', roles: ['S'] },
-            { name: 'Penjualan', path: '/laporan/penjualan' },
-            { name: 'Btt Kirim Outstanding', path: '/laporan/btt-outstanding', roles: ['S'] },
-            { name: 'Perjalanan Btt', path: '/laporan/perjalanan-btt' },
-            { name: 'Penjualan Dan Penerimaan', path: '/laporan/penjualan-penerimaan', roles: ['S'] },
-            { name: 'Laporan Omset Penjualan', path: '/laporan/omset-penjualan' },
-            { name: 'Monitoring Btt', path: '/laporan/monitoring-btt', roles: ['S'] },
-          ]
-        },
-        {
-          name: 'Pengajuan Khusus',
-          icon: <Truck size={18} />,
-          roles: ['S'],
-          children: [
-            { name: 'Asuransi', path: '/pengajuan/asuransi', roles: ['S'] },
-            { name: 'Order Jemput', path: '/pengajuan/order-jemput' },
-            { name: 'Packing', path: '/pengajuan/packing' },
-          ]
-        },
-        {
-          name: 'Penerimaan',
-          icon: <Truck size={18} />,
-          path: '', roles: ['S'],
-          children: [
-            { name: 'Btt Kembali', path: '/penerimaan/btt-kembali', roles: ['S'] },
-            { name: 'Btt / Barang Retur', path: '/penerimaan/btt-retur' },
-            { name: 'Penerimaan Pembayaran Kasir', path: '/penerimaan/pembayaran-kasir' },
-            { name: 'Pengembalian Surat Jalan Customer', path: '/penerimaan/pengembalian-surat-jalan', roles: ['S'] },
-            { name: 'Setoran Penjualan Tunai', path: '/penerimaan/setoran-penjualan' },
-          ]
-        },
-        { name: 'Pengembalian Surat Jalan Customer', path: '/marketing/pengembalian-surat-jalan-customer', roles: ['S'] },
-        { name: 'Upload CSV', path: '/marketing/upload-csv' },
-        { name: 'Proses Packing', path: '/marketing/proses-packing', roles: ['S'] },
-        { name: 'Pengemasan Barang Kurir', path: '/marketing/pengemasan-barang-kurir' },
-        { name: 'Customer - Upload CSV', path: '/marketing/customer-upload-csv', roles: ['S'] },
-      ]
 
-    },
     {
       name: 'Master',
       icon: <Database size={20} />,
@@ -328,7 +268,6 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
         },
       ]
     },
-
 
     {
       name: 'Operasional',
@@ -401,10 +340,116 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
       ]
     },
 
+    {
+      name: 'Marketing',
+      icon: <TrendingUp size={20} />,
+      roles: ['S', 'A'],
+      division: 'Marketing',
+      children: [
+        // { name: 'Dasboard', path: '/marketing/dashboard', roles: ['S'] },
+        { name: 'Master Customer', path: '/marketing/master-customer', roles: ['S'] },
+        { name: 'Bukti Tanda Terima(BTT)', path: '/marketing/btt', roles: ['S'] },
+        { name: 'Bebas Dari Biaya (Bdb) - Pengiriman', path: '/marketing/bdb' },
+        { name: 'Cetak BTT / Resi', path: '#print-btt', roles: ['S'] },
+        { name: 'Cetak Barcode Koli', path: '#print-barcode', roles: ['S'] },
+        { name: 'Closing Harian Agen', path: '/marketing/closing-harian', roles: ['S'] },
+        { name: 'Monitoring BTT', path: '/marketing/monitoring-btt', roles: ['S'] },
+        {
+          name: 'Laporan',
+          icon: <Backpack size={18} />,
+          children: [
+            { name: 'Hasil Penjualan Btt Counter / Agen', path: '/laporan/hasil-penjualan', roles: ['S'] },
+            { name: 'Penjualan Btt Harian', path: '/laporan/penjualan-harian' },
+            { name: 'Btt Belum Dibuat Laporan Penjualan', path: '/laporan/btt-belum-dibuat', roles: ['S'] },
+            { name: 'Penjualan', path: '/laporan/penjualan' },
+            { name: 'Btt Kirim Outstanding', path: '/laporan/btt-outstanding', roles: ['S'] },
+            { name: 'Perjalanan Btt', path: '/laporan/perjalanan-btt' },
+            { name: 'Penjualan Dan Penerimaan', path: '/laporan/penjualan-penerimaan', roles: ['S'] },
+            { name: 'Laporan Omset Penjualan', path: '/laporan/omset-penjualan' },
+            { name: 'Monitoring Btt', path: '/laporan/monitoring-btt', roles: ['S'] },
+          ]
+        },
+        {
+          name: 'Pengajuan Khusus',
+          icon: <Truck size={18} />,
+          roles: ['S'],
+          children: [
+            { name: 'Asuransi', path: '/pengajuan/asuransi', roles: ['S'] },
+            { name: 'Order Jemput', path: '/pengajuan/order-jemput' },
+            { name: 'Packing', path: '/pengajuan/packing' },
+          ]
+        },
+        {
+          name: 'Penerimaan',
+          icon: <Truck size={18} />,
+          path: '', roles: ['S'],
+          children: [
+            { name: 'Btt Kembali', path: '/penerimaan/btt-kembali', roles: ['S'] },
+            { name: 'Btt / Barang Retur', path: '/penerimaan/btt-retur' },
+            { name: 'Penerimaan Pembayaran Kasir', path: '/penerimaan/pembayaran-kasir' },
+            { name: 'Pengembalian Surat Jalan Customer', path: '/penerimaan/pengembalian-surat-jalan', roles: ['S'] },
+            { name: 'Setoran Penjualan Tunai', path: '/penerimaan/setoran-penjualan' },
+          ]
+        },
+        { name: 'Pengembalian Surat Jalan Customer', path: '/marketing/pengembalian-surat-jalan-customer', roles: ['S'] },
+        { name: 'Upload CSV', path: '/marketing/upload-csv' },
+        { name: 'Proses Packing', path: '/marketing/proses-packing', roles: ['S'] },
+        { name: 'Pengemasan Barang Kurir', path: '/marketing/pengemasan-barang-kurir' },
+        { name: 'Customer - Upload CSV', path: '/marketing/customer-upload-csv', roles: ['S'] },
+      ]
 
+    },
 
-
+    { name: 'Hutang', icon: <ReceiptPoundSterling size={20} />, roles: ['S', 'A'], division: 'Finance' },
     { name: 'Piutang', icon: <DollarSign size={20} />, roles: ['S', 'A'], division: 'Finance' },
+    { name: 'Klaim', icon: <WalletMinimal size={20} />, roles: ['S', 'A'], division: 'Finance' },
+
+    {
+      name: 'General Ledger',
+      icon: <Book size={20} />,
+      roles: ['S', 'A'],
+      children: [
+        { name: 'Cek Jurnal', path: '#', roles: ['S'] },
+        { name: 'Cek Jurnal Tidak Seimbang', path: '/general-ledger/jurnal-tidak-seimbang' },
+        {
+          name: 'Cetak',
+          icon: <Printer size={18} />,
+          children: [
+            { name: 'Cetak Buku Besar', path: '/general-ledger/cetak-buku-besar', roles: ['S'] },
+            { name: 'Cetak Neraca Saldo', path: '/general-ledger/cetak-neraca-saldo', roles: ['S'] },
+            { name: 'Cetak Neraca', path: '/general-ledger/cetak-neraca', roles: ['S'] },
+            { name: 'Cetak Rugi Laba', path: '/general-ledger/cetak-rugi-laba', roles: ['S'] },
+            { name: 'Cetak Posisi Keuangan', path: '/general-ledger/cetak-posisi-keuangan', roles: ['S'] },
+            { name: 'Cetak Rugi Laba Komprehensif', path: '/general-ledger/cetak-rugi-laba-komprehensif', roles: ['S'] }
+          ]
+        },
+        {
+          name: 'Daftar',
+          icon: <List size={18} />,
+          roles: ['S'],
+          children: [
+            { name: 'Daftar Bank', path: '/general-ledger/daftar-bank', roles: ['S'] },
+            { name: 'Daftar Pemasukan & Pengeluaran', path: '/general-ledger/daftar-pemasukan-pengeluaran', roles: ['S', 'A'] },
+            { name: 'Daftar Kelompok Perkiraan', path: '/general-ledger/daftar-kelompok-perkiraan', roles: ['S', 'A'] },
+            { name: 'Daftar Kode Perkiraan', path: '/general-ledger/daftar-kode-perkiraan', roles: ['S', 'A'] },
+            { name: 'Daftar SGU', path: '/general-ledger/daftar-sgu', roles: ['S', 'A'] },
+            { name: 'Daftar Akun Piutang Setoran', path: '/general-ledger/daftar-akun-piutang-setoran', roles: ['S', 'A'] },
+          ]
+        },
+        { name: 'Insentif Loper', path: '/general-ledger/insentif-loper', roles: ['S', 'A'] },
+        { name: 'Jurnal', path: '/general-ledger/jurnal', roles: ['S', 'A'] },
+        { name: 'Komisi Sopir', path: '/general-ledger/komisi-sopir', roles: ['S', 'A'] },
+        { name: 'Kas Masuk / Keluar', path: '#' },
+        { name: 'Pembayaran Vendor', path: '#' },
+
+        // { name: 'Posting Pembukuan Akhir Bulan', path: '#' },
+        // { name: 'Setoran Cod', path: '#' },
+        // { name: 'Unposting Pembukuan Akhir Bulan', path: '#' },
+        // { name: 'Insentif Loper', path: '#' },
+      ]
+    },
+    { name: 'HRD', icon: <Briefcase size={20} />, roles: ['S', 'A'], division: 'HRD' },
+
 
     // MENU SETTINGS DENGAN CHILDREN
 
