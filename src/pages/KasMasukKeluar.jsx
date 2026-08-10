@@ -1,0 +1,506 @@
+import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
+import api from '../api/axios';
+import DataTableTemplate from '../components/organisms/DataTableTemplate';
+import { useDarkMode } from '../context/DarkModeContext';
+import { Filter, Printer, FileText, CheckCircle2, X } from 'lucide-react';
+import Swal from 'sweetalert2';
+
+const KasMasukKeluar = () => {
+    const { isDarkMode } = useDarkMode();
+    const [data, setData] = useState([]);
+    const [cabangList, setCabangList] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    // Filter State
+    const today = new Date().toISOString().split('T')[0];
+    const [startDate, setStartDate] = useState(today);
+    const [endDate, setEndDate] = useState(today);
+    const [selectedCabang, setSelectedCabang] = useState('');
+    const [selectedTipe, setSelectedTipe] = useState('');
+    const [searchNoTrans, setSearchNoTrans] = useState('');
+    const [searchNoJurnal, setSearchNoJurnal] = useState('');
+    const [selectedAktif, setSelectedAktif] = useState('');
+    const [selectedPosting, setSelectedPosting] = useState('');
+    const [isFilterActive, setIsFilterActive] = useState(false);
+
+    // Modal Form State
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [formData, setFormData] = useState({
+        cb_id: '',
+        cb_tanggal: today,
+        cb_tipe: 'K',
+        cb_ket: '',
+        nominal: 0
+    });
+
+    const fetchCabangList = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await api.get('/gl/agen-ca?stt=2', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setCabangList(res.data?.data || []);
+        } catch (err) {
+            console.error("Gagal load cabang options:", err);
+        }
+    };
+
+    const fetchCashBankData = async () => {
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('token');
+            let queryParams = `/gl/cashbank?limit=500`;
+
+            if (isFilterActive) {
+                if (startDate && endDate) queryParams += `&start_date=${startDate}&end_date=${endDate}`;
+                if (selectedCabang) queryParams += `&cabang_nama=${selectedCabang}`;
+                if (selectedTipe) queryParams += `&tipe=${selectedTipe}`;
+                if (searchNoTrans) queryParams += `&no_trans=${searchNoTrans}`;
+                if (searchNoJurnal) queryParams += `&no_jurnal=${searchNoJurnal}`;
+                if (selectedAktif) queryParams += `&aktif_yn=${selectedAktif}`;
+                if (selectedPosting) queryParams += `&posting_yn=${selectedPosting}`;
+            }
+
+            const res = await api.get(queryParams, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setData(res.data?.data || []);
+        } catch (err) {
+            console.error("Gagal tarik data Kas/Bank:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchCabangList();
+    }, []);
+
+    useEffect(() => {
+        fetchCashBankData();
+    }, [isFilterActive]);
+
+    const handleApplyFilter = (e) => {
+        e.preventDefault();
+        setIsFilterActive(true);
+        fetchCashBankData();
+    };
+
+    const handleResetFilter = () => {
+        setStartDate(today);
+        setEndDate(today);
+        setSelectedCabang('');
+        setSelectedTipe('');
+        setSearchNoTrans('');
+        setSearchNoJurnal('');
+        setSelectedAktif('');
+        setSelectedPosting('');
+        setIsFilterActive(false);
+    };
+
+    const handleAdd = () => {
+        setIsEditMode(false);
+        setFormData({
+            cb_id: '',
+            cb_tanggal: today,
+            cb_tipe: 'K',
+            cb_ket: '',
+            nominal: 0
+        });
+        setIsModalOpen(true);
+    };
+
+    const handleEdit = (item) => {
+        setIsEditMode(true);
+        setFormData({
+            cb_id: item.cb_id,
+            cb_tanggal: item.cb_tanggal || today,
+            cb_tipe: item.cb_tipe || 'K',
+            cb_ket: item.cb_ket !== '-' ? item.cb_ket : '',
+            nominal: item.total_amount || 0
+        });
+        setIsModalOpen(true);
+    };
+
+    const handleSaveForm = async (e) => {
+        e.preventDefault();
+        try {
+            const token = localStorage.getItem('token');
+            await api.post('/gl/cashbank/create', {
+                ...formData,
+                nominal: parseFloat(formData.nominal) || 0
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            Swal.fire({
+                title: 'BERHASIL!',
+                text: 'Pencatatan Kas/Bank Berhasil Disimpan.',
+                icon: 'success',
+                didOpen: () => {
+                    const container = document.querySelector('.swal2-container');
+                    if (container) container.style.zIndex = '9999999';
+                }
+            });
+
+            setIsModalOpen(false);
+            fetchCashBankData();
+        } catch (err) {
+            Swal.fire({
+                title: 'GAGAL!',
+                text: err.response?.data?.message || 'Gagal menyimpan transaksi.',
+                icon: 'error',
+                didOpen: () => {
+                    const container = document.querySelector('.swal2-container');
+                    if (container) container.style.zIndex = '9999999';
+                }
+            });
+        }
+    };
+
+    const handleDelete = (item) => {
+        Swal.fire({
+            title: 'Batalkan Transaksi Kas?',
+            text: `Apakah Anda yakin ingin membatalkan transaksi kas No ${item.cb_id}?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#e11d48',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Ya, Batalkan!',
+            cancelButtonText: 'Batal',
+            didOpen: () => {
+                const container = document.querySelector('.swal2-container');
+                if (container) container.style.zIndex = '9999999';
+            }
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                try {
+                    await api.delete(`/gl/cashbank/${item.cb_id}`);
+                    Swal.fire({
+                        title: 'TERHAPUS!',
+                        text: 'Transaksi Kas berhasil dibatalkan.',
+                        icon: 'success',
+                        didOpen: () => {
+                            const container = document.querySelector('.swal2-container');
+                            if (container) container.style.zIndex = '9999999';
+                        }
+                    });
+                    fetchCashBankData();
+                } catch (err) {
+                    Swal.fire({
+                        title: 'GAGAL!',
+                        text: err.response?.data?.message || 'Gagal menghapus data.',
+                        icon: 'error',
+                        didOpen: () => {
+                            const container = document.querySelector('.swal2-container');
+                            if (container) container.style.zIndex = '9999999';
+                        }
+                    });
+                }
+            }
+        });
+    };
+
+    const handlePrint = (item) => {
+        Swal.fire({
+            title: 'PRINT BUKTI KAS',
+            text: `Mencetak Bukti Kas untuk No Transaksi ${item.cb_id}...`,
+            icon: 'info',
+            confirmButtonColor: '#0284c7',
+            didOpen: () => {
+                const container = document.querySelector('.swal2-container');
+                if (container) container.style.zIndex = '9999999';
+            }
+        });
+    };
+
+    const formatDate = (dateString) => {
+        if (!dateString || dateString === '-') return '-';
+        const parts = dateString.split('-');
+        if (parts.length === 3) {
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+        return dateString;
+    };
+
+    const columns = [
+        {
+            header: 'NO. TRANSAKSI',
+            accessor: 'cb_id',
+            render: (item) => <span className="font-mono font-bold text-sky-600">{item.cb_id}</span>
+        },
+        {
+            header: 'CABANG',
+            accessor: 'agen_nama',
+            render: (item) => <span className="font-bold text-slate-800 uppercase">{item.agen_nama}</span>
+        },
+        {
+            header: 'TANGGAL',
+            accessor: 'cb_tanggal',
+            render: (item) => <span className="font-mono text-slate-800">{formatDate(item.cb_tanggal)}</span>
+        },
+        {
+            header: 'TIPE',
+            accessor: 'cb_tipe',
+            render: (item) => item.cb_tipe === 'T' ? (
+                <span className="font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[10px]">TERIMA KAS</span>
+            ) : (
+                <span className="font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded text-[10px]">KELUAR KAS</span>
+            )
+        },
+        {
+            header: 'KETERANGAN',
+            accessor: 'cb_ket',
+            render: (item) => <span className="text-slate-600">{item.cb_ket}</span>
+        },
+        {
+            header: 'STATUS',
+            accessor: 'cb_aktifyn',
+            render: (item) => item.cb_aktifyn === 'N' ? (
+                <span className="font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded text-[10px]">HAPUS / VOID</span>
+            ) : (
+                <span className="font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[10px]">AKTIF</span>
+            )
+        },
+        {
+            header: 'NO. JURNAL',
+            accessor: 'cb_nojurnal',
+            render: (item) => <span className="font-mono text-indigo-600 font-bold">{item.cb_nojurnal}</span>
+        },
+        {
+            header: 'POSTING',
+            accessor: 'cb_postyn',
+            render: (item) => item.cb_postyn === 'Y' ? (
+                <span className="font-bold text-sky-600 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded text-[10px]">POSTING</span>
+            ) : (
+                <span className="font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-[10px]">UNPOSTED</span>
+            )
+        },
+        {
+            header: 'NOMINAL (RP)',
+            accessor: 'total_amount',
+            render: (item) => <span className="font-mono font-bold text-emerald-600">Rp {(item.total_amount || 0).toLocaleString('id-ID')}</span>
+        },
+        {
+            header: 'PRINT',
+            accessor: 'print_action',
+            render: (item) => (
+                <button
+                    onClick={() => handlePrint(item)}
+                    className="p-1.5 bg-sky-50 text-sky-600 border border-sky-200 rounded-lg hover:bg-sky-100 transition cursor-pointer flex items-center gap-1 mx-auto font-bold text-xs"
+                >
+                    <Printer size={14} /> Print
+                </button>
+            )
+        }
+    ];
+
+    // Modal Popup Template Standar
+    const modalElement = isModalOpen ? (
+        <div
+            className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs transition-opacity"
+            style={{ zIndex: 99999 }}
+        >
+            <div className={`w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden transition-all transform ${isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-slate-800'}`}>
+                <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between">
+                    <h2 className="text-base font-black uppercase tracking-wider text-slate-800">
+                        {isEditMode ? `EDIT CASH - BANK INFO (${formData.cb_id})` : 'ADD CASH - BANK INFO'}
+                    </h2>
+                    <button
+                        type="button"
+                        onClick={() => setIsModalOpen(false)}
+                        className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                        <X size={20} />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSaveForm} className="p-8 space-y-5 text-xs">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        {isEditMode && (
+                            <div className="md:col-span-2">
+                                <label className="font-bold text-slate-700 block mb-1.5">No Transaksi</label>
+                                <input
+                                    type="text"
+                                    disabled
+                                    value={formData.cb_id}
+                                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg bg-slate-100 font-bold text-slate-700 font-mono"
+                                />
+                            </div>
+                        )}
+
+                        <div>
+                            <label className="font-bold text-slate-700 block mb-1.5">Tanggal Transaksi</label>
+                            <input
+                                type="date"
+                                required
+                                value={formData.cb_tanggal}
+                                onChange={(e) => setFormData({ ...formData, cb_tanggal: e.target.value })}
+                                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg bg-white font-medium text-slate-800 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-700 block mb-1.5">Jenis Transaksi</label>
+                            <select
+                                required
+                                value={formData.cb_tipe}
+                                onChange={(e) => setFormData({ ...formData, cb_tipe: e.target.value })}
+                                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg bg-white font-medium text-slate-800 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition"
+                            >
+                                <option value="K">Keluar Kas (Pengeluaran)</option>
+                                <option value="T">Terima Kas (Penerimaan)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-700 block mb-1.5">Nominal Transaksi (Rp)</label>
+                            <input
+                                type="number"
+                                required
+                                value={formData.nominal}
+                                onChange={(e) => setFormData({ ...formData, nominal: e.target.value })}
+                                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg bg-white font-mono font-bold text-emerald-600 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition"
+                            />
+                        </div>
+
+                        <div className="md:col-span-2">
+                            <label className="font-bold text-slate-700 block mb-1.5">Keterangan</label>
+                            <textarea
+                                rows={3}
+                                placeholder="Masukkan keterangan rincian transaksi..."
+                                value={formData.cb_ket}
+                                onChange={(e) => setFormData({ ...formData, cb_ket: e.target.value })}
+                                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg bg-white font-medium text-slate-800 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex items-center justify-center gap-3 pt-6">
+                        <button
+                            type="button"
+                            onClick={() => setIsModalOpen(false)}
+                            className="px-8 py-2.5 border border-slate-300 text-slate-700 font-bold rounded-lg hover:bg-slate-50 transition uppercase cursor-pointer"
+                        >
+                            CANCEL
+                        </button>
+                        <button
+                            type="submit"
+                            className="px-8 py-2.5 bg-indigo-900 hover:bg-indigo-950 text-white font-bold rounded-lg transition shadow-md uppercase cursor-pointer"
+                        >
+                            {isEditMode ? 'UPDATE CASH - BANK' : 'ADD CASH - BANK'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    ) : null;
+
+    return (
+        <div className="space-y-4">
+            {/* Filter Panel */}
+            <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs">
+                <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
+                    <Filter size={16} className="text-sky-600" />
+                    FILTER PENCATATAN CASH - BANK
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                            <label className="font-bold text-slate-500 block mb-1">TGL MULAI</label>
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            />
+                        </div>
+                        <div className="flex-1">
+                            <label className="font-bold text-slate-500 block mb-1">TGL SAMPAI</label>
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="font-bold text-slate-500 block mb-1">CABANG / TRANSAKSI</label>
+                        <select
+                            value={selectedCabang}
+                            onChange={(e) => setSelectedCabang(e.target.value)}
+                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                        >
+                            <option value="">-- SEMUA CABANG --</option>
+                            {cabangList.map((cabang, idx) => (
+                                <option key={idx} value={cabang.agen_nama}>
+                                    {cabang.agen_nama}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="font-bold text-slate-500 block mb-1">JENIS TRANSAKSI</label>
+                        <select
+                            value={selectedTipe}
+                            onChange={(e) => setSelectedTipe(e.target.value)}
+                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                        >
+                            <option value="">-- SEMUA TIPE --</option>
+                            <option value="K">Keluar Kas (K)</option>
+                            <option value="T">Terima Kas (T)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="font-bold text-slate-500 block mb-1">NO. TRANSAKSI</label>
+                        <input
+                            type="text"
+                            placeholder="Ketik No Transaksi..."
+                            value={searchNoTrans}
+                            onChange={(e) => setSearchNoTrans(e.target.value)}
+                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                        />
+                    </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button
+                        type="button"
+                        onClick={handleResetFilter}
+                        className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer"
+                    >
+                        RESET
+                    </button>
+                    <button
+                        type="submit"
+                        className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer"
+                    >
+                        TAMPILKAN TRANSAKSI
+                    </button>
+                </div>
+            </form>
+
+            <DataTableTemplate
+                title="PENCATATAN CASH - BANK"
+                columns={columns}
+                data={data}
+                loading={loading}
+                isDarkMode={isDarkMode}
+                onAdd={handleAdd}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+            />
+
+            {modalElement && ReactDOM.createPortal(modalElement, document.body)}
+        </div>
+    );
+};
+
+export default KasMasukKeluar;

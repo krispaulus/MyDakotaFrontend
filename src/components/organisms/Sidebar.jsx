@@ -439,8 +439,10 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
         { name: 'Insentif Loper', path: '/general-ledger/insentif-loper', roles: ['S', 'A'] },
         { name: 'Jurnal', path: '/general-ledger/jurnal', roles: ['S', 'A'] },
         { name: 'Komisi Sopir', path: '/general-ledger/komisi-sopir', roles: ['S', 'A'] },
-        { name: 'Kas Masuk / Keluar', path: '#' },
-        { name: 'Pembayaran Vendor', path: '#' },
+        { name: 'Kas Masuk / Keluar', path: '/general-ledger/kas-masuk-keluar', roles: ['S', 'A'] },
+        { name: 'Pembayaran Vendor', path: '/general-ledger/pembayaran-vendor', roles: ['S', 'A'] },
+        { name: 'Posting Jurnal', path: '/general-ledger/posting-jurnal', roles: ['S', 'A'] },
+        { name: 'Setoran COD', path: '/general-ledger/setoran-cod', roles: ['S', 'A'] },
 
         // { name: 'Posting Pembukuan Akhir Bulan', path: '#' },
         // { name: 'Setoran Cod', path: '#' },

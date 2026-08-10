@@ -90,6 +90,10 @@ import DaftarAkunPiutangSetoran from './pages/DaftarAkunPiutangSetoran';
 import InsentifLoper from './pages/InsentifLoper';
 import Jurnal from './pages/Jurnal';
 import KalkulasiKomisiSopir from "./pages/KalkulasiKomisiSopir";
+import KasMasukKeluar from './pages/KasMasukKeluar';
+import PembayaranVendor from './pages/PembayaranVendor';
+import PostingJurnal from './pages/PostingJurnal';
+import SetoranCOD from './pages/SetoranCOD';
 
 const getCompanyName = (pt) => {
   if (pt === 'A') return 'Dakota Buana Sarana';
@@ -610,6 +614,10 @@ function App() {
       <Route path="/general-ledger/insentif-loper" element={<MainLayout><InsentifLoper /></MainLayout>} />
       <Route path="/general-ledger/jurnal" element={<MainLayout><Jurnal /></MainLayout>} />
       <Route path="/general-ledger/komisi-sopir" element={<MainLayout><KalkulasiKomisiSopir /></MainLayout>} />
+      <Route path="/general-ledger/kas-masuk-keluar" element={<MainLayout><KasMasukKeluar /></MainLayout>} />
+      <Route path="/general-ledger/pembayaran-vendor" element={<MainLayout><PembayaranVendor /></MainLayout>} />
+      <Route path="/general-ledger/posting-jurnal" element={<MainLayout><PostingJurnal /></MainLayout>} />
+      <Route path="/general-ledger/setoran-cod" element={<MainLayout><SetoranCOD /></MainLayout>} />
 
       {/* Jika nanti ada halaman lain, tinggal bungkus lagi pakai MainLayout 
       <Route
