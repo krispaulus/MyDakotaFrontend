@@ -62,16 +62,23 @@ const AreaCustomer = () => {
     });
     const [submitting, setSubmitting] = useState(false);
 
-    // Fetch Data BTT List
+    // 🌟 1. FETCH DATA BTT LIST DENGAN SINKRONISASI AGEN AKTIF DARI HEADER 🌟
     const fetchEconoteList = async () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
+            const activeAgen = localStorage.getItem('active_agen_id'); // 👈 AMBIL AGEN DARI HEADER
             const params = new URLSearchParams();
 
+            // Masukkan parameter filter bawaan form UI jika diisi
             Object.keys(filters).forEach(key => {
                 if (filters[key] !== '') params.append(key, filters[key]);
             });
+
+            // 🎯 FILTER SAKTI: Jika agen aktif bukan PUSAT DAKOTA, paksa kirim filter agen ke backend!
+            if (activeAgen && activeAgen !== 'PUSAT DAKOTA' && activeAgen !== 'BKI0101' && activeAgen !== 'PST001' && activeAgen !== '1') {
+                params.append('agen', activeAgen);
+            }
 
             const res = await api.get(`/master/econote/list?${params.toString()}`, {
                 headers: { Authorization: `Bearer ${token}` }
@@ -133,7 +140,7 @@ const AreaCustomer = () => {
         });
     };
 
-    // 1. READ / VIEW DETAIL & PRINT POP-UP
+    // READ / VIEW DETAIL & PRINT POP-UP
     const handleSelectBTT = (item) => {
         if (!item) return;
         Swal.fire({
@@ -183,15 +190,13 @@ const AreaCustomer = () => {
         });
     };
 
-    // 2. CREATE / TAMBAH BTT HANDLER (Buka Modal Entry Tambah BTT atau Navigate)
+    // CREATE / TAMBAH BTT HANDLER
     const handleAddBtt = () => {
-        // Cek jika ada rute internal React Router /marketing/btt
         try {
             navigate('/marketing/btt');
         } catch {
             setIsAddModalOpen(true);
         }
-        // Jaga-jaga jika menggunakan Modal Form
         setIsAddModalOpen(true);
     };
 
@@ -226,7 +231,7 @@ const AreaCustomer = () => {
         }
     };
 
-    // 3. UPDATE / BUKA MODAL EDIT BTT
+    // UPDATE / BUKA MODAL EDIT BTT
     const handleOpenEdit = (item) => {
         if (!item) return;
         setEditFormData({
@@ -273,7 +278,7 @@ const AreaCustomer = () => {
         }
     };
 
-    // 4. DELETE / SOFT DELETE BTT
+    // DELETE / SOFT DELETE BTT
     const handleDelete = (item) => {
         if (!item) return;
         Swal.fire({
@@ -342,7 +347,7 @@ const AreaCustomer = () => {
             accessor: 'servisjd',
             render: (item) => (
                 <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase ${item.bttt_servid === 1 ? 'bg-slate-100 text-slate-800' :
-                        item.bttt_servid === 2 ? 'bg-cyan-100 text-cyan-800' : 'bg-purple-100 text-purple-800'
+                    item.bttt_servid === 2 ? 'bg-cyan-100 text-cyan-800' : 'bg-purple-100 text-purple-800'
                     }`}>
                     {item.servisjd}
                 </span>
@@ -371,7 +376,7 @@ const AreaCustomer = () => {
             accessor: 'jnbayar',
             render: (item) => (
                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${item.bttt_pembayaran === 1 ? 'bg-emerald-100 text-emerald-800' :
-                        item.bttt_pembayaran === 2 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                    item.bttt_pembayaran === 2 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
                     }`}>
                     {item.jnbayar}
                 </span>
@@ -433,6 +438,19 @@ const AreaCustomer = () => {
             )
         }
     ];
+
+    // 🌟 FILTER DATA DI FRONTEND (SAFETY GUARD): Jika backend mengirimkan semua data, saring lokal berdasarkan agen aktif
+    const activeAgen = localStorage.getItem('active_agen_id');
+    const filteredData = data.filter(item => {
+        if (!activeAgen || activeAgen === 'PUSAT DAKOTA' || activeAgen === 'BKI0101' || activeAgen === 'PST001' || activeAgen === '1') {
+            return true; // Tampilkan seluruh BTT nasional jika di Holding Pusat
+        }
+
+        const target = activeAgen.toString().trim().toUpperCase();
+        return item.bttt_asalid?.toString().trim().toUpperCase() === target ||
+            item.bttt_agenasal?.toString().trim().toUpperCase() === target ||
+            item.bttt_cabangid?.toString().trim().toUpperCase() === target;
+    });
 
     return (
         <div className="space-y-3">
@@ -560,11 +578,11 @@ const AreaCustomer = () => {
                 </form>
             )}
 
-            {/* 🌟 DATATABLETEMPLATE DENGAN HANDLER onAdd YANG DIBAWA SECARA DIRECT FUNCTION 🌟 */}
+            {/* 🌟 DATATABLETEMPLATE MENGGUNAKAN DATA YANG SUDAH TERFILTER PRESISI 🌟 */}
             <DataTableTemplate
-                title="BTT PENGIRIMAN"
+                title="BUKTI TANDA TERIMA (BTT)"
                 columns={columns}
-                data={data}
+                data={filteredData}
                 loading={loading}
                 isDarkMode={isDarkMode}
                 onAdd={handleAddBtt}
@@ -573,7 +591,7 @@ const AreaCustomer = () => {
                 onDelete={(item) => handleDelete(item)}
             />
 
-            {/* 🌟 MODAL POP-UP TAMBAH BTT BARU (ELEGAN 2 KOLOM IDENTIK EDIT USER) 🌟 */}
+            {/* MODAL TAMBAH & EDIT TETAP PRESISI SEPERTI SEMULA */}
             {isAddModalOpen && (
                 <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
                     <div className="w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden bg-white border border-gray-100 p-8 transition-all">
@@ -731,7 +749,6 @@ const AreaCustomer = () => {
                 </div>
             )}
 
-            {/* 🌟 MODAL POP-UP EDIT BTT PRESISI DISAMAKAN DENGAN EDIT USER 🌟 */}
             {isEditModalOpen && (
                 <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
                     <div className="w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden bg-white border border-gray-100 p-8 transition-all">

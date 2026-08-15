@@ -362,53 +362,59 @@ const UserManagement = () => {
   }, [editUser?.all_cabangyn, agens]);
 
 
-  // --- DELETE USER ---
-
+  // --- DELETE USER SAKTI & ANTI-GAGAL ---
   const handleDelete = (username) => {
-    // 1. Tampilkan Pop Up Warning (Gambar 1)
+    if (!username) return;
+
     Swal.fire({
       title: 'WARNING',
-      text: `apakah kamu yakin akan delete ${username} !`,
+      text: `Apakah kamu yakin akan delete ${username} ?`,
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#ff0000', // Warna merah untuk tombol DELETE
-      cancelButtonColor: '#ffffff', // Warna putih
+      confirmButtonColor: '#ff0000',
+      cancelButtonColor: '#ffffff',
       confirmButtonText: 'DELETE',
       cancelButtonText: 'Back',
-      reverseButtons: true, // Supaya Back di kiri, Delete di kanan
+      reverseButtons: true,
       customClass: {
-        cancelButton: 'border border-gray-300 text-black', // Styling manual tombol Back
+        cancelButton: 'border border-gray-300 text-black',
       }
-    }).then((result) => {
+    }).then(async (result) => {
       if (result.isConfirmed) {
-        // 2. Jika klik DELETE, panggil API Backend
-        fetch(`/users/${username.trim()}`, {
-          method: 'DELETE',
-          headers: {
-            // Tambahkan ini supaya Backend tahu kamu admin yang sah
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          },
-        })
-          .then(res => res.json())
-          .then(data => {
-            if (data.status === 'success') {
-              // 3. Tampilkan Pop Up Sukses (Gambar 2)
-              Swal.fire({
-                title: 'SUKSES !!',
-                text: `Data ${username} berhasil terhapus !`,
-                icon: 'success',
-                confirmButtonText: 'OK',
-                confirmButtonColor: '#10b981', // Warna hijau
-              });
+        try {
+          setLoading(true);
+          const token = localStorage.getItem('token');
+          const cleanUsername = username.trim();
 
-              // Refresh data di table (panggil fungsi fetch users kamu)
-              fetchUsers();
-            }
-          })
-          .catch(err => {
-            Swal.fire('Error', 'Gagal menghapus data', 'error');
+          // 🎯 Panggil API DELETE /users/:username
+          const response = await api.delete(`/users/${cleanUsername}`, {
+            headers: { Authorization: `Bearer ${token}` }
           });
+
+          if (response.status === 200 || response.data?.status === 'success') {
+            Swal.fire({
+              title: 'SUKSES !!',
+              text: `Data ${cleanUsername} berhasil terhapus !`,
+              icon: 'success',
+              confirmButtonText: 'OK',
+              confirmButtonColor: '#10b981',
+            });
+
+            await fetchUsers(); // Refresh tabel
+          }
+        } catch (err) {
+          console.error("Gagal delete user:", err);
+          const errMsg = err.response?.data?.message || "Gagal menghapus data dari server";
+
+          Swal.fire({
+            title: 'Error',
+            text: errMsg,
+            icon: 'error',
+            confirmButtonColor: '#d33'
+          });
+        } finally {
+          setLoading(false);
+        }
       }
     });
   };

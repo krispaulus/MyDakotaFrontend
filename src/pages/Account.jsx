@@ -240,17 +240,21 @@ function AccountPage() {
 
 
   const renderCabangBadges = () => {
-    let list = formData.kode_cabang || [];
-    const isAll = formData.all_cabangyn === 'Y';
+    const currentNick = (formData.nickname || formData.realname || '').toLowerCase();
+    const isAll = formData.all_cabangyn === 'Y' || formData.usertype === 'S' || currentNick.startsWith('super');
 
+    // 🌟 KUNCI FIXING: Jika Superadmin / All Cabang, TAMPILKAN 1 BADGE PUSAT DAKOTA!
     if (isAll) {
       return (
-        <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium border border-blue-200">
-          PUSAT DAKOTA (ALL ACCESS)
-        </span>
+        <div className="flex items-center justify-start py-2">
+          <span className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black tracking-widest uppercase shadow-md flex items-center gap-2">
+            🏢 PUSAT DAKOTA (HOLDING / ALL ACCESS)
+          </span>
+        </div>
       );
     }
 
+    let list = formData.kode_cabang || [];
     if (typeof list === 'string') {
       list = list.split(',').map(s => s.trim());
     }
@@ -258,16 +262,16 @@ function AccountPage() {
     if (!list || list.length === 0) return <span className="text-gray-400">Tidak ada cabang</span>;
 
     return (
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-1">
         {list.map((nama, index) => (
           <span
             key={index}
-            className={`px-3 py-1 rounded-md text-xs font-medium border transition-all
-                            ${isDarkMode
+            className={`px-3 py-1 rounded-md text-xs font-bold border transition-all ${isDarkMode
                 ? 'bg-gray-700 border-gray-600 text-gray-200'
-                : 'bg-white border-gray-200 text-gray-700 shadow-sm'}`}
+                : 'bg-white border-gray-200 text-gray-700 shadow-sm'
+              }`}
           >
-            {nama}
+            📍 {nama}
           </span>
         ))}
       </div>

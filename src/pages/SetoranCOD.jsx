@@ -333,6 +333,39 @@ const SetoranCOD = () => {
         }
     ];
 
+    // 🌟 Tentukan BTT List State & Fetch saat Cabang Berubah
+    const [bttOptions, setBttOptions] = useState([]);
+
+    const fetchBttOptions = async (cbId) => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await api.get(`/gl/setoran-cod/btt-options?cb_id=${cbId || ''}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setBttOptions(res.data?.data || []);
+        } catch (err) {
+            console.error("Gagal load BTT COD Options:", err);
+        }
+    };
+
+    useEffect(() => {
+        if (isModalOpen) {
+            fetchBttOptions(formData.cod_cbid);
+        }
+    }, [formData.cod_cbid, isModalOpen]);
+
+    // 🌟 Event Handler saat BTT Dipilih dari Dropdown
+    const handleSelectBTT = (index, selectedBttNo) => {
+        const selectedBttObj = bttOptions.find(b => b.btt_no === selectedBttNo);
+        const newDetails = [...formData.details];
+
+        newDetails[index].codd_bttid = selectedBttNo;
+        if (selectedBttObj) {
+            newDetails[index].codd_nilai = selectedBttObj.nominal_cod; // 👈 Auto-fill Nominal COD
+        }
+        setFormData({ ...formData, details: newDetails });
+    };
+
     // Modal Popup Template
     const modalElement = isModalOpen ? (
         <div
@@ -420,17 +453,23 @@ const SetoranCOD = () => {
                         <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                             {formData.details.map((item, idx) => (
                                 <div key={idx} className="flex items-center gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                                    <span className="font-mono font-bold text-slate-400 w-6 text-center">{idx + 1}.</span>
-                                    <div className="flex-1">
-                                        <input
-                                            type="text"
-                                            required
-                                            placeholder="Nomor BTT / STT"
-                                            value={item.codd_bttid}
-                                            onChange={(e) => handleDetailChange(idx, 'codd_bttid', e.target.value)}
-                                            className="w-full p-2 border border-slate-300 rounded-lg font-mono font-bold text-slate-800 bg-white outline-none focus:border-indigo-600"
-                                        />
-                                    </div>
+                                    <select
+                                        required
+                                        value={item.codd_bttid}
+                                        onChange={(e) => handleSelectBTT(idx, e.target.value)}
+                                        className="w-full p-2 border border-slate-300 rounded-lg font-mono font-bold text-slate-800 bg-white outline-none focus:border-indigo-600 text-xs"
+                                    >
+                                        <option value="">-- Pilih Nomor BTT --</option>
+                                        {bttOptions.map((btt, bIdx) => (
+                                            <option key={bIdx} value={btt.btt_no}>
+                                                {btt.btt_no} - {btt.penerima} (Rp {btt.nominal_cod.toLocaleString('id-ID')})
+                                            </option>
+                                        ))}
+                                        {/* Tetap izinkan jika nomor BTT diketik manual */}
+                                        {item.codd_bttid && !bttOptions.some(b => b.btt_no === item.codd_bttid) && (
+                                            <option value={item.codd_bttid}>{item.codd_bttid} (Manual)</option>
+                                        )}
+                                    </select>
                                     <div className="flex-1">
                                         <input
                                             type="number"

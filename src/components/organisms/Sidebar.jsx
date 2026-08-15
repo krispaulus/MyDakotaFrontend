@@ -80,46 +80,53 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
   // ==============================================================
   // 🟢 REVISED FETCH PROFILE: MURNI DINAMIS & OPERASIONAL DAKOTA CARGO
   // ==============================================================
+  // Helper pembentuk URL Gambar yang sama persis seperti di UserManagement / AccountPage
+  const getProfileImageUrl = (rawPath) => {
+    if (!rawPath || rawPath === 'null' || rawPath === 'undefined') return '';
+    if (rawPath.startsWith('http')) return rawPath;
+
+    const BASE_URL = window.location.origin;
+    const cleanPath = rawPath.startsWith('/') ? rawPath : `/uploads/${rawPath}`;
+    return `${BASE_URL}${cleanPath}`;
+  };
+
   const fetchProfile = async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const ptId = localStorage.getItem('selected_pt') || 'A';
+      const ptId = localStorage.getItem('selected_pt') || 'C'; // Default DLI
       const response = await api.get(`/profile?pt_id=${ptId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      // 🌟 KUNCI EMAS: PostgreSQL langsung mengembalikan object di response.data murni!
       if (response.data) {
-        const d = response.data;
+        const d = response.data.data ? response.data.data : response.data;
 
-        // Baca role penugasan (S = Superadmin, A = Admin, U = User)
-        let backendRole = d.usertype || d.role_akses || localStorage.getItem('role_akses') || '';
-        let currentRole = 'U'; // default fallback
+        let rawRole = (d.usertype || d.UserType || d.role_akses || localStorage.getItem('role_akses') || '').toString().trim().toUpperCase();
+        let rawUsername = (d.username || d.Username || localStorage.getItem('user_name') || '').toString().trim().toLowerCase();
 
-        if (backendRole === 'S' || backendRole === 'Super Admin' || backendRole === 'Superadmin') {
+        let currentRole = 'U';
+        if (rawRole === 'S' || rawRole === 'SUPERADMIN' || rawUsername.startsWith('super')) {
           currentRole = 'S';
-        } else if (backendRole === 'A' || backendRole === 'Admin') {
+        } else if (rawRole === 'A' || rawRole === 'ADMIN') {
           currentRole = 'A';
-        } else if (backendRole === 'V' || backendRole === 'Vendor') {
-          currentRole = 'V';
         }
 
+        const imgRaw = d.profileimage || d.ProfileImage || d.profile_image || '';
+        const validImgUrl = getProfileImageUrl(imgRaw);
+
         setUser({
-          // Menggunakan penamaan kolom database PostgreSQL riil milik Dakota Cargo
           name: d.realname || d.real_name || d.username || localStorage.getItem('user_name') || 'Staff Dakota',
           email: d.email || localStorage.getItem('user_email') || 'staff@dakota.com',
-          role: currentRole, // Mengunci nilai 'S' murni agar menu tembus!
+          role: currentRole,
           division: d.kode_cabang || '',
-          profileimage: d.profileimage || localStorage.getItem('profileimage') || ''
+          profileimage: validImgUrl
         });
 
-        // Simpan standarisasi kode ke local storage browser untuk backup layout
         localStorage.setItem('role_akses', currentRole);
-        localStorage.setItem('profile_kode_cabang', d.kode_cabang || '');
         if (d.realname) localStorage.setItem('user_name', d.realname);
-        if (d.profileimage) localStorage.setItem('profileimage', d.profileimage);
+        if (validImgUrl) localStorage.setItem('profileimage', validImgUrl);
       }
     } catch (error) {
       console.error("❌ Gagal fetch profile di sidebar:", error);
@@ -468,18 +475,24 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
     },
   ];
 
-  // const filteredMenus = allMenus.filter(menu => {
-  //   //if (user.role === 'S' || user.role === 'A') return menu.roles.includes(user.role);
-  //   if (user.role === 'S') return true; // Superadmin lihat semua menu
-  //   if (user.role === 'A') return menu.roles.includes('A'); // Admin lihat menu yang untuk Admin  
-  //   return menu.name === 'Dashboard' || menu.division === user.division;
-  // });
+
+  // 🎯 PENJARING MENU MULTI-LEVEL DENGAN HAK AKSES SUPERADMIN UNLIMITED
+  const currentUsernameLower = (user.name || localStorage.getItem('user_name') || '').toLowerCase();
+  const isSuperAdmin = user.role === 'S' || user.role === 'Superadmin' || currentUsernameLower.startsWith('super');
 
   const filteredMenus = allMenus
-    .filter(menu => menu.roles.includes(user.role)) // Filter level atas
+    .filter(menu => {
+      // 👑 JIKA SUPERADMIN: Loloskan seluruh menu tanpa syarat!
+      if (isSuperAdmin) return true;
+      return menu.roles && menu.roles.includes(user.role);
+    })
     .map(menu => {
+      // 👑 JIKA SUPERADMIN: Loloskan seluruh sub-menu (children) tanpa disaring!
+      if (isSuperAdmin) {
+        return menu;
+      }
+
       if (menu.children) {
-        // Filter children berdasarkan role user
         return {
           ...menu,
           children: menu.children.filter(child =>
@@ -489,7 +502,6 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
       }
       return menu;
     });
-
 
 
   return (
