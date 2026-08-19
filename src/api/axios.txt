@@ -1,0 +1,60 @@
+import axios from 'axios';
+
+// 🎯 1. Prioritaskan dari .env, fallback otomatis ke host browser dengan port 9090
+const currentHost = typeof window !== 'undefined' ? window.location.hostname : '192.168.22.25';
+const defaultBaseURL = `http://${currentHost}:9090/api`;
+
+const baseURL = import.meta.env.VITE_API_BASE_URL 
+             || import.meta.env.VITE_API_URL 
+             || defaultBaseURL;
+
+console.log("🌐 [Axios] Menghubungi API Gateway di:", baseURL);
+
+const api = axios.create({
+    baseURL: baseURL,
+    headers: {
+        'Content-Type': 'application/json'
+    },
+    timeout: 15000 // 15 detik timeout agar tidak hanging
+});
+
+// 🔍 REQUEST INTERCEPTOR - Injeksi Token Otomatis & Log Detail
+api.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+
+        console.log("%c📤 REQUEST DETAIL:", "color: #FF6B6B; font-weight: bold;");
+        console.log("URL:", config.baseURL ? `${config.baseURL}${config.url}` : config.url);
+        console.log("Method:", config.method?.toUpperCase());
+        console.log("Headers:", config.headers);
+        console.log("Data yang dikirim:", config.data);
+        return config;
+    },
+    (error) => {
+        console.error("❌ Request Error:", error);
+        return Promise.reject(error);
+    }
+);
+
+// 🔍 RESPONSE INTERCEPTOR - Log semua response dari backend
+api.interceptors.response.use(
+    (response) => {
+        console.log("%c📥 RESPONSE DETAIL (SUCCESS):", "color: #51CF66; font-weight: bold;");
+        console.log("Status:", response.status);
+        console.log("Data:", response.data);
+        return response;
+    },
+    (error) => {
+        console.error("%c❌ RESPONSE DETAIL (ERROR):", "color: #FF6B6B; font-weight: bold;");
+        console.log("Status:", error.response?.status);
+        console.log("Error Message:", error.response?.data?.error || error.response?.data?.message || error.message);
+        console.log("Full Error Response:", error.response?.data);
+        console.log("Error Config:", error.config);
+        return Promise.reject(error);
+    }
+);
+
+export default api;

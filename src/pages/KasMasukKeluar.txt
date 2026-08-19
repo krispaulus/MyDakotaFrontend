@@ -3,35 +3,39 @@ import ReactDOM from 'react-dom';
 import api from '../api/axios';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
-import { Filter, Printer, X } from 'lucide-react';
+import { Filter, Printer, FileText, CheckCircle2, X } from 'lucide-react';
 import Swal from 'sweetalert2';
 
-const Jurnal = () => {
+const KasMasukKeluar = () => {
     const { isDarkMode } = useDarkMode();
     const [data, setData] = useState([]);
     const [cabangList, setCabangList] = useState([]);
     const [loading, setLoading] = useState(false);
 
     // Filter State
-    const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const today = now.toISOString().split('T')[0];
-
-    const [startDate, setStartDate] = useState(firstDay);
+    const today = new Date().toISOString().split('T')[0];
+    const [startDate, setStartDate] = useState(today);
     const [endDate, setEndDate] = useState(today);
     const [selectedCabang, setSelectedCabang] = useState('');
-    const [selectedType, setSelectedType] = useState('');
+    const [selectedTipe, setSelectedTipe] = useState('');
+    const [searchNoTrans, setSearchNoTrans] = useState('');
     const [searchNoJurnal, setSearchNoJurnal] = useState('');
+    const [selectedAktif, setSelectedAktif] = useState('');
+    const [selectedPosting, setSelectedPosting] = useState('');
     const [isFilterActive, setIsFilterActive] = useState(false);
 
-    // State Modal Form
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+
+    // Modal Form State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
     const [formData, setFormData] = useState({
-        tjurh_no: '',
-        tjurh_tanggal: today,
-        tjurh_type: 'M',
-        tjurh_keterangan: '',
+        cb_id: '',
+        cb_tanggal: today,
+        cb_tipe: 'K',
+        cb_ket: '',
+        cb_postyn: 'N',
         nominal: 0
     });
 
@@ -47,17 +51,20 @@ const Jurnal = () => {
         }
     };
 
-    const fetchJurnalData = async () => {
+    const fetchCashBankData = async () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            let queryParams = `/gl/jurnal?limit=500`;
+            let queryParams = `/gl/cashbank?limit=500`;
 
             if (isFilterActive) {
                 if (startDate && endDate) queryParams += `&start_date=${startDate}&end_date=${endDate}`;
                 if (selectedCabang) queryParams += `&cabang_nama=${selectedCabang}`;
-                if (selectedType) queryParams += `&tipe_jurnal=${selectedType}`;
+                if (selectedTipe) queryParams += `&tipe=${selectedTipe}`;
+                if (searchNoTrans) queryParams += `&no_trans=${searchNoTrans}`;
                 if (searchNoJurnal) queryParams += `&no_jurnal=${searchNoJurnal}`;
+                if (selectedAktif) queryParams += `&aktif_yn=${selectedAktif}`;
+                if (selectedPosting) queryParams += `&posting_yn=${selectedPosting}`;
             }
 
             const res = await api.get(queryParams, {
@@ -65,7 +72,7 @@ const Jurnal = () => {
             });
             setData(res.data?.data || []);
         } catch (err) {
-            console.error("Gagal tarik data Jurnal:", err);
+            console.error("Gagal tarik data Kas/Bank:", err);
         } finally {
             setLoading(false);
         }
@@ -76,31 +83,35 @@ const Jurnal = () => {
     }, []);
 
     useEffect(() => {
-        fetchJurnalData();
+        fetchCashBankData();
     }, [isFilterActive]);
 
     const handleApplyFilter = (e) => {
         e.preventDefault();
         setIsFilterActive(true);
-        fetchJurnalData();
+        fetchCashBankData();
     };
 
     const handleResetFilter = () => {
-        setStartDate(firstDay);
+        setStartDate(today);
         setEndDate(today);
         setSelectedCabang('');
-        setSelectedType('');
+        setSelectedTipe('');
+        setSearchNoTrans('');
         setSearchNoJurnal('');
+        setSelectedAktif('');
+        setSelectedPosting('');
         setIsFilterActive(false);
     };
 
     const handleAdd = () => {
         setIsEditMode(false);
         setFormData({
-            tjurh_no: '',
-            tjurh_tanggal: today,
-            tjurh_type: 'M',
-            tjurh_keterangan: '',
+            cb_id: '',
+            cb_tanggal: today,
+            cb_tipe: 'K',
+            cb_ket: '',
+            cb_postyn: 'N',
             nominal: 0
         });
         setIsModalOpen(true);
@@ -109,10 +120,11 @@ const Jurnal = () => {
     const handleEdit = (item) => {
         setIsEditMode(true);
         setFormData({
-            tjurh_no: item.tjurh_no,
-            tjurh_tanggal: item.tjurh_tanggal || today,
-            tjurh_type: item.tjurh_type || 'M',
-            tjurh_keterangan: item.tjurh_keterangan !== '-' ? item.tjurh_keterangan : '',
+            cb_id: item.cb_id,
+            cb_tanggal: item.cb_tanggal || today,
+            cb_tipe: item.cb_tipe || 'K',
+            cb_ket: item.cb_ket !== '-' ? item.cb_ket : '',
+            cb_postyn: item.cb_postyn || 'N',
             nominal: item.total_amount || 0
         });
         setIsModalOpen(true);
@@ -122,21 +134,18 @@ const Jurnal = () => {
         e.preventDefault();
         try {
             const token = localStorage.getItem('token');
-            const headers = { Authorization: `Bearer ${token}` };
-            const payload = {
+            const endpoint = isEditMode ? '/gl/cashbank/update' : '/gl/cashbank/create';
+
+            await api.post(endpoint, {
                 ...formData,
                 nominal: parseFloat(formData.nominal) || 0
-            };
-
-            if (isEditMode) {
-                await api.post('/gl/jurnal/update', payload, { headers });
-            } else {
-                await api.post('/gl/jurnal/create', payload, { headers });
-            }
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
 
             Swal.fire({
                 title: 'BERHASIL!',
-                text: `Data Jurnal berhasil ${isEditMode ? 'diperbarui' : 'ditambahkan'}.`,
+                text: 'Pencatatan Kas/Bank Berhasil Disimpan.',
                 icon: 'success',
                 didOpen: () => {
                     const container = document.querySelector('.swal2-container');
@@ -145,11 +154,11 @@ const Jurnal = () => {
             });
 
             setIsModalOpen(false);
-            fetchJurnalData();
+            fetchCashBankData();
         } catch (err) {
             Swal.fire({
                 title: 'GAGAL!',
-                text: err.response?.data?.message || 'Gagal menyimpan jurnal.',
+                text: err.response?.data?.message || 'Gagal menyimpan transaksi.',
                 icon: 'error',
                 didOpen: () => {
                     const container = document.querySelector('.swal2-container');
@@ -159,23 +168,10 @@ const Jurnal = () => {
         }
     };
 
-    const handlePrint = (item, format = 'A4') => {
-        Swal.fire({
-            title: `PRINT VOUCHER (${format})`,
-            text: `Mencetak Voucher Jurnal Nomor ${item.tjurh_no}...`,
-            icon: 'info',
-            confirmButtonColor: '#0284c7',
-            didOpen: () => {
-                const container = document.querySelector('.swal2-container');
-                if (container) container.style.zIndex = '9999999';
-            }
-        });
-    };
-
     const handleDelete = (item) => {
         Swal.fire({
-            title: 'Batalkan Jurnal?',
-            text: `Apakah Anda yakin ingin membatalkan/void jurnal ${item.tjurh_no}?`,
+            title: 'Batalkan Transaksi Kas?',
+            text: `Apakah Anda yakin ingin membatalkan transaksi kas No ${item.cb_id}?`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#e11d48',
@@ -189,21 +185,21 @@ const Jurnal = () => {
         }).then(async (result) => {
             if (result.isConfirmed) {
                 try {
-                    await api.delete(`/gl/jurnal/${item.tjurh_no}`);
+                    await api.delete(`/gl/cashbank/${item.cb_id}`);
                     Swal.fire({
                         title: 'TERHAPUS!',
-                        text: 'Jurnal berhasil dibatalkan.',
+                        text: 'Transaksi Kas berhasil dibatalkan.',
                         icon: 'success',
                         didOpen: () => {
                             const container = document.querySelector('.swal2-container');
                             if (container) container.style.zIndex = '9999999';
                         }
                     });
-                    fetchJurnalData();
+                    fetchCashBankData();
                 } catch (err) {
                     Swal.fire({
                         title: 'GAGAL!',
-                        text: err.response?.data?.message || 'Gagal membatalkan jurnal.',
+                        text: err.response?.data?.message || 'Gagal menghapus data.',
                         icon: 'error',
                         didOpen: () => {
                             const container = document.querySelector('.swal2-container');
@@ -215,18 +211,33 @@ const Jurnal = () => {
         });
     };
 
+    const handlePrint = (item) => {
+        Swal.fire({
+            title: 'PRINT BUKTI KAS',
+            text: `Mencetak Bukti Kas untuk No Transaksi ${item.cb_id}...`,
+            icon: 'info',
+            confirmButtonColor: '#0284c7',
+            didOpen: () => {
+                const container = document.querySelector('.swal2-container');
+                if (container) container.style.zIndex = '9999999';
+            }
+        });
+    };
+
     const formatDate = (dateString) => {
         if (!dateString || dateString === '-') return '-';
         const parts = dateString.split('-');
-        if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        if (parts.length === 3) {
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
         return dateString;
     };
 
     const columns = [
         {
-            header: 'NO. JURNAL',
-            accessor: 'tjurh_no',
-            render: (item) => <span className="font-mono font-bold text-sky-600">{item.tjurh_no}</span>
+            header: 'NO. TRANSAKSI',
+            accessor: 'cb_id',
+            render: (item) => <span className="font-mono font-bold text-sky-600">{item.cb_id}</span>
         },
         {
             header: 'CABANG',
@@ -235,46 +246,48 @@ const Jurnal = () => {
         },
         {
             header: 'TANGGAL',
-            accessor: 'tjurh_tanggal',
-            render: (item) => <span className="font-mono text-slate-800">{formatDate(item.tjurh_tanggal)}</span>
+            accessor: 'cb_tanggal',
+            render: (item) => <span className="font-mono text-slate-800">{formatDate(item.cb_tanggal)}</span>
         },
         {
-            header: 'TYPE',
-            accessor: 'tjurh_type',
-            render: (item) => {
-                const typeMap = { B: 'Pembelian', J: 'Penjualan', T: 'Terima Kas', K: 'Keluar Kas', M: 'Memorial' };
-                return (
-                    <span className="font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-[11px]">
-                        {typeMap[item.tjurh_type] || item.tjurh_type}
-                    </span>
-                );
-            }
+            header: 'TIPE',
+            accessor: 'cb_tipe',
+            render: (item) => item.cb_tipe === 'T' ? (
+                <span className="font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[10px]">TERIMA KAS</span>
+            ) : (
+                <span className="font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded text-[10px]">KELUAR KAS</span>
+            )
         },
         {
             header: 'KETERANGAN',
-            accessor: 'tjurh_keterangan',
-            render: (item) => <span className="text-slate-600">{item.tjurh_keterangan}</span>
+            accessor: 'cb_ket',
+            render: (item) => <span className="text-slate-600">{item.cb_ket}</span>
         },
         {
             header: 'STATUS',
-            accessor: 'tjurh_deleteyn',
-            render: (item) => item.tjurh_deleteyn === 'Y' ? (
-                <span className="font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded text-[10px]">BATAL</span>
+            accessor: 'cb_aktifyn',
+            render: (item) => item.cb_aktifyn === 'N' ? (
+                <span className="font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded text-[10px]">HAPUS / VOID</span>
             ) : (
                 <span className="font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[10px]">AKTIF</span>
             )
         },
         {
+            header: 'NO. JURNAL',
+            accessor: 'cb_nojurnal',
+            render: (item) => <span className="font-mono text-indigo-600 font-bold">{item.cb_nojurnal}</span>
+        },
+        {
             header: 'POSTING',
-            accessor: 'tjurh_postyn',
-            render: (item) => item.tjurh_postyn === 'Y' ? (
+            accessor: 'cb_postyn',
+            render: (item) => item.cb_postyn === 'Y' ? (
                 <span className="font-bold text-sky-600 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded text-[10px]">POSTING</span>
             ) : (
                 <span className="font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-[10px]">UNPOSTED</span>
             )
         },
         {
-            header: 'TOTAL (RP)',
+            header: 'NOMINAL (RP)',
             accessor: 'total_amount',
             render: (item) => <span className="font-mono font-bold text-emerald-600">Rp {(item.total_amount || 0).toLocaleString('id-ID')}</span>
         },
@@ -282,24 +295,17 @@ const Jurnal = () => {
             header: 'PRINT',
             accessor: 'print_action',
             render: (item) => (
-                <div className="flex items-center justify-center gap-1">
-                    <button
-                        onClick={() => handlePrint(item, 'A4')}
-                        className="px-2 py-1 bg-sky-50 text-sky-600 border border-sky-200 rounded-md hover:bg-sky-100 transition cursor-pointer font-bold text-[10px] flex items-center gap-1"
-                    >
-                        <Printer size={12} /> A4
-                    </button>
-                    <button
-                        onClick={() => handlePrint(item, 'Letter')}
-                        className="px-2 py-1 bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-md hover:bg-indigo-100 transition cursor-pointer font-bold text-[10px] flex items-center gap-1"
-                    >
-                        <Printer size={12} /> Letter
-                    </button>
-                </div>
+                <button
+                    onClick={() => handlePrint(item)}
+                    className="p-1.5 bg-sky-50 text-sky-600 border border-sky-200 rounded-lg hover:bg-sky-100 transition cursor-pointer flex items-center gap-1 mx-auto font-bold text-xs"
+                >
+                    <Printer size={14} /> Print
+                </button>
             )
         }
     ];
 
+    // Modal Popup Template Standar
     const modalElement = isModalOpen ? (
         <div
             className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs transition-opacity"
@@ -308,7 +314,7 @@ const Jurnal = () => {
             <div className={`w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden transition-all transform ${isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-slate-800'}`}>
                 <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between">
                     <h2 className="text-base font-black uppercase tracking-wider text-slate-800">
-                        {isEditMode ? `EDIT JURNAL INFO (${formData.tjurh_no})` : 'ADD JURNAL INFO'}
+                        {isEditMode ? `EDIT CASH - BANK INFO (${formData.cb_id})` : 'ADD CASH - BANK INFO'}
                     </h2>
                     <button
                         type="button"
@@ -323,45 +329,42 @@ const Jurnal = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         {isEditMode && (
                             <div className="md:col-span-2">
-                                <label className="font-bold text-slate-700 block mb-1.5">Nomor Jurnal</label>
+                                <label className="font-bold text-slate-700 block mb-1.5">No Transaksi</label>
                                 <input
                                     type="text"
                                     disabled
-                                    value={formData.tjurh_no}
+                                    value={formData.cb_id}
                                     className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg bg-slate-100 font-bold text-slate-700 font-mono"
                                 />
                             </div>
                         )}
 
                         <div>
-                            <label className="font-bold text-slate-700 block mb-1.5">Tanggal Jurnal</label>
+                            <label className="font-bold text-slate-700 block mb-1.5">Tanggal Transaksi</label>
                             <input
                                 type="date"
                                 required
-                                value={formData.tjurh_tanggal}
-                                onChange={(e) => setFormData({ ...formData, tjurh_tanggal: e.target.value })}
+                                value={formData.cb_tanggal}
+                                onChange={(e) => setFormData({ ...formData, cb_tanggal: e.target.value })}
                                 className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg bg-white font-medium text-slate-800 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition"
                             />
                         </div>
 
                         <div>
-                            <label className="font-bold text-slate-700 block mb-1.5">Tipe Jurnal</label>
+                            <label className="font-bold text-slate-700 block mb-1.5">Jenis Transaksi</label>
                             <select
                                 required
-                                value={formData.tjurh_type}
-                                onChange={(e) => setFormData({ ...formData, tjurh_type: e.target.value })}
+                                value={formData.cb_tipe}
+                                onChange={(e) => setFormData({ ...formData, cb_tipe: e.target.value })}
                                 className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg bg-white font-medium text-slate-800 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition"
                             >
-                                <option value="B">Pembelian</option>
-                                <option value="J">Penjualan</option>
-                                <option value="T">Terima Kas</option>
-                                <option value="K">Keluar Kas</option>
-                                <option value="M">Memorial</option>
+                                <option value="K">Keluar Kas (Pengeluaran)</option>
+                                <option value="T">Terima Kas (Penerimaan)</option>
                             </select>
                         </div>
 
-                        <div className="md:col-span-2">
-                            <label className="font-bold text-slate-700 block mb-1.5">Nominal Jurnal (Rp)</label>
+                        <div>
+                            <label className="font-bold text-slate-700 block mb-1.5">Nominal Transaksi (Rp)</label>
                             <input
                                 type="number"
                                 required
@@ -371,13 +374,26 @@ const Jurnal = () => {
                             />
                         </div>
 
+                        <div>
+                            <label className="font-bold text-slate-700 block mb-1.5">Status Posting</label>
+                            <select
+                                required
+                                value={formData.cb_postyn}
+                                onChange={(e) => setFormData({ ...formData, cb_postyn: e.target.value })}
+                                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg bg-white font-medium text-slate-800 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition"
+                            >
+                                <option value="N">UNPOSTING (UNPOSTED)</option>
+                                <option value="Y">POSTING (POSTED)</option>
+                            </select>
+                        </div>
+
                         <div className="md:col-span-2">
-                            <label className="font-bold text-slate-700 block mb-1.5">Keterangan Jurnal</label>
+                            <label className="font-bold text-slate-700 block mb-1.5">Keterangan</label>
                             <textarea
                                 rows={3}
-                                placeholder="Masukkan keterangan jurnal..."
-                                value={formData.tjurh_keterangan}
-                                onChange={(e) => setFormData({ ...formData, tjurh_keterangan: e.target.value })}
+                                placeholder="Masukkan keterangan rincian transaksi..."
+                                value={formData.cb_ket}
+                                onChange={(e) => setFormData({ ...formData, cb_ket: e.target.value })}
                                 className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg bg-white font-medium text-slate-800 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition"
                             />
                         </div>
@@ -395,7 +411,7 @@ const Jurnal = () => {
                             type="submit"
                             className="px-8 py-2.5 bg-indigo-900 hover:bg-indigo-950 text-white font-bold rounded-lg transition shadow-md uppercase cursor-pointer"
                         >
-                            {isEditMode ? 'UPDATE JURNAL' : 'ADD JURNAL'}
+                            {isEditMode ? 'UPDATE CASH - BANK' : 'ADD CASH - BANK'}
                         </button>
                     </div>
                 </form>
@@ -405,10 +421,11 @@ const Jurnal = () => {
 
     return (
         <div className="space-y-4">
+            {/* Filter Panel */}
             <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs">
                 <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
                     <Filter size={16} className="text-sky-600" />
-                    FILTER JURNAL KEUANGAN
+                    FILTER PENCATATAN CASH - BANK
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -434,7 +451,7 @@ const Jurnal = () => {
                     </div>
 
                     <div>
-                        <label className="font-bold text-slate-500 block mb-1">CABANG / AGEN</label>
+                        <label className="font-bold text-slate-500 block mb-1">CABANG / TRANSAKSI</label>
                         <select
                             value={selectedCabang}
                             onChange={(e) => setSelectedCabang(e.target.value)}
@@ -450,28 +467,25 @@ const Jurnal = () => {
                     </div>
 
                     <div>
-                        <label className="font-bold text-slate-500 block mb-1">TIPE JURNAL</label>
+                        <label className="font-bold text-slate-500 block mb-1">JENIS TRANSAKSI</label>
                         <select
-                            value={selectedType}
-                            onChange={(e) => setSelectedType(e.target.value)}
+                            value={selectedTipe}
+                            onChange={(e) => setSelectedTipe(e.target.value)}
                             className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
                         >
                             <option value="">-- SEMUA TIPE --</option>
-                            <option value="B">Pembelian (B)</option>
-                            <option value="J">Penjualan (J)</option>
-                            <option value="T">Terima Kas (T)</option>
                             <option value="K">Keluar Kas (K)</option>
-                            <option value="M">Memorial (M)</option>
+                            <option value="T">Terima Kas (T)</option>
                         </select>
                     </div>
 
                     <div>
-                        <label className="font-bold text-slate-500 block mb-1">CARI NO. JURNAL</label>
+                        <label className="font-bold text-slate-500 block mb-1">NO. TRANSAKSI</label>
                         <input
                             type="text"
-                            placeholder="Ketik Nomor Jurnal..."
-                            value={searchNoJurnal}
-                            onChange={(e) => setSearchNoJurnal(e.target.value)}
+                            placeholder="Ketik No Transaksi..."
+                            value={searchNoTrans}
+                            onChange={(e) => setSearchNoTrans(e.target.value)}
                             className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
                         />
                     </div>
@@ -489,13 +503,13 @@ const Jurnal = () => {
                         type="submit"
                         className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer"
                     >
-                        TAMPILKAN JURNAL
+                        TAMPILKAN TRANSAKSI
                     </button>
                 </div>
             </form>
 
             <DataTableTemplate
-                title="JURNAL KEUANGAN GENERAL LEDGER"
+                title="PENCATATAN CASH - BANK"
                 columns={columns}
                 data={data}
                 loading={loading}
@@ -510,4 +524,4 @@ const Jurnal = () => {
     );
 };
 
-export default Jurnal;
+export default KasMasukKeluar;

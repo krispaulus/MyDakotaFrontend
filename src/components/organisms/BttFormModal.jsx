@@ -3,6 +3,7 @@ import { X, Save, Package, MapPin, Layers, Calculator, FileText, Search } from '
 import api from '../../api/axios';
 import Swal from 'sweetalert2';
 
+
 const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
     if (!isOpen) return null;
 
@@ -38,6 +39,8 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
 
     const [errors, setErrors] = useState({});
     const [loadingTarif, setLoadingTarif] = useState(false);
+
+    const [emailError, setEmailError] = useState('');
 
     // Ambil tanggal hari ini berdasarkan zona waktu lokal komputer
     const hariIniObj = new Date();
@@ -133,13 +136,13 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
     // 🌟 REKAYASA PENYELARASAN AGEN AKTIF
     useEffect(() => {
         if (isOpen) {
-            const sessionAgenId = localStorage.getItem('active_agen_id') || sessionStorage.getItem('active_agen_id') || '';
-
-            console.log("🛸 [SESSION DETECTED] Mengunci Kode Agen ID untuk BTT:", sessionAgenId);
+            const sessionAgenId = localStorage.getItem('active_agen_id') || sessionStorage.getItem('active_agen_id') || '1';
+            const sessionAgenNama = localStorage.getItem('active_agen_nama') || sessionStorage.getItem('active_agen_nama') || 'DENPASAR DLI AGEN';
 
             setFormData(prev => ({
                 ...prev,
                 bttt_asalagenid: sessionAgenId,
+                bttt_asalkota: sessionAgenNama,
                 bttt_tanggal: prev.bttt_tanggal || new Date().toISOString().split('T')[0]
             }));
         }
@@ -255,6 +258,36 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
         } else {
             setEmailPenerimaError('');
             return true;
+        }
+    };
+
+    const validateEmailPengirim = (emailVal) => {
+        if (!emailVal || emailVal.trim() === "") {
+            setEmailError('');
+            return true;
+        }
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(emailVal.trim())) {
+            setEmailError("Format email salah! Harus mengandung '@' dan nama domain (contoh: pengirim@email.com)");
+            return false;
+        } else {
+            setEmailError('');
+            return true;
+        }
+    };
+
+    const validateEmail = (email) => {
+        const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return re.test(String(email).toLowerCase());
+    };
+
+    // Handler onBlur pada input email pengirim:
+    const handleEmailBlur = (e) => {
+        const val = e.target.value;
+        if (val && !validateEmail(val)) {
+            setEmailError("Format email tidak valid (contoh: user@dakota.com)");
+        } else {
+            setEmailError("");
         }
     };
 
@@ -633,45 +666,92 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
         );
     };
 
-    // 🎯 PASTIKAN FUNGSI FETCH / HITUNG TARIF SEPERTI INI:
     const fetchTarifOtomatis = async (kecamatanTujuan) => {
-        if (!kecamatanTujuan) return;
+        const kec = kecamatanTujuan || formData.bttt_tujuankecamatan;
+        if (!kec) return;
 
-        // 🌟 Ambil ID Agen aktif dari sesi/localStorage (misal: '4')
-        const activeAgenId = localStorage.getItem('active_agen_id') || sessionStorage.getItem('active_agen_id') || '4';
+        // Ambil ID Agen aktif
+        const activeAgenId = localStorage.getItem('active_agen_id') || formData.bttt_asalagenid || 'BDO004';
+
+        // Hitung berat terbesar antara berat asli vs volume
+        const beratAsli = parseFloat(formData.bttt_berat) || 0;
+        const p = parseFloat(formData.bttt_panjang || formData.panjang) || 0;
+        const l = parseFloat(formData.bttt_lebar || formData.lebar) || 0;
+        const t = parseFloat(formData.bttt_tinggi || formData.tinggi) || 0;
+        const beratVolume = (p * l * t) / 4000;
+        const beratFinal = Math.max(beratAsli, beratVolume, 1);
 
         try {
-            const response = await api.post('/btt/calculate-tarif', {
-                agen_id: String(activeAgenId),          // 👈 Kirim "4"
-                asal_kota: String(activeAgenId),        // 👈 Kirim "4"
-                tujuan_kecamatan: kecamatanTujuan,     // "AMBARAWA"
-                berat_asli: parseFloat(formData.bttt_berat) || 1,
-                panjang: parseFloat(formData.bttt_panjang) || 0,
-                lebar: parseFloat(formData.bttt_lebar) || 0,
-                tinggi: parseFloat(formData.bttt_tinggi) || 0,
-                jenis_layanan: formData.bttt_jenis_layanan || 'REGULER'
+            const token = localStorage.getItem('token');
+            const res = await api.post('/btt/calculate-tarif', {
+                agen_id: String(activeAgenId).trim(),
+                asal_kota: String(activeAgenId).trim(),
+                tujuan_kec: kec.trim(),
+                tujuan_kecamatan: kec.trim(),
+                berat_asli: beratFinal,
+                panjang: p,
+                lebar: l,
+                tinggi: t,
+                jenis_layanan: formData.bttt_paketyn === 'N' ? 'EKONOMIS' : 'REGULER'
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
             });
 
-            if (response.data && response.data.status === "success") {
-                const resData = response.data;
-                const row = resData.reguler_row || {};
+            if (res.data && res.data.status === "success") {
+                const data = res.data;
+                const regRow = data.reguler_row || data.data_reguler || {};
+                const ekoRow = data.ekonomis_row || data.data_ekonomis || {};
 
-                // 🎯 Isi state tarif form dengan data dari mkt_m_eharga
+                console.log("💰 Data Tarif Berhasil Diterima:", { regRow, ekoRow });
+
+                setTarifRegulerData(regRow);
+                setTarifEkonomisData(ekoRow);
+
                 setFormData(prev => ({
                     ...prev,
-                    bttt_harga: resData.grand_total || row.hargapokok || 0,
-                    bttt_biayapenerus: resData.biaya_penerus || row.biayatambahan || 0,
-                    // data blok tabel tarif
-                    tarif_dasar: row.hargapokok || 0,
-                    tarif_kg_min: row.minimalkg || 0,
-                    tarif_kg_next: row.hargakgselanjutnya || 0,
-                    tarif_lt: row.estimasihari || 0
+                    bttt_harga: (prev.bttt_paketyn === 'N' ? ekoRow.hargapokok : regRow.hargapokok) || data.grand_total || 0,
+                    bttt_biayapenerus: regRow.biayatambahan || data.biaya_penerus || 0
                 }));
             }
         } catch (err) {
-            console.error("Gagal hitung tarif:", err);
+            console.error("❌ Gagal hitung tarif:", err);
         }
     };
+
+    useEffect(() => {
+        if (isOpen && formData.bttt_tujuankecamatan) {
+            const delayDebounceFn = setTimeout(() => {
+                fetchTarifOtomatis(formData.bttt_tujuankecamatan);
+            }, 400);
+
+            return () => clearTimeout(delayDebounceFn);
+        }
+    }, [
+        formData.bttt_tujuankecamatan,
+        formData.bttt_berat,
+        formData.bttt_panjang,
+        formData.bttt_lebar,
+        formData.bttt_tinggi
+    ]);
+
+    useEffect(() => {
+        const tujuanKec = formData.bttt_tujuankecamatan || formData.tujuan_kecamatan;
+        if (isOpen && tujuanKec) {
+            const timer = setTimeout(() => {
+                fetchTarifOtomatis(tujuanKec);
+            }, 300);
+
+            return () => clearTimeout(timer);
+        }
+    }, [
+        isOpen,
+        formData.bttt_tujuankecamatan,
+        formData.tujuan_kecamatan,
+        formData.bttt_berat,
+        formData.bttt_panjang,
+        formData.bttt_lebar,
+        formData.bttt_tinggi
+    ]);
 
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -842,13 +922,26 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                                 <div className="col-span-2 md:col-span-1">
                                     <label className="text-xs font-black text-gray-500 uppercase">Email Pengirim</label>
                                     <input
-                                        type="email"
+                                        type="text"
                                         name="bttt_asalemail"
-                                        value={formData.asal_email || formData.bttt_asalemail || ""}
-                                        onChange={handleChange}
-                                        className="w-full mt-1.5 p-4 border-2 border-gray-200 rounded-xl text-lg"
-                                        placeholder="contoh@email.com"
+                                        value={formData.bttt_asalemail || ""}
+                                        onChange={(e) => {
+                                            handleChange(e);
+                                            validateEmailPengirim(e.target.value);
+                                        }}
+                                        className={`w-full mt-1.5 p-4 border-2 rounded-xl text-lg outline-none transition-all duration-300 ${emailError
+                                            ? 'border-red-500 bg-red-50/20 text-red-900 focus:ring-4 focus:ring-red-100'
+                                            : formData.bttt_asalemail && !emailError
+                                                ? 'border-emerald-500 bg-emerald-50/10 text-emerald-900 focus:ring-4 focus:ring-emerald-100'
+                                                : 'border-gray-200 bg-white text-gray-900 focus:border-blue-400'
+                                            }`}
+                                        placeholder="contohpengirim@email.com"
                                     />
+                                    {emailError && (
+                                        <span className="text-xs font-bold text-red-500 mt-1.5 block animate-in fade-in slide-in-from-top-1 duration-200">
+                                            ⚠️ {emailError}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -1211,13 +1304,14 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                     {/* 📑 SECTION 4: INFORMASI TARIF DASAR                                       */}
                     {/* ========================================================================= */}
                     <div className="p-6 rounded-2xl border-l-8 border-teal-500 bg-teal-50/20 dark:bg-teal-950/20 border-y border-r border-teal-100 dark:border-teal-900/50 space-y-5">
-                        <div className="flex items-center gap-2 border-b pb-2 border-teal-100 dark:border-gray-700">
-                            <Layers className="text-teal-600 dark:text-teal-400" size={18} />
-                            <span className="font-bold text-teal-700 dark:text-teal-300 text-sm uppercase tracking-wider">
-                                Informasi Tarif Dasar (Rute: {formData.bttt_asalkota || 'BANDAR LAMPUNG'} ➡️ {formData.bttt_tujuankecamatan || 'CILANDAK'})
+                        <div className="flex items-center gap-2 border-b pb-2 border-gray-400">
+                            <Layers className="text-black" size={18} />
+                            <span className="font-black text-black text-sm uppercase tracking-wider">
+                                Informasi Tarif Dasar (Rute: {formData.bttt_asalkota || localStorage.getItem('active_agen_nama') || 'PUSAT'} ➡️ {formData.bttt_tujuankecamatan || '-'})
                             </span>
                         </div>
 
+                        {/* ================= BLOK LAYANAN : DARAT REGULER ================= */}
                         <div className="space-y-2">
                             <div className="w-full bg-purple-600 dark:bg-purple-700 text-white font-black text-xs uppercase p-2.5 rounded-lg tracking-widest text-left pl-4 shadow-sm select-none">
                                 🟣 BLOK LAYANAN : DARAT REGULER
@@ -1227,7 +1321,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                                     <thead>
                                         <tr className="border-b border-gray-200 dark:border-gray-700 text-[11px] font-black uppercase text-slate-700 dark:text-white tracking-wider bg-slate-50 dark:bg-gray-800/50">
                                             <th className="p-2 text-center w-12 rounded-l-lg">PILIH</th>
-                                            <th className="p-2 text-center w-12">LT</th>
+                                            <th className="p-2 text-center w-16">LT</th>
                                             <th className="p-2 text-right">DASAR</th>
                                             <th className="p-2 text-center">KG MIN</th>
                                             <th className="p-2 text-center">KG NEXT</th>
@@ -1248,27 +1342,41 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                                             <td className="p-2 text-center">
                                                 <input
                                                     type="radio"
-                                                    name="pilih_tarif_layanan_reg"
-                                                    checked={formData.bttt_paketyn === 'Y'}
-                                                    onChange={() => setFormData(prev => ({ ...prev, bttt_paketyn: 'Y', bttt_harga: tarifRegulerData?.hargapokok || 0 }))}
+                                                    name="pilih_tarif_layanan"
+                                                    checked={formData.bttt_paketyn === 'Y' || formData.bttt_paketyn === 'REGULER'}
+                                                    onChange={() => setFormData(prev => ({
+                                                        ...prev,
+                                                        bttt_paketyn: 'Y',
+                                                        bttt_harga: tarifRegulerData?.hargapokok || 0
+                                                    }))}
                                                     className="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500 cursor-pointer"
                                                 />
                                             </td>
+                                            {/* LT / Estimasi Hari */}
                                             <td className="p-1">
-                                                <input type="text" readOnly className="w-full p-2 text-right bg-white border border-gray-200 text-slate-900 rounded-lg font-bold shadow-sm" value={Math.round(tarifRegulerData?.estimasihari || 0).toLocaleString('id-ID')} />
+                                                <input type="text" readOnly className="w-full p-2 text-center bg-white border border-gray-200 text-slate-900 rounded-lg font-bold shadow-sm" value={tarifRegulerData?.estimasihari || '-'} />
                                             </td>
-                                            <td className="p-1"><input type="text" readOnly className="w-full p-2 text-right bg-white border border-gray-200 text-slate-900 rounded-lg font-bold shadow-sm" value={Math.round(tarifRegulerData?.hargapokok || 0).toLocaleString('id-ID')} /></td>
-                                            <td className="p-1"><input type="text" readOnly className="w-full p-2 text-center bg-white border border-gray-200 text-indigo-600 rounded-lg font-black shadow-sm" value={tarifRegulerData?.minimalkg || 0} /></td>
-                                            <td className="p-1"><input type="text" readOnly className="w-full p-2 text-center bg-white border border-gray-200 text-slate-900 rounded-lg font-bold shadow-sm" value={Math.round(tarifRegulerData?.hargakgselanjutnya || 0).toLocaleString('id-ID')} /></td>
+                                            {/* Tarif Dasar */}
+                                            <td className="p-1">
+                                                <input type="text" readOnly className="w-full p-2 text-right bg-white border border-gray-200 text-slate-900 rounded-lg font-bold shadow-sm" value={(Number(tarifRegulerData?.hargapokok) || 0).toLocaleString('id-ID')} />
+                                            </td>
+                                            {/* Kg Min */}
+                                            <td className="p-1">
+                                                <input type="text" readOnly className="w-full p-2 text-center bg-white border border-gray-200 text-indigo-600 rounded-lg font-black shadow-sm" value={tarifRegulerData?.minimalkg || 0} />
+                                            </td>
+                                            {/* Kg Next */}
+                                            <td className="p-1">
+                                                <input type="text" readOnly className="w-full p-2 text-center bg-white border border-gray-200 text-slate-900 rounded-lg font-bold shadow-sm" value={(Number(tarifRegulerData?.hargakgselanjutnya) || 0).toLocaleString('id-ID')} />
+                                            </td>
                                             <td className="p-1"><input type="text" readOnly className="w-full p-2 text-center bg-slate-100 border border-gray-200 text-slate-500 rounded-lg font-mono shadow-sm" value={tarifRegulerData?.flag_ds || 'N'} /></td>
                                             <td className="p-1"><input type="text" readOnly className="w-full p-2 text-center bg-white border border-purple-200 text-purple-600 rounded-lg shadow-sm" value={tarifRegulerData?.bypass1kg || 0} /></td>
-                                            <td className="p-1"><input type="text" readOnly className="w-full p-2 text-right bg-white border border-purple-200 text-purple-600 rounded-lg shadow-sm" value={Math.round(tarifRegulerData?.harga1kg || 0).toLocaleString('id-ID')} /></td>
+                                            <td className="p-1"><input type="text" readOnly className="w-full p-2 text-right bg-white border border-purple-200 text-purple-600 rounded-lg shadow-sm" value={(Number(tarifRegulerData?.harga1kg) || 0).toLocaleString('id-ID')} /></td>
                                             <td className="p-1"><input type="text" readOnly className="w-full p-2 text-center bg-white border border-indigo-200 text-indigo-600 rounded-lg shadow-sm" value={tarifRegulerData?.bypass2kg || 0} /></td>
-                                            <td className="p-1"><input type="text" readOnly className="w-full p-2 text-right bg-white border border-indigo-200 text-indigo-600 rounded-lg shadow-sm" value={Math.round(tarifRegulerData?.harga2kg || 0).toLocaleString('id-ID')} /></td>
+                                            <td className="p-1"><input type="text" readOnly className="w-full p-2 text-right bg-white border border-indigo-200 text-indigo-600 rounded-lg shadow-sm" value={(Number(tarifRegulerData?.harga2kg) || 0).toLocaleString('id-ID')} /></td>
                                             <td className="p-1"><input type="text" readOnly className="w-full p-2 text-center bg-white border border-teal-200 text-teal-600 rounded-lg shadow-sm" value={tarifRegulerData?.bypass3kg || 0} /></td>
-                                            <td className="p-1"><input type="text" readOnly className="w-full p-2 text-right bg-white border border-teal-200 text-teal-600 rounded-lg shadow-sm" value={Math.round(tarifRegulerData?.harga3kg || 0).toLocaleString('id-ID')} /></td>
+                                            <td className="p-1"><input type="text" readOnly className="w-full p-2 text-right bg-white border border-teal-200 text-teal-600 rounded-lg shadow-sm" value={(Number(tarifRegulerData?.harga3kg) || 0).toLocaleString('id-ID')} /></td>
                                             <td className="p-1"><input type="text" readOnly className="w-full p-2 bg-slate-50 border border-gray-200 text-gray-400 rounded-lg text-center shadow-sm" value={tarifRegulerData?.keterangan || '---'} /></td>
-                                            <td className="p-1"><input type="text" readOnly className="w-full p-2 text-right bg-white border border-gray-200 text-orange-600 rounded-lg font-bold shadow-sm" value={Math.round(tarifRegulerData?.biayatambahan || 0).toLocaleString('id-ID')} /></td>
+                                            <td className="p-1"><input type="text" readOnly className="w-full p-2 text-right bg-white border border-gray-200 text-orange-600 rounded-lg font-bold shadow-sm" value={(Number(tarifRegulerData?.biayatambahan) || 0).toLocaleString('id-ID')} /></td>
                                             <td className="p-1"><input type="text" readOnly className="w-full p-2 text-center bg-white border border-gray-200 text-orange-600 rounded-lg shadow-sm" value="0" /></td>
                                         </tr>
                                     </tbody>
@@ -1276,6 +1384,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                             </div>
                         </div>
 
+                        {/* ================= BLOK LAYANAN : DARAT EKONOMIS ================= */}
                         <div className="space-y-2 pt-2">
                             <div className="w-full bg-emerald-600 text-white font-black text-xs uppercase p-2.5 rounded-lg tracking-widest text-left pl-4 shadow-sm select-none">
                                 🟢 BLOK LAYANAN : DARAT EKONOMIS
@@ -1285,7 +1394,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                                     <thead>
                                         <tr className="border-b border-gray-200 dark:border-gray-700 text-[11px] font-black uppercase text-slate-700 dark:text-white tracking-wider bg-slate-50 dark:bg-gray-800/50">
                                             <th className="p-2 text-center w-12 rounded-l-lg">PILIH</th>
-                                            <th className="p-2 text-center w-12">LT</th>
+                                            <th className="p-2 text-center w-16">LT</th>
                                             <th className="p-2 text-right">DASAR</th>
                                             <th className="p-2 text-center">KG MIN</th>
                                             <th className="p-2 text-center">KG NEXT</th>
@@ -1306,129 +1415,48 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                                             <td className="p-2 text-center">
                                                 <input
                                                     type="radio"
-                                                    name="pilih_tarif_layanan_eko"
-                                                    checked={formData.bttt_paketyn === 'N'}
-                                                    onChange={() => setFormData(prev => ({ ...prev, bttt_paketyn: 'N', bttt_harga: tarifEkonomisData?.hargapokok || 0 }))}
+                                                    name="pilih_tarif_layanan"
+                                                    checked={formData.bttt_paketyn === 'N' || formData.bttt_paketyn === 'EKONOMIS'}
+                                                    onChange={() => setFormData(prev => ({
+                                                        ...prev,
+                                                        bttt_paketyn: 'N',
+                                                        bttt_harga: tarifEkonomisData?.hargapokok || 0
+                                                    }))}
                                                     className="w-4 h-4 text-emerald-600 border-gray-300 focus:ring-emerald-500 cursor-pointer"
                                                 />
                                             </td>
+                                            {/* LT / Estimasi Hari */}
                                             <td className="p-1">
-                                                <input
-                                                    type="text"
-                                                    readOnly
-                                                    className="w-full p-2 text-right bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-slate-900 dark:text-white rounded-lg outline-none font-bold shadow-sm"
-                                                    value={Math.round(tarifEkonomisData?.estimasihari || 0).toLocaleString('id-ID')}
-                                                />
+                                                <input type="text" readOnly className="w-full p-2 text-center bg-white border border-gray-200 text-slate-900 rounded-lg font-bold shadow-sm" value={tarifEkonomisData?.estimasihari || '-'} />
                                             </td>
+                                            {/* Tarif Dasar */}
                                             <td className="p-1">
-                                                <input
-                                                    type="text"
-                                                    readOnly
-                                                    className="w-full p-2 text-right bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-slate-900 dark:text-white rounded-lg outline-none font-bold shadow-sm"
-                                                    value={Math.round(tarifEkonomisData?.hargapokok || 0).toLocaleString('id-ID')}
-                                                />
+                                                <input type="text" readOnly className="w-full p-2 text-right bg-white border border-gray-200 text-slate-900 rounded-lg font-bold shadow-sm" value={(Number(tarifEkonomisData?.hargapokok) || 0).toLocaleString('id-ID')} />
                                             </td>
+                                            {/* Kg Min */}
                                             <td className="p-1">
-                                                <input
-                                                    type="text"
-                                                    readOnly
-                                                    className="w-full p-2 text-center bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-indigo-600 dark:text-indigo-400 rounded-lg outline-none font-black shadow-sm"
-                                                    value={tarifEkonomisData?.minimalkg || 0}
-                                                />
+                                                <input type="text" readOnly className="w-full p-2 text-center bg-white border border-gray-200 text-indigo-600 rounded-lg font-black shadow-sm" value={tarifEkonomisData?.minimalkg || 0} />
                                             </td>
+                                            {/* Kg Next */}
                                             <td className="p-1">
-                                                <input
-                                                    type="text"
-                                                    readOnly
-                                                    className="w-full p-2 text-center bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-slate-900 dark:text-white rounded-lg outline-none font-bold shadow-sm"
-                                                    value={Math.round(tarifEkonomisData?.hargakgselanjutnya || 0).toLocaleString('id-ID')}
-                                                />
+                                                <input type="text" readOnly className="w-full p-2 text-center bg-white border border-gray-200 text-slate-900 rounded-lg font-bold shadow-sm" value={(Number(tarifEkonomisData?.hargakgselanjutnya) || 0).toLocaleString('id-ID')} />
                                             </td>
-                                            <td className="p-1">
-                                                <input
-                                                    type="text"
-                                                    readOnly
-                                                    className="w-full p-2 text-center bg-slate-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-slate-500 dark:text-gray-300 rounded-lg font-mono outline-none shadow-sm"
-                                                    value={tarifEkonomisData?.flag_ds || 'N'}
-                                                />
-                                            </td>
-                                            <td className="p-1">
-                                                <input
-                                                    type="text"
-                                                    readOnly
-                                                    className="w-full p-2 text-center bg-white dark:bg-gray-700 border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 rounded-lg outline-none shadow-sm font-bold"
-                                                    value={tarifEkonomisData?.bypass1kg || 0}
-                                                />
-                                            </td>
-                                            <td className="p-1">
-                                                <input
-                                                    type="text"
-                                                    readOnly
-                                                    className="w-full p-2 text-right bg-white dark:bg-gray-700 border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 rounded-lg outline-none shadow-sm font-bold"
-                                                    value={Math.round(tarifEkonomisData?.harga1kg || 0).toLocaleString('id-ID')}
-                                                />
-                                            </td>
-                                            <td className="p-1">
-                                                <input
-                                                    type="text"
-                                                    readOnly
-                                                    className="w-full p-2 text-center bg-white dark:bg-gray-700 border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 rounded-lg outline-none shadow-sm font-bold"
-                                                    value={tarifEkonomisData?.bypass2kg || 0}
-                                                />
-                                            </td>
-                                            <td className="p-1">
-                                                <input
-                                                    type="text"
-                                                    readOnly
-                                                    className="w-full p-2 text-right bg-white dark:bg-gray-700 border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 rounded-lg outline-none shadow-sm font-bold"
-                                                    value={Math.round(tarifEkonomisData?.harga2kg || 0).toLocaleString('id-ID')}
-                                                />
-                                            </td>
-                                            <td className="p-1">
-                                                <input
-                                                    type="text"
-                                                    readOnly
-                                                    className="w-full p-2 text-center bg-white dark:bg-gray-700 border border-teal-200 dark:border-teal-800 text-teal-600 dark:text-teal-400 rounded-lg outline-none shadow-sm font-bold"
-                                                    value={tarifEkonomisData?.bypass3kg || 0}
-                                                />
-                                            </td>
-                                            <td className="p-1">
-                                                <input
-                                                    type="text"
-                                                    readOnly
-                                                    className="w-full p-2 text-right bg-white dark:bg-gray-700 border border-teal-200 dark:border-teal-800 text-teal-600 dark:text-teal-400 rounded-lg outline-none shadow-sm font-bold"
-                                                    value={Math.round(tarifEkonomisData?.harga3kg || 0).toLocaleString('id-ID')}
-                                                />
-                                            </td>
-                                            <td className="p-1">
-                                                <input
-                                                    type="text"
-                                                    readOnly
-                                                    className="w-full p-2 bg-slate-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 text-gray-400 rounded-lg text-center outline-none shadow-sm"
-                                                    value={tarifEkonomisData?.keterangan || '---'}
-                                                />
-                                            </td>
-                                            <td className="p-1">
-                                                <input
-                                                    type="text"
-                                                    readOnly
-                                                    className="w-full p-2 text-right bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-orange-600 dark:text-orange-400 rounded-lg outline-none font-bold shadow-sm"
-                                                    value={Math.round(tarifEkonomisData?.biayatambahan || 0).toLocaleString('id-ID')}
-                                                />
-                                            </td>
-                                            <td className="p-1">
-                                                <input
-                                                    type="text"
-                                                    readOnly
-                                                    className="w-full p-2 text-center bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-orange-600 dark:text-orange-400 rounded-lg outline-none shadow-sm"
-                                                    value="0"
-                                                />
-                                            </td>
+                                            <td className="p-1"><input type="text" readOnly className="w-full p-2 text-center bg-slate-100 border border-gray-200 text-slate-500 rounded-lg font-mono shadow-sm" value={tarifEkonomisData?.flag_ds || 'N'} /></td>
+                                            <td className="p-1"><input type="text" readOnly className="w-full p-2 text-center bg-white border border-emerald-200 text-emerald-600 rounded-lg shadow-sm font-bold" value={tarifEkonomisData?.bypass1kg || 0} /></td>
+                                            <td className="p-1"><input type="text" readOnly className="w-full p-2 text-right bg-white border border-emerald-200 text-emerald-600 rounded-lg shadow-sm font-bold" value={(Number(tarifEkonomisData?.harga1kg) || 0).toLocaleString('id-ID')} /></td>
+                                            <td className="p-1"><input type="text" readOnly className="w-full p-2 text-center bg-white border border-indigo-200 text-indigo-600 rounded-lg shadow-sm font-bold" value={tarifEkonomisData?.bypass2kg || 0} /></td>
+                                            <td className="p-1"><input type="text" readOnly className="w-full p-2 text-right bg-white border border-indigo-200 text-indigo-600 rounded-lg shadow-sm font-bold" value={(Number(tarifEkonomisData?.harga2kg) || 0).toLocaleString('id-ID')} /></td>
+                                            <td className="p-1"><input type="text" readOnly className="w-full p-2 text-center bg-white border border-teal-200 text-teal-600 rounded-lg shadow-sm font-bold" value={tarifEkonomisData?.bypass3kg || 0} /></td>
+                                            <td className="p-1"><input type="text" readOnly className="w-full p-2 text-right bg-white border border-teal-200 text-teal-600 rounded-lg shadow-sm font-bold" value={(Number(tarifEkonomisData?.harga3kg) || 0).toLocaleString('id-ID')} /></td>
+                                            <td className="p-1"><input type="text" readOnly className="w-full p-2 bg-slate-50 border border-gray-200 text-gray-400 rounded-lg text-center shadow-sm" value={tarifEkonomisData?.keterangan || '---'} /></td>
+                                            <td className="p-1"><input type="text" readOnly className="w-full p-2 text-right bg-white border border-gray-200 text-orange-600 rounded-lg font-bold shadow-sm" value={(Number(tarifEkonomisData?.biayatambahan) || 0).toLocaleString('id-ID')} /></td>
+                                            <td className="p-1"><input type="text" readOnly className="w-full p-2 text-center bg-white border border-gray-200 text-orange-600 rounded-lg shadow-sm" value="0" /></td>
                                         </tr>
                                     </tbody>
                                 </table>
                             </div>
                         </div>
+
                     </div>
 
                     {/* ========================================================================= */}
