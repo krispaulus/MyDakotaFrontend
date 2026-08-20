@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Header from '../components/organisms/Header';
 import Sidebar from '../components/organisms/Sidebar';
 import { useDarkMode } from '../context/DarkModeContext';
-import { useNavigate, Outlet } from 'react-router-dom';
+import { useNavigate, Navigate, Outlet } from 'react-router-dom';
 import WarningModal from '../components/WarningModal.jsx';
 
 const MainLayout = ({ children }) => {
