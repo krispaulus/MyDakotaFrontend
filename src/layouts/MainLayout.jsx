@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Header from '../components/organisms/Header';
 import Sidebar from '../components/organisms/Sidebar';
 import { useDarkMode } from '../context/DarkModeContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Outlet } from 'react-router-dom';
 import WarningModal from '../components/WarningModal.jsx';
 
 const MainLayout = ({ children }) => {
@@ -12,13 +12,23 @@ const MainLayout = ({ children }) => {
     const [isIdleModalOpen, setIsIdleModalOpen] = useState(false);
     const toggleSidebar = () => setIsCollapsed(!isCollapsed);
 
+    // 🔒 1. PROTEKSI AUTH: Cek ketersediaan token saat komponen dimuat
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+
+    useEffect(() => {
+        if (!token) {
+            navigate('/login', { replace: true });
+        }
+    }, [token, navigate]);
+
     // ================= LOGIKA AUTO LOGOUT ON IDLE ================
     useEffect(() => {
+        if (!token) return; // Jangan jalankan timer jika belum login
+
         let timeoutId;
 
         const getIdleTimeout = () => {
             const savedTime = localStorage.getItem('max_idle_time');
-            // Default 3 menit jika belum di-set di setting admin
             return savedTime ? parseInt(savedTime, 10) : 3 * 60 * 1000;
         };
 
@@ -28,16 +38,13 @@ const MainLayout = ({ children }) => {
         };
 
         const resetTimer = () => {
-            // Jika modal warning idle sudah terbuka di layar, timer tidak boleh di-reset lagi
             if (isIdleModalOpen) return;
 
             if (timeoutId) clearTimeout(timeoutId);
             const currentTimeout = getIdleTimeout();
-            console.log(' [MainLayout] Set timer baru:', currentTimeout, 'ms (', currentTimeout / 60000, 'menit)'); // DEBUG LOG
             timeoutId = setTimeout(triggerIdleModal, currentTimeout);
         };
 
-        // Event deteksi pergerakan user
         const activityEvents = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart'];
 
         activityEvents.forEach((event) => {
@@ -47,7 +54,6 @@ const MainLayout = ({ children }) => {
         resetTimer();
 
         const handleTimeChange = () => {
-            console.log("🔄 Konfigurasi durasi sesi berubah, mengatur ulang timer...");
             resetTimer();
         };
         window.addEventListener('idle_time_changed', handleTimeChange);
@@ -59,24 +65,25 @@ const MainLayout = ({ children }) => {
             });
             window.removeEventListener('idle_time_changed', handleTimeChange);
         };
-    }, [navigate, isIdleModalOpen]); // Tambahkan isIdleModalOpen ke dependency array
+    }, [navigate, isIdleModalOpen, token]);
 
-    // =========================================================================
-
-    // FUNGSI EKSEKUSI LOGOUT: Dipanggil saat tombol 'Back' di modal diklik
+    // FUNGSI EKSEKUSI LOGOUT
     const handleConfirmLogout = () => {
         setIsIdleModalOpen(false);
 
-        // Hapus sesi data
         localStorage.removeItem('token');
         localStorage.removeItem('user_name');
         localStorage.removeItem('selected_pt');
         localStorage.removeItem('pt_ID');
+        sessionStorage.clear();
 
-        // Pindah ke login screen
-        navigate('/login');
+        navigate('/login', { replace: true });
     };
-    // ==============================================================    
+
+    // 🔒 2. CEGAH RENDER LAYOUT JIKA TIDAK ADA TOKEN
+    if (!token) {
+        return null;
+    }
 
     return (
         <div className={`flex h-screen w-full overflow-hidden transition-colors ${isDarkMode ? 'bg-gray-900' : 'bg-[#f4f7fe]'}`}>
@@ -87,19 +94,20 @@ const MainLayout = ({ children }) => {
             {/* AREA KANAN (HEADER + CONTENT) */}
             <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
 
-                {/* HEADER: Muncul di bagian atas area kanan */}
+                {/* HEADER */}
                 <Header onMenuClick={toggleSidebar} />
 
-                {/* CONTENT AREA: Tempat konten utama dashboard muncul */}
+                {/* CONTENT AREA: Mendukung children atau Outlet React Router */}
                 <main className={`flex-1 overflow-y-auto p-8 transition-colors ${isDarkMode ? 'bg-gray-900' : 'bg-[#f4f7fe]'}`}>
-                    {children}
+                    {children || <Outlet />}
                 </main>
             </div>
+
             <WarningModal
                 isOpen={isIdleModalOpen}
                 title="SESSION EXPIRED"
                 message={`Sesi Anda telah berakhir karena tidak ada\naktivitas selama beberapa menit terakhir.`}
-                onClose={handleConfirmLogout} // Begitu tombol diklik, jalankan fungsi logout bersih
+                onClose={handleConfirmLogout}
             />
         </div>
     );
