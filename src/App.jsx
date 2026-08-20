@@ -499,127 +499,128 @@ function LoginPage() {
 
 function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/" element={<LoginPage />} />
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/" element={<LoginPage />} />
 
-      <Route path="/dashboard" element={<MainLayout>            <Dashboard />          </MainLayout>} />
-      <Route path="/account" element={<MainLayout>            <Account />          </MainLayout>} />
-      <Route path="/hrd" element={<MainLayout>            <UnderConstruction menuName="HRD" />          </MainLayout>} />
+        <Route path="/dashboard" element={<MainLayout>            <Dashboard />          </MainLayout>} />
+        <Route path="/account" element={<MainLayout>            <Account />          </MainLayout>} />
+        <Route path="/hrd" element={<MainLayout>            <UnderConstruction menuName="HRD" />          </MainLayout>} />
 
-      <Route path="/marketing" element={<MainLayout>            <UnderConstruction menuName="Marketing" />          </MainLayout>} />
-      <Route path="/marketing/master-customer" element={<MainLayout>            <MasterCustomer />          </MainLayout>} />
-      <Route path="/marketing/btt" element={<MainLayout>            <MarketingBTT />          </MainLayout>} />
-      <Route path="/marketing/btt/print" element={<BttPrintPage />} />
-      <Route path="/marketing/bdb" element={<MainLayout>            <MarketingBDB />          </MainLayout>} />
-      <Route path="/marketing/cetak-btt" element={<MainLayout>            <MarketingBTT />          </MainLayout>} />
-      <Route path="/marketing/monitoring-btt" element={<MainLayout>            <MarketingMonitoringBTT />          </MainLayout>} />
-      <Route path="/marketing/pengembalian-surat-jalan-customer" element={<MainLayout><PengembalianSuratJalanCustomer menuName="Pengembalian SJ" /></MainLayout>} />
-      <Route path="/marketing/pengembalian-surat-jalan-customer/add" element={<MainLayout><TambahPengembalianSuratJalan /></MainLayout>} />
-      <Route path="/marketing/closing-harian" element={<MainLayout>            <BttClosingHarianDashboard />          </MainLayout>} />
-      <Route path="/marketing/closing-harian-agen" element={<MainLayout>            <BttClosingHarianDashboard />          </MainLayout>} />
-      <Route path="/marketing/upload-csv" element={<MainLayout>            <UnderConstruction menuName="Upload CSV" />          </MainLayout>} />
-      <Route path="/marketing/pengemasan-barang-kurir" element={<MainLayout>            <UnderConstruction menuName="Pengemasan Barang Kurir" />          </MainLayout>} />
-      <Route path="/marketing/customer-upload-csv" element={<MainLayout>            <UnderConstruction menuName="Customer Upload CSV" />          </MainLayout>} />
-      <Route path="/marketing/proses-packing" element={<MainLayout><ProsesPacking /></MainLayout>} />
+        <Route path="/marketing" element={<MainLayout>            <UnderConstruction menuName="Marketing" />          </MainLayout>} />
+        <Route path="/marketing/master-customer" element={<MainLayout>            <MasterCustomer />          </MainLayout>} />
+        <Route path="/marketing/btt" element={<MainLayout>            <MarketingBTT />          </MainLayout>} />
+        <Route path="/marketing/btt/print" element={<BttPrintPage />} />
+        <Route path="/marketing/bdb" element={<MainLayout>            <MarketingBDB />          </MainLayout>} />
+        <Route path="/marketing/cetak-btt" element={<MainLayout>            <MarketingBTT />          </MainLayout>} />
+        <Route path="/marketing/monitoring-btt" element={<MainLayout>            <MarketingMonitoringBTT />          </MainLayout>} />
+        <Route path="/marketing/pengembalian-surat-jalan-customer" element={<MainLayout><PengembalianSuratJalanCustomer menuName="Pengembalian SJ" /></MainLayout>} />
+        <Route path="/marketing/pengembalian-surat-jalan-customer/add" element={<MainLayout><TambahPengembalianSuratJalan /></MainLayout>} />
+        <Route path="/marketing/closing-harian" element={<MainLayout>            <BttClosingHarianDashboard />          </MainLayout>} />
+        <Route path="/marketing/closing-harian-agen" element={<MainLayout>            <BttClosingHarianDashboard />          </MainLayout>} />
+        <Route path="/marketing/upload-csv" element={<MainLayout>            <UnderConstruction menuName="Upload CSV" />          </MainLayout>} />
+        <Route path="/marketing/pengemasan-barang-kurir" element={<MainLayout>            <UnderConstruction menuName="Pengemasan Barang Kurir" />          </MainLayout>} />
+        <Route path="/marketing/customer-upload-csv" element={<MainLayout>            <UnderConstruction menuName="Customer Upload CSV" />          </MainLayout>} />
+        <Route path="/marketing/proses-packing" element={<MainLayout><ProsesPacking /></MainLayout>} />
 
-      <Route path="/operasional" element={<MainLayout>            <UnderConstruction menuName="Operasional" />          </MainLayout>} />
-      <Route path="/operasional/pengembalian" element={<MainLayout><UnderConstruction /></MainLayout>} />
-      <Route path="/operasional/sp-terima/print-nota/:id" element={<SuratPengantarPrint />} />
+        <Route path="/operasional" element={<MainLayout>            <UnderConstruction menuName="Operasional" />          </MainLayout>} />
+        <Route path="/operasional/pengembalian" element={<MainLayout><UnderConstruction /></MainLayout>} />
+        <Route path="/operasional/sp-terima/print-nota/:id" element={<SuratPengantarPrint />} />
 
-      <Route path="/operasional/surat-pengantar-pengiriman" element={<MainLayout><SuratPengantarPengiriman /></MainLayout>} />
-      <Route path="/operasional/surat-pengantar-sp-pad" element={<MainLayout><SuratPengantarPAD /></MainLayout>} />
-      <Route path="/operasional/surat-kembali-btt" element={<MainLayout><SuratKembaliBTT /></MainLayout>} />
-      <Route path="/operasional/surat-pengantar-turun" element={<MainLayout><SuratPengantarTurun /></MainLayout>} />
-      <Route path="/operasional/hasil-loper" element={<MainLayout><HasilLoper menuName="HasilLoper" /></MainLayout>} />
+        <Route path="/operasional/surat-pengantar-pengiriman" element={<MainLayout><SuratPengantarPengiriman /></MainLayout>} />
+        <Route path="/operasional/surat-pengantar-sp-pad" element={<MainLayout><SuratPengantarPAD /></MainLayout>} />
+        <Route path="/operasional/surat-kembali-btt" element={<MainLayout><SuratKembaliBTT /></MainLayout>} />
+        <Route path="/operasional/surat-pengantar-turun" element={<MainLayout><SuratPengantarTurun /></MainLayout>} />
+        <Route path="/operasional/hasil-loper" element={<MainLayout><HasilLoper menuName="HasilLoper" /></MainLayout>} />
 
-      <Route path="/operasional/laporan-lsbp" element={<MainLayout><LaporanLSBP menuName="LaporanLSBP" /></MainLayout>} />
-      <Route path="/operasional/laporan-lsbp-v2" element={<MainLayout><LaporanLSBPV2 menuName="LaporanLSBPV2" /></MainLayout>} />
-      <Route path="/operasional/laporan-barang-turun" element={<MainLayout><LaporanBarangTurun menuName="LaporanBarangTurun" /></MainLayout>} />
-      <Route path="/operasional/laporan-btt-belum-kembali" element={<MainLayout><LaporanBTTBelumKembali menuName="LaporanBTTBelumKembali" /></MainLayout>} />
-      <Route path="/operasional/laporan-data-penerima-customer" element={<MainLayout><LaporanDataPenerimaCustomer menuName="LaporanDataPenerimaCustomer" /></MainLayout>} />
-      <Route path="/operasional/laporan-pendapatan-operasional" element={<MainLayout><LaporanPendapatanOperasional menuName="LaporanPendapatanOperasional" /></MainLayout>} />
-      <Route path="/operasional/inventory-customer" element={<MainLayout><InventoryCustomer menuName="InventoryCustomer" /></MainLayout>} />
-      <Route path="/operasional/pengeluaran-inventory-customer" element={<MainLayout><PengeluaranInventoryCustomer menuName="PengeluaranInventoryCustomer" /></MainLayout>} />
-      <Route path="/operasional/pengembalian-btt" element={<MainLayout><PengembalianBTT menuName="PengembalianBTT" /></MainLayout>} />
-      <Route path="/operasional/pengembalian/barang-retur" element={<MainLayout><BarangRetur menuName="BarangRetur" /></MainLayout>} />
+        <Route path="/operasional/laporan-lsbp" element={<MainLayout><LaporanLSBP menuName="LaporanLSBP" /></MainLayout>} />
+        <Route path="/operasional/laporan-lsbp-v2" element={<MainLayout><LaporanLSBPV2 menuName="LaporanLSBPV2" /></MainLayout>} />
+        <Route path="/operasional/laporan-barang-turun" element={<MainLayout><LaporanBarangTurun menuName="LaporanBarangTurun" /></MainLayout>} />
+        <Route path="/operasional/laporan-btt-belum-kembali" element={<MainLayout><LaporanBTTBelumKembali menuName="LaporanBTTBelumKembali" /></MainLayout>} />
+        <Route path="/operasional/laporan-data-penerima-customer" element={<MainLayout><LaporanDataPenerimaCustomer menuName="LaporanDataPenerimaCustomer" /></MainLayout>} />
+        <Route path="/operasional/laporan-pendapatan-operasional" element={<MainLayout><LaporanPendapatanOperasional menuName="LaporanPendapatanOperasional" /></MainLayout>} />
+        <Route path="/operasional/inventory-customer" element={<MainLayout><InventoryCustomer menuName="InventoryCustomer" /></MainLayout>} />
+        <Route path="/operasional/pengeluaran-inventory-customer" element={<MainLayout><PengeluaranInventoryCustomer menuName="PengeluaranInventoryCustomer" /></MainLayout>} />
+        <Route path="/operasional/pengembalian-btt" element={<MainLayout><PengembalianBTT menuName="PengembalianBTT" /></MainLayout>} />
+        <Route path="/operasional/pengembalian/barang-retur" element={<MainLayout><BarangRetur menuName="BarangRetur" /></MainLayout>} />
 
-      <Route path="/operasional/pengisian-bbm" element={<MainLayout><PengisianBBM menuName="PengisianBBM" /></MainLayout>} />
-      <Route path="/operasional/surat-tugas" element={<MainLayout><SuratTugas menuName="SuratTugas" /></MainLayout>} />
-      <Route path="/operasional/surat-muatan-udara" element={<MainLayout><SuratMuatanUdara menuName="SuratMuatanUdara" /></MainLayout>} />
-      <Route path="/operasional/cetak-surat-pengiriman" element={<MainLayout><CetakSuratPengiriman menuName="CetakSuratPengiriman" /></MainLayout>} />
+        <Route path="/operasional/pengisian-bbm" element={<MainLayout><PengisianBBM menuName="PengisianBBM" /></MainLayout>} />
+        <Route path="/operasional/surat-tugas" element={<MainLayout><SuratTugas menuName="SuratTugas" /></MainLayout>} />
+        <Route path="/operasional/surat-muatan-udara" element={<MainLayout><SuratMuatanUdara menuName="SuratMuatanUdara" /></MainLayout>} />
+        <Route path="/operasional/cetak-surat-pengiriman" element={<MainLayout><CetakSuratPengiriman menuName="CetakSuratPengiriman" /></MainLayout>} />
 
-      <Route path="/operasional/loading-barang" element={<MainLayout><LoadingBarang menuName="LoadingBarang" /></MainLayout>} />
-      <Route path="/operasional/loper" element={<MainLayout><Loper /></MainLayout>} />
-      <Route path="/operasional/loper-deadline" element={<MainLayout><LoperDeadline menuName="LoperDeadline" /></MainLayout>} />
-      <Route path="/operasional/pembongkaran-barang" element={<MainLayout><PembongkaranBarang menuName="PembongkaranBarang" /></MainLayout>} />
-      <Route path="/operasional/stok/stok-barang-gudang" element={<MainLayout><StokBarangGudang /></MainLayout>} />
-      <Route path="/operasional/voucher-bbm" element={<MainLayout><VoucherBBM /></MainLayout>} />
+        <Route path="/operasional/loading-barang" element={<MainLayout><LoadingBarang menuName="LoadingBarang" /></MainLayout>} />
+        <Route path="/operasional/loper" element={<MainLayout><Loper /></MainLayout>} />
+        <Route path="/operasional/loper-deadline" element={<MainLayout><LoperDeadline menuName="LoperDeadline" /></MainLayout>} />
+        <Route path="/operasional/pembongkaran-barang" element={<MainLayout><PembongkaranBarang menuName="PembongkaranBarang" /></MainLayout>} />
+        <Route path="/operasional/stok/stok-barang-gudang" element={<MainLayout><StokBarangGudang /></MainLayout>} />
+        <Route path="/operasional/voucher-bbm" element={<MainLayout><VoucherBBM /></MainLayout>} />
 
-      <Route path="/general-ledger" element={<MainLayout><UnderConstruction menuName="General Ledger" /></MainLayout>} />
+        <Route path="/general-ledger" element={<MainLayout><UnderConstruction menuName="General Ledger" /></MainLayout>} />
 
-      <Route path="/Master" element={<MainLayout><UnderConstruction menuName="Master Data" /></MainLayout>} />
-      <Route path="/Master/area-customer" element={<MainLayout><AreaCustomer /></MainLayout>} />
-      <Route path="/Master/master-agen" element={<MainLayout><MasterAgen menuName="master-agen" /></MainLayout>} />
-      <Route path="/Master/master-area-loper" element={<MainLayout><MasterAreaLoper menuName="master-area-loper" /></MainLayout>} />
-      <Route path="/Master/master-area-tidak-dilayani" element={<MainLayout><MasterAreaTidakDilayani /></MainLayout>} />
-      <Route path="/master/master-device-karyawan" element={<MainLayout><MasterDeviceKaryawan /></MainLayout>} />
-      <Route path="/master/monitoring-karyawan" element={<MainLayout><MonitoringLokasiKaryawan /></MainLayout>} />
-      <Route path="/master/master-harga-perwilayah" element={<MainLayout><MasterHargaPerwilayah /></MainLayout>} />
-      <Route path="/master/master-kendaraan" element={<MainLayout><MasterKendaraan /></MainLayout>} />
-      <Route path="/master/perawatan-kendaraan" element={<MainLayout><PerawatanKendaraan /></MainLayout>} />
-      <Route path="/master/master-sewa-kendaraan" element={<MainLayout><MasterSewaKendaraan /></MainLayout>} />
-      <Route path="/master/master-kodepos" element={<MainLayout><MasterKodePos menuName="master-kodepos" /></MainLayout>} />
-      <Route path="/master/master-korwil" element={<MainLayout><MasterKorwil menuName="master-korwil" /></MainLayout>} />
-      <Route path="/master/master-leadtime-customer" element={<MainLayout><MasterLeadTimeCustomer menuName="master-leadtime-customer" /></MainLayout>} />
-      <Route path="/master/master-customer-new" element={<MainLayout><MasterCustomerNew menuName="master-customer-new" /></MainLayout>} />
+        <Route path="/Master" element={<MainLayout><UnderConstruction menuName="Master Data" /></MainLayout>} />
+        <Route path="/Master/area-customer" element={<MainLayout><AreaCustomer /></MainLayout>} />
+        <Route path="/Master/master-agen" element={<MainLayout><MasterAgen menuName="master-agen" /></MainLayout>} />
+        <Route path="/Master/master-area-loper" element={<MainLayout><MasterAreaLoper menuName="master-area-loper" /></MainLayout>} />
+        <Route path="/Master/master-area-tidak-dilayani" element={<MainLayout><MasterAreaTidakDilayani /></MainLayout>} />
+        <Route path="/master/master-device-karyawan" element={<MainLayout><MasterDeviceKaryawan /></MainLayout>} />
+        <Route path="/master/monitoring-karyawan" element={<MainLayout><MonitoringLokasiKaryawan /></MainLayout>} />
+        <Route path="/master/master-harga-perwilayah" element={<MainLayout><MasterHargaPerwilayah /></MainLayout>} />
+        <Route path="/master/master-kendaraan" element={<MainLayout><MasterKendaraan /></MainLayout>} />
+        <Route path="/master/perawatan-kendaraan" element={<MainLayout><PerawatanKendaraan /></MainLayout>} />
+        <Route path="/master/master-sewa-kendaraan" element={<MainLayout><MasterSewaKendaraan /></MainLayout>} />
+        <Route path="/master/master-kodepos" element={<MainLayout><MasterKodePos menuName="master-kodepos" /></MainLayout>} />
+        <Route path="/master/master-korwil" element={<MainLayout><MasterKorwil menuName="master-korwil" /></MainLayout>} />
+        <Route path="/master/master-leadtime-customer" element={<MainLayout><MasterLeadTimeCustomer menuName="master-leadtime-customer" /></MainLayout>} />
+        <Route path="/master/master-customer-new" element={<MainLayout><MasterCustomerNew menuName="master-customer-new" /></MainLayout>} />
 
-      <Route path="/master/master-sopir" element={<MainLayout><MasterSopir menuName="master-sopir" /></MainLayout>} />
-      <Route path="/master/master-trayek" element={<MainLayout><MasterTrayek menuName="master-trayek" /></MainLayout>} />
-      <Route path="/master/tarif-carter" element={<MainLayout><TarifCarter menuName="TarifCarter" /></MainLayout>} />
-      <Route path="/master/tarif-ekonomis" element={<MainLayout><MasterTarifEkonomis menuName="MasterTarifEkonomis" /></MainLayout>} />
-      <Route path="/master/tarif-umum" element={<MainLayout><MasterTarifReguler menuName="MasterTarifReguler" /></MainLayout>} />
-      <Route path="/master/tarif-unit" element={<MainLayout><MasterTarifUnit menuName="MasterTarifUnit" /></MainLayout>} />
-      <Route path="/master/tarif-customer" element={<MainLayout><MasterTarifCustomer menuName="MasterTarifCustomer" /></MainLayout>} />
-      <Route path="/master/tarif-handling-propinsi" element={<MainLayout><TarifHandlingPropinsi menuName="TarifHandlingPropinsi" /></MainLayout>} />
-      <Route path="/master/tarif-paket" element={<MainLayout><TarifPaket menuName="TarifPaket" /></MainLayout>} />
-      <Route path="/master/jenis-kendaraan-carter" element={<MainLayout><JenisKendaraanCarter menuName="JenisKendaraanCarter" /></MainLayout>} />
-      <Route path="/master/master-vendor" element={<MainLayout><MasterVendor menuName="MasterVendor" /></MainLayout>} />
+        <Route path="/master/master-sopir" element={<MainLayout><MasterSopir menuName="master-sopir" /></MainLayout>} />
+        <Route path="/master/master-trayek" element={<MainLayout><MasterTrayek menuName="master-trayek" /></MainLayout>} />
+        <Route path="/master/tarif-carter" element={<MainLayout><TarifCarter menuName="TarifCarter" /></MainLayout>} />
+        <Route path="/master/tarif-ekonomis" element={<MainLayout><MasterTarifEkonomis menuName="MasterTarifEkonomis" /></MainLayout>} />
+        <Route path="/master/tarif-umum" element={<MainLayout><MasterTarifReguler menuName="MasterTarifReguler" /></MainLayout>} />
+        <Route path="/master/tarif-unit" element={<MainLayout><MasterTarifUnit menuName="MasterTarifUnit" /></MainLayout>} />
+        <Route path="/master/tarif-customer" element={<MainLayout><MasterTarifCustomer menuName="MasterTarifCustomer" /></MainLayout>} />
+        <Route path="/master/tarif-handling-propinsi" element={<MainLayout><TarifHandlingPropinsi menuName="TarifHandlingPropinsi" /></MainLayout>} />
+        <Route path="/master/tarif-paket" element={<MainLayout><TarifPaket menuName="TarifPaket" /></MainLayout>} />
+        <Route path="/master/jenis-kendaraan-carter" element={<MainLayout><JenisKendaraanCarter menuName="JenisKendaraanCarter" /></MainLayout>} />
+        <Route path="/master/master-vendor" element={<MainLayout><MasterVendor menuName="MasterVendor" /></MainLayout>} />
 
-      <Route path="/Piutang" element={<MainLayout><UnderConstruction menuName="Piutang" /></MainLayout>} />
+        <Route path="/Piutang" element={<MainLayout><UnderConstruction menuName="Piutang" /></MainLayout>} />
 
-      <Route path="/Settings" element={<MainLayout><UnderConstruction menuName="Settings" /></MainLayout>} />
-      <Route path="/settings/users" element={<MainLayout><UserManagement menuName="UserManagement" /></MainLayout>} />
-      <Route path="/settings/configurasi" element={<MainLayout><MasterConfigParam menuName="configurasi" /></MainLayout>} />
-      <Route path="/settings/security" element={<MainLayout><SecuritySettings menuName="SecuritySettings" /></MainLayout>} />
+        <Route path="/Settings" element={<MainLayout><UnderConstruction menuName="Settings" /></MainLayout>} />
+        <Route path="/settings/users" element={<MainLayout><UserManagement menuName="UserManagement" /></MainLayout>} />
+        <Route path="/settings/configurasi" element={<MainLayout><MasterConfigParam menuName="configurasi" /></MainLayout>} />
+        <Route path="/settings/security" element={<MainLayout><SecuritySettings menuName="SecuritySettings" /></MainLayout>} />
 
-      <Route path="/pengambilan/barang-sendiri" element={<MainLayout><Pengambilan /></MainLayout>} />
-      <Route path="/pengambilan/pengambilan-retur" element={<MainLayout><PengambilanRetur /></MainLayout>} />
+        <Route path="/pengambilan/barang-sendiri" element={<MainLayout><Pengambilan /></MainLayout>} />
+        <Route path="/pengambilan/pengambilan-retur" element={<MainLayout><PengambilanRetur /></MainLayout>} />
 
-      <Route path="/general-ledger/jurnal-tidak-seimbang" element={<MainLayout><JurnalTidakSeimbang /></MainLayout>} />
-      <Route path="/general-ledger/cetak-buku-besar" element={<MainLayout><CetakBukuBesar /></MainLayout>} />
-      <Route path="/general-ledger/cetak-neraca-saldo" element={<MainLayout><CetakNeracaSaldo /></MainLayout>} />
-      <Route path="/general-ledger/cetak-neraca" element={<MainLayout><CetakNeraca /></MainLayout>} />
-      <Route path="/general-ledger/cetak-rugi-laba" element={<MainLayout><CetakRugiLaba /></MainLayout>} />
-      <Route path="/general-ledger/cetak-posisi-keuangan" element={<MainLayout><CetakPosisiKeuangan /></MainLayout>} />
-      <Route path="/general-ledger/cetak-rugi-laba-komprehensif" element={<MainLayout><CetakLabaRugiKomprehensif /></MainLayout>} />
+        <Route path="/general-ledger/jurnal-tidak-seimbang" element={<MainLayout><JurnalTidakSeimbang /></MainLayout>} />
+        <Route path="/general-ledger/cetak-buku-besar" element={<MainLayout><CetakBukuBesar /></MainLayout>} />
+        <Route path="/general-ledger/cetak-neraca-saldo" element={<MainLayout><CetakNeracaSaldo /></MainLayout>} />
+        <Route path="/general-ledger/cetak-neraca" element={<MainLayout><CetakNeraca /></MainLayout>} />
+        <Route path="/general-ledger/cetak-rugi-laba" element={<MainLayout><CetakRugiLaba /></MainLayout>} />
+        <Route path="/general-ledger/cetak-posisi-keuangan" element={<MainLayout><CetakPosisiKeuangan /></MainLayout>} />
+        <Route path="/general-ledger/cetak-rugi-laba-komprehensif" element={<MainLayout><CetakLabaRugiKomprehensif /></MainLayout>} />
 
-      <Route path="/general-ledger/daftar-bank" element={<MainLayout><DaftarBank /></MainLayout>} />
-      <Route path="/general-ledger/daftar-pemasukan-pengeluaran" element={<MainLayout><DaftarPemasukanPengeluaran /></MainLayout>} />
-      <Route path="/general-ledger/daftar-kelompok-perkiraan" element={<MainLayout><DaftarKelompokPerkiraan /></MainLayout>} />
-      <Route path="/general-ledger/daftar-kode-perkiraan" element={<MainLayout><DaftarKodePerkiraan /></MainLayout>} />
-      <Route path="/general-ledger/daftar-sgu" element={<MainLayout><DaftarSGU /></MainLayout>} />
-      <Route path="/general-ledger/daftar-akun-piutang-setoran" element={<MainLayout><DaftarAkunPiutangSetoran /></MainLayout>} />
+        <Route path="/general-ledger/daftar-bank" element={<MainLayout><DaftarBank /></MainLayout>} />
+        <Route path="/general-ledger/daftar-pemasukan-pengeluaran" element={<MainLayout><DaftarPemasukanPengeluaran /></MainLayout>} />
+        <Route path="/general-ledger/daftar-kelompok-perkiraan" element={<MainLayout><DaftarKelompokPerkiraan /></MainLayout>} />
+        <Route path="/general-ledger/daftar-kode-perkiraan" element={<MainLayout><DaftarKodePerkiraan /></MainLayout>} />
+        <Route path="/general-ledger/daftar-sgu" element={<MainLayout><DaftarSGU /></MainLayout>} />
+        <Route path="/general-ledger/daftar-akun-piutang-setoran" element={<MainLayout><DaftarAkunPiutangSetoran /></MainLayout>} />
 
-      <Route path="/general-ledger/insentif-loper" element={<MainLayout><InsentifLoper /></MainLayout>} />
-      <Route path="/general-ledger/jurnal" element={<MainLayout><Jurnal /></MainLayout>} />
-      <Route path="/general-ledger/komisi-sopir" element={<MainLayout><KalkulasiKomisiSopir /></MainLayout>} />
-      <Route path="/general-ledger/kas-masuk-keluar" element={<MainLayout><KasMasukKeluar /></MainLayout>} />
-      <Route path="/general-ledger/pembayaran-vendor" element={<MainLayout><PembayaranVendor /></MainLayout>} />
-      <Route path="/general-ledger/posting-jurnal" element={<MainLayout><PostingJurnal /></MainLayout>} />
-      <Route path="/general-ledger/setoran-cod" element={<MainLayout><SetoranCOD /></MainLayout>} />
+        <Route path="/general-ledger/insentif-loper" element={<MainLayout><InsentifLoper /></MainLayout>} />
+        <Route path="/general-ledger/jurnal" element={<MainLayout><Jurnal /></MainLayout>} />
+        <Route path="/general-ledger/komisi-sopir" element={<MainLayout><KalkulasiKomisiSopir /></MainLayout>} />
+        <Route path="/general-ledger/kas-masuk-keluar" element={<MainLayout><KasMasukKeluar /></MainLayout>} />
+        <Route path="/general-ledger/pembayaran-vendor" element={<MainLayout><PembayaranVendor /></MainLayout>} />
+        <Route path="/general-ledger/posting-jurnal" element={<MainLayout><PostingJurnal /></MainLayout>} />
+        <Route path="/general-ledger/setoran-cod" element={<MainLayout><SetoranCOD /></MainLayout>} />
 
-      {/* Jika nanti ada halaman lain, tinggal bungkus lagi pakai MainLayout 
+        {/* Jika nanti ada halaman lain, tinggal bungkus lagi pakai MainLayout 
       <Route
         path="/laporan"
         element={
@@ -628,7 +629,8 @@ function App() {
           </MainLayout>
         }
       /> */}
-    </Routes>
+      </Routes>
+    </BrowserRouter>
   )
 }
 
