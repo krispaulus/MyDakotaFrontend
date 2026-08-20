@@ -2,26 +2,25 @@ import React, { useEffect, useState } from 'react';
 import { LayoutDashboard, Package, Truck, Clock } from 'lucide-react';
 import { jwtDecode } from 'jwt-decode';
 import { useDarkMode } from '../context/DarkModeContext';
+import api from '../api/axios';
 
 function Dashboard() {
   const { isDarkMode } = useDarkMode();
   const [role, setRole] = useState('');
-  const [agens, setAgens] = useState([]); // Deklarasikan cukup satu kali saja
-  const userName = localStorage.getItem('username');
+  const [agens, setAgens] = useState([]);
+  const userName = localStorage.getItem('user_name') || localStorage.getItem('username') || '';
 
   // 1. Ambil Role secara akurat dari Token atau Local Storage
   useEffect(() => {
     const token = localStorage.getItem('token');
-    
-    // 🌟 KUNCI EMAS: Utamakan cache role_akses Local Storage terupdate yang bernilai 'S'
     const cachedRoleType = localStorage.getItem('role_akses') || 'U';
-    
+
     if (cachedRoleType === 'S' || cachedRoleType === 'Super Admin') {
       setRole('Superadmin');
     } else if (cachedRoleType === 'A' || cachedRoleType === 'Admin') {
       setRole('Admin');
-      } else if (cachedRoleType === 'U' || cachedRoleType === 'User') {
-      setRole('User'); // Mengunci 'User' secara presisi untuk huruf 'U'
+    } else if (cachedRoleType === 'U' || cachedRoleType === 'User') {
+      setRole('User');
     } else if (token) {
       try {
         const decoded = jwtDecode(token);
@@ -38,26 +37,20 @@ function Dashboard() {
     }
   }, []);
 
-  // 2. Fetch Data Agen jika Superadmin
+  // 2. Fetch Data Agen jika Superadmin menggunakan instance Axios
   useEffect(() => {
     const fetchAgens = async () => {
-      // Hanya jalankan jika role sudah terdeteksi sebagai Superadmin
       if (role === 'Superadmin') {
         try {
-          const token = localStorage.getItem('token');
-          const response = await fetch(`${import.meta.env.VITE_API_URL}/api/agens`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
-          const result = await response.json();
+          // ✅ Gunakan api.get('/agens') langsung!
+          const res = await api.get('/agens');
+          const resultData = res.data?.data || res.data || [];
 
-          // Sesuai screenshot Postman, data dibungkus dalam properti 'data'
-          if (result.status === 'success' && Array.isArray(result.data)) {
-            setAgens(result.data);
-            console.log("Berhasil load agen:", result.data.length);
+          if (Array.isArray(resultData)) {
+            setAgens(resultData);
+            console.log("Berhasil load agen:", resultData.length);
           } else {
-            console.error("Format data backend tidak sesuai:", result);
+            console.error("Format data backend tidak sesuai:", res.data);
           }
         } catch (error) {
           console.error("Gagal mengambil data agen:", error);
@@ -66,7 +59,7 @@ function Dashboard() {
     };
 
     fetchAgens();
-  }, [role]); 
+  }, [role]);
 
   return (
     <div className="w-full">
@@ -74,7 +67,7 @@ function Dashboard() {
       <div className="mb-8">
         <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-[#2b3674]'}`}>Dashboard MyDakota</h1>
         <p className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>
-          Selamat Datang, 
+          Selamat Datang,
           <span className={`font-semibold ml-1 ${isDarkMode ? 'text-blue-400' : 'text-[#2170f4]'}`}>{userName}</span>!
           <span> Kamu sebagai </span>
           <span className={`font-semibold ${isDarkMode ? 'text-blue-400' : 'text-[#2170f4]'}`}>{role}</span>!
@@ -92,8 +85,8 @@ function Dashboard() {
       {/* Area Placeholder Grafik */}
       <div className={`w-full h-96 rounded-2xl shadow-sm border flex items-center justify-center transition-colors ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
         <p className={`italic ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-          {role === 'Superadmin' 
-            ? `Grafik Business Insight untuk ${agens.length} agen akan muncul di sini` 
+          {role === 'Superadmin'
+            ? `Grafik Business Insight untuk ${agens.length} agen akan muncul di sini`
             : "Grafik Laporan Business Insight Akan Muncul di Sini"}
         </p>
       </div>
