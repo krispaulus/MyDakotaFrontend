@@ -82,7 +82,7 @@ const MainLayout = ({ children }) => {
 
     // 🔒 2. CEGAH RENDER LAYOUT JIKA TIDAK ADA TOKEN
     if (!token) {
-        return null;
+        return <Navigate to="/login" replace />;
     }
 
     return (
