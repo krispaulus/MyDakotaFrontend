@@ -282,6 +282,20 @@ const Jurnal = () => {
     const handleSaveForm = async (e) => {
         e.preventDefault();
 
+        // Validasi Mandatory Keterangan Header
+        if (!formData.tjurh_keterangan || !formData.tjurh_keterangan.trim()) {
+            Swal.fire({
+                title: 'Peringatan',
+                text: 'Keterangan Jurnal wajib diisi!',
+                icon: 'warning',
+                didOpen: () => {
+                    const container = document.querySelector('.swal2-container');
+                    if (container) container.style.zIndex = '9999999';
+                }
+            });
+            return;
+        }
+
         if (details.length === 0) {
             Swal.fire({
                 title: 'Peringatan',
@@ -558,10 +572,13 @@ const Jurnal = () => {
                             </div>
 
                             <div className="md:col-span-4">
-                                <label className="font-bold text-slate-700 block mb-1">KETERANGAN :</label>
+                                <label className="font-bold text-slate-700 block mb-1">
+                                    KETERANGAN <span className="text-rose-600 font-bold">*</span> :
+                                </label>
                                 <input
                                     type="text"
-                                    placeholder="Masukkan keterangan header jurnal..."
+                                    required
+                                    placeholder="Masukkan keterangan header jurnal (wajib diisi)..."
                                     value={formData.tjurh_keterangan}
                                     onChange={(e) => setFormData({ ...formData, tjurh_keterangan: e.target.value })}
                                     className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg bg-white font-medium text-slate-800 outline-none focus:border-indigo-600"
