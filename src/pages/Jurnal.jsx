@@ -235,6 +235,8 @@ const Jurnal = () => {
     // Buka Modal Edit
     const handleEdit = async (item) => {
         setIsEditMode(true);
+        const ptId = localStorage.getItem('pt_id') || localStorage.getItem('selected_pt') || 'C';
+
         setFormData({
             tjurh_no: item.tjurh_no,
             tjurh_tanggal: item.tjurh_tanggal || today,
@@ -245,7 +247,7 @@ const Jurnal = () => {
 
         try {
             const token = localStorage.getItem('token');
-            const res = await api.get(`/gl/jurnal/detail/${encodeURIComponent(item.tjurh_no)}`, {
+            const res = await api.get(`/gl/jurnal/detail/${encodeURIComponent(item.tjurh_no)}?pt_id=${encodeURIComponent(ptId)}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setDetails(res.data?.details || []);
@@ -336,19 +338,6 @@ const Jurnal = () => {
                 }
             });
         }
-    };
-
-    const handlePrint = (item, format = 'A4') => {
-        Swal.fire({
-            title: `PRINT VOUCHER (${format})`,
-            text: `Mencetak Voucher Jurnal Nomor ${item.tjurh_no}...`,
-            icon: 'info',
-            confirmButtonColor: '#0284c7',
-            didOpen: () => {
-                const container = document.querySelector('.swal2-container');
-                if (container) container.style.zIndex = '9999999';
-            }
-        });
     };
 
     const handleDelete = (item) => {
@@ -776,6 +765,32 @@ const Jurnal = () => {
             </div>
         </div>
     ) : null;
+
+    const handlePrint = async (item, format = 'A4') => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await api.get(`/gl/jurnal/detail/${encodeURIComponent(item.tjurh_no)}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            const header = res.data?.header || item;
+            const details = res.data?.details || [];
+
+            // Buka format cetak voucher jurnal
+            window.open(`/gl_t_cashbank_print_jurnal.html?no=${encodeURIComponent(item.tjurh_no)}&format=${format}`, '_blank');
+        } catch (err) {
+            console.error("Gagal print jurnal:", err);
+            Swal.fire({
+                title: 'GAGAL PRINT',
+                text: 'Tidak dapat memuat data rincian jurnal untuk dicetak.',
+                icon: 'error',
+                didOpen: () => {
+                    const container = document.querySelector('.swal2-container');
+                    if (container) container.style.zIndex = '9999999';
+                }
+            });
+        }
+    };
 
     return (
         <div className="space-y-4">

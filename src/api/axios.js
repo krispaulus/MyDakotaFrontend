@@ -1,13 +1,8 @@
 import axios from 'axios';
 
-// 🌐 Deteksi Hostname & Port Backend Secara Otomatis
 const currentHost = window.location.hostname;
 const isLocal = currentHost === 'localhost' || currentHost === '127.0.0.1';
-
-// Jika local pakai 8080, jika server/IP lain (misal 192.168.22.25) pakai 9090
 const backendPort = isLocal ? '8080' : '9090';
-
-// Jika di server ada domain/reverse proxy khusus, fallback tetap aman
 const backendBaseURL = `http://${currentHost}:${backendPort}/api`;
 
 const api = axios.create({
@@ -17,10 +12,8 @@ const api = axios.create({
     }
 });
 
-// 🔍 REQUEST INTERCEPTOR - Injeksi Token Otomatis & Debug Log
 api.interceptors.request.use(
     (config) => {
-        // Ambil token dari localStorage atau sessionStorage
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
@@ -40,7 +33,6 @@ api.interceptors.request.use(
     }
 );
 
-// 🔍 RESPONSE INTERCEPTOR - Log Response & Auto Redirect jika Sesi Habis (401)
 api.interceptors.response.use(
     (response) => {
         console.log("%c📥 RESPONSE DETAIL (SUCCESS):", "color: #51CF66; font-weight: bold;");
