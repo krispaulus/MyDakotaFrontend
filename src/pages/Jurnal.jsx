@@ -5,6 +5,7 @@ import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
 import { Filter, Printer, X, Plus, Trash2, Search } from 'lucide-react';
 import Swal from 'sweetalert2';
+import logoDakota from '../assets/new_logo 2.png';
 
 const Jurnal = () => {
     const { isDarkMode } = useDarkMode();
@@ -51,6 +52,9 @@ const Jurnal = () => {
     const [coaList, setCoaList] = useState([]);
     const [showCoaDropdown, setShowCoaDropdown] = useState(false);
     const [coaKeyword, setCoaKeyword] = useState('');
+
+    const [isPrintOpen, setIsPrintOpen] = useState(false);
+    const [printData, setPrintData] = useState(null);
 
     const fetchCabangList = async () => {
         try {
@@ -766,20 +770,67 @@ const Jurnal = () => {
         </div>
     ) : null;
 
-    const handlePrint = async (item, format = 'A4') => {
+    // Print Voucher Handler Murni Dinamis dari Database
+    const handlePrint = async (item) => {
         try {
             const token = localStorage.getItem('token');
-            const res = await api.get(`/gl/jurnal/detail/${encodeURIComponent(item.tjurh_no)}`, {
+            const ptId = localStorage.getItem('pt_id') || localStorage.getItem('selected_pt') || 'C';
+
+            const res = await api.get(`/gl/jurnal/detail/${encodeURIComponent(item.tjurh_no)}?pt_id=${encodeURIComponent(ptId)}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            const header = res.data?.header || item;
-            const details = res.data?.details || [];
+            const jDetails = res.data?.details || [];
 
-            // Buka format cetak voucher jurnal
-            window.open(`/gl_t_cashbank_print_jurnal.html?no=${encodeURIComponent(item.tjurh_no)}&format=${format}`, '_blank');
+            // Validasi: jika tidak ada rincian baris di database, hentikan proses cetak
+            if (jDetails.length === 0) {
+                Swal.fire({
+                    title: 'Rincian Kosong',
+                    text: `Jurnal ${item.tjurh_no} belum memiliki rincian transaksi di database.`,
+                    icon: 'warning',
+                    didOpen: () => {
+                        const container = document.querySelector('.swal2-container');
+                        if (container) container.style.zIndex = '9999999';
+                    }
+                });
+                return;
+            }
+
+            // Pisahkan baris Debet & Kredit murni dari data database
+            const creditRows = jDetails.filter(d => Number(d.tjurd_kredit) > 0);
+            const debitRows = jDetails.filter(d => Number(d.tjurd_debet) > 0);
+
+            // Tentukan akun lawan/sumber dana utama
+            const mainCredit = creditRows[0] || {};
+            const lawanCode = mainCredit.tjurd_acccode || '-';
+            const lawanName = mainCredit.ca_name || '-';
+
+            // Petakan rincian baris transaksi (Debet)
+            const details = debitRows.map(d => ({
+                code: d.tjurd_acccode,
+                nama: d.ca_name,
+                keterangan: d.tjurd_keterangan,
+                nominal: Number(d.tjurd_debet) || 0
+            }));
+
+            // Hitung total nilai transaksi
+            const totalAmount = item.total_amount ||
+                debitRows.reduce((sum, d) => sum + Number(d.tjurd_debet || 0), 0) ||
+                creditRows.reduce((sum, d) => sum + Number(d.tjurd_kredit || 0), 0);
+
+            setPrintData({
+                noTrans: item.tjurh_no,
+                tanggal: formatDate(item.tjurh_tanggal),
+                keterangan: item.tjurh_keterangan,
+                tipe: item.tjurh_type,
+                total: totalAmount,
+                lawanCode,
+                lawanName,
+                details
+            });
+            setIsPrintOpen(true);
         } catch (err) {
-            console.error("Gagal print jurnal:", err);
+            console.error("Gagal load print voucher:", err);
             Swal.fire({
                 title: 'GAGAL PRINT',
                 text: 'Tidak dapat memuat data rincian jurnal untuk dicetak.',
@@ -896,6 +947,117 @@ const Jurnal = () => {
             />
 
             {modalElement && ReactDOM.createPortal(modalElement, document.body)}
+            {/* MODAL PRINT VOUCHER */}
+            {isPrintOpen && printData && ReactDOM.createPortal(
+                <div className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs transition-opacity" style={{ zIndex: 999999 }}>
+                    <div className="w-full max-w-4xl bg-white text-slate-800 rounded-2xl shadow-2xl overflow-hidden p-8 space-y-6">
+                        <div className="flex items-center justify-between border-b pb-3 border-slate-200">
+                            <button
+                                type="button"
+                                onClick={() => setIsPrintOpen(false)}
+                                className="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition text-xs"
+                            >
+                                ← Tutup
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => window.print()}
+                                className="px-5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-lg shadow transition text-xs flex items-center gap-1.5"
+                            >
+                                <Printer size={14} /> Print Voucher
+                            </button>
+                        </div>
+
+                        {/* Layout Voucher Sesuai Gambar */}
+                        <div className="border border-slate-300 rounded-xl p-8 space-y-6 bg-white text-xs">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <div className="font-black text-sm tracking-wider text-slate-900">DAKOTA LOGISTIK INDONESIA</div>
+                                    <div className="text-slate-600">Jl. Wibawa Mukti II No. 8 Jatiasih, Bekasi</div>
+                                    <div className="text-slate-600">BEKASI KOTA</div>
+                                    <div className="text-slate-600">(021) 8603278 / (021) 86608589</div>
+                                </div>
+                                <div className="flex flex-col items-end">
+                                    <img
+                                        src={logoDakota}
+                                        alt="Dakota Cargo"
+                                        className="h-10 w-auto object-contain"
+                                    />
+                                </div>
+
+                            </div>
+
+                            <div className="text-center">
+                                <span className="font-black text-sm uppercase underline tracking-wider text-slate-900">
+                                    VOUCHER PENGELUARAN KAS
+                                </span>
+                            </div>
+
+                            <div className="space-y-1">
+                                <div className="flex"><span className="w-28 font-bold">No. Transaksi</span><span>: {printData.noTrans}</span></div>
+                                <div className="flex"><span className="w-28 font-bold">Tanggal</span><span>: {printData.tanggal}</span></div>
+                                <div className="flex"><span className="w-28 font-bold">Keterangan</span><span>: {printData.keterangan}</span></div>
+                            </div>
+
+                            <table className="w-full border-collapse border border-slate-400 text-left">
+                                <thead className="bg-slate-100 font-bold border-b border-slate-400">
+                                    <tr>
+                                        <th className="p-2 border border-slate-400">Account</th>
+                                        <th className="p-2 border border-slate-400 text-center">CC</th>
+                                        <th className="p-2 border border-slate-400">Keterangan</th>
+                                        <th className="p-2 border border-slate-400 text-right">Debet</th>
+                                        <th className="p-2 border border-slate-400 text-right">Kredit</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {/* Baris Kredit (Sumber Bank/Kas) */}
+                                    <tr>
+                                        <td className="p-2 border border-slate-400 font-mono">{printData.lawanCode}</td>
+                                        <td className="p-2 border border-slate-400 text-center">1</td>
+                                        <td className="p-2 border border-slate-400 font-bold">{printData.lawanName} : {printData.keterangan}</td>
+                                        <td className="p-2 border border-slate-400 text-right font-mono">0.00</td>
+                                        <td className="p-2 border border-slate-400 text-right font-mono">{printData.total.toLocaleString('id-ID')},00</td>
+                                    </tr>
+                                    {/* Baris Debet (Rincian Biaya/Uang Muka) */}
+                                    {printData.details.map((d, i) => (
+                                        <tr key={i}>
+                                            <td className="p-2 border border-slate-400 font-mono">{d.code}</td>
+                                            <td className="p-2 border border-slate-400 text-center">1</td>
+                                            <td className="p-2 border border-slate-400 font-bold">{d.nama} : {d.keterangan}</td>
+                                            <td className="p-2 border border-slate-400 text-right font-mono">{Number(d.nominal).toLocaleString('id-ID')},00</td>
+                                            <td className="p-2 border border-slate-400 text-right font-mono">0.00</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                                <tfoot className="font-black bg-slate-50 border-t border-slate-400">
+                                    <tr>
+                                        <td colSpan={3} className="p-2 text-right uppercase border border-slate-400">TOTAL</td>
+                                        <td className="p-2 text-right border border-slate-400 font-mono">{printData.total.toLocaleString('id-ID')},00</td>
+                                        <td className="p-2 text-right border border-slate-400 font-mono">{printData.total.toLocaleString('id-ID')},00</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+
+                            {/* Tanda Tangan */}
+                            <div className="grid grid-cols-3 text-center pt-8 font-bold">
+                                <div>
+                                    <div className="mb-14">Diterima</div>
+                                    <div className="underline">( Keuangan )</div>
+                                </div>
+                                <div>
+                                    <div className="mb-14">Disetujui</div>
+                                    <div className="underline">( Direksi )</div>
+                                </div>
+                                <div>
+                                    <div className="mb-14">Diketahui</div>
+                                    <div className="underline">( Akunting )</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
         </div>
     );
 };

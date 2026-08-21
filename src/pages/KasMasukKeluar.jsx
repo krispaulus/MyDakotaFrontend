@@ -5,6 +5,7 @@ import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
 import { Filter, Printer, X, ArrowLeft, Search, Trash2 } from 'lucide-react';
 import Swal from 'sweetalert2';
+import logoDakota from '../assets/new_logo 2.png';
 
 const angkaTerbilang = (nilai) => {
     const angka = Math.floor(Math.abs(Number(nilai)));
@@ -455,54 +456,98 @@ const KasMasukKeluar = () => {
     };
 
     // Print Handler
+    // Print Voucher Handler 100% Dinamis Tanpa Hardcode
     const handlePrint = async (item) => {
         try {
             const token = localStorage.getItem('token');
-            let details = [];
-            let lawanName = 'BANK CENTRAL ASIA (PST)';
-            let lawanCode = 'B006030066';
+            const ptId = localStorage.getItem('pt_id') || localStorage.getItem('selected_pt') || 'C';
 
-            if (item.cb_nojurnal && item.cb_nojurnal !== '-') {
-                const jRes = await api.get(`/gl/jurnal/detail/${encodeURIComponent(item.cb_nojurnal)}`, {
+            let details = [];
+            let lawanName = '-';
+            let lawanCode = '-';
+            let totalAmount = Number(item.total_amount || item.cb_total || 0);
+
+            // 1. Jika sudah posting dan memiliki Nomor Jurnal
+            if (item.cb_nojurnal && item.cb_nojurnal !== '-' && item.cb_nojurnal !== '') {
+                const jRes = await api.get(`/gl/jurnal/detail/${encodeURIComponent(item.cb_nojurnal)}?pt_id=${encodeURIComponent(ptId)}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
+
                 const jDetails = jRes.data?.details || [];
-                const creditRow = jDetails.find(d => Number(d.tjurd_kredit) > 0);
-                if (creditRow) {
-                    lawanName = creditRow.ca_name;
-                    lawanCode = creditRow.tjurd_acccode;
+
+                // Cari baris akun lawan / sumber dana
+                const lawanRow = item.cb_tipe === 'K'
+                    ? jDetails.find(d => Number(d.tjurd_kredit) > 0)
+                    : jDetails.find(d => Number(d.tjurd_debet) > 0);
+
+                if (lawanRow) {
+                    lawanName = lawanRow.ca_name || '-';
+                    lawanCode = lawanRow.tjurd_acccode || '-';
                 }
-                const debitRows = jDetails.filter(d => Number(d.tjurd_debet) > 0);
-                details = debitRows.map(d => ({
+
+                // Ambil baris rincian transaksi
+                const detailRows = item.cb_tipe === 'K'
+                    ? jDetails.filter(d => Number(d.tjurd_debet) > 0)
+                    : jDetails.filter(d => Number(d.tjurd_kredit) > 0);
+
+                details = detailRows.map(d => ({
                     code: d.tjurd_acccode,
                     nama: d.ca_name,
                     keterangan: d.tjurd_keterangan,
-                    nominal: d.tjurd_debet
+                    nominal: Number(item.cb_tipe === 'K' ? d.tjurd_debet : d.tjurd_kredit) || 0
                 }));
-            }
 
-            if (details.length === 0) {
-                details = [{
-                    code: 'E101020050',
-                    nama: item.cb_ket || 'BIAYA OPERASIONAL',
-                    keterangan: item.cb_ket || 'BIAYA OPERASIONAL',
-                    nominal: item.total_amount || 0
-                }];
+                if (details.length > 0) {
+                    totalAmount = details.reduce((sum, d) => sum + Number(d.nominal), 0);
+                }
+            } else {
+                // 2. Jika belum posting (ambil rincian dari data item kas aktif)
+                const rawDetails = item.details || item.rincian || [];
+                if (rawDetails.length > 0) {
+                    details = rawDetails.map(d => ({
+                        code: d.cbd_itemid || d.item_id || '-',
+                        nama: d.item_name || d.cbd_ket || item.cb_ket || '-',
+                        keterangan: d.cbd_ket || item.cb_ket || '-',
+                        nominal: Number(d.cbd_total || (d.cbd_quantity * d.cbd_hargasatuan) || 0)
+                    }));
+                    totalAmount = details.reduce((sum, d) => sum + Number(d.nominal), 0);
+                } else {
+                    // Validasi: jika tidak ada detail sama sekali
+                    Swal.fire({
+                        title: 'Data Belum Lengkap',
+                        text: 'Transaksi ini belum diposting dan tidak memiliki rincian biaya.',
+                        icon: 'warning',
+                        didOpen: () => {
+                            const container = document.querySelector('.swal2-container');
+                            if (container) container.style.zIndex = '9999999';
+                        }
+                    });
+                    return;
+                }
             }
 
             setPrintData({
-                noTrans: item.cb_nojurnal !== '-' ? item.cb_nojurnal : item.cb_id,
+                noTrans: (item.cb_nojurnal && item.cb_nojurnal !== '-') ? item.cb_nojurnal : item.cb_id,
                 tanggal: formatDate(item.cb_tanggal),
-                keterangan: item.cb_ket,
+                keterangan: item.cb_ket || '-',
                 tipe: item.cb_tipe,
-                total: item.total_amount || details.reduce((a, b) => a + Number(b.nominal), 0),
+                total: totalAmount,
                 lawanCode,
                 lawanName,
                 details
             });
             setIsPrintOpen(true);
         } catch (err) {
-            console.error("Gagal load print voucher:", err);
+            console.error("Gagal memuat voucher cetak:", err);
+            Swal.fire({
+                title: 'GAGAL PRINT',
+                text: 'Tidak dapat memuat data rincian kas untuk dicetak.',
+                icon: 'error',
+                didOpen: () => {
+                    const container = document.querySelector('.swal2-container');
+                    if (container) container.style.zIndex = '9999999';
+                }
+            });
         }
     };
 
@@ -974,9 +1019,12 @@ const KasMasukKeluar = () => {
                         <p className="text-xs">BEKASI KOTA</p>
                         <p className="text-xs">(021) 8603278 / (021) 86608589</p>
                     </div>
-                    <div className="text-right">
-                        <h1 className="font-black text-xl tracking-wide">DAKOTA</h1>
-                        <p className="text-[10px] tracking-widest font-bold text-red-600">LOGISTIK INDONESIA</p>
+                    <div className="flex flex-col items-end">
+                        <img
+                            src={logoDakota}
+                            alt="Dakota Cargo"
+                            className="h-10 w-auto object-contain"
+                        />
                     </div>
                 </div>
 
