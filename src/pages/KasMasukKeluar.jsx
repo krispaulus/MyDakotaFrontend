@@ -575,7 +575,7 @@ const KasMasukKeluar = () => {
             render: (item) => <span className="font-mono text-slate-800">{formatDate(item.cb_tanggal)}</span>
         },
         {
-            header: 'TIPE',
+            header: 'TYPE',
             accessor: 'cb_tipe',
             render: (item) => item.cb_tipe === 'T' ? (
                 <span className="font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[10px]">TERIMA KAS</span>

@@ -416,7 +416,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
       icon: <Book size={20} />,
       roles: ['S', 'A'],
       children: [
-        { name: 'Cek Jurnal', path: '#', roles: ['S'] },
+        // { name: 'Cek Jurnal', path: '#', roles: ['S'] },
         { name: 'Cek Jurnal Tidak Seimbang', path: '/general-ledger/jurnal-tidak-seimbang' },
         {
           name: 'Cetak',
