@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import api from '../api/axios';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
-import { Filter, Printer, X, Plus, Trash2, Search } from 'lucide-react';
+import { Filter, Printer, X, Plus, Trash2, Search, Edit } from 'lucide-react';
 import Swal from 'sweetalert2';
 import logoDakota from '../assets/new_logo 2.png';
 
@@ -24,6 +24,7 @@ const Jurnal = () => {
     const [selectedType, setSelectedType] = useState('');
     const [searchNoJurnal, setSearchNoJurnal] = useState('');
     const [isFilterActive, setIsFilterActive] = useState(false);
+    const [editingIndex, setEditingIndex] = useState(null);
 
     // Modal Form State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -152,7 +153,40 @@ const Jurnal = () => {
         setShowCoaDropdown(false);
     };
 
-    // Tambah Baris Detail
+    // ✏️ Mulai Edit Baris Rincian
+    const handleEditRow = (index) => {
+        const row = details[index];
+        if (!row) return;
+
+        setEditingIndex(index);
+        setEntryRow({
+            tjurd_acccode: row.tjurd_acccode,
+            ca_name: row.ca_name,
+            tjurd_agenid: row.tjurd_agenid || formData.tjurh_cbid || '1',
+            agen_nama: row.agen_nama || 'DLI PUSAT',
+            tjurd_keterangan: row.tjurd_keterangan || '',
+            tjurd_debet: row.tjurd_debet || 0,
+            tjurd_kredit: row.tjurd_kredit || 0
+        });
+        setCoaKeyword(`${row.tjurd_acccode} - ${row.ca_name}`);
+    };
+
+    // ❌ Batalkan Edit Baris
+    const handleCancelEditRow = () => {
+        setEditingIndex(null);
+        setCoaKeyword('');
+        setEntryRow({
+            tjurd_acccode: '',
+            ca_name: '',
+            tjurd_agenid: formData.tjurh_cbid || '1',
+            agen_nama: '',
+            tjurd_keterangan: formData.tjurh_keterangan || '',
+            tjurd_debet: 0,
+            tjurd_kredit: 0
+        });
+    };
+
+    // ➕ Tambah / Simpan Perubahan Baris Rincian (Dengan Auto-Merge Akun yang Sama)
     const handleAddRow = (e) => {
         if (e) e.preventDefault();
 
@@ -186,16 +220,54 @@ const Jurnal = () => {
         }
 
         const selectedCab = cabangList.find(c => String(c.agen_id || c.AgenID) === String(entryRow.tjurd_agenid));
-        const newDetail = {
+        const updatedItem = {
             ...entryRow,
-            agen_nama: selectedCab ? (selectedCab.agen_nama || selectedCab.AgenNama) : 'DLI PUSAT',
+            agen_nama: selectedCab ? (selectedCab.agen_nama || selectedCab.AgenNama) : (entryRow.agen_nama || 'DLI PUSAT'),
             tjurd_debet: debet,
             tjurd_kredit: kredit
         };
 
-        setDetails((prevDetails) => [...prevDetails, newDetail]);
+        if (editingIndex !== null) {
+            // Mode Edit: Perbarui baris yang sedang diedit
+            setDetails(details.map((item, idx) => (idx === editingIndex ? updatedItem : item)));
+            setEditingIndex(null);
+        } else {
+            // Mode Tambah: Cek apakah Kode Akun & Cabang sudah ada di tabel
+            const existingIndex = details.findIndex(
+                d => d.tjurd_acccode === entryRow.tjurd_acccode &&
+                    String(d.tjurd_agenid) === String(entryRow.tjurd_agenid)
+            );
 
-        // Reset Entry
+            if (existingIndex !== -1) {
+                // 💡 JIKA SUDAH ADA: Gabungkan nominal Debet & Kredit
+                const updatedDetails = [...details];
+                updatedDetails[existingIndex] = {
+                    ...updatedDetails[existingIndex],
+                    tjurd_debet: (parseFloat(updatedDetails[existingIndex].tjurd_debet) || 0) + debet,
+                    tjurd_kredit: (parseFloat(updatedDetails[existingIndex].tjurd_kredit) || 0) + kredit,
+                    // Gabungkan keterangan jika berbeda
+                    tjurd_keterangan: updatedDetails[existingIndex].tjurd_keterangan || entryRow.tjurd_keterangan
+                };
+                setDetails(updatedDetails);
+
+                Swal.fire({
+                    title: 'Akun Digabungkan',
+                    text: `Nominal untuk akun ${entryRow.tjurd_acccode} berhasil diakumulasikan ke baris yang sudah ada.`,
+                    icon: 'info',
+                    timer: 1500,
+                    showConfirmButton: false,
+                    didOpen: () => {
+                        const container = document.querySelector('.swal2-container');
+                        if (container) container.style.zIndex = '9999999';
+                    }
+                });
+            } else {
+                // Jika belum ada, tambahkan sebagai baris baru
+                setDetails((prevDetails) => [...prevDetails, updatedItem]);
+            }
+        }
+
+        // Reset Form Input
         setCoaKeyword('');
         setEntryRow({
             tjurd_acccode: '',
@@ -208,8 +280,56 @@ const Jurnal = () => {
         });
     };
 
+    // 🗑️ Hapus Baris Rincian dengan Konfirmasi Swal
     const handleDeleteRow = (index) => {
-        setDetails(details.filter((_, idx) => idx !== index));
+        const row = details[index];
+        const accLabel = row ? `${row.tjurd_acccode} (${row.ca_name})` : 'baris ini';
+
+        Swal.fire({
+            title: 'Hapus Baris Rincian?',
+            text: `Apakah Anda yakin ingin menghapus rincian akun ${accLabel}?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#e11d48',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Ya, Hapus!',
+            cancelButtonText: 'Batal',
+            didOpen: () => {
+                const container = document.querySelector('.swal2-container');
+                if (container) container.style.zIndex = '9999999';
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Jika sedang mengedit baris yang dihapus, batalkan mode edit
+                if (editingIndex === index) {
+                    setEditingIndex(null);
+                    setCoaKeyword('');
+                    setEntryRow({
+                        tjurd_acccode: '',
+                        ca_name: '',
+                        tjurd_agenid: formData.tjurh_cbid || '1',
+                        agen_nama: '',
+                        tjurd_keterangan: formData.tjurh_keterangan || '',
+                        tjurd_debet: 0,
+                        tjurd_kredit: 0
+                    });
+                }
+
+                setDetails(prevDetails => prevDetails.filter((_, idx) => idx !== index));
+
+                Swal.fire({
+                    title: 'Terhapus!',
+                    text: 'Baris rincian berhasil dihapus.',
+                    icon: 'success',
+                    timer: 1000,
+                    showConfirmButton: false,
+                    didOpen: () => {
+                        const container = document.querySelector('.swal2-container');
+                        if (container) container.style.zIndex = '9999999';
+                    }
+                });
+            }
+        });
     };
 
     // Buka Modal Tambah
@@ -619,13 +739,27 @@ const Jurnal = () => {
                                                 {parseFloat(item.tjurd_kredit || 0).toLocaleString('id-ID')}
                                             </td>
                                             <td className="p-2.5 text-center">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleDeleteRow(idx)}
-                                                    className="p-1 text-rose-600 hover:text-rose-800 cursor-pointer"
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
+                                                <div className="flex items-center justify-center gap-1.5">
+                                                    {/* Tombol Edit Baris */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleEditRow(idx)}
+                                                        className="p-1 text-sky-600 hover:text-sky-800 hover:bg-sky-50 rounded transition cursor-pointer"
+                                                        title="Edit Baris Rincian"
+                                                    >
+                                                        <Edit size={14} />
+                                                    </button>
+
+                                                    {/* Tombol Hapus Baris */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDeleteRow(idx)}
+                                                        className="p-1 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded transition cursor-pointer"
+                                                        title="Hapus Baris Rincian"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
