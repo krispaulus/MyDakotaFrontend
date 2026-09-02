@@ -20,72 +20,65 @@ const Invoice = () => {
     const [showFilter, setShowFilter] = useState(false);
 
     // =========================================================================
-    // DINAMIS: DETEKSI CABANG LOGIN & STATUS PUSAT DARI DATA RESMI DATABASE
+    // HELPER: DETEKSI CABANG & STATUS HOLDING / PUSAT SECARA DINAMIS
     // =========================================================================
-    const getActiveSessionBranchId = () => {
-        // 1. Ambil dari key standar string
-        const directKeys = ['active_cabang_id', 'active_agen_id', 'cabang_id', 'agen_id', 'branch_id'];
-        for (const k of directKeys) {
-            const val = localStorage.getItem(k);
-            if (val && typeof val === 'string' && val.trim() && !val.startsWith('{')) {
-                return val.trim();
-            }
+    function getActiveAgen() {
+        const activeAgenId = localStorage.getItem('active_agen_id') || '';
+        const activeCabangId = localStorage.getItem('active_cabang_id') || '';
+        const sessionCabangNama = localStorage.getItem('active_cabang_nama')
+            || localStorage.getItem('cabang_nama')
+            || localStorage.getItem('active_agen_nama')
+            || '';
+
+        if (sessionCabangNama) {
+            return {
+                id: activeCabangId || activeAgenId || '001',
+                nama: sessionCabangNama.toUpperCase()
+            };
         }
 
-        // 2. Jika tersimpan di dalam JSON object (user/userData/profile)
-        const jsonKeys = ['user', 'userData', 'auth', 'profile', 'session'];
-        for (const k of jsonKeys) {
-            try {
-                const raw = localStorage.getItem(k);
-                if (raw) {
-                    const obj = JSON.parse(raw);
-                    const id = obj.agen_id || obj.AgenID || obj.cabang_id || obj.CabangID || obj.branch_id;
-                    if (id) return String(id).trim();
-                }
-            } catch (_) { }
+        const found = cabangList.find(c => {
+            const cId = String(c.agen_id || c.AgenID || '').trim().toLowerCase();
+            const cKode = String(c.agen_kode || c.AgenKode || '').trim().toLowerCase();
+            const cNama = String(c.agen_nama || c.AgenNama || '').trim().toLowerCase();
+            const targetAgen = activeAgenId.trim().toLowerCase();
+            const targetCabang = activeCabangId.trim().toLowerCase();
+
+            return (
+                (targetAgen && (cId === targetAgen || cKode === targetAgen || cNama.includes(targetAgen))) ||
+                (targetCabang && (cId === targetCabang || cKode === targetCabang || cNama.includes(targetCabang)))
+            );
+        });
+
+        if (found) {
+            return {
+                id: found.agen_id || found.AgenID,
+                nama: found.agen_nama || found.AgenNama
+            };
         }
 
-        return '';
-    };
-
-    const currentActiveAgen = React.useMemo(() => {
-        const activeId = getActiveSessionBranchId();
-
-        // Cari data resmi cabang di cabangList berdasarkan ID atau Kode Agen
-        if (cabangList.length > 0 && activeId) {
-            const found = cabangList.find(c => {
-                const cId = String(c.agen_id || c.AgenID || '').trim().toLowerCase();
-                const cKode = String(c.agen_kode || c.AgenKode || '').trim().toLowerCase();
-                const target = activeId.toLowerCase();
-                return cId === target || cKode === target;
-            });
-
-            if (found) {
-                return {
-                    id: String(found.agen_id || found.AgenID),
-                    nama: String(found.agen_nama || found.AgenNama).toUpperCase()
-                };
-            }
+        if (activeAgenId && activeAgenId.toUpperCase().includes('PUSAT')) {
+            return { id: '001', nama: 'PUSAT DAKOTA' };
         }
 
-        // Fallback default jika cabangList belum selesai di-fetch
         return {
-            id: activeId || '001',
-            nama: ''
+            id: activeCabangId || activeAgenId || '001',
+            nama: activeAgenId ? `AGEN ${activeAgenId.toUpperCase()}` : 'PUSAT DAKOTA'
         };
-    }, [cabangList]);
+    }
 
-    // Evaluasi Holding/Pusat murni dari ID Agen Pusat resmi ('001' atau '000')
-    const isHoldingUser = React.useMemo(() => {
-        const id = String(currentActiveAgen.id || '').trim();
-        return id === '001' || id === '000' || id === '';
-    }, [currentActiveAgen]);
+    const currentActiveAgen = getActiveAgen();
+    const isHoldingUser =
+        String(currentActiveAgen.nama || '').toUpperCase().includes('PUSAT') ||
+        String(currentActiveAgen.nama || '').toUpperCase().includes('HOLDING') ||
+        String(currentActiveAgen.id || '') === '001' ||
+        String(localStorage.getItem('active_agen_id') || '').toUpperCase().includes('PUSAT');
 
     // Filter States
     const [startDate, setStartDate] = useState(firstDay);
     const [endDate, setEndDate] = useState(today);
     const [bypassTanggal, setBypassTanggal] = useState(false);
-    const [selectedCabang, setSelectedCabang] = useState('');
+    const [selectedCabang, setSelectedCabang] = useState(isHoldingUser ? '' : currentActiveAgen.id);
     const [selectedJenis, setSelectedJenis] = useState('');
     const [selectedTerbayar, setSelectedTerbayar] = useState('');
     const [searchCustomer, setSearchCustomer] = useState('');
@@ -93,7 +86,7 @@ const Invoice = () => {
     const [searchKwitansi, setSearchKwitansi] = useState('');
     const [searchBTT, setSearchBTT] = useState('');
 
-    // Kunci cabang otomatis saat data cabang selesai di-load jika bukan user holding
+    // Sinkronisasi cabang otomatis untuk user non-holding
     useEffect(() => {
         if (!isHoldingUser && currentActiveAgen.id) {
             setSelectedCabang(currentActiveAgen.id);
@@ -194,6 +187,7 @@ const Invoice = () => {
         fetchInvoiceList();
     };
 
+    // Load Unbilled BTT saat Customer Dipilih di Modal Tambah
     const handleSelectCustomerForNewInvoice = async (custId) => {
         const cust = custList.find(c => String(c.cust_id) === String(custId));
         setNewInvoiceForm(prev => ({
@@ -224,6 +218,7 @@ const Invoice = () => {
         }
     };
 
+    // Simpan Invoice Baru
     const handleSaveNewInvoice = async (e) => {
         e.preventDefault();
 
@@ -291,6 +286,7 @@ const Invoice = () => {
         }
     };
 
+    // Buka Modal Edit Invoice
     const handleOpenEditInvoice = async (item) => {
         try {
             const token = localStorage.getItem('token');
@@ -324,6 +320,7 @@ const Invoice = () => {
         }
     };
 
+    // Simpan Perubahan Edit Invoice
     const handleSaveEditInvoice = async (e) => {
         e.preventDefault();
         try {
@@ -499,7 +496,7 @@ const Invoice = () => {
                                 type="text"
                                 readOnly
                                 tabIndex={-1}
-                                value={newInvoiceForm.artih_agenname || currentActiveAgen.nama}
+                                value={newInvoiceForm.artih_agenname || getActiveAgen().nama}
                                 className="w-full p-2 bg-slate-100 border border-slate-200 rounded-lg font-bold text-slate-700 cursor-not-allowed select-none outline-none focus:outline-none"
                                 title="Cabang terkunci otomatis sesuai lokasi login aktif Anda"
                             />
@@ -1024,7 +1021,7 @@ const Invoice = () => {
             `}
             </style>
 
-            {/* Filter Panel */}
+            {/* 2. Panel Filter hanya tampil jika showFilter bernilai true */}
             {showFilter && (
                 <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all">
                     <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
@@ -1184,7 +1181,7 @@ const Invoice = () => {
                 </form>
             )}
 
-            {/* Tabel List Invoice */}
+            {/* 3. DataTableTemplate menerima prop onFilter */}
             <DataTableTemplate
                 title="INVOICE"
                 columns={columns}
@@ -1195,7 +1192,7 @@ const Invoice = () => {
                 hideAddButton={false}
                 onFilter={() => setShowFilter(prev => !prev)}
                 onAdd={() => {
-                    const currentAgen = getActiveSessionAgen();
+                    const currentAgen = getActiveAgen();
                     setNewInvoiceForm({
                         artih_tanggal: today,
                         artih_custid: '',
