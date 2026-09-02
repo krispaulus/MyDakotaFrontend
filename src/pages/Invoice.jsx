@@ -20,67 +20,82 @@ const Invoice = () => {
     const [showFilter, setShowFilter] = useState(false);
 
     // =========================================================================
-    // HELPER: DETEKSI CABANG LOGIN SECARA DINAMIS
+    // REAKTIF: DETEKSI CABANG LOGIN & LEVEL HOLDING
     // =========================================================================
-    function getActiveSessionAgen() {
-        const activeAgenId = localStorage.getItem('active_agen_id') || '';
-        const activeCabangId = localStorage.getItem('active_cabang_id') || '';
-        const sessionCabangNama = localStorage.getItem('active_cabang_nama')
-            || localStorage.getItem('cabang_nama')
-            || localStorage.getItem('active_agen_nama')
-            || '';
+    const currentActiveAgen = React.useMemo(() => {
+        const activeAgenId = String(localStorage.getItem('active_agen_id') || '').trim();
+        const activeCabangId = String(localStorage.getItem('active_cabang_id') || '').trim();
+        const sessionCabangNama = String(
+            localStorage.getItem('active_cabang_nama') ||
+            localStorage.getItem('cabang_nama') ||
+            localStorage.getItem('active_agen_nama') ||
+            ''
+        ).trim().toUpperCase();
 
+        // 1. Cek langsung dari nama session jika tersimpan
         if (sessionCabangNama) {
+            const foundInList = cabangList.find(c =>
+                String(c.agen_nama || c.AgenNama || '').toUpperCase().includes(sessionCabangNama) ||
+                sessionCabangNama.includes(String(c.agen_nama || c.AgenNama || '').toUpperCase())
+            );
             return {
-                id: activeCabangId || activeAgenId || '',
-                nama: sessionCabangNama.toUpperCase()
+                id: foundInList ? (foundInList.agen_id || foundInList.AgenID) : (activeCabangId || activeAgenId || 'DPS001'),
+                nama: foundInList ? (foundInList.agen_nama || foundInList.AgenNama) : sessionCabangNama
             };
         }
 
+        // 2. Cocokkan ID / Kode jika cabangList sudah tersedia
         if (cabangList.length > 0) {
+            const target = (activeCabangId || activeAgenId).toLowerCase();
             const found = cabangList.find(c => {
                 const cId = String(c.agen_id || c.AgenID || '').trim().toLowerCase();
                 const cKode = String(c.agen_kode || c.AgenKode || '').trim().toLowerCase();
                 const cNama = String(c.agen_nama || c.AgenNama || '').trim().toLowerCase();
-                const target = (activeCabangId || activeAgenId).trim().toLowerCase();
-
-                return target && (cId === target || cKode === target || cNama.includes(target));
+                return target && (cId === target || cKode === target || cNama.includes(target) || target.includes(cNama));
             });
 
             if (found) {
                 return {
                     id: found.agen_id || found.AgenID,
-                    nama: (found.agen_nama || found.AgenNama).toUpperCase()
+                    nama: found.agen_nama || found.AgenNama
                 };
             }
         }
 
-        const badgeEl = document.querySelector('[class*="DENPASAR"], [class*="PUSAT DAKOTA"]');
-        if (badgeEl && badgeEl.textContent) {
+        // 3. Fallback cerdas: deteksi teks Denpasar jika ada di session/DOM
+        const allText = typeof document !== 'undefined' && document.body ? document.body.innerText.toUpperCase() : '';
+        if (allText.includes('DENPASAR DLI AGEN') || allText.includes('DLI DENPASAR')) {
+            const dps = cabangList.find(c => String(c.agen_nama || c.AgenNama || '').toUpperCase().includes('DENPASAR'));
             return {
-                id: activeCabangId || activeAgenId || '',
-                nama: badgeEl.textContent.trim().toUpperCase()
+                id: dps ? (dps.agen_id || dps.AgenID) : (activeCabangId || activeAgenId || 'DPS001'),
+                nama: dps ? (dps.agen_nama || dps.AgenNama) : 'DLI DENPASAR'
             };
         }
 
         return {
-            id: activeCabangId || activeAgenId || '',
-            nama: activeAgenId ? activeAgenId.toUpperCase() : ''
+            id: activeCabangId || activeAgenId || '001',
+            nama: activeAgenId ? activeAgenId.toUpperCase() : 'PUSAT DAKOTA'
         };
-    }
+    }, [cabangList]);
 
-    // Deklarasi tunggal
-    const currentActiveAgen = getActiveSessionAgen();
-    const isHoldingUser =
-        String(currentActiveAgen.nama).includes('PUSAT') ||
-        String(currentActiveAgen.nama).includes('HOLDING') ||
-        (currentActiveAgen.id === '001' && !currentActiveAgen.nama.includes('AGEN'));
+    // Evaluasi Holding User secara dinamis
+    const isHoldingUser = React.useMemo(() => {
+        const nama = String(currentActiveAgen.nama || '').toUpperCase();
+        const rawAgen = String(localStorage.getItem('active_agen_id') || '').toUpperCase();
+        const rawNama = String(localStorage.getItem('active_cabang_nama') || '').toUpperCase();
+
+        if (nama.includes('DENPASAR') || rawAgen.includes('DPS') || rawNama.includes('DENPASAR')) {
+            return false;
+        }
+
+        return nama.includes('PUSAT') || nama.includes('HOLDING') || rawAgen.includes('PUSAT');
+    }, [currentActiveAgen]);
 
     // Filter States
     const [startDate, setStartDate] = useState(firstDay);
     const [endDate, setEndDate] = useState(today);
     const [bypassTanggal, setBypassTanggal] = useState(false);
-    const [selectedCabang, setSelectedCabang] = useState(isHoldingUser ? '' : currentActiveAgen.id);
+    const [selectedCabang, setSelectedCabang] = useState('');
     const [selectedJenis, setSelectedJenis] = useState('');
     const [selectedTerbayar, setSelectedTerbayar] = useState('');
     const [searchCustomer, setSearchCustomer] = useState('');
@@ -88,12 +103,12 @@ const Invoice = () => {
     const [searchKwitansi, setSearchKwitansi] = useState('');
     const [searchBTT, setSearchBTT] = useState('');
 
-    // Sinkronisasi cabang otomatis untuk user cabang
+    // Sinkronisasi otomatis saat cabangList selesai di-fetch
     useEffect(() => {
         if (!isHoldingUser && currentActiveAgen.id) {
             setSelectedCabang(currentActiveAgen.id);
         }
-    }, [isHoldingUser, currentActiveAgen.id, cabangList]);
+    }, [isHoldingUser, currentActiveAgen]);
 
     // Modal Add Invoice
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
