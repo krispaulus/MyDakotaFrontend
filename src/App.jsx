@@ -629,6 +629,8 @@ function App() {
       <Route path="/saldo-awal-piutang" element={<MainLayout><SaldoAwalPiutang menuName="SaldoAwalPiutang" /></MainLayout>} />
       <Route path="/tukar-faktur" element={<MainLayout><TukarFaktur /></MainLayout>} />
 
+      <Route path="/klaim" element={<MainLayout><UnderConstruction menuName="Klaim" /></MainLayout>} />
+
       <Route path="/Settings" element={<MainLayout><UnderConstruction menuName="Settings" /></MainLayout>} />
       <Route path="/settings/users" element={<MainLayout><UserManagement menuName="UserManagement" /></MainLayout>} />
       <Route path="/settings/configurasi" element={<MainLayout><MasterConfigParam menuName="configurasi" /></MainLayout>} />

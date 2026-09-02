@@ -28,6 +28,7 @@ const Invoice = () => {
     const [custList, setCustList] = useState([]);
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [showFilter, setShowFilter] = useState(false);
 
     // Modal Add Invoice
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -44,7 +45,7 @@ const Invoice = () => {
     const [unbilledBTTList, setUnbilledBTTList] = useState([]);
     const [loadingUnbilled, setLoadingUnbilled] = useState(false);
 
-    // Modal Edit & Konsolidasi BTT Penuh (Seperti Aplikasi Lawas)
+    // Modal Edit
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [activeInvoice, setActiveInvoice] = useState(null);
     const [activeBTTList, setActiveBTTList] = useState([]);
@@ -55,7 +56,7 @@ const Invoice = () => {
 
     // Modal Cetak Preview
     const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-    const [printMode, setPrintMode] = useState('KWITANSI_1'); // KWITANSI_1 | KWITANSI_2 | FAKTUR_2 | SUMMARY
+    const [printMode, setPrintMode] = useState('KWITANSI_1');
 
     const fetchOptions = async () => {
         try {
@@ -122,7 +123,77 @@ const Invoice = () => {
         fetchInvoiceList();
     };
 
-    // Buka Modal Edit Invoice (Menampilkan Seluruh BTT yang Sudah Terpilih + BTT Tersedia)
+    // Load Unbilled BTT saat Customer Dipilih di Modal Tambah
+    const handleSelectCustomerForNewInvoice = async (custId) => {
+        const cust = custList.find(c => String(c.cust_id) === String(custId));
+        setNewInvoiceForm(prev => ({
+            ...prev,
+            artih_custid: custId,
+            artih_custname: cust ? (cust.cust_name || cust.CustName) : '',
+            selected_btts: []
+        }));
+
+        if (!custId) {
+            setUnbilledBTTList([]);
+            return;
+        }
+
+        setLoadingUnbilled(true);
+        try {
+            const token = localStorage.getItem('token');
+            const ptId = localStorage.getItem('pt_id') || 'C';
+            const res = await api.get(`/piutang/invoice/unbilled-btt?pt_id=${ptId}&cust_id=${encodeURIComponent(custId)}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setUnbilledBTTList(res.data?.data || []);
+        } catch (err) {
+            console.error("Gagal load unbilled BTT:", err);
+            Swal.fire('Error', 'Gagal mengambil daftar BTT customer.', 'error');
+        } finally {
+            setLoadingUnbilled(false);
+        }
+    };
+
+    // Simpan Invoice Baru
+    const handleSaveNewInvoice = async (e) => {
+        e.preventDefault();
+        if (!newInvoiceForm.artih_custid) {
+            Swal.fire('Peringatan', 'Pilih customer terlebih dahulu!', 'warning');
+            return;
+        }
+        if (newInvoiceForm.selected_btts.length === 0) {
+            Swal.fire('Peringatan', 'Pilih minimal 1 resi BTT untuk difakturkan!', 'warning');
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            const ptId = localStorage.getItem('pt_id') || 'C';
+
+            const payload = {
+                artih_tanggal: newInvoiceForm.artih_tanggal,
+                artih_custid: newInvoiceForm.artih_custid,
+                artih_custname: newInvoiceForm.artih_custname,
+                artih_agenid: newInvoiceForm.artih_agenid,
+                artih_jenis: newInvoiceForm.artih_jenis,
+                artih_fktpajak: newInvoiceForm.artih_fktpajak,
+                artih_keterangan: newInvoiceForm.artih_keterangan,
+                btt_list: newInvoiceForm.selected_btts
+            };
+
+            const res = await api.post(`/piutang/invoice/save?pt_id=${ptId}`, payload, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            Swal.fire('Berhasil!', res.data?.message || 'Invoice berhasil diterbitkan.', 'success');
+            setIsAddModalOpen(false);
+            fetchInvoiceList();
+        } catch (err) {
+            Swal.fire('Gagal!', err.response?.data?.message || 'Gagal menyimpan invoice.', 'error');
+        }
+    };
+
+    // Buka Modal Edit Invoice
     const handleOpenEditInvoice = async (item) => {
         try {
             const token = localStorage.getItem('token');
@@ -143,7 +214,6 @@ const Invoice = () => {
             setBttToAdd([]);
             setIsEditModalOpen(true);
 
-            // Load BTT yang belum difakturkan untuk customer ini
             if (header.artih_custid) {
                 setLoadingAddBTT(true);
                 const unbilledRes = await api.get(`/piutang/invoice/unbilled-btt?pt_id=${ptId}&cust_id=${encodeURIComponent(header.artih_custid)}`, {
@@ -157,7 +227,7 @@ const Invoice = () => {
         }
     };
 
-    // Simpan Perubahan Edit Invoice & Sinkronisasi BTT
+    // Simpan Perubahan Edit Invoice
     const handleSaveEditInvoice = async (e) => {
         e.preventDefault();
         try {
@@ -225,12 +295,14 @@ const Invoice = () => {
         return `${terbilangKapital(Math.floor(angka / 1000000000))} MILIAR ${terbilangKapital(angka % 1000000000)}`.trim();
     };
 
-    // Kalkulasi Total BTT Aktif (tidak termasuk yang dicentang hapus)
     const currentActiveBTTs = activeBTTList.filter(b => !bttToRemove.includes(b.bttt_id));
     const totalBiayaKirim = currentActiveBTTs.reduce((sum, b) => sum + (parseFloat(b.bttt_harga) || 0), 0);
     const totalPenerus = currentActiveBTTs.reduce((sum, b) => sum + (parseFloat(b.bttt_biayapenerus) || 0), 0);
     const totalPacking = currentActiveBTTs.reduce((sum, b) => sum + (parseFloat(b.biaya_packing) || 0), 0);
     const grandTotalTagihan = totalBiayaKirim + totalPenerus + totalPacking;
+
+    const selectedBTTsData = unbilledBTTList.filter(b => newInvoiceForm.selected_btts.includes(b.bttt_id));
+    const totalNewInvoice = selectedBTTsData.reduce((sum, b) => sum + (parseFloat(b.subtotal) || 0), 0);
 
     const columns = [
         {
@@ -293,12 +365,219 @@ const Invoice = () => {
     ];
 
     // ==========================================
-    // MODAL EDIT INVOICE (TAMPILAN RESMI PERSIS APLIKASI LAWAS)
+    // MODAL TAMBAH INVOICE
+    // ==========================================
+    const addModalElement = isAddModalOpen ? (
+        <div className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs transition-opacity" style={{ zIndex: 99999 }}>
+            <div className={`w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white text-slate-800'}`}>
+                <div className="px-6 py-3.5 bg-blue-600 text-white flex items-center justify-between">
+                    <div className="font-black uppercase tracking-wider text-sm flex items-center gap-2">
+                        <Plus size={18} className="text-white" />
+                        BUAT INVOICE PENAGIHAN BARU
+                    </div>
+                    <button type="button" onClick={() => setIsAddModalOpen(false)} className="text-white/80 hover:text-white cursor-pointer">
+                        <X size={20} />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSaveNewInvoice} className="p-6 space-y-4 overflow-y-auto text-xs flex-1">
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <div>
+                            <label className="font-bold text-slate-600 block mb-1">TANGGAL INVOICE :</label>
+                            <input
+                                type="date"
+                                value={newInvoiceForm.artih_tanggal}
+                                onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, artih_tanggal: e.target.value })}
+                                className="w-full p-2 bg-white border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-blue-500"
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-600 block mb-1">CABANG / AGEN :</label>
+                            <select
+                                value={newInvoiceForm.artih_agenid}
+                                onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, artih_agenid: e.target.value })}
+                                className="w-full p-2 bg-white border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-blue-500"
+                            >
+                                {cabangList.map((c, i) => (
+                                    <option key={i} value={c.agen_id || c.AgenID}>
+                                        {c.agen_nama || c.AgenNama}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-600 block mb-1">JENIS INVOICE :</label>
+                            <select
+                                value={newInvoiceForm.artih_jenis}
+                                onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, artih_jenis: e.target.value })}
+                                className="w-full p-2 bg-white border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-blue-500"
+                            >
+                                <option value="K">Kredit (Langganan)</option>
+                                <option value="B">Tunai (Cash)</option>
+                                <option value="T">Tagih Turun (COD)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-600 block mb-1">FAKTUR PAJAK :</label>
+                            <input
+                                type="text"
+                                placeholder="Nomor faktur pajak..."
+                                value={newInvoiceForm.artih_fktpajak}
+                                onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, artih_fktpajak: e.target.value })}
+                                className="w-full p-2 bg-white border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-blue-500"
+                            />
+                        </div>
+
+                        <div className="md:col-span-2">
+                            <label className="font-bold text-slate-600 block mb-1">CUSTOMER :</label>
+                            <select
+                                value={newInvoiceForm.artih_custid}
+                                onChange={(e) => handleSelectCustomerForNewInvoice(e.target.value)}
+                                className="w-full p-2 bg-white border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-blue-500"
+                                required
+                            >
+                                <option value="">-- PILIH CUSTOMER --</option>
+                                {custList.map((cust, i) => (
+                                    <option key={i} value={cust.cust_id}>
+                                        {cust.cust_name} [{cust.cust_id}]
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="md:col-span-2">
+                            <label className="font-bold text-slate-600 block mb-1">KETERANGAN :</label>
+                            <input
+                                type="text"
+                                placeholder="Catatan invoice..."
+                                value={newInvoiceForm.artih_keterangan}
+                                onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, artih_keterangan: e.target.value })}
+                                className="w-full p-2 bg-white border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-blue-500"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between font-black uppercase text-xs text-slate-700">
+                            <span>DAFTAR RESI BTT SIAP DIFAKTURKAN ({unbilledBTTList.length} RESI TERSEDIA)</span>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (newInvoiceForm.selected_btts.length === unbilledBTTList.length) {
+                                            setNewInvoiceForm(p => ({ ...p, selected_btts: [] }));
+                                        } else {
+                                            setNewInvoiceForm(p => ({ ...p, selected_btts: unbilledBTTList.map(b => b.bttt_id) }));
+                                        }
+                                    }}
+                                    className="text-blue-600 hover:underline cursor-pointer font-bold"
+                                >
+                                    {newInvoiceForm.selected_btts.length === unbilledBTTList.length && unbilledBTTList.length > 0 ? 'Batal Pilih Semua' : 'Pilih Semua'}
+                                </button>
+                                <span className="text-blue-700 font-mono font-bold bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                                    {newInvoiceForm.selected_btts.length} Dipilih
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="border border-slate-200 rounded-xl max-h-60 overflow-y-auto">
+                            <table className="w-full text-left border-collapse text-[11px]">
+                                <thead className="bg-slate-100 border-b border-slate-200 font-bold text-slate-700 sticky top-0">
+                                    <tr>
+                                        <th className="p-2.5 w-12 text-center">PILIH</th>
+                                        <th className="p-2.5">NO. BTT</th>
+                                        <th className="p-2.5">TANGGAL</th>
+                                        <th className="p-2.5">TUJUAN</th>
+                                        <th className="p-2.5">PENERIMA</th>
+                                        <th className="p-2.5">BERAT</th>
+                                        <th className="p-2.5 text-right">TOTAL (RP)</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {unbilledBTTList.map((btt, idx) => {
+                                        const isChecked = newInvoiceForm.selected_btts.includes(btt.bttt_id);
+                                        return (
+                                            <tr key={idx} className={`hover:bg-blue-50/50 ${isChecked ? 'bg-blue-50/70 font-semibold' : ''}`}>
+                                                <td className="p-2.5 text-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isChecked}
+                                                        onChange={() => {
+                                                            setNewInvoiceForm(prev => ({
+                                                                ...prev,
+                                                                selected_btts: isChecked
+                                                                    ? prev.selected_btts.filter(id => id !== btt.bttt_id)
+                                                                    : [...prev.selected_btts, btt.bttt_id]
+                                                            }));
+                                                        }}
+                                                        className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+                                                    />
+                                                </td>
+                                                <td className="p-2.5 font-mono font-bold text-blue-700">{btt.bttt_id}</td>
+                                                <td className="p-2.5 font-mono">{String(btt.bttt_tanggal).split('T')[0]}</td>
+                                                <td className="p-2.5">{btt.bttt_tujuankota}</td>
+                                                <td className="p-2.5">{btt.bttt_tujuannama}</td>
+                                                <td className="p-2.5 font-mono">{btt.bttt_berat} Kg</td>
+                                                <td className="p-2.5 text-right font-mono font-bold text-rose-600">
+                                                    Rp {Number(btt.subtotal).toLocaleString('id-ID')}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                    {unbilledBTTList.length === 0 && (
+                                        <tr>
+                                            <td colSpan={7} className="p-8 text-center text-slate-400 font-bold">
+                                                {loadingUnbilled
+                                                    ? 'Memuat daftar resi BTT...'
+                                                    : newInvoiceForm.artih_custid
+                                                        ? 'Tidak ada resi BTT yang belum difakturkan untuk customer ini.'
+                                                        : 'Silakan pilih customer terlebih dahulu untuk memuat resi BTT.'}
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-3 border-t border-slate-200">
+                        <div className="font-bold text-xs">
+                            <span className="text-slate-500 mr-2">TOTAL TAGIHAN :</span>
+                            <span className="font-mono text-base font-black text-rose-600">
+                                Rp {Number(totalNewInvoice).toLocaleString('id-ID')}
+                            </span>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setIsAddModalOpen(false)}
+                                className="px-5 py-2.5 border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold rounded-xl uppercase transition cursor-pointer"
+                            >
+                                BATAL
+                            </button>
+                            <button
+                                type="submit"
+                                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl uppercase transition cursor-pointer shadow-md"
+                            >
+                                SIMPAN INVOICE
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    ) : null;
+
+    // ==========================================
+    // MODAL EDIT INVOICE
     // ==========================================
     const editModalElement = isEditModalOpen && activeInvoice ? (
         <div className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs transition-opacity" style={{ zIndex: 99999 }}>
             <div className={`w-full max-w-7xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh] ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white text-slate-800'}`}>
-                {/* Header Edit */}
                 <div className="px-6 py-3 bg-[#004b84] text-white flex items-center justify-between">
                     <div className="font-black uppercase tracking-wider text-sm flex items-center gap-2">
                         <FileText size={18} className="text-sky-300" />
@@ -308,7 +587,6 @@ const Invoice = () => {
                 </div>
 
                 <form onSubmit={handleSaveEditInvoice} className="p-6 space-y-5 overflow-y-auto text-xs flex-1">
-                    {/* Header Input Grid */}
                     <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 grid grid-cols-1 md:grid-cols-4 gap-3">
                         <div>
                             <label className="font-bold text-slate-500 block mb-1">CABANG / AGEN :</label>
@@ -341,7 +619,6 @@ const Invoice = () => {
                         </div>
                     </div>
 
-                    {/* TABEL BTT YANG SUDAH DIPILIH */}
                     <div className="space-y-2">
                         <div className="bg-[#004b84] text-white px-4 py-2 rounded-t-lg font-black uppercase text-center tracking-wider text-xs">
                             BTT YANG SUDAH DIPILIH ({currentActiveBTTs.length} RESI)
@@ -403,7 +680,6 @@ const Invoice = () => {
                         </div>
                     </div>
 
-                    {/* Ringkasan Total Akumulasi Bawah Tabel */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-slate-100 p-4 rounded-xl border border-slate-200 font-bold text-xs">
                         <div><span className="text-slate-500 block text-[10px]">TOTAL BIAYA KIRIM:</span> <span className="font-mono text-slate-800">Rp {Number(totalBiayaKirim).toLocaleString('id-ID')}</span></div>
                         <div><span className="text-slate-500 block text-[10px]">TOTAL BIAYA PENERUS:</span> <span className="font-mono text-slate-800">Rp {Number(totalPenerus).toLocaleString('id-ID')}</span></div>
@@ -414,7 +690,6 @@ const Invoice = () => {
                         </div>
                     </div>
 
-                    {/* TOMBOL CETAK KWITANSI DAN FAKTUR[cite: 9] */}
                     <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-2">
                         <div className="font-bold text-slate-600 uppercase text-[10px] tracking-wider">CETAK KWITANSI DAN FAKTUR :</div>
                         <div className="flex gap-2 flex-wrap">
@@ -433,7 +708,6 @@ const Invoice = () => {
                         </div>
                     </div>
 
-                    {/* DAFTAR NOMOR BTT UNTUK DITAMBAHKAN (PICKER BARU)[cite: 9] */}
                     <div className="space-y-2 pt-2 border-t border-slate-200">
                         <div className="font-black text-slate-700 uppercase tracking-wider text-xs flex justify-between items-center">
                             <span>DAFTAR NOMOR BTT UNTUK DITAMBAHKAN ({availableBTTToAdd.length} RESI TERSEDIA)</span>
@@ -493,7 +767,6 @@ const Invoice = () => {
                         </div>
                     </div>
 
-                    {/* Tombol Aksi Bawah[cite: 9] */}
                     <div className="flex justify-between items-center pt-3 border-t border-slate-200">
                         <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-8 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl uppercase transition cursor-pointer shadow-md">
                             BATAL
@@ -507,7 +780,7 @@ const Invoice = () => {
         </div>
     ) : null;
 
-    // Sub-komponen Cetak Kwitansi Rangkap 2[cite: 9]
+    // Sub-komponen Cetak Kwitansi
     const KwitansiSlip = ({ copyType }) => (
         <div className="py-2 text-[11px] leading-relaxed text-black font-sans">
             <div className="flex justify-between items-start mb-3">
@@ -556,7 +829,7 @@ const Invoice = () => {
         </div>
     );
 
-    // Modal Cetak Dokumen (Kwitansi / Faktur)
+    // Modal Cetak Dokumen
     const printDocElement = isPrintModalOpen && activeInvoice ? (
         <div className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs transition-opacity" style={{ zIndex: 999999 }}>
             <div className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
@@ -642,158 +915,160 @@ const Invoice = () => {
         <div className="space-y-5">
             <style>
                 {`
-                @media print {
-                    body * { visibility: hidden; }
-                    .print-container, .print-container * { visibility: visible; }
-                    .print-container { position: absolute; left: 0; top: 0; width: 100%; }
-                    .no-print { display: none !important; }
-                }
-                `}
+            @media print {
+                body * { visibility: hidden; }
+                .print-container, .print-container * { visibility: visible; }
+                .print-container { position: absolute; left: 0; top: 0; width: 100%; }
+                .no-print { display: none !important; }
+            }
+            `}
             </style>
 
-            {/* Filter Panel */}
-            <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs">
-                <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
-                    <Filter size={16} className="text-sky-600" />
-                    FILTER INVOICE PENAGIHAN PIUTANG
-                </div>
+            {/* 2. Panel Filter hanya tampil jika showFilter bernilai true */}
+            {showFilter && (
+                <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all">
+                    <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
+                        <Filter size={16} className="text-sky-600" />
+                        FILTER INVOICE PENAGIHAN PIUTANG
+                    </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                            <label className="font-bold text-slate-500 block mb-1">TGL AWAL</label>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                                <label className="font-bold text-slate-500 block mb-1">TGL AWAL</label>
+                                <input
+                                    type="date"
+                                    disabled={bypassTanggal}
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className={`w-full p-2 border rounded-lg font-bold outline-none ${bypassTanggal ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-white text-slate-800 border-slate-300 focus:border-sky-500'}`}
+                                />
+                            </div>
+                            <div className="flex-1">
+                                <label className="font-bold text-slate-500 block mb-1">TGL AKHIR</label>
+                                <input
+                                    type="date"
+                                    disabled={bypassTanggal}
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className={`w-full p-2 border rounded-lg font-bold outline-none ${bypassTanggal ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-white text-slate-800 border-slate-300 focus:border-sky-500'}`}
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">CABANG</label>
+                            <select
+                                value={selectedCabang}
+                                onChange={(e) => setSelectedCabang(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            >
+                                <option value="">-- SEMUA CABANG --</option>
+                                {cabangList.map((c, i) => (
+                                    <option key={i} value={c.agen_id || c.AgenID}>{c.agen_nama || c.AgenNama}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">JENIS INVOICE</label>
+                            <select
+                                value={selectedJenis}
+                                onChange={(e) => setSelectedJenis(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            >
+                                <option value="">-- SEMUA JENIS --</option>
+                                <option value="K">Kredit (Langganan Tempo)</option>
+                                <option value="B">Tunai (Cash)</option>
+                                <option value="T">Tagih Turun (COD)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">STATUS PEMBAYARAN</label>
+                            <select
+                                value={selectedTerbayar}
+                                onChange={(e) => setSelectedTerbayar(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            >
+                                <option value="">-- SEMUA STATUS --</option>
+                                <option value="Y">Lunas</option>
+                                <option value="N">Belum Lunas</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">CUSTOMER</label>
                             <input
-                                type="date"
-                                disabled={bypassTanggal}
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                className={`w-full p-2 border rounded-lg font-bold outline-none ${bypassTanggal ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-white text-slate-800 border-slate-300 focus:border-sky-500'}`}
+                                type="text"
+                                placeholder="Cari nama customer..."
+                                value={searchCustomer}
+                                onChange={(e) => setSearchCustomer(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
                             />
                         </div>
-                        <div className="flex-1">
-                            <label className="font-bold text-slate-500 block mb-1">TGL AKHIR</label>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">NO. INVOICE</label>
                             <input
-                                type="date"
-                                disabled={bypassTanggal}
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                className={`w-full p-2 border rounded-lg font-bold outline-none ${bypassTanggal ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-white text-slate-800 border-slate-300 focus:border-sky-500'}`}
+                                type="text"
+                                placeholder="Nomor invoice..."
+                                value={searchInvoice}
+                                onChange={(e) => setSearchInvoice(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
                             />
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">NO. KWITANSI</label>
+                            <input
+                                type="text"
+                                placeholder="Nomor kwitansi..."
+                                value={searchKwitansi}
+                                onChange={(e) => setSearchKwitansi(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            />
+                        </div>
+
+                        <div className="flex items-center">
+                            <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700 mt-5">
+                                <input
+                                    type="checkbox"
+                                    checked={bypassTanggal}
+                                    onChange={(e) => setBypassTanggal(e.target.checked)}
+                                    className="w-4 h-4 text-sky-600 rounded"
+                                />
+                                Bypass Filter Tanggal
+                            </label>
                         </div>
                     </div>
 
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">CABANG</label>
-                        <select
-                            value={selectedCabang}
-                            onChange={(e) => setSelectedCabang(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={() => window.print()}
+                            className="px-5 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold rounded-xl transition flex items-center gap-1.5 uppercase cursor-pointer"
                         >
-                            <option value="">-- SEMUA CABANG --</option>
-                            {cabangList.map((c, i) => (
-                                <option key={i} value={c.agen_id || c.AgenID}>{c.agen_nama || c.AgenNama}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">JENIS INVOICE</label>
-                        <select
-                            value={selectedJenis}
-                            onChange={(e) => setSelectedJenis(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            <Printer size={14} /> Cetak Grid
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleResetFilter}
+                            className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer"
                         >
-                            <option value="">-- SEMUA JENIS --</option>
-                            <option value="K">Kredit (Langganan Tempo)</option>
-                            <option value="B">Tunai (Cash)</option>
-                            <option value="T">Tagih Turun (COD)</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">STATUS PEMBAYARAN</label>
-                        <select
-                            value={selectedTerbayar}
-                            onChange={(e) => setSelectedTerbayar(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            RESET
+                        </button>
+                        <button
+                            type="submit"
+                            className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5"
                         >
-                            <option value="">-- SEMUA STATUS --</option>
-                            <option value="Y">Lunas</option>
-                            <option value="N">Belum Lunas</option>
-                        </select>
+                            <RefreshCw size={14} /> REFRESH DATA
+                        </button>
                     </div>
+                </form>
+            )}
 
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">CUSTOMER</label>
-                        <input
-                            type="text"
-                            placeholder="Cari nama customer..."
-                            value={searchCustomer}
-                            onChange={(e) => setSearchCustomer(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">NO. INVOICE</label>
-                        <input
-                            type="text"
-                            placeholder="Nomor invoice..."
-                            value={searchInvoice}
-                            onChange={(e) => setSearchInvoice(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">NO. KWITANSI</label>
-                        <input
-                            type="text"
-                            placeholder="Nomor kwitansi..."
-                            value={searchKwitansi}
-                            onChange={(e) => setSearchKwitansi(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                        />
-                    </div>
-
-                    <div className="flex items-center">
-                        <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700 mt-5">
-                            <input
-                                type="checkbox"
-                                checked={bypassTanggal}
-                                onChange={(e) => setBypassTanggal(e.target.checked)}
-                                className="w-4 h-4 text-sky-600 rounded"
-                            />
-                            Bypass Filter Tanggal
-                        </label>
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                    <button
-                        type="button"
-                        onClick={() => window.print()}
-                        className="px-5 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold rounded-xl transition flex items-center gap-1.5 uppercase cursor-pointer"
-                    >
-                        <Printer size={14} /> Cetak Grid
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleResetFilter}
-                        className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer"
-                    >
-                        RESET
-                    </button>
-                    <button
-                        type="submit"
-                        className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5"
-                    >
-                        <RefreshCw size={14} /> REFRESH DATA
-                    </button>
-                </div>
-            </form>
-
-            {/* Tabel List Invoice */}
+            {/* 3. DataTableTemplate menerima prop onFilter */}
             <DataTableTemplate
                 title="INVOICE"
                 columns={columns}
@@ -802,6 +1077,7 @@ const Invoice = () => {
                 isDarkMode={isDarkMode}
                 isAddDisabled={false}
                 hideAddButton={false}
+                onFilter={() => setShowFilter(prev => !prev)}
                 onAdd={() => {
                     setNewInvoiceForm({
                         artih_tanggal: today,
@@ -820,10 +1096,12 @@ const Invoice = () => {
                 onDelete={handleDeleteInvoice}
             />
 
+            {addModalElement && ReactDOM.createPortal(addModalElement, document.body)}
             {editModalElement && ReactDOM.createPortal(editModalElement, document.body)}
             {printDocElement && ReactDOM.createPortal(printDocElement, document.body)}
         </div>
     );
+
 };
 
 export default Invoice;
