@@ -23,8 +23,8 @@ const Invoice = () => {
     // HELPER: DETEKSI CABANG & STATUS HOLDING / PUSAT SECARA DINAMIS
     // =========================================================================
     function getActiveAgen() {
-        const activeAgenId = localStorage.getItem('active_agen_id') || '';
-        const activeCabangId = localStorage.getItem('active_cabang_id') || '';
+        const activeAgenId = localStorage.getItem('active_agen_id') || localStorage.getItem('agen_id') || '';
+        const activeCabangId = localStorage.getItem('active_cabang_id') || localStorage.getItem('cabang_id') || '';
         const sessionCabangNama = localStorage.getItem('active_cabang_nama')
             || localStorage.getItem('cabang_nama')
             || localStorage.getItem('active_agen_nama')
@@ -32,7 +32,7 @@ const Invoice = () => {
 
         if (sessionCabangNama) {
             return {
-                id: activeCabangId || activeAgenId || '001',
+                id: activeCabangId || activeAgenId || '',
                 nama: sessionCabangNama.toUpperCase()
             };
         }
@@ -52,8 +52,8 @@ const Invoice = () => {
 
         if (found) {
             return {
-                id: found.agen_id || found.AgenID,
-                nama: found.agen_nama || found.AgenNama
+                id: String(found.agen_id || found.AgenID),
+                nama: String(found.agen_nama || found.AgenNama).toUpperCase()
             };
         }
 
@@ -62,8 +62,8 @@ const Invoice = () => {
         }
 
         return {
-            id: activeCabangId || activeAgenId || '001',
-            nama: activeAgenId ? `AGEN ${activeAgenId.toUpperCase()}` : 'PUSAT DAKOTA'
+            id: activeCabangId || activeAgenId || '',
+            nama: activeAgenId ? `AGEN ${activeAgenId.toUpperCase()}` : ''
         };
     }
 
@@ -72,7 +72,8 @@ const Invoice = () => {
         String(currentActiveAgen.nama || '').toUpperCase().includes('PUSAT') ||
         String(currentActiveAgen.nama || '').toUpperCase().includes('HOLDING') ||
         String(currentActiveAgen.id || '') === '001' ||
-        String(localStorage.getItem('active_agen_id') || '').toUpperCase().includes('PUSAT');
+        String(localStorage.getItem('active_agen_id') || '').toUpperCase().includes('PUSAT') ||
+        (!currentActiveAgen.id && !currentActiveAgen.nama); // Default jika login pusat tanpa ID agen
 
     // Filter States
     const [startDate, setStartDate] = useState(firstDay);
@@ -86,12 +87,12 @@ const Invoice = () => {
     const [searchKwitansi, setSearchKwitansi] = useState('');
     const [searchBTT, setSearchBTT] = useState('');
 
-    // Sinkronisasi cabang otomatis untuk user non-holding
+    // Sinkronisasi cabang otomatis saat cabangList selesai di-fetch dari API
     useEffect(() => {
         if (!isHoldingUser && currentActiveAgen.id) {
             setSelectedCabang(currentActiveAgen.id);
         }
-    }, [isHoldingUser, currentActiveAgen.id]);
+    }, [isHoldingUser, currentActiveAgen.id, cabangList]);
 
     // Modal Add Invoice
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
