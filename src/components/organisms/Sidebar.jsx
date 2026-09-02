@@ -407,8 +407,43 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
 
     },
 
-    { name: 'Hutang', icon: <ReceiptPoundSterling size={20} />, roles: ['S', 'A'], division: 'Finance' },
-    { name: 'Piutang', icon: <DollarSign size={20} />, roles: ['S', 'A'], division: 'Finance' },
+    {
+      name: 'Hutang',
+      icon: <ReceiptPoundSterling size={20} />,
+      roles: ['S', 'A'],
+      division: 'Finance',
+      children: [
+        { name: 'Aging Hutang', path: '/aging-hutang', roles: ['S', 'A'], division: 'Finance' },
+        { name: 'Invoice Vendor', path: '/invoice-vendor', roles: ['S', 'A'], division: 'Finance' },
+      ],
+    },
+
+    {
+      name: 'Piutang',
+      icon: <DollarSign size={20} />,
+      roles: ['S', 'A'],
+      division: 'Finance',
+      children: [
+        { name: 'Aging Piutang', path: '/agingpiutang', roles: ['S'] },
+        { name: 'Approval Customer', path: '/approval-customer', roles: ['S'] },
+        { name: 'Bukti Tanda Terima (BTT) - Tagih Turun', path: '/BTTTagihTujuan', roles: ['S'] },
+        { name: 'Credit Note', path: '/credit-note', roles: ['S'] },
+        { name: 'Invoice', path: '/invoice', roles: ['S'] },
+        { name: 'Kondisi BTT dan Order Jemput', path: '/kondisi-btt', roles: ['S'] },
+        { name: 'Master Faktur Pajak', path: '/faktur-pajak', roles: ['S'] },
+        { name: 'Mutasi Piutang', path: '/mutasi-piutang', roles: ['S'] },
+        { name: 'Penagihan invoide oleh Kolekter', path: '/tagih-invoice', roles: ['S'] },
+        { name: 'Pencairan Giro Mundur Kredit', path: '/pencairan-giro', roles: ['S'] },
+        { name: 'Penerimaan Pembayaran', path: '/penerimaan-pembayaran', roles: ['S'] },
+        { name: 'Penerimaan Penagihan Kolektor', path: '/penerimaan-penagihan-kolektor', roles: ['S'] },
+        { name: 'Penerimaan Setoran Agen', path: '/penerimaan-setoran-agen', roles: ['S'] },
+        { name: 'Proforma Invoice', path: '/proforma-invoice', roles: ['S'] },
+        { name: 'Proses Piutang', path: '/proses-piutang', roles: ['S'] },
+        { name: 'Revisi Btt Apl (Harga)', path: '/revisi-btt-apl', roles: ['S'] },
+        { name: 'Saldo Awal Piutang', path: '/saldo-awal-piutang', roles: ['S'] },
+        { name: 'Tukar Faktur', path: '/tukar-faktur', roles: ['S'] },
+      ]
+    },
     { name: 'Klaim', icon: <WalletMinimal size={20} />, roles: ['S', 'A'], division: 'Finance' },
 
     {

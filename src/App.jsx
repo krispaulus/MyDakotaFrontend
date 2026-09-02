@@ -95,6 +95,25 @@ import KasMasukKeluar from './pages/KasMasukKeluar';
 import PembayaranVendor from './pages/PembayaranVendor';
 import PostingJurnal from './pages/PostingJurnal';
 import SetoranCOD from './pages/SetoranCOD';
+import AgingPiutang from './pages/AgingPiutang';
+import ApprovalCustomer from './pages/ApprovalCustomer';
+import BTTTagihTujuan from "./pages/BTTTagihTujuan";
+import CreditNote from './pages/CreditNote';
+import Invoice from "./pages/Invoice";
+import KondisiBTT from "./pages/KondisiBTT";
+import FakturPajak from './pages/FakturPajak';
+import MutasiPiutang from "./pages/MutasiPiutang";
+import TagihInvoice from "./pages/TagihInvoice";
+import PenerimaanPembayaran from './pages/PenerimaanPembayaran';
+import PenerimaanPenagihanKolektor from "./pages/PenerimaanPenagihanKolektor";
+import PenerimaanSetoranAgen from "./pages/PenerimaanSetoranAgen";
+import ProformaInvoice from "./pages/ProformaInvoice";
+import ProsesPiutang from './pages/ProsesPiutang';
+import RevisiBTTAPL from "./pages/RevisiBTTAPL";
+import SaldoAwalPiutang from "./pages/SaldoAwalPiutang";
+import TukarFaktur from "./pages/TukarFaktur";
+import AgingHutang from "./pages/AgingHutang";
+import InvoiceVendor from "./pages/InvoiceVendor";
 
 const getCompanyName = (pt) => {
   if (pt === 'A') return 'Dakota Buana Sarana';
@@ -504,27 +523,27 @@ function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/" element={<LoginPage />} />
 
-      <Route path="/dashboard" element={<MainLayout>            <Dashboard />          </MainLayout>} />
-      <Route path="/account" element={<MainLayout>            <Account />          </MainLayout>} />
-      <Route path="/hrd" element={<MainLayout>            <UnderConstruction menuName="HRD" />          </MainLayout>} />
+      <Route path="/dashboard" element={<MainLayout><Dashboard /></MainLayout>} />
+      <Route path="/account" element={<MainLayout><Account /></MainLayout>} />
+      <Route path="/hrd" element={<MainLayout><UnderConstruction menuName="HRD" /></MainLayout>} />
 
-      <Route path="/marketing" element={<MainLayout>            <UnderConstruction menuName="Marketing" />          </MainLayout>} />
-      <Route path="/marketing/master-customer" element={<MainLayout>            <MasterCustomer />          </MainLayout>} />
-      <Route path="/marketing/btt" element={<MainLayout>            <MarketingBTT />          </MainLayout>} />
+      <Route path="/marketing" element={<MainLayout><UnderConstruction menuName="Marketing" /></MainLayout>} />
+      <Route path="/marketing/master-customer" element={<MainLayout><MasterCustomer /></MainLayout>} />
+      <Route path="/marketing/btt" element={<MainLayout><MarketingBTT /></MainLayout>} />
       <Route path="/marketing/btt/print" element={<BttPrintPage />} />
-      <Route path="/marketing/bdb" element={<MainLayout>            <MarketingBDB />          </MainLayout>} />
-      <Route path="/marketing/cetak-btt" element={<MainLayout>            <MarketingBTT />          </MainLayout>} />
-      <Route path="/marketing/monitoring-btt" element={<MainLayout>            <MarketingMonitoringBTT />          </MainLayout>} />
+      <Route path="/marketing/bdb" element={<MainLayout><MarketingBDB /></MainLayout>} />
+      <Route path="/marketing/cetak-btt" element={<MainLayout><MarketingBTT /></MainLayout>} />
+      <Route path="/marketing/monitoring-btt" element={<MainLayout><MarketingMonitoringBTT /></MainLayout>} />
       <Route path="/marketing/pengembalian-surat-jalan-customer" element={<MainLayout><PengembalianSuratJalanCustomer menuName="Pengembalian SJ" /></MainLayout>} />
       <Route path="/marketing/pengembalian-surat-jalan-customer/add" element={<MainLayout><TambahPengembalianSuratJalan /></MainLayout>} />
-      <Route path="/marketing/closing-harian" element={<MainLayout>            <BttClosingHarianDashboard />          </MainLayout>} />
-      <Route path="/marketing/closing-harian-agen" element={<MainLayout>            <BttClosingHarianDashboard />          </MainLayout>} />
-      <Route path="/marketing/upload-csv" element={<MainLayout>            <UnderConstruction menuName="Upload CSV" />          </MainLayout>} />
-      <Route path="/marketing/pengemasan-barang-kurir" element={<MainLayout>            <UnderConstruction menuName="Pengemasan Barang Kurir" />          </MainLayout>} />
-      <Route path="/marketing/customer-upload-csv" element={<MainLayout>            <UnderConstruction menuName="Customer Upload CSV" />          </MainLayout>} />
+      <Route path="/marketing/closing-harian" element={<MainLayout><BttClosingHarianDashboard /></MainLayout>} />
+      <Route path="/marketing/closing-harian-agen" element={<MainLayout><BttClosingHarianDashboard /></MainLayout>} />
+      <Route path="/marketing/upload-csv" element={<MainLayout><UnderConstruction menuName="Upload CSV" /></MainLayout>} />
+      <Route path="/marketing/pengemasan-barang-kurir" element={<MainLayout><UnderConstruction menuName="Pengemasan Barang Kurir" /></MainLayout>} />
+      <Route path="/marketing/customer-upload-csv" element={<MainLayout><UnderConstruction menuName="Customer Upload CSV" /></MainLayout>} />
       <Route path="/marketing/proses-packing" element={<MainLayout><ProsesPacking /></MainLayout>} />
 
-      <Route path="/operasional" element={<MainLayout>            <UnderConstruction menuName="Operasional" />          </MainLayout>} />
+      <Route path="/operasional" element={<MainLayout><UnderConstruction menuName="Operasional" /></MainLayout>} />
       <Route path="/operasional/pengembalian" element={<MainLayout><UnderConstruction /></MainLayout>} />
       <Route path="/operasional/sp-terima/print-nota/:id" element={<SuratPengantarPrint />} />
 
@@ -587,7 +606,28 @@ function App() {
       <Route path="/master/jenis-kendaraan-carter" element={<MainLayout><JenisKendaraanCarter menuName="JenisKendaraanCarter" /></MainLayout>} />
       <Route path="/master/master-vendor" element={<MainLayout><MasterVendor menuName="MasterVendor" /></MainLayout>} />
 
+      <Route path="/aging-hutang" element={<MainLayout><AgingHutang menuName="AgingHutang" /></MainLayout>} />
+      <Route path="/invoice-vendor" element={<MainLayout><InvoiceVendor menuName="InvoiceVendor" /></MainLayout>} />
+
       <Route path="/Piutang" element={<MainLayout><UnderConstruction menuName="Piutang" /></MainLayout>} />
+      <Route path="/agingpiutang" element={<MainLayout><AgingPiutang /></MainLayout>} />
+      <Route path="/approval-customer" element={<MainLayout><ApprovalCustomer /></MainLayout>} />
+      <Route path="/BTTTagihTujuan" element={<MainLayout><BTTTagihTujuan /></MainLayout>} />
+      <Route path="/credit-note" element={<MainLayout><CreditNote /></MainLayout>} />
+      <Route path="/invoice" element={<MainLayout><Invoice /></MainLayout>} />
+      <Route path="/kondisi-btt" element={<MainLayout><KondisiBTT /></MainLayout>} />
+      <Route path="/faktur-pajak" element={<MainLayout><FakturPajak /></MainLayout>} />
+      <Route path="/mutasi-piutang" element={<MainLayout><MutasiPiutang menuName="MutasiPiutang" /></MainLayout>} />
+      <Route path="/tagih-invoice" element={<MainLayout><TagihInvoice menuName="TagihInvoice" /></MainLayout>} />
+      <Route path="/pencairan-giro" element={<MainLayout><UnderConstruction menuName="PencairanGiro" /></MainLayout>} />
+      <Route path="/penerimaan-pembayaran" element={<MainLayout><PenerimaanPembayaran menuName="PenerimaanPembayaran" /></MainLayout>} />
+      <Route path="/penerimaan-penagihan-kolektor" element={<MainLayout><PenerimaanPenagihanKolektor menuName="PenerimaanPenagihanKolektor" /></MainLayout>} />
+      <Route path="/penerimaan-setoran-agen" element={<MainLayout><PenerimaanSetoranAgen menuName="PenerimaanSetoranAgen" /></MainLayout>} />
+      <Route path="/proforma-invoice" element={<MainLayout><ProformaInvoice menuName="ProformaInvoice" /></MainLayout>} />
+      <Route path="/proses-piutang" element={<MainLayout><ProsesPiutang menuName="ProsesPiutang" /></MainLayout>} />
+      <Route path="/revisi-btt-apl" element={<MainLayout><RevisiBTTAPL menuName="RevisiBTTAPL" /></MainLayout>} />
+      <Route path="/saldo-awal-piutang" element={<MainLayout><SaldoAwalPiutang menuName="SaldoAwalPiutang" /></MainLayout>} />
+      <Route path="/tukar-faktur" element={<MainLayout><TukarFaktur /></MainLayout>} />
 
       <Route path="/Settings" element={<MainLayout><UnderConstruction menuName="Settings" /></MainLayout>} />
       <Route path="/settings/users" element={<MainLayout><UserManagement menuName="UserManagement" /></MainLayout>} />

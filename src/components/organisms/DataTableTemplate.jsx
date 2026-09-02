@@ -1,24 +1,37 @@
 import React, { useState } from 'react';
-import { Plus, Filter, Search, Copy, MapPin, Building2, ShieldCheck, Edit, Trash2, Eye, EyeOff, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import { Plus, Filter, Search, Edit, Trash2, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 
-// 🟢 FIX UTAMA: Ditambahkan 'actionMode' ke dalam list parameter agar dikenali oleh sistem!
-const DataTableTemplate = ({ title, columns, data, onAdd, onEdit, onDelete, renderExtraActions, loading, isDarkMode, actionMode }) => {
+const DataTableTemplate = ({
+    title,
+    columns,
+    data = [],
+    onAdd,
+    onEdit,
+    onDelete,
+    onFilter, // <-- Tambahkan prop onFilter
+    renderExtraActions,
+    loading,
+    isDarkMode,
+    actionMode,
+    isAddDisabled = false,
+    hideAddButton = false,
+    hideActionColumn = false
+}) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
 
-    // 1. Logika Search
-    const filteredData = data.filter(item =>
-        Object.values(item).some(val => 
-            String(val).toLowerCase().includes(searchTerm.toLowerCase())
+    const showActionCol = !hideActionColumn && (Boolean(onEdit) || Boolean(onDelete) || Boolean(renderExtraActions));
+
+    const filteredData = (data || []).filter(item =>
+        Object.values(item || {}).some(val =>
+            String(val || '').toLowerCase().includes(searchTerm.toLowerCase())
         )
     );
 
-    // 2. Logika Pagination
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
 
-    // Definisi Warna berdasarkan Mode
     const theme = {
         bg: isDarkMode ? 'bg-[#1e293b]' : 'bg-[#f8fafc]',
         card: isDarkMode ? 'bg-[#0f172a] border-slate-700' : 'bg-white border-gray-100',
@@ -29,12 +42,12 @@ const DataTableTemplate = ({ title, columns, data, onAdd, onEdit, onDelete, rend
         hover: isDarkMode ? 'hover:bg-slate-800/50' : 'hover:bg-gray-50/50',
     };
 
-    const startIndex = (currentPage - 1) * itemsPerPage; 
+    const startIndex = (currentPage - 1) * itemsPerPage;
     const currentItems = filteredData.slice(startIndex, startIndex + itemsPerPage);
-    const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+    const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
 
     const getPaginationGroup = () => {
-        const sideNeighbors = 1; 
+        const sideNeighbors = 1;
         const pages = [];
 
         if (totalPages <= 7) {
@@ -56,14 +69,23 @@ const DataTableTemplate = ({ title, columns, data, onAdd, onEdit, onDelete, rend
             {/* HEADER: Button & Filter di Atas */}
             <div className="flex justify-between items-center mb-6">
                 <div className="flex gap-4">
-                    <button 
-                        onClick={onAdd} 
-                        className="flex items-center gap-2 bg-[#2563eb] hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-semibold transition-all shadow-sm"
-                    >
-                        <Plus size={18} /> {title === 'USER MANAGEMENT' ? 'Add User' : `Tambah ${title}`}
-                    </button>
-                    <button 
-                        className="bg-white border border-gray-200 text-blue-600 px-6 py-2.5 rounded-lg flex items-center gap-2 font-semibold shadow-sm hover:bg-gray-50 transition-all"
+                    {!hideAddButton && (
+                        <button
+                            type="button"
+                            disabled={isAddDisabled}
+                            onClick={!isAddDisabled ? onAdd : undefined}
+                            className={`flex items-center gap-2 px-5 py-2 rounded-lg font-semibold transition-all shadow-sm ${isAddDisabled
+                                ? 'bg-slate-300 text-slate-500 border border-slate-300 cursor-not-allowed opacity-75 shadow-none select-none'
+                                : 'bg-[#2563eb] hover:bg-blue-700 text-white cursor-pointer'
+                                }`}
+                        >
+                            <Plus size={18} /> {title === 'USER MANAGEMENT' ? 'Add User' : `Tambah ${title}`}
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={onFilter} // <-- Pasang handler onClick di sini
+                        className="bg-white border border-gray-200 text-blue-600 px-6 py-2.5 rounded-lg flex items-center gap-2 font-semibold shadow-sm hover:bg-gray-50 transition-all cursor-pointer"
                     >
                         <Filter size={18} /> Filter
                     </button>
@@ -75,11 +97,14 @@ const DataTableTemplate = ({ title, columns, data, onAdd, onEdit, onDelete, rend
                 <div className="p-6 flex justify-between items-center border-b border-gray-50">
                     <h2 className="text-lg font-bold text-slate-800 uppercase tracking-tight">{title}</h2>
                     <div className="relative w-72">
-                        <input 
-                            type="text" 
-                            placeholder="Cari data..." 
+                        <input
+                            type="text"
+                            placeholder="Cari data..."
                             className="w-full pl-4 pr-10 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onChange={(e) => {
+                                setSearchTerm(e.target.value);
+                                setCurrentPage(1);
+                            }}
                         />
                         <Search className="absolute right-3 top-2.5 text-gray-400" size={18} />
                     </div>
@@ -91,7 +116,7 @@ const DataTableTemplate = ({ title, columns, data, onAdd, onEdit, onDelete, rend
                             {columns.map((col, index) => (
                                 <th key={index} className="px-6 py-4">{col.header}</th>
                             ))}
-                            <th className="px-6 py-4 text-right">Action</th>
+                            {showActionCol && <th className="px-6 py-4 text-right">Action</th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -102,34 +127,42 @@ const DataTableTemplate = ({ title, columns, data, onAdd, onEdit, onDelete, rend
                                         {col.render ? col.render(item) : item[col.accessor]}
                                     </td>
                                 ))}
-                                <td className="px-6 py-5 text-right">
-                                    <div className="flex justify-end gap-3 text-gray-400">
-                                        
-                                        {/* 🚀 LOGIKA STRATEGIS FILTER SAKRAL (ANTI BENTROK SE-INDONESIA) */}
-                                        {actionMode === 'readonly_print' ? (
-                                            // A. Jika dipanggil oleh menu BTT: Tampilkan murni hanya icon print kertas tunggal!
-                                            <button onClick={() => onEdit(item)} className="text-blue-600 hover:text-blue-800" title="View & Cetak Resi">
-                                                <FileText size={18} />
-                                            </button>
-                                        ) : (
-                                            // B. Jika dipanggil oleh menu LAIN (User, Customer, dll): Tampilkan icon pensil bawaan normal!
-                                            <button onClick={() => onEdit(item)} className="text-blue-500 hover:text-blue-400">
-                                                <Edit size={18} />
-                                            </button>
-                                        )}
+                                {showActionCol && (
+                                    <td className="px-6 py-5 text-right">
+                                        <div className="flex justify-end gap-3 text-gray-400">
+                                            {actionMode === 'readonly_print' ? (
+                                                onEdit && (
+                                                    <button onClick={() => onEdit(item)} className="text-blue-600 hover:text-blue-800" title="View & Cetak Resi">
+                                                        <FileText size={18} />
+                                                    </button>
+                                                )
+                                            ) : (
+                                                onEdit && (
+                                                    <button onClick={() => onEdit(item)} className="text-blue-500 hover:text-blue-400 cursor-pointer" title="Edit Data">
+                                                        <Edit size={18} />
+                                                    </button>
+                                                )
+                                            )}
 
-                                        {renderExtraActions && renderExtraActions(item)}                                        
-                                        
-                                        {/* Sembunyikan tombol sampah murni hanya jika berada di mode readonly_print BTT */}
-                                        {actionMode !== 'readonly_print' && (
-                                            <button onClick={() => onDelete(item)} className="text-red-500 hover:text-red-400">
-                                                <Trash2 size={18} />
-                                            </button>
-                                        )}
-                                    </div>
-                                </td>
+                                            {renderExtraActions && renderExtraActions(item)}
+
+                                            {actionMode !== 'readonly_print' && onDelete && (
+                                                <button onClick={() => onDelete(item)} className="text-red-500 hover:text-red-400 cursor-pointer" title="Hapus Data">
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </td>
+                                )}
                             </tr>
                         ))}
+                        {currentItems.length === 0 && (
+                            <tr>
+                                <td colSpan={columns.length + (showActionCol ? 1 : 0)} className="px-6 py-12 text-center text-gray-400 font-medium">
+                                    {loading ? 'Memuat data...' : 'Tidak ada data yang ditemukan.'}
+                                </td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
             </div>
@@ -137,7 +170,7 @@ const DataTableTemplate = ({ title, columns, data, onAdd, onEdit, onDelete, rend
             {/* FOOTER CONTAINER */}
             <div className={`p-6 border-t ${isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-100 bg-white'} flex items-center justify-between`}>
                 <div className="text-sm text-gray-400 font-medium w-1/4">
-                    Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredData.length)} of {filteredData.length} entries
+                    Showing {filteredData.length === 0 ? 0 : startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredData.length)} of {filteredData.length} entries
                 </div>
 
                 <div className="flex items-center justify-center gap-1 flex-1">
@@ -153,7 +186,7 @@ const DataTableTemplate = ({ title, columns, data, onAdd, onEdit, onDelete, rend
                         ))}
                     </div>
 
-                    <button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages} className="flex items-center gap-1 px-3 py-1 text-sm font-semibold text-gray-400 hover:text-blue-600 disabled:opacity-30 transition-colors">
+                    <button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages || totalPages === 0} className="flex items-center gap-1 px-3 py-1 text-sm font-semibold text-gray-400 hover:text-blue-600 disabled:opacity-30 transition-colors">
                         Next <ChevronRight size={16} />
                     </button>
                 </div>
