@@ -20,9 +20,9 @@ const Invoice = () => {
     const [showFilter, setShowFilter] = useState(false);
 
     // =========================================================================
-    // HELPER: DETEKSI CABANG & STATUS HOLDING / PUSAT SECARA DINAMIS
+    // HELPER: DETEKSI CABANG LOGIN SECARA DINAMIS
     // =========================================================================
-    function getActiveAgen() {
+    function getActiveSessionAgen() {
         const activeAgenId = localStorage.getItem('active_agen_id') || '';
         const activeCabangId = localStorage.getItem('active_cabang_id') || '';
         const sessionCabangNama = localStorage.getItem('active_cabang_nama')
@@ -32,47 +32,49 @@ const Invoice = () => {
 
         if (sessionCabangNama) {
             return {
-                id: activeCabangId || activeAgenId || '001',
+                id: activeCabangId || activeAgenId || '',
                 nama: sessionCabangNama.toUpperCase()
             };
         }
 
-        const found = cabangList.find(c => {
-            const cId = String(c.agen_id || c.AgenID || '').trim().toLowerCase();
-            const cKode = String(c.agen_kode || c.AgenKode || '').trim().toLowerCase();
-            const cNama = String(c.agen_nama || c.AgenNama || '').trim().toLowerCase();
-            const targetAgen = activeAgenId.trim().toLowerCase();
-            const targetCabang = activeCabangId.trim().toLowerCase();
+        if (cabangList.length > 0) {
+            const found = cabangList.find(c => {
+                const cId = String(c.agen_id || c.AgenID || '').trim().toLowerCase();
+                const cKode = String(c.agen_kode || c.AgenKode || '').trim().toLowerCase();
+                const cNama = String(c.agen_nama || c.AgenNama || '').trim().toLowerCase();
+                const target = (activeCabangId || activeAgenId).trim().toLowerCase();
 
-            return (
-                (targetAgen && (cId === targetAgen || cKode === targetAgen || cNama.includes(targetAgen))) ||
-                (targetCabang && (cId === targetCabang || cKode === targetCabang || cNama.includes(targetCabang)))
-            );
-        });
+                return target && (cId === target || cKode === target || cNama.includes(target));
+            });
 
-        if (found) {
+            if (found) {
+                return {
+                    id: found.agen_id || found.AgenID,
+                    nama: (found.agen_nama || found.AgenNama).toUpperCase()
+                };
+            }
+        }
+
+        const badgeEl = document.querySelector('[class*="DENPASAR"], [class*="PUSAT DAKOTA"]');
+        if (badgeEl && badgeEl.textContent) {
             return {
-                id: found.agen_id || found.AgenID,
-                nama: found.agen_nama || found.AgenNama
+                id: activeCabangId || activeAgenId || '',
+                nama: badgeEl.textContent.trim().toUpperCase()
             };
         }
 
-        if (activeAgenId && activeAgenId.toUpperCase().includes('PUSAT')) {
-            return { id: '001', nama: 'PUSAT DAKOTA' };
-        }
-
         return {
-            id: activeCabangId || activeAgenId || '001',
-            nama: activeAgenId ? `AGEN ${activeAgenId.toUpperCase()}` : 'PUSAT DAKOTA'
+            id: activeCabangId || activeAgenId || '',
+            nama: activeAgenId ? activeAgenId.toUpperCase() : ''
         };
     }
 
-    const currentActiveAgen = getActiveAgen();
+    // Deklarasi tunggal
+    const currentActiveAgen = getActiveSessionAgen();
     const isHoldingUser =
-        String(currentActiveAgen.nama || '').toUpperCase().includes('PUSAT') ||
-        String(currentActiveAgen.nama || '').toUpperCase().includes('HOLDING') ||
-        String(currentActiveAgen.id || '') === '001' ||
-        String(localStorage.getItem('active_agen_id') || '').toUpperCase().includes('PUSAT');
+        String(currentActiveAgen.nama).includes('PUSAT') ||
+        String(currentActiveAgen.nama).includes('HOLDING') ||
+        (currentActiveAgen.id === '001' && !currentActiveAgen.nama.includes('AGEN'));
 
     // Filter States
     const [startDate, setStartDate] = useState(firstDay);
@@ -86,12 +88,12 @@ const Invoice = () => {
     const [searchKwitansi, setSearchKwitansi] = useState('');
     const [searchBTT, setSearchBTT] = useState('');
 
-    // Sinkronisasi cabang otomatis untuk user non-holding
+    // Sinkronisasi cabang otomatis untuk user cabang
     useEffect(() => {
         if (!isHoldingUser && currentActiveAgen.id) {
             setSelectedCabang(currentActiveAgen.id);
         }
-    }, [isHoldingUser, currentActiveAgen.id]);
+    }, [isHoldingUser, currentActiveAgen.id, cabangList]);
 
     // Modal Add Invoice
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -187,7 +189,6 @@ const Invoice = () => {
         fetchInvoiceList();
     };
 
-    // Load Unbilled BTT saat Customer Dipilih di Modal Tambah
     const handleSelectCustomerForNewInvoice = async (custId) => {
         const cust = custList.find(c => String(c.cust_id) === String(custId));
         setNewInvoiceForm(prev => ({
@@ -218,7 +219,6 @@ const Invoice = () => {
         }
     };
 
-    // Simpan Invoice Baru
     const handleSaveNewInvoice = async (e) => {
         e.preventDefault();
 
@@ -286,7 +286,6 @@ const Invoice = () => {
         }
     };
 
-    // Buka Modal Edit Invoice
     const handleOpenEditInvoice = async (item) => {
         try {
             const token = localStorage.getItem('token');
@@ -320,7 +319,6 @@ const Invoice = () => {
         }
     };
 
-    // Simpan Perubahan Edit Invoice
     const handleSaveEditInvoice = async (e) => {
         e.preventDefault();
         try {
@@ -496,7 +494,7 @@ const Invoice = () => {
                                 type="text"
                                 readOnly
                                 tabIndex={-1}
-                                value={newInvoiceForm.artih_agenname || getActiveAgen().nama}
+                                value={newInvoiceForm.artih_agenname || currentActiveAgen.nama}
                                 className="w-full p-2 bg-slate-100 border border-slate-200 rounded-lg font-bold text-slate-700 cursor-not-allowed select-none outline-none focus:outline-none"
                                 title="Cabang terkunci otomatis sesuai lokasi login aktif Anda"
                             />
@@ -1021,7 +1019,7 @@ const Invoice = () => {
             `}
             </style>
 
-            {/* 2. Panel Filter hanya tampil jika showFilter bernilai true */}
+            {/* Filter Panel */}
             {showFilter && (
                 <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all">
                     <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
@@ -1060,8 +1058,8 @@ const Invoice = () => {
                                 disabled={!isHoldingUser}
                                 onChange={(e) => setSelectedCabang(e.target.value)}
                                 className={`w-full p-2 border rounded-lg font-bold outline-none ${!isHoldingUser
-                                        ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed select-none'
-                                        : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500 cursor-pointer'
+                                    ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed select-none'
+                                    : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500 cursor-pointer'
                                     }`}
                                 title={!isHoldingUser ? "Filter cabang terkunci sesuai lokasi login Anda" : "Pilih cabang untuk monitoring"}
                             >
@@ -1181,7 +1179,7 @@ const Invoice = () => {
                 </form>
             )}
 
-            {/* 3. DataTableTemplate menerima prop onFilter */}
+            {/* Tabel List Invoice */}
             <DataTableTemplate
                 title="INVOICE"
                 columns={columns}
@@ -1192,7 +1190,7 @@ const Invoice = () => {
                 hideAddButton={false}
                 onFilter={() => setShowFilter(prev => !prev)}
                 onAdd={() => {
-                    const currentAgen = getActiveAgen();
+                    const currentAgen = getActiveSessionAgen();
                     setNewInvoiceForm({
                         artih_tanggal: today,
                         artih_custid: '',
