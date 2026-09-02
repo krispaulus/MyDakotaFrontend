@@ -155,14 +155,34 @@ const Invoice = () => {
     };
 
     // Simpan Invoice Baru
+    // Simpan Invoice Baru
     const handleSaveNewInvoice = async (e) => {
         e.preventDefault();
+
+        // 1. Lepas fokus dari tombol sebelum menampilkan popup
+        if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+        }
+
+        const modalTarget = document.getElementById('modal-root') ? '#modal-root' : undefined;
+
         if (!newInvoiceForm.artih_custid) {
-            Swal.fire('Peringatan', 'Pilih customer terlebih dahulu!', 'warning');
+            Swal.fire({
+                title: 'Peringatan',
+                text: 'Pilih customer terlebih dahulu!',
+                icon: 'warning',
+                target: modalTarget
+            });
             return;
         }
+
         if (newInvoiceForm.selected_btts.length === 0) {
-            Swal.fire('Peringatan', 'Pilih minimal 1 resi BTT untuk difakturkan!', 'warning');
+            Swal.fire({
+                title: 'Peringatan',
+                text: 'Pilih minimal 1 resi BTT untuk difakturkan! Jika daftar kosong, customer belum memiliki resi BTT aktif yang unbilled.',
+                icon: 'warning',
+                target: modalTarget
+            });
             return;
         }
 
@@ -185,11 +205,22 @@ const Invoice = () => {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            Swal.fire('Berhasil!', res.data?.message || 'Invoice berhasil diterbitkan.', 'success');
             setIsAddModalOpen(false);
+
+            Swal.fire({
+                title: 'Berhasil!',
+                text: res.data?.message || 'Invoice berhasil diterbitkan.',
+                icon: 'success'
+            });
+
             fetchInvoiceList();
         } catch (err) {
-            Swal.fire('Gagal!', err.response?.data?.message || 'Gagal menyimpan invoice.', 'error');
+            Swal.fire({
+                title: 'Gagal!',
+                text: err.response?.data?.message || 'Gagal menyimpan invoice.',
+                icon: 'error',
+                target: modalTarget
+            });
         }
     };
 
@@ -368,7 +399,11 @@ const Invoice = () => {
     // MODAL TAMBAH INVOICE
     // ==========================================
     const addModalElement = isAddModalOpen ? (
-        <div className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs transition-opacity" style={{ zIndex: 99999 }}>
+        <div
+            role="dialog" aria-modal="true" aria-labelledby="add-invoice-title"
+            className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs transition-opacity"
+            style={{ zIndex: 1000 }}
+        >
             <div className={`w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white text-slate-800'}`}>
                 <div className="px-6 py-3.5 bg-blue-600 text-white flex items-center justify-between">
                     <div className="font-black uppercase tracking-wider text-sm flex items-center gap-2">
@@ -576,7 +611,7 @@ const Invoice = () => {
     // MODAL EDIT INVOICE
     // ==========================================
     const editModalElement = isEditModalOpen && activeInvoice ? (
-        <div className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs transition-opacity" style={{ zIndex: 99999 }}>
+        <div className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs transition-opacity" style={{ zIndex: 1000 }}>
             <div className={`w-full max-w-7xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh] ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white text-slate-800'}`}>
                 <div className="px-6 py-3 bg-[#004b84] text-white flex items-center justify-between">
                     <div className="font-black uppercase tracking-wider text-sm flex items-center gap-2">
@@ -911,6 +946,8 @@ const Invoice = () => {
         </div>
     ) : null;
 
+    const modalRoot = document.getElementById('modal-root') || document.body;
+
     return (
         <div className="space-y-5">
             <style>
@@ -1096,9 +1133,9 @@ const Invoice = () => {
                 onDelete={handleDeleteInvoice}
             />
 
-            {addModalElement && ReactDOM.createPortal(addModalElement, document.body)}
-            {editModalElement && ReactDOM.createPortal(editModalElement, document.body)}
-            {printDocElement && ReactDOM.createPortal(printDocElement, document.body)}
+            {addModalElement && ReactDOM.createPortal(addModalElement, modalRoot)}
+            {editModalElement && ReactDOM.createPortal(editModalElement, modalRoot)}
+            {printDocElement && ReactDOM.createPortal(printDocElement, modalRoot)}
         </div>
     );
 
