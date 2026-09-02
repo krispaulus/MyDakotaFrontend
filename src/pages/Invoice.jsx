@@ -13,10 +13,72 @@ const Invoice = () => {
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
     const today = now.toISOString().split('T')[0];
 
+    const [cabangList, setCabangList] = useState([]);
+    const [custList, setCustList] = useState([]);
+    const [data, setData] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [showFilter, setShowFilter] = useState(false);
+
+    // =========================================================================
+    // HELPER: DETEKSI CABANG & STATUS HOLDING / PUSAT SECARA DINAMIS
+    // =========================================================================
+    function getActiveAgen() {
+        const activeAgenId = localStorage.getItem('active_agen_id') || '';
+        const activeCabangId = localStorage.getItem('active_cabang_id') || '';
+        const sessionCabangNama = localStorage.getItem('active_cabang_nama')
+            || localStorage.getItem('cabang_nama')
+            || localStorage.getItem('active_agen_nama')
+            || '';
+
+        if (sessionCabangNama) {
+            return {
+                id: activeCabangId || activeAgenId || '001',
+                nama: sessionCabangNama.toUpperCase()
+            };
+        }
+
+        const found = cabangList.find(c => {
+            const cId = String(c.agen_id || c.AgenID || '').trim().toLowerCase();
+            const cKode = String(c.agen_kode || c.AgenKode || '').trim().toLowerCase();
+            const cNama = String(c.agen_nama || c.AgenNama || '').trim().toLowerCase();
+            const targetAgen = activeAgenId.trim().toLowerCase();
+            const targetCabang = activeCabangId.trim().toLowerCase();
+
+            return (
+                (targetAgen && (cId === targetAgen || cKode === targetAgen || cNama.includes(targetAgen))) ||
+                (targetCabang && (cId === targetCabang || cKode === targetCabang || cNama.includes(targetCabang)))
+            );
+        });
+
+        if (found) {
+            return {
+                id: found.agen_id || found.AgenID,
+                nama: found.agen_nama || found.AgenNama
+            };
+        }
+
+        if (activeAgenId && activeAgenId.toUpperCase().includes('PUSAT')) {
+            return { id: '001', nama: 'PUSAT DAKOTA' };
+        }
+
+        return {
+            id: activeCabangId || activeAgenId || '001',
+            nama: activeAgenId ? `AGEN ${activeAgenId.toUpperCase()}` : 'PUSAT DAKOTA'
+        };
+    }
+
+    const currentActiveAgen = getActiveAgen();
+    const isHoldingUser =
+        String(currentActiveAgen.nama || '').toUpperCase().includes('PUSAT') ||
+        String(currentActiveAgen.nama || '').toUpperCase().includes('HOLDING') ||
+        String(currentActiveAgen.id || '') === '001' ||
+        String(localStorage.getItem('active_agen_id') || '').toUpperCase().includes('PUSAT');
+
+    // Filter States
     const [startDate, setStartDate] = useState(firstDay);
     const [endDate, setEndDate] = useState(today);
     const [bypassTanggal, setBypassTanggal] = useState(false);
-    const [selectedCabang, setSelectedCabang] = useState('');
+    const [selectedCabang, setSelectedCabang] = useState(isHoldingUser ? '' : currentActiveAgen.id);
     const [selectedJenis, setSelectedJenis] = useState('');
     const [selectedTerbayar, setSelectedTerbayar] = useState('');
     const [searchCustomer, setSearchCustomer] = useState('');
@@ -24,11 +86,12 @@ const Invoice = () => {
     const [searchKwitansi, setSearchKwitansi] = useState('');
     const [searchBTT, setSearchBTT] = useState('');
 
-    const [cabangList, setCabangList] = useState([]);
-    const [custList, setCustList] = useState([]);
-    const [data, setData] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [showFilter, setShowFilter] = useState(false);
+    // Sinkronisasi cabang otomatis untuk user non-holding
+    useEffect(() => {
+        if (!isHoldingUser && currentActiveAgen.id) {
+            setSelectedCabang(currentActiveAgen.id);
+        }
+    }, [isHoldingUser, currentActiveAgen.id]);
 
     // Modal Add Invoice
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -36,7 +99,8 @@ const Invoice = () => {
         artih_tanggal: today,
         artih_custid: '',
         artih_custname: '',
-        artih_agenid: '001',
+        artih_agenid: currentActiveAgen.id,
+        artih_agenname: currentActiveAgen.nama,
         artih_jenis: 'K',
         artih_fktpajak: '',
         artih_keterangan: '',
@@ -113,7 +177,7 @@ const Invoice = () => {
         setStartDate(firstDay);
         setEndDate(today);
         setBypassTanggal(false);
-        setSelectedCabang('');
+        setSelectedCabang(isHoldingUser ? '' : currentActiveAgen.id);
         setSelectedJenis('');
         setSelectedTerbayar('');
         setSearchCustomer('');
@@ -155,11 +219,9 @@ const Invoice = () => {
     };
 
     // Simpan Invoice Baru
-    // Simpan Invoice Baru
     const handleSaveNewInvoice = async (e) => {
         e.preventDefault();
 
-        // 1. Lepas fokus dari tombol sebelum menampilkan popup
         if (document.activeElement instanceof HTMLElement) {
             document.activeElement.blur();
         }
@@ -430,17 +492,15 @@ const Invoice = () => {
 
                         <div>
                             <label className="font-bold text-slate-600 block mb-1">CABANG / AGEN :</label>
-                            <select
-                                value={newInvoiceForm.artih_agenid}
-                                onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, artih_agenid: e.target.value })}
-                                className="w-full p-2 bg-white border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-blue-500"
-                            >
-                                {cabangList.map((c, i) => (
-                                    <option key={i} value={c.agen_id || c.AgenID}>
-                                        {c.agen_nama || c.AgenNama}
-                                    </option>
-                                ))}
-                            </select>
+                            <input
+                                type="text"
+                                readOnly
+                                tabIndex={-1}
+                                value={newInvoiceForm.artih_agenname || getActiveAgen().nama}
+                                className="w-full p-2 bg-slate-100 border border-slate-200 rounded-lg font-bold text-slate-700 cursor-not-allowed select-none outline-none focus:outline-none"
+                                title="Cabang terkunci otomatis sesuai lokasi login aktif Anda"
+                            />
+                            <input type="hidden" value={newInvoiceForm.artih_agenid} />
                         </div>
 
                         <div>
@@ -546,7 +606,7 @@ const Invoice = () => {
                                                                 ...prev,
                                                                 selected_btts: isChecked
                                                                     ? prev.selected_btts.filter(id => id !== btt.bttt_id)
-                                                                    : [...prev.selected_btts, btt.bttt_id]
+                                                                    : [...prev, btt.bttt_id]
                                                             }));
                                                         }}
                                                         className="w-4 h-4 text-blue-600 rounded cursor-pointer"
@@ -997,13 +1057,29 @@ const Invoice = () => {
                             <label className="font-bold text-slate-500 block mb-1">CABANG</label>
                             <select
                                 value={selectedCabang}
+                                disabled={!isHoldingUser}
                                 onChange={(e) => setSelectedCabang(e.target.value)}
-                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                                className={`w-full p-2 border rounded-lg font-bold outline-none ${!isHoldingUser
+                                        ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed select-none'
+                                        : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500 cursor-pointer'
+                                    }`}
+                                title={!isHoldingUser ? "Filter cabang terkunci sesuai lokasi login Anda" : "Pilih cabang untuk monitoring"}
                             >
-                                <option value="">-- SEMUA CABANG --</option>
-                                {cabangList.map((c, i) => (
-                                    <option key={i} value={c.agen_id || c.AgenID}>{c.agen_nama || c.AgenNama}</option>
-                                ))}
+                                {isHoldingUser && (
+                                    <option value="">-- SEMUA CABANG --</option>
+                                )}
+
+                                {!isHoldingUser ? (
+                                    <option value={currentActiveAgen.id}>
+                                        {currentActiveAgen.nama}
+                                    </option>
+                                ) : (
+                                    cabangList.map((c, i) => (
+                                        <option key={i} value={c.agen_id || c.AgenID}>
+                                            {c.agen_nama || c.AgenNama}
+                                        </option>
+                                    ))
+                                )}
                             </select>
                         </div>
 
@@ -1116,11 +1192,13 @@ const Invoice = () => {
                 hideAddButton={false}
                 onFilter={() => setShowFilter(prev => !prev)}
                 onAdd={() => {
+                    const currentAgen = getActiveAgen();
                     setNewInvoiceForm({
                         artih_tanggal: today,
                         artih_custid: '',
                         artih_custname: '',
-                        artih_agenid: '001',
+                        artih_agenid: currentAgen.id,
+                        artih_agenname: currentAgen.nama,
                         artih_jenis: 'K',
                         artih_fktpajak: '',
                         artih_keterangan: '',
@@ -1138,7 +1216,6 @@ const Invoice = () => {
             {printDocElement && ReactDOM.createPortal(printDocElement, modalRoot)}
         </div>
     );
-
 };
 
 export default Invoice;
