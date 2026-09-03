@@ -13,11 +13,77 @@ const ApprovalCustomer = () => {
     const [kotaList, setKotaList] = useState([]);
     const [loading, setLoading] = useState(false);
 
+    // State Buka-Tutup Filter (default tertutup seperti halaman lain)
+    const [showFilter, setShowFilter] = useState(false);
+
+    // =========================================================================
+    // HELPER: DETEKSI CABANG & STATUS HOLDING / PUSAT SECARA DINAMIS
+    // =========================================================================
+    function getActiveAgen() {
+        const activeAgenId = localStorage.getItem('active_agen_id') || localStorage.getItem('agen_id') || '';
+        const activeCabangId = localStorage.getItem('active_cabang_id') || localStorage.getItem('cabang_id') || '';
+        const sessionCabangNama = localStorage.getItem('active_cabang_nama')
+            || localStorage.getItem('cabang_nama')
+            || localStorage.getItem('active_agen_nama')
+            || '';
+
+        if (sessionCabangNama) {
+            return {
+                id: activeCabangId || activeAgenId || '',
+                nama: sessionCabangNama.toUpperCase()
+            };
+        }
+
+        const found = cabangList.find(c => {
+            const cId = String(c.agen_id || c.AgenID || '').trim().toLowerCase();
+            const cKode = String(c.agen_kode || c.AgenKode || '').trim().toLowerCase();
+            const cNama = String(c.agen_nama || c.AgenNama || '').trim().toLowerCase();
+            const targetAgen = activeAgenId.trim().toLowerCase();
+            const targetCabang = activeCabangId.trim().toLowerCase();
+
+            return (
+                (targetAgen && (cId === targetAgen || cKode === targetAgen || cNama.includes(targetAgen))) ||
+                (targetCabang && (cId === targetCabang || cKode === targetCabang || cNama.includes(targetCabang)))
+            );
+        });
+
+        if (found) {
+            return {
+                id: String(found.agen_id || found.AgenID),
+                nama: String(found.agen_nama || found.AgenNama).toUpperCase()
+            };
+        }
+
+        if (activeAgenId && activeAgenId.toUpperCase().includes('PUSAT')) {
+            return { id: '001', nama: 'PUSAT DAKOTA' };
+        }
+
+        return {
+            id: activeCabangId || activeAgenId || '',
+            nama: activeAgenId ? `AGEN ${activeAgenId.toUpperCase()}` : ''
+        };
+    }
+
+    const currentActiveAgen = getActiveAgen();
+    const isHoldingUser =
+        String(currentActiveAgen.nama || '').toUpperCase().includes('PUSAT') ||
+        String(currentActiveAgen.nama || '').toUpperCase().includes('HOLDING') ||
+        String(currentActiveAgen.id || '') === '001' ||
+        String(localStorage.getItem('active_agen_id') || '').toUpperCase().includes('PUSAT') ||
+        (!currentActiveAgen.id && !currentActiveAgen.nama);
+
     // Filter State
-    const [selectedCabang, setSelectedCabang] = useState('');
+    const [selectedCabang, setSelectedCabang] = useState(isHoldingUser ? '' : currentActiveAgen.id);
     const [selectedAktif, setSelectedAktif] = useState('Y');
     const [selectedApprove, setSelectedApprove] = useState('N');
     const [searchNama, setSearchNama] = useState('');
+
+    // Sinkronisasi filter cabang untuk akun cabang daerah
+    useEffect(() => {
+        if (!isHoldingUser && currentActiveAgen.id) {
+            setSelectedCabang(currentActiveAgen.id);
+        }
+    }, [isHoldingUser, currentActiveAgen.id, cabangList]);
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -51,7 +117,7 @@ const ApprovalCustomer = () => {
             setCabangList(resCabang.data?.data || []);
             setKotaList(resKota.data?.data || []);
         } catch (err) {
-            console.error("Gagal load opsi dropdown:", err);
+            console.error('Gagal load opsi dropdown:', err);
         }
     };
 
@@ -62,13 +128,14 @@ const ApprovalCustomer = () => {
             const ptId = localStorage.getItem('pt_id') || 'C';
             let url = `/piutang/approval-customer?pt_id=${ptId}&aktif_yn=${selectedAktif}&approve_yn=${selectedApprove}`;
 
-            if (selectedCabang) url += `&agen_nama=${encodeURIComponent(selectedCabang)}`;
+            const activeFilterCabang = !isHoldingUser ? currentActiveAgen.id : selectedCabang;
+            if (activeFilterCabang) url += `&agen_nama=${encodeURIComponent(activeFilterCabang)}`;
             if (searchNama) url += `&cust_name=${encodeURIComponent(searchNama)}`;
 
             const res = await api.get(url, { headers: { Authorization: `Bearer ${token}` } });
             setData(res.data?.data || []);
         } catch (err) {
-            console.error("Gagal load antrean approval customer:", err);
+            console.error('Gagal load antrean approval customer:', err);
         } finally {
             setLoading(false);
         }
@@ -85,14 +152,13 @@ const ApprovalCustomer = () => {
     };
 
     const handleResetFilter = () => {
-        setSelectedCabang('');
+        setSelectedCabang(isHoldingUser ? '' : currentActiveAgen.id);
         setSelectedAktif('Y');
         setSelectedApprove('N');
         setSearchNama('');
         fetchCustomerList();
     };
 
-    // Ekstraksi 3 digit angka murni dari string cabang/counter
     const extract3Digit = (val) => {
         const digits = String(val || '').replace(/\D/g, '');
         if (digits.length > 0) {
@@ -101,7 +167,6 @@ const ApprovalCustomer = () => {
         return '001';
     };
 
-    // Hitung Virtual Account BCA: 01058 + 3 digit Cabang + 3 digit Counter + 4 digit Ekor CustID
     const calculateVA = (custId, cbg, ctr) => {
         const cleanCust = String(custId || '').replace(/\D/g, '');
         const ekor = cleanCust.length >= 4 ? cleanCust.slice(-4) : cleanCust.padStart(4, '0');
@@ -110,34 +175,6 @@ const ApprovalCustomer = () => {
         return `01058${cbg3}${ctr3}${ekor}`;
     };
 
-    // ➕ Aksi Tambah Customer Baru ke Antrean
-    const handleAddCustomer = () => {
-        setIsEditMode(false);
-        const initialCbg = '1';
-        const initialCtr = '1';
-        const defaultVA = calculateVA('0000', initialCbg, initialCtr);
-
-        setFormApproval({
-            cust_id: '',
-            cust_name: '',
-            cust_alamat1: '',
-            cust_kotaid: '',
-            kota_name: '',
-            cust_telp1: '',
-            cust_contact_person: '',
-            cust_approve_yn: 'N', // Default Baru: Pending
-            cabang_id: initialCbg,
-            counter_id: initialCtr,
-            kdbca: '01058',
-            cust_kredit_yn: 'N',
-            cust_kredit_limit: 0,
-            cust_kredit_aktif: 0,
-            cust_virtual_acc: defaultVA
-        });
-        setIsModalOpen(true);
-    };
-
-    // ✏️ Aksi Edit / Approval Customer
     const handleOpenEdit = async (item) => {
         try {
             setIsEditMode(true);
@@ -186,7 +223,6 @@ const ApprovalCustomer = () => {
         }
     };
 
-    // 🗑️ Aksi Delete / Nonaktifkan Customer
     const handleDeleteCustomer = (item) => {
         Swal.fire({
             title: 'Nonaktifkan Customer?',
@@ -330,7 +366,6 @@ const ApprovalCustomer = () => {
     const modalElement = isModalOpen ? (
         <div className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs transition-opacity" style={{ zIndex: 99999 }}>
             <div className={`w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden transition-all transform ${isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-slate-800'}`}>
-                {/* Modal Header */}
                 <div className="px-8 py-5 border-b border-slate-100 flex items-center justify-between">
                     <h2 className="text-base font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
                         <CreditCard className="text-sky-600" size={20} />
@@ -342,7 +377,6 @@ const ApprovalCustomer = () => {
                 </div>
 
                 <form onSubmit={handleSaveApproval} className="p-8 space-y-6 text-xs max-h-[85vh] overflow-y-auto">
-                    {/* Profil Customer Readonly */}
                     <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
                         <div className="font-bold text-slate-700 uppercase tracking-wider">DATA PROFIL CUSTOMER</div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -365,7 +399,6 @@ const ApprovalCustomer = () => {
                         </div>
                     </div>
 
-                    {/* Pengaturan Status Approval & Virtual Account */}
                     <div className="p-5 bg-white border border-slate-200 rounded-2xl space-y-4">
                         <div className="font-bold text-slate-700 uppercase tracking-wider">PENGATURAN STATUS & VIRTUAL ACCOUNT</div>
 
@@ -437,7 +470,6 @@ const ApprovalCustomer = () => {
                         </div>
                     </div>
 
-                    {/* Pengaturan Plafon Kredit */}
                     <div className="p-5 bg-white border border-slate-200 rounded-2xl space-y-4">
                         <div className="font-bold text-slate-700 uppercase tracking-wider">FASILITAS KREDIT & PLAFON PIUTANG</div>
 
@@ -492,7 +524,6 @@ const ApprovalCustomer = () => {
                         </div>
                     </div>
 
-                    {/* Footer Modal Actions */}
                     <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                         <button
                             type="button"
@@ -515,83 +546,100 @@ const ApprovalCustomer = () => {
 
     return (
         <div className="space-y-5">
-            <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs">
-                <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
-                    <Filter size={16} className="text-sky-600" />
-                    FILTER APPROVAL CUSTOMER
-                </div>
+            {/* Panel Filter (Buka/Tutup dengan animasi kondisional) */}
+            {showFilter && (
+                <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs">
+                    <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
+                        <Filter size={16} className="text-sky-600" />
+                        FILTER APPROVAL CUSTOMER
+                    </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">AGEN / CABANG</label>
-                        <select
-                            value={selectedCabang}
-                            onChange={(e) => setSelectedCabang(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">AGEN / CABANG</label>
+                            <select
+                                value={!isHoldingUser && currentActiveAgen.id ? currentActiveAgen.id : selectedCabang}
+                                disabled={!isHoldingUser}
+                                onChange={(e) => setSelectedCabang(e.target.value)}
+                                className={`w-full p-2 border rounded-lg font-bold outline-none ${!isHoldingUser
+                                        ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed select-none'
+                                        : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500 cursor-pointer'
+                                    }`}
+                                title={!isHoldingUser ? 'Filter cabang terkunci sesuai lokasi login Anda' : 'Pilih cabang untuk monitoring'}
+                            >
+                                {isHoldingUser && (
+                                    <option value="">-- SEMUA CABANG (ALL) --</option>
+                                )}
+
+                                {!isHoldingUser ? (
+                                    <option value={currentActiveAgen.id}>
+                                        {currentActiveAgen.nama || 'CABANG AKTIF'}
+                                    </option>
+                                ) : (
+                                    cabangList.map((c, i) => (
+                                        <option key={i} value={c.agen_nama || c.AgenNama}>{c.agen_nama || c.AgenNama}</option>
+                                    ))
+                                )}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">STATUS APPROVAL</label>
+                            <select
+                                value={selectedApprove}
+                                onChange={(e) => setSelectedApprove(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            >
+                                <option value="N">Belum Approve (Pending)</option>
+                                <option value="Y">Sudah Approve (Approved)</option>
+                                <option value="">-- SEMUA STATUS --</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">STATUS AKTIF</label>
+                            <select
+                                value={selectedAktif}
+                                onChange={(e) => setSelectedAktif(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            >
+                                <option value="Y">Aktif (Ya)</option>
+                                <option value="N">Tidak Aktif</option>
+                                <option value="">-- SEMUA --</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">NAMA CUSTOMER</label>
+                            <input
+                                type="text"
+                                placeholder="Cari nama customer..."
+                                value={searchNama}
+                                onChange={(e) => setSearchNama(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={handleResetFilter}
+                            className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer"
                         >
-                            <option value="">-- SEMUA CABANG (ALL) --</option>
-                            {cabangList.map((c, i) => (
-                                <option key={i} value={c.agen_nama || c.AgenNama}>{c.agen_nama || c.AgenNama}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">STATUS APPROVAL</label>
-                        <select
-                            value={selectedApprove}
-                            onChange={(e) => setSelectedApprove(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            RESET
+                        </button>
+                        <button
+                            type="submit"
+                            className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5"
                         >
-                            <option value="N">Belum Approve (Pending)</option>
-                            <option value="Y">Sudah Approve (Approved)</option>
-                            <option value="">-- SEMUA STATUS --</option>
-                        </select>
+                            <RefreshCw size={14} /> REFRESH DATA
+                        </button>
                     </div>
+                </form>
+            )}
 
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">STATUS AKTIF</label>
-                        <select
-                            value={selectedAktif}
-                            onChange={(e) => setSelectedAktif(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                        >
-                            <option value="Y">Aktif (Ya)</option>
-                            <option value="N">Tidak Aktif</option>
-                            <option value="">-- SEMUA --</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">NAMA CUSTOMER</label>
-                        <input
-                            type="text"
-                            placeholder="Cari nama customer..."
-                            value={searchNama}
-                            onChange={(e) => setSearchNama(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                        />
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                    <button
-                        type="button"
-                        onClick={handleResetFilter}
-                        className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer"
-                    >
-                        RESET
-                    </button>
-                    <button
-                        type="submit"
-                        className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5"
-                    >
-                        <RefreshCw size={14} /> REFRESH DATA
-                    </button>
-                </div>
-            </form>
-
-            {/* Tabel List Antrean Approval */}
+            {/* Tabel List Antrean Approval dengan onFilter toggle */}
             <DataTableTemplate
                 title="DAFTAR ANTREAN APPROVAL CUSTOMER"
                 columns={columns}
@@ -599,6 +647,7 @@ const ApprovalCustomer = () => {
                 loading={loading}
                 isDarkMode={isDarkMode}
                 isAddDisabled={true}
+                onFilter={() => setShowFilter(prev => !prev)}
                 onEdit={handleOpenEdit}
                 onDelete={handleDeleteCustomer}
             />

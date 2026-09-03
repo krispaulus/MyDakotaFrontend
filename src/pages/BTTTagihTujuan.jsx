@@ -12,19 +12,86 @@ const BTTTagihTujuan = () => {
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
     const today = now.toISOString().split('T')[0];
 
-    const [startDate, setStartDate] = useState(firstDay);
-    const [endDate, setEndDate] = useState(today);
-    const [bypassTanggal, setBypassTanggal] = useState(false);
-    const [selectedCabang, setSelectedCabang] = useState('');
-    const [selectedTerbayar, setSelectedTerbayar] = useState('');
-    const [searchCustomer, setSearchCustomer] = useState('');
-    const [searchBTT, setSearchBTT] = useState('');
-    const [searchSuratJalan, setSearchSuratJalan] = useState('');
+    // State Buka-Tutup Filter
+    const [showFilter, setShowFilter] = useState(false);
 
     const [cabangList, setCabangList] = useState([]);
     const [custList, setCustList] = useState([]);
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    // =========================================================================
+    // HELPER: DETEKSI CABANG & STATUS HOLDING / PUSAT SECARA DINAMIS
+    // =========================================================================
+    function getActiveAgen() {
+        const activeAgenId = localStorage.getItem('active_agen_id') || localStorage.getItem('agen_id') || '';
+        const activeCabangId = localStorage.getItem('active_cabang_id') || localStorage.getItem('cabang_id') || '';
+        const sessionCabangNama = localStorage.getItem('active_cabang_nama')
+            || localStorage.getItem('cabang_nama')
+            || localStorage.getItem('active_agen_nama')
+            || '';
+
+        if (sessionCabangNama) {
+            return {
+                id: activeCabangId || activeAgenId || '',
+                nama: sessionCabangNama.toUpperCase()
+            };
+        }
+
+        const found = cabangList.find(c => {
+            const cId = String(c.agen_id || c.AgenID || '').trim().toLowerCase();
+            const cKode = String(c.agen_kode || c.AgenKode || '').trim().toLowerCase();
+            const cNama = String(c.agen_nama || c.AgenNama || '').trim().toLowerCase();
+            const targetAgen = activeAgenId.trim().toLowerCase();
+            const targetCabang = activeCabangId.trim().toLowerCase();
+
+            return (
+                (targetAgen && (cId === targetAgen || cKode === targetAgen || cNama.includes(targetAgen))) ||
+                (targetCabang && (cId === targetCabang || cKode === targetCabang || cNama.includes(targetCabang)))
+            );
+        });
+
+        if (found) {
+            return {
+                id: String(found.agen_id || found.AgenID),
+                nama: String(found.agen_nama || found.AgenNama).toUpperCase()
+            };
+        }
+
+        if (activeAgenId && activeAgenId.toUpperCase().includes('PUSAT')) {
+            return { id: '001', nama: 'PUSAT DAKOTA' };
+        }
+
+        return {
+            id: activeCabangId || activeAgenId || '',
+            nama: activeAgenId ? `AGEN ${activeAgenId.toUpperCase()}` : ''
+        };
+    }
+
+    const currentActiveAgen = getActiveAgen();
+    const isHoldingUser =
+        String(currentActiveAgen.nama || '').toUpperCase().includes('PUSAT') ||
+        String(currentActiveAgen.nama || '').toUpperCase().includes('HOLDING') ||
+        String(currentActiveAgen.id || '') === '001' ||
+        String(localStorage.getItem('active_agen_id') || '').toUpperCase().includes('PUSAT') ||
+        (!currentActiveAgen.id && !currentActiveAgen.nama);
+
+    // Filter States
+    const [startDate, setStartDate] = useState(firstDay);
+    const [endDate, setEndDate] = useState(today);
+    const [bypassTanggal, setBypassTanggal] = useState(false);
+    const [selectedCabang, setSelectedCabang] = useState(isHoldingUser ? '' : currentActiveAgen.id);
+    const [selectedTerbayar, setSelectedTerbayar] = useState('');
+    const [searchCustomer, setSearchCustomer] = useState('');
+    const [searchBTT, setSearchBTT] = useState('');
+    const [searchSuratJalan, setSearchSuratJalan] = useState('');
+
+    // Sinkronisasi cabang otomatis untuk cabang daerah
+    useEffect(() => {
+        if (!isHoldingUser && currentActiveAgen.id) {
+            setSelectedCabang(currentActiveAgen.id);
+        }
+    }, [isHoldingUser, currentActiveAgen.id, cabangList]);
 
     // Multi-Select Batch State
     const [selectedBttIds, setSelectedBttIds] = useState([]);
@@ -54,7 +121,7 @@ const BTTTagihTujuan = () => {
 
     const fetchBTTList = async () => {
         setLoading(true);
-        setSelectedBttIds([]); // Reset checklist saat refresh
+        setSelectedBttIds([]);
         try {
             const token = localStorage.getItem('token');
             const ptId = localStorage.getItem('pt_id') || 'C';
@@ -63,7 +130,8 @@ const BTTTagihTujuan = () => {
             if (!bypassTanggal) {
                 url += `&start_date=${startDate}&end_date=${endDate}`;
             }
-            if (selectedCabang) url += `&tujuan_agen_id=${encodeURIComponent(selectedCabang)}`;
+            const activeFilterCabang = !isHoldingUser ? currentActiveAgen.id : selectedCabang;
+            if (activeFilterCabang) url += `&tujuan_agen_id=${encodeURIComponent(activeFilterCabang)}`;
             if (selectedTerbayar) url += `&terbayar_yn=${selectedTerbayar}`;
             if (searchCustomer) url += `&customer_name=${encodeURIComponent(searchCustomer)}`;
             if (searchBTT) url += `&no_btt=${encodeURIComponent(searchBTT)}`;
@@ -92,7 +160,7 @@ const BTTTagihTujuan = () => {
         setStartDate(firstDay);
         setEndDate(today);
         setBypassTanggal(false);
-        setSelectedCabang('');
+        setSelectedCabang(isHoldingUser ? '' : currentActiveAgen.id);
         setSelectedTerbayar('');
         setSearchCustomer('');
         setSearchBTT('');
@@ -200,7 +268,6 @@ const BTTTagihTujuan = () => {
         }
     };
 
-    // Eksekusi Cetak Multi Resi
     const handlePrintMulti = () => {
         window.print();
     };
@@ -307,7 +374,6 @@ const BTTTagihTujuan = () => {
                     </button>
                 </div>
 
-                {/* Konten Lembar Cetak Resi */}
                 <div ref={printAreaRef} className="p-6 overflow-y-auto space-y-8 print-container text-black">
                     {selectedItemsData.map((item, idx) => (
                         <div key={idx} className="border-2 border-dashed border-slate-400 p-5 rounded-xl space-y-3 page-break-after">
@@ -457,7 +523,6 @@ const BTTTagihTujuan = () => {
 
     return (
         <div className="space-y-5">
-            {/* Style khusus cetak print */}
             <style>
                 {`
                 @media print {
@@ -470,168 +535,180 @@ const BTTTagihTujuan = () => {
                 `}
             </style>
 
-            {/* Filter Panel */}
-            <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs">
-                <div className="flex items-center justify-between border-b pb-3 border-slate-100">
-                    <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
-                        <Filter size={16} className="text-sky-600" />
-                        FILTER BTT PENGIRIMAN TAGIH TUJUAN
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                            <label className="font-bold text-slate-500 block mb-1">TGL AWAL</label>
-                            <input
-                                type="date"
-                                disabled={bypassTanggal}
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                className={`w-full p-2 border rounded-lg font-bold outline-none ${bypassTanggal ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-white text-slate-800 border-slate-300 focus:border-sky-500'}`}
-                            />
-                        </div>
-                        <div className="flex-1">
-                            <label className="font-bold text-slate-500 block mb-1">TGL AKHIR</label>
-                            <input
-                                type="date"
-                                disabled={bypassTanggal}
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                className={`w-full p-2 border rounded-lg font-bold outline-none ${bypassTanggal ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-white text-slate-800 border-slate-300 focus:border-sky-500'}`}
-                            />
+            {/* Filter Panel (Kondisional Buka/Tutup) */}
+            {showFilter && (
+                <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all no-print">
+                    <div className="flex items-center justify-between border-b pb-3 border-slate-100">
+                        <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
+                            <Filter size={16} className="text-sky-600" />
+                            FILTER BTT PENGIRIMAN TAGIH TUJUAN
                         </div>
                     </div>
 
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">CABANG TUJUAN</label>
-                        <select
-                            value={selectedCabang}
-                            onChange={(e) => setSelectedCabang(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                        >
-                            <option value="">-- SEMUA CABANG TUJUAN --</option>
-                            {cabangList.map((c, i) => (
-                                <option key={i} value={c.agen_id || c.AgenID}>{c.agen_nama || c.AgenNama}</option>
-                            ))}
-                        </select>
-                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                                <label className="font-bold text-slate-500 block mb-1">TGL AWAL</label>
+                                <input
+                                    type="date"
+                                    disabled={bypassTanggal}
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className={`w-full p-2 border rounded-lg font-bold outline-none ${bypassTanggal ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-white text-slate-800 border-slate-300 focus:border-sky-500'}`}
+                                />
+                            </div>
+                            <div className="flex-1">
+                                <label className="font-bold text-slate-500 block mb-1">TGL AKHIR</label>
+                                <input
+                                    type="date"
+                                    disabled={bypassTanggal}
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className={`w-full p-2 border rounded-lg font-bold outline-none ${bypassTanggal ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-white text-slate-800 border-slate-300 focus:border-sky-500'}`}
+                                />
+                            </div>
+                        </div>
 
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">STATUS PEMBAYARAN</label>
-                        <select
-                            value={selectedTerbayar}
-                            onChange={(e) => setSelectedTerbayar(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                        >
-                            <option value="">-- SEMUA STATUS --</option>
-                            <option value="Y">Lunas (Terbayar)</option>
-                            <option value="N">Belum Lunas (Piutang)</option>
-                        </select>
-                    </div>
+                        {/* Cabang Filter */}
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">CABANG TUJUAN</label>
+                            <select
+                                value={!isHoldingUser && currentActiveAgen.id ? currentActiveAgen.id : selectedCabang}
+                                disabled={!isHoldingUser}
+                                onChange={(e) => setSelectedCabang(e.target.value)}
+                                className={`w-full p-2 border rounded-lg font-bold outline-none ${!isHoldingUser
+                                        ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed select-none'
+                                        : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500 cursor-pointer'
+                                    }`}
+                                title={!isHoldingUser ? "Filter cabang terkunci sesuai lokasi login Anda" : "Pilih cabang tujuan"}
+                            >
+                                {isHoldingUser && (
+                                    <option value="">-- SEMUA CABANG TUJUAN --</option>
+                                )}
 
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">CUSTOMER</label>
-                        <input
-                            type="text"
-                            placeholder="Cari customer / pengirim..."
-                            value={searchCustomer}
-                            onChange={(e) => setSearchCustomer(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                        />
-                    </div>
+                                {!isHoldingUser ? (
+                                    <option value={currentActiveAgen.id}>
+                                        {currentActiveAgen.nama || 'CABANG AKTIF'}
+                                    </option>
+                                ) : (
+                                    cabangList.map((c, i) => (
+                                        <option key={i} value={c.agen_id || c.AgenID}>{c.agen_nama || c.AgenNama}</option>
+                                    ))
+                                )}
+                            </select>
+                        </div>
 
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">NO. BTT</label>
-                        <input
-                            type="text"
-                            placeholder="Nomor resi BTT..."
-                            value={searchBTT}
-                            onChange={(e) => setSearchBTT(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                        />
-                    </div>
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">STATUS PEMBAYARAN</label>
+                            <select
+                                value={selectedTerbayar}
+                                onChange={(e) => setSelectedTerbayar(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            >
+                                <option value="">-- SEMUA STATUS --</option>
+                                <option value="Y">Lunas (Terbayar)</option>
+                                <option value="N">Belum Lunas (Piutang)</option>
+                            </select>
+                        </div>
 
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">NO. SURAT JALAN</label>
-                        <input
-                            type="text"
-                            placeholder="Nomor surat jalan..."
-                            value={searchSuratJalan}
-                            onChange={(e) => setSearchSuratJalan(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                        />
-                    </div>
-
-                    <div className="flex items-center">
-                        <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700 mt-5">
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">CUSTOMER</label>
                             <input
-                                type="checkbox"
-                                checked={bypassTanggal}
-                                onChange={(e) => setBypassTanggal(e.target.checked)}
-                                className="w-4 h-4 text-sky-600 rounded"
+                                type="text"
+                                placeholder="Cari customer / pengirim..."
+                                value={searchCustomer}
+                                onChange={(e) => setSearchCustomer(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
                             />
-                            Bypass Filter Tanggal
-                        </label>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">NO. BTT</label>
+                            <input
+                                type="text"
+                                placeholder="Nomor resi BTT..."
+                                value={searchBTT}
+                                onChange={(e) => setSearchBTT(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">NO. SURAT JALAN</label>
+                            <input
+                                type="text"
+                                placeholder="Nomor surat jalan..."
+                                value={searchSuratJalan}
+                                onChange={(e) => setSearchSuratJalan(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            />
+                        </div>
+
+                        <div className="flex items-center">
+                            <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700 mt-5">
+                                <input
+                                    type="checkbox"
+                                    checked={bypassTanggal}
+                                    onChange={(e) => setBypassTanggal(e.target.checked)}
+                                    className="w-4 h-4 text-sky-600 rounded"
+                                />
+                                Bypass Filter Tanggal
+                            </label>
+                        </div>
                     </div>
-                </div>
 
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 flex-wrap">
-                    {/* Tombol Cetak Grid Penjualan */}
-                    <button
-                        type="button"
-                        onClick={() => window.print()}
-                        className="px-4 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold rounded-xl transition flex items-center gap-1.5 uppercase cursor-pointer text-xs"
-                    >
-                        <Printer size={14} /> Cetak Grid
-                    </button>
+                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 flex-wrap">
+                        <button
+                            type="button"
+                            onClick={() => window.print()}
+                            className="px-4 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold rounded-xl transition flex items-center gap-1.5 uppercase cursor-pointer text-xs"
+                        >
+                            <Printer size={14} /> Cetak Grid
+                        </button>
 
-                    {/* Tombol Cetak BTT Lebih Dari 1 Lembar (Multi Print) */}
-                    <button
-                        type="button"
-                        onClick={() => {
-                            if (selectedBttIds.length === 0) {
-                                Swal.fire({
-                                    title: 'Pilih Resi Terlebih Dahulu',
-                                    text: 'Silakan centang kotak (checkbox) pada resi BTT yang ingin dicetak di tabel bawah.',
-                                    icon: 'info'
-                                });
-                                return;
-                            }
-                            setIsPrintModalOpen(true);
-                        }}
-                        className={`px-4 py-2 font-bold rounded-xl transition flex items-center gap-1.5 uppercase cursor-pointer text-xs shadow-xs ${selectedBttIds.length > 0
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (selectedBttIds.length === 0) {
+                                    Swal.fire({
+                                        title: 'Pilih Resi Terlebih Dahulu',
+                                        text: 'Silakan centang kotak (checkbox) pada resi BTT yang ingin dicetak di tabel bawah.',
+                                        icon: 'info'
+                                    });
+                                    return;
+                                }
+                                setIsPrintModalOpen(true);
+                            }}
+                            className={`px-4 py-2 font-bold rounded-xl transition flex items-center gap-1.5 uppercase cursor-pointer text-xs shadow-xs ${selectedBttIds.length > 0
                                 ? 'bg-slate-800 hover:bg-slate-900 text-white'
                                 : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
-                            }`}
-                    >
-                        <Layers size={14} className={selectedBttIds.length > 0 ? "text-sky-400" : "text-slate-500"} />
-                        CETAK BTT LEBIH DARI 1 LEMBAR {selectedBttIds.length > 0 ? `(${selectedBttIds.length})` : ''}
-                    </button>
+                                }`}
+                        >
+                            <Layers size={14} className={selectedBttIds.length > 0 ? "text-sky-400" : "text-slate-500"} />
+                            CETAK BTT LEBIH DARI 1 LEMBAR {selectedBttIds.length > 0 ? `(${selectedBttIds.length})` : ''}
+                        </button>
 
-                    {/* Tombol Reset */}
-                    <button
-                        type="button"
-                        onClick={handleResetFilter}
-                        className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer text-xs"
-                    >
-                        RESET
-                    </button>
+                        <button
+                            type="button"
+                            onClick={handleResetFilter}
+                            className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer text-xs"
+                        >
+                            RESET
+                        </button>
 
-                    {/* Tombol Refresh */}
-                    <button
-                        type="submit"
-                        className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5 text-xs"
-                    >
-                        <RefreshCw size={14} /> REFRESH DATA
-                    </button>
-                </div>
-
-            </form>
+                        <button
+                            type="submit"
+                            className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5 text-xs"
+                        >
+                            <RefreshCw size={14} /> REFRESH DATA
+                        </button>
+                    </div>
+                </form>
+            )}
 
             {/* Floating Action Bar jika ada BTT yang dicentang */}
             {selectedBttIds.length > 0 && (
-                <div className="bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-xl flex items-center justify-between animate-fade-in">
+                <div className="bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-xl flex items-center justify-between animate-fade-in no-print">
                     <div className="flex items-center gap-3 text-xs font-bold">
                         <Layers className="text-sky-400" size={18} />
                         <span>{selectedBttIds.length} BTT Dipilih untuk Cetak Multi-Resi</span>
@@ -664,6 +741,7 @@ const BTTTagihTujuan = () => {
                 isDarkMode={isDarkMode}
                 isAddDisabled={true}
                 hideAddButton={true}
+                onFilter={() => setShowFilter(prev => !prev)}
                 onEdit={handleOpenEdit}
             />
 

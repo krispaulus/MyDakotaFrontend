@@ -11,10 +11,75 @@ const KondisiBTT = () => {
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
     const today = now.toISOString().split('T')[0];
 
+    // State Buka-Tutup Filter
+    const [showFilter, setShowFilter] = useState(false);
+
+    const [cabangList, setCabangList] = useState([]);
+    const [picList, setPicList] = useState([]);
+    const [data, setData] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    // =========================================================================
+    // HELPER: DETEKSI CABANG & STATUS HOLDING / PUSAT SECARA DINAMIS
+    // =========================================================================
+    function getActiveAgen() {
+        const activeAgenId = localStorage.getItem('active_agen_id') || localStorage.getItem('agen_id') || '';
+        const activeCabangId = localStorage.getItem('active_cabang_id') || localStorage.getItem('cabang_id') || '';
+        const sessionCabangNama = localStorage.getItem('active_cabang_nama')
+            || localStorage.getItem('cabang_nama')
+            || localStorage.getItem('active_agen_nama')
+            || '';
+
+        if (sessionCabangNama) {
+            return {
+                id: activeCabangId || activeAgenId || '',
+                nama: sessionCabangNama.toUpperCase()
+            };
+        }
+
+        const found = cabangList.find(c => {
+            const cId = String(c.agen_id || c.AgenID || '').trim().toLowerCase();
+            const cKode = String(c.agen_kode || c.AgenKode || '').trim().toLowerCase();
+            const cNama = String(c.agen_nama || c.AgenNama || '').trim().toLowerCase();
+            const targetAgen = activeAgenId.trim().toLowerCase();
+            const targetCabang = activeCabangId.trim().toLowerCase();
+
+            return (
+                (targetAgen && (cId === targetAgen || cKode === targetAgen || cNama.includes(targetAgen))) ||
+                (targetCabang && (cId === targetCabang || cKode === targetCabang || cNama.includes(targetCabang)))
+            );
+        });
+
+        if (found) {
+            return {
+                id: String(found.agen_id || found.AgenID),
+                nama: String(found.agen_nama || found.AgenNama).toUpperCase()
+            };
+        }
+
+        if (activeAgenId && activeAgenId.toUpperCase().includes('PUSAT')) {
+            return { id: '001', nama: 'PUSAT DAKOTA' };
+        }
+
+        return {
+            id: activeCabangId || activeAgenId || '',
+            nama: activeAgenId ? `AGEN ${activeAgenId.toUpperCase()}` : ''
+        };
+    }
+
+    const currentActiveAgen = getActiveAgen();
+    const isHoldingUser =
+        String(currentActiveAgen.nama || '').toUpperCase().includes('PUSAT') ||
+        String(currentActiveAgen.nama || '').toUpperCase().includes('HOLDING') ||
+        String(currentActiveAgen.id || '') === '001' ||
+        String(localStorage.getItem('active_agen_id') || '').toUpperCase().includes('PUSAT') ||
+        (!currentActiveAgen.id && !currentActiveAgen.nama);
+
+    // Filter States
     const [startDate, setStartDate] = useState(firstDay);
     const [endDate, setEndDate] = useState(today);
     const [bypassTanggal, setBypassTanggal] = useState(false);
-    const [selectedCabang, setSelectedCabang] = useState('');
+    const [selectedCabang, setSelectedCabang] = useState(isHoldingUser ? '' : currentActiveAgen.id);
     const [bttKembali, setBttKembali] = useState('');
     const [selectedPIC, setSelectedPIC] = useState('');
     const [searchCustomer, setSearchCustomer] = useState('');
@@ -25,10 +90,12 @@ const KondisiBTT = () => {
     const [showBTT, setShowBTT] = useState(true);
     const [showOrderJemput, setShowOrderJemput] = useState(true);
 
-    const [cabangList, setCabangList] = useState([]);
-    const [picList, setPicList] = useState([]);
-    const [data, setData] = useState([]);
-    const [loading, setLoading] = useState(false);
+    // Sinkronisasi cabang otomatis untuk cabang daerah
+    useEffect(() => {
+        if (!isHoldingUser && currentActiveAgen.id) {
+            setSelectedCabang(currentActiveAgen.id);
+        }
+    }, [isHoldingUser, currentActiveAgen.id, cabangList]);
 
     const fetchOptions = async () => {
         try {
@@ -40,7 +107,7 @@ const KondisiBTT = () => {
             setCabangList(resCabang.data?.data || []);
             setPicList(resPIC.data?.pic_list || []);
         } catch (err) {
-            console.error("Gagal load opsi filter:", err);
+            console.error('Gagal load opsi filter:', err);
         }
     };
 
@@ -54,7 +121,8 @@ const KondisiBTT = () => {
             if (!bypassTanggal) {
                 url += `&start_date=${startDate}&end_date=${endDate}`;
             }
-            if (selectedCabang) url += `&cabang_asal=${encodeURIComponent(selectedCabang)}`;
+            const activeFilterCabang = !isHoldingUser ? currentActiveAgen.id : selectedCabang;
+            if (activeFilterCabang) url += `&cabang_asal=${encodeURIComponent(activeFilterCabang)}`;
             if (bttKembali) url += `&btt_kembali=${encodeURIComponent(bttKembali)}`;
             if (selectedPIC) url += `&pic=${encodeURIComponent(selectedPIC)}`;
             if (searchCustomer) url += `&customer=${encodeURIComponent(searchCustomer)}`;
@@ -66,7 +134,7 @@ const KondisiBTT = () => {
             const res = await api.get(url, { headers: { Authorization: `Bearer ${token}` } });
             setData(res.data?.data || []);
         } catch (err) {
-            console.error("Gagal load data kondisi BTT:", err);
+            console.error('Gagal load data kondisi BTT:', err);
         } finally {
             setLoading(false);
         }
@@ -86,7 +154,7 @@ const KondisiBTT = () => {
         setStartDate(firstDay);
         setEndDate(today);
         setBypassTanggal(false);
-        setSelectedCabang('');
+        setSelectedCabang(isHoldingUser ? '' : currentActiveAgen.id);
         setBttKembali('');
         setSelectedPIC('');
         setSearchCustomer('');
@@ -187,193 +255,212 @@ const KondisiBTT = () => {
 
     return (
         <div className="space-y-5">
-            {/* Filter Panel */}
-            <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs">
-                <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
-                    <Filter size={16} className="text-sky-600" />
-                    FILTER KONDISI BTT & ORDER JEMPUT
-                </div>
+            {/* Filter Panel (Kondisional Buka/Tutup) */}
+            {showFilter && (
+                <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all">
+                    <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
+                        <Filter size={16} className="text-sky-600" />
+                        FILTER KONDISI BTT & ORDER JEMPUT
+                    </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                            <label className="font-bold text-slate-500 block mb-1">TGL AWAL</label>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                                <label className="font-bold text-slate-500 block mb-1">TGL AWAL</label>
+                                <input
+                                    type="date"
+                                    disabled={bypassTanggal}
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className={`w-full p-2 border rounded-lg font-bold outline-none ${bypassTanggal ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-white text-slate-800 border-slate-300 focus:border-sky-500'
+                                        }`}
+                                />
+                            </div>
+                            <div className="flex-1">
+                                <label className="font-bold text-slate-500 block mb-1">TGL AKHIR</label>
+                                <input
+                                    type="date"
+                                    disabled={bypassTanggal}
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className={`w-full p-2 border rounded-lg font-bold outline-none ${bypassTanggal ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-white text-slate-800 border-slate-300 focus:border-sky-500'
+                                        }`}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Cabang Asal Filter */}
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">CABANG ASAL</label>
+                            <select
+                                value={!isHoldingUser && currentActiveAgen.id ? currentActiveAgen.id : selectedCabang}
+                                disabled={!isHoldingUser}
+                                onChange={(e) => setSelectedCabang(e.target.value)}
+                                className={`w-full p-2 border rounded-lg font-bold outline-none ${!isHoldingUser
+                                        ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed select-none'
+                                        : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500 cursor-pointer'
+                                    }`}
+                                title={!isHoldingUser ? 'Filter cabang terkunci sesuai lokasi login Anda' : 'Pilih cabang asal'}
+                            >
+                                {isHoldingUser && (
+                                    <option value="">-- SEMUA CABANG ASAL --</option>
+                                )}
+
+                                {!isHoldingUser ? (
+                                    <option value={currentActiveAgen.id}>
+                                        {currentActiveAgen.nama || 'CABANG AKTIF'}
+                                    </option>
+                                ) : (
+                                    cabangList.map((c, i) => (
+                                        <option key={i} value={c.agen_id || c.AgenID}>{c.agen_nama || c.AgenNama}</option>
+                                    ))
+                                )}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">BTT TELAH KEMBALI</label>
+                            <select
+                                value={bttKembali}
+                                onChange={(e) => setBttKembali(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            >
+                                <option value="">-- SEMUA STATUS FISIK --</option>
+                                <option value="Y">Sudah Kembali (POD)</option>
+                                <option value="N">Belum Kembali</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">PIC MARKETING</label>
+                            <select
+                                value={selectedPIC}
+                                onChange={(e) => setSelectedPIC(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            >
+                                <option value="">-- SEMUA PIC --</option>
+                                {picList.map((pic, i) => (
+                                    <option key={i} value={pic}>{pic}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">CUSTOMER</label>
                             <input
-                                type="date"
-                                disabled={bypassTanggal}
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                className={`w-full p-2 border rounded-lg font-bold outline-none ${bypassTanggal ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-white text-slate-800 border-slate-300 focus:border-sky-500'}`}
+                                type="text"
+                                placeholder="Cari customer / pengirim..."
+                                value={searchCustomer}
+                                onChange={(e) => setSearchCustomer(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
                             />
                         </div>
-                        <div className="flex-1">
-                            <label className="font-bold text-slate-500 block mb-1">TGL AKHIR</label>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">STATUS FAKTUR INVOICE</label>
+                            <select
+                                value={sudahInvoice}
+                                onChange={(e) => setSudahInvoice(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            >
+                                <option value="">-- SEMUA STATUS FAKTUR --</option>
+                                <option value="Y">Sudah Dibuatkan Invoice</option>
+                                <option value="N">Belum Difakturkan (Unbilled)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">STATUS BAYAR</label>
+                            <select
+                                value={statusBayar}
+                                onChange={(e) => setStatusBayar(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            >
+                                <option value="">-- SEMUA STATUS LUNAS --</option>
+                                <option value="Y">Sudah Lunas</option>
+                                <option value="N">Belum Lunas</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">METODE PEMBAYARAN</label>
+                            <select
+                                value={metodeBayar}
+                                onChange={(e) => setMetodeBayar(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            >
+                                <option value="">-- SEMUA METODE --</option>
+                                <option value="TUNAI">TUNAI</option>
+                                <option value="KREDIT">KREDIT</option>
+                                <option value="TAGIH TURUN">TAGIH TURUN (COD)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">TGL PELUNASAN</label>
                             <input
                                 type="date"
-                                disabled={bypassTanggal}
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                className={`w-full p-2 border rounded-lg font-bold outline-none ${bypassTanggal ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-white text-slate-800 border-slate-300 focus:border-sky-500'}`}
+                                value={tglPelunasan}
+                                onChange={(e) => setTglPelunasan(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
                             />
+                        </div>
+
+                        <div className="flex items-center gap-4 mt-5">
+                            <label className="flex items-center gap-1.5 cursor-pointer font-bold text-slate-700">
+                                <input
+                                    type="checkbox"
+                                    checked={showBTT}
+                                    onChange={(e) => setShowBTT(e.target.checked)}
+                                    className="w-4 h-4 text-sky-600 rounded"
+                                />
+                                BTT
+                            </label>
+                            <label className="flex items-center gap-1.5 cursor-pointer font-bold text-slate-700">
+                                <input
+                                    type="checkbox"
+                                    checked={showOrderJemput}
+                                    onChange={(e) => setShowOrderJemput(e.target.checked)}
+                                    className="w-4 h-4 text-sky-600 rounded"
+                                />
+                                Order Jemput
+                            </label>
+                            <label className="flex items-center gap-1.5 cursor-pointer font-bold text-slate-700">
+                                <input
+                                    type="checkbox"
+                                    checked={bypassTanggal}
+                                    onChange={(e) => setBypassTanggal(e.target.checked)}
+                                    className="w-4 h-4 text-sky-600 rounded"
+                                />
+                                Bypass Tgl
+                            </label>
                         </div>
                     </div>
 
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">CABANG ASAL</label>
-                        <select
-                            value={selectedCabang}
-                            onChange={(e) => setSelectedCabang(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={() => window.print()}
+                            className="px-5 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold rounded-xl transition flex items-center gap-1.5 uppercase cursor-pointer"
                         >
-                            <option value="">-- SEMUA CABANG ASAL --</option>
-                            {cabangList.map((c, i) => (
-                                <option key={i} value={c.agen_id || c.AgenID}>{c.agen_nama || c.AgenNama}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">BTT TELAH KEMBALI</label>
-                        <select
-                            value={bttKembali}
-                            onChange={(e) => setBttKembali(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            <Printer size={14} /> Cetak Laporan
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleResetFilter}
+                            className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer"
                         >
-                            <option value="">-- SEMUA STATUS FISIK --</option>
-                            <option value="Y">Sudah Kembali (POD)</option>
-                            <option value="N">Belum Kembali</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">PIC MARKETING</label>
-                        <select
-                            value={selectedPIC}
-                            onChange={(e) => setSelectedPIC(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            RESET
+                        </button>
+                        <button
+                            type="submit"
+                            className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5"
                         >
-                            <option value="">-- SEMUA PIC --</option>
-                            {picList.map((pic, i) => (
-                                <option key={i} value={pic}>{pic}</option>
-                            ))}
-                        </select>
+                            <RefreshCw size={14} /> REFRESH DATA
+                        </button>
                     </div>
-
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">CUSTOMER</label>
-                        <input
-                            type="text"
-                            placeholder="Cari customer / pengirim..."
-                            value={searchCustomer}
-                            onChange={(e) => setSearchCustomer(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">STATUS FAKTUR INVOICE</label>
-                        <select
-                            value={sudahInvoice}
-                            onChange={(e) => setSudahInvoice(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                        >
-                            <option value="">-- SEMUA STATUS FAKTUR --</option>
-                            <option value="Y">Sudah Dibuatkan Invoice</option>
-                            <option value="N">Belum Difakturkan (Unbilled)</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">STATUS BAYAR</label>
-                        <select
-                            value={statusBayar}
-                            onChange={(e) => setStatusBayar(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                        >
-                            <option value="">-- SEMUA STATUS LUNAS --</option>
-                            <option value="Y">Sudah Lunas</option>
-                            <option value="N">Belum Lunas</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">METODE PEMBAYARAN</label>
-                        <select
-                            value={metodeBayar}
-                            onChange={(e) => setMetodeBayar(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                        >
-                            <option value="">-- SEMUA METODE --</option>
-                            <option value="TUNAI">TUNAI</option>
-                            <option value="KREDIT">KREDIT</option>
-                            <option value="TAGIH TURUN">TAGIH TURUN (COD)</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">TGL PELUNASAN</label>
-                        <input
-                            type="date"
-                            value={tglPelunasan}
-                            onChange={(e) => setTglPelunasan(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                        />
-                    </div>
-
-                    <div className="flex items-center gap-4 mt-5">
-                        <label className="flex items-center gap-1.5 cursor-pointer font-bold text-slate-700">
-                            <input
-                                type="checkbox"
-                                checked={showBTT}
-                                onChange={(e) => setShowBTT(e.target.checked)}
-                                className="w-4 h-4 text-sky-600 rounded"
-                            />
-                            BTT
-                        </label>
-                        <label className="flex items-center gap-1.5 cursor-pointer font-bold text-slate-700">
-                            <input
-                                type="checkbox"
-                                checked={showOrderJemput}
-                                onChange={(e) => setShowOrderJemput(e.target.checked)}
-                                className="w-4 h-4 text-sky-600 rounded"
-                            />
-                            Order Jemput
-                        </label>
-                        <label className="flex items-center gap-1.5 cursor-pointer font-bold text-slate-700">
-                            <input
-                                type="checkbox"
-                                checked={bypassTanggal}
-                                onChange={(e) => setBypassTanggal(e.target.checked)}
-                                className="w-4 h-4 text-sky-600 rounded"
-                            />
-                            Bypass Tgl
-                        </label>
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                    <button
-                        type="button"
-                        onClick={() => window.print()}
-                        className="px-5 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold rounded-xl transition flex items-center gap-1.5 uppercase cursor-pointer"
-                    >
-                        <Printer size={14} /> Cetak Laporan
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleResetFilter}
-                        className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer"
-                    >
-                        RESET
-                    </button>
-                    <button
-                        type="submit"
-                        className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5"
-                    >
-                        <RefreshCw size={14} /> REFRESH DATA
-                    </button>
-                </div>
-            </form>
+                </form>
+            )}
 
             {/* Tabel List Monitoring */}
             <DataTableTemplate
@@ -386,6 +473,7 @@ const KondisiBTT = () => {
                 hideAddButton={true}
                 hideActions={true}
                 hideActionColumn={true}
+                onFilter={() => setShowFilter(prev => !prev)}
                 onEdit={(item) => {
                     Swal.fire({
                         title: `Detail Resi ${item.no_dokumen}`,

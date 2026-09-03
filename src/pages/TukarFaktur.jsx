@@ -1,26 +1,103 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api/axios';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
-import { Filter, RotateCcw, Search } from 'lucide-react';
+import { Filter, RotateCcw, Search, RefreshCw, Printer } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 const TukarFaktur = () => {
     const { isDarkMode } = useDarkMode();
     const [data, setData] = useState([]);
+    const [cabangList, setCabangList] = useState([]);
     const [loading, setLoading] = useState(false);
     const [showFilter, setShowFilter] = useState(false);
 
     const todayStr = new Date().toISOString().split('T')[0];
+
+    // =========================================================================
+    // HELPER: DETEKSI CABANG & STATUS HOLDING / PUSAT SECARA DINAMIS
+    // =========================================================================
+    function getActiveAgen() {
+        const activeAgenId = localStorage.getItem('active_agen_id') || localStorage.getItem('agen_id') || '';
+        const activeCabangId = localStorage.getItem('active_cabang_id') || localStorage.getItem('cabang_id') || '';
+        const sessionCabangNama = localStorage.getItem('active_cabang_nama')
+            || localStorage.getItem('cabang_nama')
+            || localStorage.getItem('active_agen_nama')
+            || '';
+
+        if (sessionCabangNama) {
+            return {
+                id: activeCabangId || activeAgenId || '',
+                nama: sessionCabangNama.toUpperCase()
+            };
+        }
+
+        const found = cabangList.find(c => {
+            const cId = String(c.agen_id || c.AgenID || '').trim().toLowerCase();
+            const cKode = String(c.agen_kode || c.AgenKode || '').trim().toLowerCase();
+            const cNama = String(c.agen_nama || c.AgenNama || '').trim().toLowerCase();
+            const targetAgen = activeAgenId.trim().toLowerCase();
+            const targetCabang = activeCabangId.trim().toLowerCase();
+
+            return (
+                (targetAgen && (cId === targetAgen || cKode === targetAgen || cNama.includes(targetAgen))) ||
+                (targetCabang && (cId === targetCabang || cKode === targetCabang || cNama.includes(targetCabang)))
+            );
+        });
+
+        if (found) {
+            return {
+                id: String(found.agen_id || found.AgenID),
+                nama: String(found.agen_nama || found.AgenNama).toUpperCase()
+            };
+        }
+
+        if (activeAgenId && activeAgenId.toUpperCase().includes('PUSAT')) {
+            return { id: '001', nama: 'PUSAT DAKOTA' };
+        }
+
+        return {
+            id: activeCabangId || activeAgenId || '',
+            nama: activeAgenId ? `AGEN ${activeAgenId.toUpperCase()}` : ''
+        };
+    }
+
+    const currentActiveAgen = getActiveAgen();
+    const isHoldingUser =
+        String(currentActiveAgen.nama || '').toUpperCase().includes('PUSAT') ||
+        String(currentActiveAgen.nama || '').toUpperCase().includes('HOLDING') ||
+        String(currentActiveAgen.id || '') === '001' ||
+        String(localStorage.getItem('active_agen_id') || '').toUpperCase().includes('PUSAT') ||
+        (!currentActiveAgen.id && !currentActiveAgen.nama);
+
+    // Filter Form State
     const [filterState, setFilterState] = useState({
         useTanggal: false,
         startDate: todayStr,
         endDate: todayStr,
+        selectedCabang: isHoldingUser ? '' : currentActiveAgen.id,
         useNoInvoice: false,
         noInvoice: '',
         useNoKW: false,
         noKW: ''
     });
+
+    const fetchOptions = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const resCabang = await api.get('/gl/agen-ca?stt=', { headers: { Authorization: `Bearer ${token}` } });
+            setCabangList(resCabang.data?.data || []);
+        } catch (err) {
+            console.error("Gagal load opsi cabang:", err);
+        }
+    };
+
+    // Sinkronisasi cabang otomatis untuk user cabang
+    useEffect(() => {
+        if (!isHoldingUser && currentActiveAgen.id) {
+            setFilterState(prev => ({ ...prev, selectedCabang: currentActiveAgen.id }));
+        }
+    }, [isHoldingUser, currentActiveAgen.id, cabangList]);
 
     const fetchTukarFaktur = async () => {
         setLoading(true);
@@ -32,6 +109,10 @@ const TukarFaktur = () => {
             if (filterState.useTanggal) {
                 params.start_date = filterState.startDate;
                 params.end_date = filterState.endDate;
+            }
+            const activeFilterCabang = !isHoldingUser ? currentActiveAgen.id : filterState.selectedCabang;
+            if (activeFilterCabang) {
+                params.cabang_id = activeFilterCabang;
             }
             if (filterState.useNoInvoice && filterState.noInvoice.trim()) {
                 params.no_invoice = filterState.noInvoice.trim();
@@ -53,6 +134,7 @@ const TukarFaktur = () => {
     };
 
     useEffect(() => {
+        fetchOptions();
         fetchTukarFaktur();
     }, []);
 
@@ -61,11 +143,13 @@ const TukarFaktur = () => {
             useTanggal: false,
             startDate: todayStr,
             endDate: todayStr,
+            selectedCabang: isHoldingUser ? '' : currentActiveAgen.id,
             useNoInvoice: false,
             noInvoice: '',
             useNoKW: false,
             noKW: ''
         });
+        fetchTukarFaktur();
     };
 
     const handleFormSubmit = async (item = null) => {
@@ -76,8 +160,12 @@ const TukarFaktur = () => {
         let invoiceOptionsHtml = '';
         if (!isEdit) {
             try {
+                const activeFilterCabang = !isHoldingUser ? currentActiveAgen.id : filterState.selectedCabang;
                 const resInv = await api.get('/piutang/tukar-faktur/available-invoices', {
-                    params: { pt_id: ptId },
+                    params: {
+                        pt_id: ptId,
+                        cabang_id: activeFilterCabang || undefined
+                    },
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 const invoices = resInv.data?.data || [];
@@ -119,8 +207,8 @@ const TukarFaktur = () => {
             `,
             focusConfirm: false,
             showCancelButton: true,
-            confirmButtonColor: '#2563eb',
-            cancelButtonColor: '#d33',
+            confirmButtonColor: '#0284c7',
+            cancelButtonColor: '#64748b',
             confirmButtonText: 'Simpan Data',
             cancelButtonText: 'Batal',
             preConfirm: () => {
@@ -169,7 +257,7 @@ const TukarFaktur = () => {
             html: `Apakah Anda yakin ingin membatalkan status Tukar Faktur untuk invoice <b>${item.invoice_no}</b>?`,
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: '#dc2626',
+            confirmButtonColor: '#e11d48',
             confirmButtonText: 'Ya, Hapus!'
         });
 
@@ -195,7 +283,7 @@ const TukarFaktur = () => {
             header: 'NO. INVOICE',
             accessor: 'invoice_no',
             render: (item) => (
-                <span className="font-mono font-black text-blue-600 dark:text-blue-400">
+                <span className="font-mono font-bold text-sky-600">
                     {item.invoice_no}
                 </span>
             )
@@ -204,7 +292,7 @@ const TukarFaktur = () => {
             header: 'TGL. INV',
             accessor: 'tgl_invoice',
             render: (item) => (
-                <span style={{ color: isDarkMode ? '#FFFFFF' : '#000000' }} className="font-mono font-bold">
+                <span className="font-mono text-slate-600">
                     {item.tgl_invoice || '-'}
                 </span>
             )
@@ -213,9 +301,9 @@ const TukarFaktur = () => {
             header: 'PELANGGAN',
             accessor: 'cust_name',
             render: (item) => (
-                <div style={{ color: isDarkMode ? '#FFFFFF' : '#000000' }} className="font-bold flex flex-col">
-                    <span>{item.cust_name}</span>
-                    <span className="text-[10px] text-slate-500 font-mono font-normal">{item.cust_id}</span>
+                <div className="font-bold flex flex-col">
+                    <span className="text-slate-800">{item.cust_name}</span>
+                    <span className="text-[10px] text-slate-400 font-mono font-normal">{item.cust_id}</span>
                 </div>
             )
         },
@@ -223,16 +311,16 @@ const TukarFaktur = () => {
             header: 'FAKTUR PAJAK',
             accessor: 'faktur_pajak',
             render: (item) => (
-                <span style={{ color: isDarkMode ? '#FFFFFF' : '#000000' }} className="font-mono font-bold text-xs">
+                <span className="font-mono text-slate-700 text-xs">
                     {item.faktur_pajak || '-'}
                 </span>
             )
         },
         {
-            header: 'TAGIHAN',
+            header: 'TAGIHAN (RP)',
             accessor: 'total_tagihan',
             render: (item) => (
-                <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
+                <span className="font-mono font-black text-rose-600">
                     Rp {Number(item.total_tagihan || 0).toLocaleString('id-ID')}
                 </span>
             )
@@ -241,7 +329,7 @@ const TukarFaktur = () => {
             header: 'TGL. TUKAR',
             accessor: 'tgl_tukar',
             render: (item) => (
-                <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
+                <span className="font-mono font-bold text-amber-600">
                     {item.tgl_tukar || '-'}
                 </span>
             )
@@ -250,7 +338,7 @@ const TukarFaktur = () => {
             header: 'PENERIMA (PIC)',
             accessor: 'penerima',
             render: (item) => (
-                <span style={{ color: isDarkMode ? '#FFFFFF' : '#000000' }} className="font-bold uppercase">
+                <span className="font-bold uppercase text-slate-800">
                     {item.penerima || '-'}
                 </span>
             )
@@ -258,27 +346,30 @@ const TukarFaktur = () => {
     ];
 
     return (
-        <div className="space-y-3">
+        <div className="space-y-5">
             {/* PANEL FILTER EXPANDABLE */}
             {showFilter && (
-                <div className={`p-5 rounded-2xl border shadow-sm transition-all ${isDarkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-slate-300 text-slate-900'
-                    }`}>
-                    <div className="flex items-center gap-2 pb-3 border-b border-slate-200 dark:border-gray-700 mb-4">
-                        <Filter size={18} className="text-blue-600" />
-                        <h3 className="text-xs font-black uppercase tracking-wider">
-                            Filter Parameter Tukar Faktur
-                        </h3>
+                <form
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        fetchTukarFaktur();
+                    }}
+                    className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all"
+                >
+                    <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
+                        <Filter size={16} className="text-sky-600" />
+                        FILTER PARAMETER TUKAR FAKTUR
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-bold">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 font-bold">
                         {/* 1. Filter Rentang Tanggal */}
                         <div className="space-y-1.5 md:col-span-2">
-                            <label className="flex items-center gap-2 cursor-pointer select-none">
+                            <label className="flex items-center gap-2 cursor-pointer select-none text-slate-600">
                                 <input
                                     type="checkbox"
                                     checked={filterState.useTanggal}
                                     onChange={(e) => setFilterState(p => ({ ...p, useTanggal: e.target.checked }))}
-                                    className="w-4 h-4 rounded text-blue-600 cursor-pointer"
+                                    className="w-4 h-4 rounded text-sky-600 cursor-pointer"
                                 />
                                 <span>TANGGAL TUKAR FAKTUR</span>
                             </label>
@@ -288,28 +379,61 @@ const TukarFaktur = () => {
                                     disabled={!filterState.useTanggal}
                                     value={filterState.startDate}
                                     onChange={(e) => setFilterState(p => ({ ...p, startDate: e.target.value }))}
-                                    className={`w-full p-2 border rounded-xl font-mono outline-none ${!filterState.useTanggal ? 'opacity-50 cursor-not-allowed bg-slate-100 dark:bg-gray-700' : ''
-                                        } ${isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
+                                    className={`w-full p-2 border rounded-lg font-mono outline-none ${!filterState.useTanggal
+                                            ? 'opacity-50 cursor-not-allowed bg-slate-100 border-slate-200 text-slate-400'
+                                            : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500'
+                                        }`}
                                 />
                                 <input
                                     type="date"
                                     disabled={!filterState.useTanggal}
                                     value={filterState.endDate}
                                     onChange={(e) => setFilterState(p => ({ ...p, endDate: e.target.value }))}
-                                    className={`w-full p-2 border rounded-xl font-mono outline-none ${!filterState.useTanggal ? 'opacity-50 cursor-not-allowed bg-slate-100 dark:bg-gray-700' : ''
-                                        } ${isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
+                                    className={`w-full p-2 border rounded-lg font-mono outline-none ${!filterState.useTanggal
+                                            ? 'opacity-50 cursor-not-allowed bg-slate-100 border-slate-200 text-slate-400'
+                                            : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500'
+                                        }`}
                                 />
                             </div>
                         </div>
 
+                        {/* Dropdown Cabang dengan Logika Penguncian */}
+                        <div>
+                            <label className="block mb-1 text-slate-500">AGEN / CABANG</label>
+                            <select
+                                value={!isHoldingUser && currentActiveAgen.id ? currentActiveAgen.id : filterState.selectedCabang}
+                                disabled={!isHoldingUser}
+                                onChange={(e) => setFilterState(p => ({ ...p, selectedCabang: e.target.value }))}
+                                className={`w-full p-2 border rounded-lg font-bold outline-none ${!isHoldingUser
+                                        ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed select-none'
+                                        : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500 cursor-pointer'
+                                    }`}
+                                title={!isHoldingUser ? 'Filter cabang terkunci sesuai lokasi login Anda' : 'Pilih cabang'}
+                            >
+                                {isHoldingUser && (
+                                    <option value="">-- SEMUA CABANG --</option>
+                                )}
+
+                                {!isHoldingUser ? (
+                                    <option value={currentActiveAgen.id}>
+                                        {currentActiveAgen.nama || 'CABANG AKTIF'}
+                                    </option>
+                                ) : (
+                                    cabangList.map((c, i) => (
+                                        <option key={i} value={c.agen_id || c.AgenID}>{c.agen_nama || c.AgenNama}</option>
+                                    ))
+                                )}
+                            </select>
+                        </div>
+
                         {/* 2. Filter No Invoice */}
                         <div className="space-y-1.5">
-                            <label className="flex items-center gap-2 cursor-pointer select-none">
+                            <label className="flex items-center gap-2 cursor-pointer select-none text-slate-600">
                                 <input
                                     type="checkbox"
                                     checked={filterState.useNoInvoice}
                                     onChange={(e) => setFilterState(p => ({ ...p, useNoInvoice: e.target.checked }))}
-                                    className="w-4 h-4 rounded text-blue-600 cursor-pointer"
+                                    className="w-4 h-4 rounded text-sky-600 cursor-pointer"
                                 />
                                 <span>NO. INVOICE</span>
                             </label>
@@ -319,19 +443,21 @@ const TukarFaktur = () => {
                                 disabled={!filterState.useNoInvoice}
                                 value={filterState.noInvoice}
                                 onChange={(e) => setFilterState(p => ({ ...p, noInvoice: e.target.value }))}
-                                className={`w-full p-2 border rounded-xl font-mono outline-none ${!filterState.useNoInvoice ? 'opacity-50 cursor-not-allowed bg-slate-100 dark:bg-gray-700' : ''
-                                    } ${isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
+                                className={`w-full p-2 border rounded-lg font-mono outline-none ${!filterState.useNoInvoice
+                                        ? 'opacity-50 cursor-not-allowed bg-slate-100 border-slate-200 text-slate-400'
+                                        : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500'
+                                    }`}
                             />
                         </div>
 
                         {/* 3. Filter No Kwitansi */}
                         <div className="space-y-1.5">
-                            <label className="flex items-center gap-2 cursor-pointer select-none">
+                            <label className="flex items-center gap-2 cursor-pointer select-none text-slate-600">
                                 <input
                                     type="checkbox"
                                     checked={filterState.useNoKW}
                                     onChange={(e) => setFilterState(p => ({ ...p, useNoKW: e.target.checked }))}
-                                    className="w-4 h-4 rounded text-blue-600 cursor-pointer"
+                                    className="w-4 h-4 rounded text-sky-600 cursor-pointer"
                                 />
                                 <span>NO. KWITANSI</span>
                             </label>
@@ -341,29 +467,30 @@ const TukarFaktur = () => {
                                 disabled={!filterState.useNoKW}
                                 value={filterState.noKW}
                                 onChange={(e) => setFilterState(p => ({ ...p, noKW: e.target.value }))}
-                                className={`w-full p-2 border rounded-xl font-mono outline-none ${!filterState.useNoKW ? 'opacity-50 cursor-not-allowed bg-slate-100 dark:bg-gray-700' : ''
-                                    } ${isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
+                                className={`w-full p-2 border rounded-lg font-mono outline-none ${!filterState.useNoKW
+                                        ? 'opacity-50 cursor-not-allowed bg-slate-100 border-slate-200 text-slate-400'
+                                        : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500'
+                                    }`}
                             />
                         </div>
                     </div>
 
-                    <div className="flex justify-end gap-2 pt-4 mt-4 border-t border-slate-200 dark:border-gray-700">
+                    <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                         <button
                             type="button"
                             onClick={handleResetFilter}
-                            className="px-4 py-2 border border-slate-300 rounded-xl font-bold text-xs flex items-center gap-1.5 text-slate-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-gray-700 cursor-pointer"
+                            className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer text-xs"
                         >
-                            <RotateCcw size={14} /> Reset Filter
+                            RESET
                         </button>
                         <button
-                            type="button"
-                            onClick={fetchTukarFaktur}
-                            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"
+                            type="submit"
+                            className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5 text-xs"
                         >
-                            <Search size={14} /> Terapkan Filter
+                            <RefreshCw size={14} /> REFRESH DATA
                         </button>
                     </div>
-                </div>
+                </form>
             )}
 
             {/* TABEL TUKAR FAKTUR */}
