@@ -114,6 +114,8 @@ import SaldoAwalPiutang from "./pages/SaldoAwalPiutang";
 import TukarFaktur from "./pages/TukarFaktur";
 import AgingHutang from "./pages/AgingHutang";
 import InvoiceVendor from "./pages/InvoiceVendor";
+import MasterKaryawan from './pages/MasterKaryawan';
+import DaftarFormHRD from './pages/DaftarFormHRD';
 
 const getCompanyName = (pt) => {
   if (pt === 'A') return 'Dakota Buana Sarana';
@@ -525,7 +527,6 @@ function App() {
 
       <Route path="/dashboard" element={<MainLayout><Dashboard /></MainLayout>} />
       <Route path="/account" element={<MainLayout><Account /></MainLayout>} />
-      <Route path="/hrd" element={<MainLayout><UnderConstruction menuName="HRD" /></MainLayout>} />
 
       <Route path="/marketing" element={<MainLayout><UnderConstruction menuName="Marketing" /></MainLayout>} />
       <Route path="/marketing/master-customer" element={<MainLayout><MasterCustomer /></MainLayout>} />
@@ -630,6 +631,11 @@ function App() {
       <Route path="/tukar-faktur" element={<MainLayout><TukarFaktur /></MainLayout>} />
 
       <Route path="/klaim" element={<MainLayout><UnderConstruction menuName="Klaim" /></MainLayout>} />
+
+      <Route path="/hrd" element={<MainLayout><UnderConstruction menuName="HRD" /></MainLayout>} />
+      <Route path="/hrd/karyawan" element={<MainLayout><MasterKaryawan /></MainLayout>} />
+      <Route path="/hrd/MasterKaryawan" element={<MainLayout><MasterKaryawan /></MainLayout>} />
+      <Route path="/hrd/form" element={<MainLayout><DaftarFormHRD /></MainLayout>} />
 
       <Route path="/Settings" element={<MainLayout><UnderConstruction menuName="Settings" /></MainLayout>} />
       <Route path="/settings/users" element={<MainLayout><UserManagement menuName="UserManagement" /></MainLayout>} />

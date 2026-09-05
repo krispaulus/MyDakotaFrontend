@@ -492,12 +492,19 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
         // { name: 'Insentif Loper', path: '#' },
       ]
     },
-    { name: 'HRD', icon: <Briefcase size={20} />, roles: ['S', 'A'], division: 'HRD' },
 
+    {
+      name: 'HRD',
+      icon: <Briefcase size={20} />,
+      roles: ['S', 'A'],
+      children: [
+        // { name: 'Cek Jurnal', path: '#', roles: ['S'] },
+        { name: 'Master Karyawan', path: '/hrd/karyawan', roles: ['S'] },
+        { name: 'Daftar Form HRD', path: '/hrd/form', roles: ['S', 'A', 'U'] },
+      ]
+    },
 
     // MENU SETTINGS DENGAN CHILDREN
-
-
     {
       name: 'Settings',
       icon: <Settings size={20} />,

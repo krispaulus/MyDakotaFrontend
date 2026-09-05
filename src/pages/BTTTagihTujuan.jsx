@@ -5,6 +5,7 @@ import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
 import { Filter, CheckCircle2, XCircle, Printer, X, RefreshCw, Truck, Layers, CheckSquare, Square } from 'lucide-react';
 import Swal from 'sweetalert2';
+import dakotaLogo from '../assets/new_logo 2.png';
 
 const BTTTagihTujuan = () => {
     const { isDarkMode } = useDarkMode();
@@ -115,7 +116,7 @@ const BTTTagihTujuan = () => {
             setCabangList(resCabang.data?.data || []);
             setCustList(resCust.data?.data || []);
         } catch (err) {
-            console.error("Gagal load opsi filter:", err);
+            console.error('Gagal load opsi filter:', err);
         }
     };
 
@@ -140,7 +141,7 @@ const BTTTagihTujuan = () => {
             const res = await api.get(url, { headers: { Authorization: `Bearer ${token}` } });
             setData(res.data?.data || []);
         } catch (err) {
-            console.error("Gagal load data BTT Tagih Tujuan:", err);
+            console.error('Gagal load data BTT Tagih Tujuan:', err);
         } finally {
             setLoading(false);
         }
@@ -183,7 +184,6 @@ const BTTTagihTujuan = () => {
         );
     };
 
-    // Terbilang Rupiah
     const terbilang = (angka) => {
         const bilangan = ['', 'Satu', 'Dua', 'Tiga', 'Empat', 'Lima', 'Enam', 'Tujuh', 'Delapan', 'Sembilan', 'Sepuluh', 'Sebelas'];
         angka = Math.floor(Math.abs(angka));
@@ -378,9 +378,15 @@ const BTTTagihTujuan = () => {
                     {selectedItemsData.map((item, idx) => (
                         <div key={idx} className="border-2 border-dashed border-slate-400 p-5 rounded-xl space-y-3 page-break-after">
                             <div className="flex justify-between items-center border-b pb-2 border-slate-300">
-                                <div>
-                                    <h2 className="text-base font-black tracking-widest text-slate-900">DAKOTA CARGO</h2>
-                                    <span className="text-[10px] text-slate-500 font-bold uppercase">BUKTI TANDA TERIMA (BTT TAGIH TUJUAN)</span>
+                                <div className="flex flex-col items-start gap-3">
+                                    <img
+                                        src={dakotaLogo}
+                                        alt="Logo Dakota Cargo"
+                                        className="h-8 w-auto object-contain"
+                                    />
+                                    <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">
+                                        BUKTI TANDA TERIMA (BTT TAGIH TUJUAN)
+                                    </span>
                                 </div>
                                 <div className="text-right font-mono">
                                     <span className="text-xs text-slate-400 block font-bold">NO. RESI BTT</span>
@@ -535,7 +541,7 @@ const BTTTagihTujuan = () => {
                 `}
             </style>
 
-            {/* Filter Panel (Kondisional Buka/Tutup) */}
+            {/* Filter Panel */}
             {showFilter && (
                 <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all no-print">
                     <div className="flex items-center justify-between border-b pb-3 border-slate-100">
@@ -577,8 +583,8 @@ const BTTTagihTujuan = () => {
                                 disabled={!isHoldingUser}
                                 onChange={(e) => setSelectedCabang(e.target.value)}
                                 className={`w-full p-2 border rounded-lg font-bold outline-none ${!isHoldingUser
-                                        ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed select-none'
-                                        : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500 cursor-pointer'
+                                    ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed select-none'
+                                    : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500 cursor-pointer'
                                     }`}
                                 title={!isHoldingUser ? "Filter cabang terkunci sesuai lokasi login Anda" : "Pilih cabang tujuan"}
                             >
