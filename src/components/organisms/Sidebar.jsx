@@ -238,6 +238,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
       icon: <Database size={20} />,
       roles: ['S', 'A'],
       children: [
+        { name: 'Master Dalam Kota', path: '/master/master-dalam-kota', roles: ['S', 'A'] },
         { name: 'Area Customer', path: '/master/area-customer', roles: ['S', 'A'] },
         { name: 'Agen', path: '/master/master-agen', roles: ['S', 'A'] },
         { name: 'Area Loper', path: '/master/master-area-loper', roles: ['S', 'A'] },
@@ -254,6 +255,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
         { name: 'Master Customer New', path: '/master/master-customer-new', roles: ['S', 'A'] },
         { name: 'Sopir', path: '/master/master-sopir' },
         { name: 'Trayek', path: '/master/master-trayek', roles: ['S', 'A'] },
+        { name: 'Tarif Handling Propinsi', path: '/master/tarif-handling-propinsi' },
         {
           name: 'Tarif',
           icon: <Truck size={18} />,
@@ -261,7 +263,6 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
             { name: 'Tarif Carter', path: '/master/tarif-carter' },
             // { name: 'Tarif Handling', path: '/settings/general-ledger' },
             { name: 'Tarif Paket Customer', path: '/master/tarif-customer' },
-            { name: 'Tarif Handling Propinsi', path: '/master/tarif-handling-propinsi' },
             { name: 'Tarif Paket', path: '/master/tarif-paket' },
             // { name: 'Tarif Paket Kurir', path: '/settings/marketing' },
             { name: 'Tarif Paket Ekonomis', path: '/master/tarif-ekonomis' },
@@ -269,10 +270,9 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
             // { name: 'Tarif Transit', path: '/settings/account' },
             { name: 'Tarif Unit', path: '/master/tarif-unit' },
             { name: 'Jenis Kendaraan Carter', path: '/master/jenis-kendaraan-carter' },
-            { name: 'Master Vendor', path: '/master/master-vendor' },
           ]
-
         },
+        { name: 'Master Vendor', path: '/master/master-vendor' },
       ]
     },
 
@@ -357,23 +357,26 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
         { name: 'Master Customer', path: '/marketing/master-customer', roles: ['S'] },
         { name: 'Bukti Tanda Terima(BTT)', path: '/marketing/btt', roles: ['S'] },
         { name: 'Bebas Dari Biaya (Bdb) - Pengiriman', path: '/marketing/bdb' },
+        { name: 'Cek BTT Dari No BTT Manual', path: '/marketing/cek-nobtt-manual', roles: ['S'] },
         { name: 'Cetak BTT / Resi', path: '#print-btt', roles: ['S'] },
         { name: 'Cetak Barcode Koli', path: '#print-barcode', roles: ['S'] },
         { name: 'Closing Harian Agen', path: '/marketing/closing-harian', roles: ['S'] },
-        { name: 'Monitoring BTT', path: '/marketing/monitoring-btt', roles: ['S'] },
+        //{ name: 'Monitoring BTT', path: '/marketing/monitoring-btt', roles: ['S'] }, //MarketingMonitoringBtt.jsx
+        { name: 'Monitoring Btt', path: '/laporan/monitoring-btt', roles: ['S'] }, //MonitoringBtt.jsx
         {
           name: 'Laporan',
           icon: <Backpack size={18} />,
           children: [
-            { name: 'Hasil Penjualan Btt Counter / Agen', path: '/laporan/hasil-penjualan', roles: ['S'] },
+            { name: 'Laporan Handling Barang Naik', path: '/laporan/handling-barang-naik', roles: ['S'] },
+            { name: 'Hasil Penjualan Btt Counter / Agen', path: '/laporan/btt-counter', roles: ['S'] },
             { name: 'Penjualan Btt Harian', path: '/laporan/penjualan-harian' },
-            { name: 'Btt Belum Dibuat Laporan Penjualan', path: '/laporan/btt-belum-dibuat', roles: ['S'] },
+            //{ name: 'Btt Belum Dibuat Laporan Penjualan', path: '/laporan/btt-belum-dibuat', roles: ['S'] }, 
             { name: 'Penjualan', path: '/laporan/penjualan' },
             { name: 'Btt Kirim Outstanding', path: '/laporan/btt-outstanding', roles: ['S'] },
-            { name: 'Perjalanan Btt', path: '/laporan/perjalanan-btt' },
-            { name: 'Penjualan Dan Penerimaan', path: '/laporan/penjualan-penerimaan', roles: ['S'] },
-            { name: 'Laporan Omset Penjualan', path: '/laporan/omset-penjualan' },
-            { name: 'Monitoring Btt', path: '/laporan/monitoring-btt', roles: ['S'] },
+            // { name: 'Perjalanan Btt', path: '/laporan/perjalanan-btt' },
+            // { name: 'Penjualan Dan Penerimaan', path: '/laporan/penjualan-penerimaan', roles: ['S'] },
+            // { name: 'Laporan Omset Penjualan', path: '/laporan/omset-penjualan' },
+            //{ name: 'Monitoring Btt', path: '/laporan/monitoring-btt', roles: ['S'] }, //MonitoringBtt.jsx
           ]
         },
         {
@@ -381,18 +384,18 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
           icon: <Truck size={18} />,
           roles: ['S'],
           children: [
-            { name: 'Asuransi', path: '/pengajuan/asuransi', roles: ['S'] },
-            { name: 'Order Jemput', path: '/pengajuan/order-jemput' },
-            { name: 'Packing', path: '/pengajuan/packing' },
+            { name: 'Asuransi', path: '/marketing/asuransi', roles: ['S'] },
+            { name: 'Order Jemput', path: '/marketing/order-jemput' },
+            { name: 'Packing', path: '/marketing/packing-list' },
           ]
         },
         {
-          name: 'Penerimaan',
+          name: 'Penerimaan BTT',
           icon: <Truck size={18} />,
           path: '', roles: ['S'],
           children: [
-            { name: 'Btt Kembali', path: '/penerimaan/btt-kembali', roles: ['S'] },
-            { name: 'Btt / Barang Retur', path: '/penerimaan/btt-retur' },
+            { name: 'BTT Kembali', path: '/marketing/terima-btt-kembali', roles: ['S'] },
+            { name: 'BTT / Barang Retur', path: '/penerimaan/btt-retur' },
             { name: 'Penerimaan Pembayaran Kasir', path: '/penerimaan/pembayaran-kasir' },
             { name: 'Pengembalian Surat Jalan Customer', path: '/penerimaan/pengembalian-surat-jalan', roles: ['S'] },
             { name: 'Setoran Penjualan Tunai', path: '/penerimaan/setoran-penjualan' },

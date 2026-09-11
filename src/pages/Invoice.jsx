@@ -389,11 +389,17 @@ const Invoice = () => {
         return `${terbilangKapital(Math.floor(angka / 1000000000))} MILIAR ${terbilangKapital(angka % 1000000000)}`.trim();
     };
 
+    // Hitung komponen tagihan akuntansi
     const currentActiveBTTs = activeBTTList.filter(b => !bttToRemove.includes(b.bttt_id));
     const totalBiayaKirim = currentActiveBTTs.reduce((sum, b) => sum + (parseFloat(b.bttt_harga) || 0), 0);
     const totalPenerus = currentActiveBTTs.reduce((sum, b) => sum + (parseFloat(b.bttt_biayapenerus) || 0), 0);
     const totalPacking = currentActiveBTTs.reduce((sum, b) => sum + (parseFloat(b.biaya_packing) || 0), 0);
-    const grandTotalTagihan = totalBiayaKirim + totalPenerus + totalPacking;
+    const totalAsuransi = currentActiveBTTs.reduce((sum, b) => sum + (parseFloat(b.biaya_asuransi) || 0), 0);
+
+    const subtotalDPP = totalBiayaKirim + totalPenerus + totalPacking;
+    const invYear = new Date(activeInvoice?.artih_tanggal || new Date()).getFullYear();
+    const totalPPN = invYear >= 2025 ? subtotalDPP * 0.012 : subtotalDPP * 0.011;
+    const grandTotalTagihan = subtotalDPP + totalPPN + totalAsuransi;
 
     const selectedBTTsData = unbilledBTTList.filter(b => newInvoiceForm.selected_btts.includes(b.bttt_id));
     const totalNewInvoice = selectedBTTsData.reduce((sum, b) => sum + (parseFloat(b.subtotal) || 0), 0);
@@ -454,6 +460,47 @@ const Invoice = () => {
                 <span className="inline-flex items-center gap-1 font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-[10px]">
                     <XCircle size={12} /> DRAFT
                 </span>
+            )
+        },
+        {
+            header: 'AKSI',
+            accessor: 'artih_id',
+            render: (item) => (
+                <div className="flex items-center gap-1.5 justify-center no-print">
+                    {/* Tombol Cetak Langsung */}
+                    <button
+                        type="button"
+                        onClick={() => handleOpenEditInvoice(item)}
+                        className="p-1 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-300 rounded transition cursor-pointer"
+                        title="Buka / Cetak Dokumen"
+                    >
+                        <Printer size={13} />
+                    </button>
+
+                    {/* Tombol Posting jika masih DRAFT */}
+                    {item.artih_postingyn !== 'Y' && (
+                        <button
+                            type="button"
+                            onClick={() => handlePostingInvoice(item.artih_id)}
+                            className="p-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 rounded transition cursor-pointer"
+                            title="Posting Invoice & Jurnal"
+                        >
+                            <Lock size={13} />
+                        </button>
+                    )}
+
+                    {/* Tombol Unposting jika sudah POSTED */}
+                    {item.artih_postingyn === 'Y' && (
+                        <button
+                            type="button"
+                            onClick={() => handleUnpostingInvoice(item)}
+                            className="p-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-300 rounded transition cursor-pointer"
+                            title="Unposting Invoice (Kembali ke Draft)"
+                        >
+                            <Unlock size={13} />
+                        </button>
+                    )}
+                </div>
             )
         }
     ];
@@ -789,16 +836,22 @@ const Invoice = () => {
                     <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-2">
                         <div className="font-bold text-slate-600 uppercase text-[10px] tracking-wider">CETAK KWITANSI DAN FAKTUR :</div>
                         <div className="flex gap-2 flex-wrap">
-                            <button type="button" onClick={() => { setPrintMode('KWITANSI_1'); setIsPrintModalOpen(true); }} className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg uppercase cursor-pointer">
-                                Kwitansi Tipe 1
+                            <button type="button" onClick={() => { setPrintMode('KWITANSI_1'); setIsPrintModalOpen(true); }} className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg uppercase cursor-pointer text-xs">
+                                Kwitansi 1
                             </button>
-                            <button type="button" onClick={() => { setPrintMode('KWITANSI_2'); setIsPrintModalOpen(true); }} className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-lg uppercase cursor-pointer">
-                                Kwitansi Tipe 2
+                            <button type="button" onClick={() => { setPrintMode('KWITANSI_2'); setIsPrintModalOpen(true); }} className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-lg uppercase cursor-pointer text-xs">
+                                Kwitansi 2
                             </button>
-                            <button type="button" onClick={() => { setPrintMode('FAKTUR_2'); setIsPrintModalOpen(true); }} className="px-4 py-2 bg-sky-800 hover:bg-sky-900 text-white font-bold rounded-lg uppercase cursor-pointer">
+                            <button type="button" onClick={() => { setPrintMode('TANDA_TERIMA'); setIsPrintModalOpen(true); }} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg uppercase cursor-pointer text-xs">
+                                Tanda Terima Tagihan
+                            </button>
+                            <button type="button" onClick={() => { setPrintMode('MEMORIAL'); setIsPrintModalOpen(true); }} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-lg uppercase cursor-pointer text-xs">
+                                Voucher Memorial
+                            </button>
+                            <button type="button" onClick={() => { setPrintMode('FAKTUR_2'); setIsPrintModalOpen(true); }} className="px-3 py-1.5 bg-sky-800 hover:bg-sky-900 text-white font-bold rounded-lg uppercase cursor-pointer text-xs">
                                 Faktur Tipe 2
                             </button>
-                            <button type="button" onClick={() => { setPrintMode('SUMMARY'); setIsPrintModalOpen(true); }} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg uppercase cursor-pointer">
+                            <button type="button" onClick={() => { setPrintMode('SUMMARY'); setIsPrintModalOpen(true); }} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg uppercase cursor-pointer text-xs">
                                 Summary Billing
                             </button>
                         </div>
@@ -864,12 +917,52 @@ const Invoice = () => {
                     </div>
 
                     <div className="flex justify-between items-center pt-3 border-t border-slate-200">
-                        <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-8 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl uppercase transition cursor-pointer shadow-md">
-                            BATAL
-                        </button>
-                        <button type="submit" className="px-8 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl uppercase transition cursor-pointer shadow-md">
-                            SIMPAN PERUBAHAN
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setIsEditModalOpen(false)}
+                                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl uppercase transition cursor-pointer shadow-sm text-xs"
+                            >
+                                BATAL
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => { setPrintMode('KWITANSI_1'); setIsPrintModalOpen(true); }}
+                                className="px-5 py-2.5 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-xl uppercase transition cursor-pointer shadow-sm text-xs flex items-center gap-1.5"
+                            >
+                                <Printer size={14} /> CETAK DOKUMEN
+                            </button>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            {/* Tombol Posting jika invoice belum diposting */}
+                            {activeInvoice?.artih_postingyn !== 'Y' ? (
+                                <button
+                                    type="button"
+                                    onClick={() => handlePostingInvoice(activeInvoice.artih_id)}
+                                    className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl uppercase transition cursor-pointer shadow-md text-xs flex items-center gap-1.5"
+                                >
+                                    <Lock size={14} /> POSTING INVOICE
+                                </button>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => handleUnpostingInvoice(activeInvoice)}
+                                    className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-xl uppercase transition cursor-pointer shadow-md text-xs flex items-center gap-1.5"
+                                >
+                                    <Unlock size={14} /> UNPOSTING INVOICE
+                                </button>
+                            )}
+
+                            {activeInvoice?.artih_postingyn !== 'Y' && (
+                                <button
+                                    type="submit"
+                                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl uppercase transition cursor-pointer shadow-md text-xs"
+                                >
+                                    SIMPAN PERUBAHAN
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </form>
             </div>
@@ -1004,10 +1097,202 @@ const Invoice = () => {
                     </button>
                 </div>
             </div>
+            {printMode === 'TANDA_TERIMA' && (
+                <div className="space-y-4 text-black">
+                    <div className="text-center font-bold">
+                        <h2 className="text-base uppercase tracking-wider">PT DAKOTA LOGISTIK INDONESIA</h2>
+                        <h3 className="text-sm font-black underline">TANDA TERIMA TAGIHAN</h3>
+                    </div>
+                    <table className="w-full border-collapse border border-black text-[11px]">
+                        <tbody>
+                            <tr>
+                                <td className="border border-black p-2 w-1/2">
+                                    <strong>Tanggal :</strong>
+                                    <p className="text-[9px] italic text-slate-600">(Wajib diisi oleh kurir saat menyerahkan tagihan)</p>
+                                </td>
+                                <td className="border border-black p-2"><strong>Tempat :</strong></td>
+                            </tr>
+                            <tr>
+                                <td className="border border-black p-2">
+                                    <strong>Dari :</strong><br />PT. DAKOTA LOGISTIK INDONESIA
+                                </td>
+                                <td className="border border-black p-2">
+                                    <strong>Untuk :</strong><br />{activeInvoice?.cust_name || activeInvoice?.artih_custname}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <table className="w-full border-collapse border border-black text-[11px]">
+                        <thead>
+                            <tr className="border border-black bg-slate-100 font-bold">
+                                <th className="border border-black p-1.5 w-10 text-center">No.</th>
+                                <th className="border border-black p-1.5">No. Kwitansi</th>
+                                <th className="border border-black p-1.5">Tanggal</th>
+                                <th className="border border-black p-1.5 text-right">Nilai Nominal</th>
+                                <th className="border border-black p-1.5 text-center w-40">Diserahkan Oleh</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td className="border border-black p-2 text-center">1</td>
+                                <td className="border border-black p-2 font-mono font-bold">{activeInvoice?.artih_nokw || activeInvoice?.artih_id}</td>
+                                <td className="border border-black p-2 font-mono">{String(activeInvoice?.artih_tanggal || '').split('T')[0]}</td>
+                                <td className="border border-black p-2 font-mono text-right font-bold">Rp {Number(grandTotalTagihan).toLocaleString('id-ID')}</td>
+                                <td className="border border-black p-2 text-center align-bottom pb-1 h-28">
+                                    <span className="text-[10px] block">(Nama Jelas & TTD)</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            {printMode === 'MEMORIAL' && (
+                <div className="space-y-4 text-black font-sans">
+                    <div className="flex justify-between items-start border-b pb-2">
+                        <div>
+                            <h2 className="font-black text-sm uppercase">PT. DAKOTA LOGISTIK INDONESIA</h2>
+                            <p className="text-[10px] text-slate-600">CABANG / AGEN: {activeInvoice?.agen_nama || 'PUSAT'}</p>
+                        </div>
+                        <div className="text-right">
+                            <h3 className="text-base font-black uppercase text-slate-900">VOUCHER MEMORIAL</h3>
+                            <p className="text-xs font-mono font-bold">No. Faktur: {activeInvoice?.artih_id}</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 text-[11px] py-1 border-b">
+                        <div><strong>Pelanggan:</strong> {activeInvoice?.cust_name || activeInvoice?.artih_custname}</div>
+                        <div className="text-right"><strong>Tanggal:</strong> {String(activeInvoice?.artih_tanggal || '').split('T')[0]}</div>
+                    </div>
+
+                    <table className="w-full border-collapse border border-black text-[11px] my-3">
+                        <thead>
+                            <tr className="bg-slate-200 border border-black font-bold">
+                                <th className="border border-black p-2 text-left">Kode Akun</th>
+                                <th className="border border-black p-2 text-center w-12">CC</th>
+                                <th className="border border-black p-2 text-left">Keterangan Akun</th>
+                                <th className="border border-black p-2 text-right">Debet (Rp)</th>
+                                <th className="border border-black p-2 text-right">Kredit (Rp)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td className="border border-black p-2 font-mono font-bold">A102010100</td>
+                                <td className="border border-black p-2 text-center">1</td>
+                                <td className="border border-black p-2">PIUTANG USAHA — {activeInvoice?.cust_name || activeInvoice?.artih_custname}</td>
+                                <td className="border border-black p-2 text-right font-mono font-bold">{Math.round(grandTotalTagihan).toLocaleString('id-ID')}</td>
+                                <td className="border border-black p-2 text-right font-mono">0</td>
+                            </tr>
+                            <tr>
+                                <td className="border border-black p-2 font-mono font-bold">B102010600</td>
+                                <td className="border border-black p-2 text-center">1</td>
+                                <td className="border border-black p-2">UTANG PPN KELUARAN</td>
+                                <td className="border border-black p-2 text-right font-mono">0</td>
+                                <td className="border border-black p-2 text-right font-mono font-bold">{Math.round(totalPPN).toLocaleString('id-ID')}</td>
+                            </tr>
+                            <tr>
+                                <td className="border border-black p-2 font-mono font-bold">D101010200</td>
+                                <td className="border border-black p-2 text-center">1</td>
+                                <td className="border border-black p-2">PENJUALAN KREDIT / PENDAPATAN JASA ANGKUT</td>
+                                <td className="border border-black p-2 text-right font-mono">0</td>
+                                <td className="border border-black p-2 text-right font-mono font-bold">{Math.round(totalBiayaKirim).toLocaleString('id-ID')}</td>
+                            </tr>
+                            {totalPacking > 0 && (
+                                <tr>
+                                    <td className="border border-black p-2 font-mono font-bold">D101010300</td>
+                                    <td className="border border-black p-2 text-center">1</td>
+                                    <td className="border border-black p-2">PENDAPATAN JASA PACKING</td>
+                                    <td className="border border-black p-2 text-right font-mono">0</td>
+                                    <td className="border border-black p-2 text-right font-mono font-bold">{Math.round(totalPacking).toLocaleString('id-ID')}</td>
+                                </tr>
+                            )}
+                            <tr className="border-t-2 border-black font-black bg-slate-100">
+                                <td colSpan={3} className="border border-black p-2 text-right">TOTAL :</td>
+                                <td className="border border-black p-2 text-right font-mono">Rp {Math.round(grandTotalTagihan).toLocaleString('id-ID')}</td>
+                                <td className="border border-black p-2 text-right font-mono">Rp {Math.round(grandTotalTagihan).toLocaleString('id-ID')}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            )}
         </div>
     ) : null;
 
     const modalRoot = document.getElementById('modal-root') || document.body;
+
+    // Handler Tombol Unposting Invoice
+    const handleUnpostingInvoice = (item) => {
+        if (item.artih_postingyn !== 'Y') {
+            Swal.fire('Perhatian', 'Hanya invoice berstatus POSTED yang dapat di-Unposting.', 'info');
+            return;
+        }
+
+        Swal.fire({
+            title: 'Unposting Invoice?',
+            text: `Invoice ${item.artih_id} akan dikembalikan menjadi DRAFT dan jurnal terkait akan dibatalkan. Lanjutkan?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d97706',
+            confirmButtonText: 'Ya, Unposting',
+            cancelButtonText: 'Batal'
+        }).then(async (res) => {
+            if (res.isConfirmed) {
+                try {
+                    const token = localStorage.getItem('token');
+                    const ptId = localStorage.getItem('pt_id') || 'C';
+                    const currentAgen = getActiveAgen();
+
+                    const response = await api.post(`/piutang/invoice/unposting?pt_id=${ptId}`, {
+                        invoice_id: item.artih_id,
+                        agen_id: currentAgen.id
+                    }, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+
+                    Swal.fire('Berhasil!', response.data?.message || 'Invoice berhasil di-unposting.', 'success');
+                    fetchInvoiceList();
+                } catch (err) {
+                    Swal.fire('Gagal!', err.response?.data?.message || 'Gagal unposting invoice.', 'error');
+                }
+            }
+        });
+    };
+
+    // Handler Posting Invoice
+    const handlePostingInvoice = (invoiceId) => {
+        const id = invoiceId || activeInvoice?.artih_id;
+        Swal.fire({
+            title: 'Posting Invoice?',
+            text: `Invoice ${id} akan diposting dan jurnal voucher memorial otomatis dibuat. Lanjutkan?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#16a34a',
+            confirmButtonText: 'Ya, Posting Sekarang',
+            cancelButtonText: 'Batal'
+        }).then(async (res) => {
+            if (res.isConfirmed) {
+                try {
+                    const token = localStorage.getItem('token');
+                    const ptId = localStorage.getItem('pt_id') || 'C';
+                    const currentAgen = getActiveAgen();
+
+                    const response = await api.post(`/piutang/invoice/posting?pt_id=${ptId}`, {
+                        invoice_id: id,
+                        agen_id: currentAgen.id
+                    }, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+
+                    Swal.fire('Berhasil!', response.data?.message || 'Invoice berhasil diposting.', 'success');
+                    setIsEditModalOpen(false);
+                    fetchInvoiceList();
+                } catch (err) {
+                    Swal.fire('Gagal!', err.response?.data?.message || 'Gagal memposting invoice.', 'error');
+                }
+            }
+        });
+    };
 
     return (
         <div className="space-y-5">

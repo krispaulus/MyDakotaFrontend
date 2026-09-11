@@ -116,6 +116,18 @@ import AgingHutang from "./pages/AgingHutang";
 import InvoiceVendor from "./pages/InvoiceVendor";
 import MasterKaryawan from './pages/MasterKaryawan';
 import DaftarFormHRD from './pages/DaftarFormHRD';
+import MasterDalamKota from './pages/MasterDalamKota';
+import CekNobttManual from './pages/CekNobttManual';
+import LaporanHandlingBarangNaik from './pages/LaporanHandlingBarangNaik';
+import LaporanBTTCounter from './pages/LaporanBTTCounter';
+import LaporanPenjualanHarian from './pages/LaporanPenjualanHarian';
+import LaporanPenjualan from './pages/LaporanPenjualan';
+import BttOutstanding from './pages/BttOutstanding';
+import MonitoringBtt from './pages/MonitoringBtt';
+import PackingList from './pages/PackingList';
+import Asuransi from './pages/Asuransi';
+import OrderJemput from './pages/OrderJemput';
+import TerimaBTTKembali from './pages/TerimaBTTKembali';
 
 const getCompanyName = (pt) => {
   if (pt === 'A') return 'Dakota Buana Sarana';
@@ -580,6 +592,7 @@ function App() {
       <Route path="/general-ledger" element={<MainLayout><UnderConstruction menuName="General Ledger" /></MainLayout>} />
 
       <Route path="/Master" element={<MainLayout><UnderConstruction menuName="Master Data" /></MainLayout>} />
+      <Route path="/master/master-dalam-kota" element={<MainLayout><MasterDalamKota /></MainLayout>} />
       <Route path="/Master/area-customer" element={<MainLayout><AreaCustomer /></MainLayout>} />
       <Route path="/Master/master-agen" element={<MainLayout><MasterAgen menuName="master-agen" /></MainLayout>} />
       <Route path="/Master/master-area-loper" element={<MainLayout><MasterAreaLoper menuName="master-area-loper" /></MainLayout>} />
@@ -667,6 +680,22 @@ function App() {
       <Route path="/general-ledger/pembayaran-vendor" element={<MainLayout><PembayaranVendor /></MainLayout>} />
       <Route path="/general-ledger/posting-jurnal" element={<MainLayout><PostingJurnal /></MainLayout>} />
       <Route path="/general-ledger/setoran-cod" element={<MainLayout><SetoranCOD /></MainLayout>} />
+
+      <Route path="/marketing/cek-nobtt-manual" element={<MainLayout><CekNobttManual /></MainLayout>} />
+
+      <Route path="/laporan/handling-barang-naik" element={<MainLayout><LaporanHandlingBarangNaik /></MainLayout>} />
+      <Route path="/laporan/btt-counter" element={<MainLayout><LaporanBTTCounter /></MainLayout>} />
+      <Route path="/laporan/penjualan-harian" element={<MainLayout><LaporanPenjualanHarian /></MainLayout>} />
+      <Route path="/laporan/penjualan" element={<MainLayout><LaporanPenjualan /></MainLayout>} />
+
+      <Route path="/laporan/btt-outstanding" element={<MainLayout><BttOutstanding /></MainLayout>} />
+      <Route path="/laporan/monitoring-btt" element={<MainLayout><MonitoringBtt /></MainLayout>} />
+
+      <Route path="/marketing/packing-list" element={<MainLayout><PackingList /></MainLayout>} />
+      <Route path="/marketing/asuransi" element={<MainLayout><Asuransi /></MainLayout>} />
+
+      <Route path="/marketing/order-jemput" element={<MainLayout><OrderJemput /></MainLayout>} />
+      <Route path="/marketing/terima-btt-kembali" element={<MainLayout><TerimaBTTKembali /></MainLayout>} />
 
       {/* Jika nanti ada halaman lain, tinggal bungkus lagi pakai MainLayout 
       <Route

@@ -11,6 +11,24 @@ const MasterAreaLoper = () => {
     const [unregistered, setUnregistered] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    const [tableSearch, setTableSearch] = useState('');
+
+    // Filter lokal case-insensitive multi-kolom
+    const filteredData = useMemo(() => {
+        if (!tableSearch.trim()) return data;
+        const q = tableSearch.toLowerCase().trim();
+        return data.filter(item => {
+            const nama = (item.agen_nama || '').toLowerCase();
+            const kode = (item.agen_kode || '').toLowerCase();
+            const kota = (item.agen_kota || '').toLowerCase();
+            const alamat = (item.agen_alamat || '').toLowerCase();
+            const id = (item.agen_id || '').toString().toLowerCase();
+            const telp = (item.agen_phone || '').toLowerCase();
+            return nama.includes(q) || kode.includes(q) || kota.includes(q) || alamat.includes(q) || id.includes(q) || telp.includes(q);
+        });
+    }, [data, tableSearch]);
+
+
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [showUnregisteredTab, setShowUnregisteredTab] = useState(false);
     const [editData, setEditData] = useState(null);
@@ -221,12 +239,40 @@ const MasterAreaLoper = () => {
     };
 
     const columns = [
-        { header: 'KODE', accessor: 'agen_kode', render: (i) => <span className="font-mono font-bold text-blue-600 tracking-wider text-[11px]" style={{ color: '#2563eb' }}>{i.agen_kode}</span> },
-        { header: 'NAMA AGEN', accessor: 'agen_nama', render: (i) => <span className="font-bold text-[11px]" style={{ color: isDarkMode ? '#ffffff' : '#000000' }}>{i.agen_nama}</span> },
-        { header: 'ALAMAT', accessor: 'agen_alamat', render: (i) => <span className="text-[11px] block max-w-sm leading-relaxed font-medium" style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b' }}>{i.agen_alamat}</span> },
-        { header: 'KOTA', accessor: 'agen_kota', render: (i) => <span className="font-bold text-[11px]" style={{ color: isDarkMode ? '#ffffff' : '#000000' }}>{i.agen_kota}</span> },
-        { header: 'TELP', accessor: 'agen_phone', render: (i) => <span className="font-mono text-[11px]" style={{ color: isDarkMode ? '#ffffff' : '#000000' }}>{i.agen_phone || '-'}</span> },
-        { header: 'JUMLAH', accessor: 'jumlah_wilayah', render: (i) => <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-50 text-blue-600 border border-blue-200 shadow-sm inline-block">{i.jumlah_wilayah || 0} Wilayah</span> }
+        {
+            header: 'KODE',
+            accessor: 'agen_kode',
+            render: (i) => <span className="font-mono font-bold text-blue-600 text-[11px]">{i.agen_kode}</span>
+        },
+        {
+            header: 'NAMA AGEN',
+            accessor: 'agen_nama',
+            render: (i) => <span className="font-bold text-[11px] text-slate-800">{i.agen_nama}</span>
+        },
+        {
+            header: 'ALAMAT',
+            accessor: 'agen_alamat',
+            render: (i) => <span className="text-[11px] block max-w-sm font-medium text-slate-700">{i.agen_alamat}</span>
+        },
+        {
+            header: 'KOTA',
+            accessor: 'agen_kota',
+            render: (i) => <span className="font-bold text-[11px] text-slate-800">{i.agen_kota}</span>
+        },
+        {
+            header: 'TELP',
+            accessor: 'agen_phone',
+            render: (i) => <span className="font-mono text-[11px]">{i.agen_phone || '-'}</span>
+        },
+        {
+            header: 'JUMLAH',
+            accessor: 'jumlah_wilayah',
+            render: (i) => (
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-50 text-blue-600 border border-blue-200">
+                    {i.jumlah_wilayah || 0} Wilayah
+                </span>
+            )
+        }
     ];
 
     const handleOpenBatchSubModal = (row) => {
@@ -356,7 +402,18 @@ const MasterAreaLoper = () => {
 
     return (
         <div className={`min-h-screen p-4 space-y-4 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-slate-50 text-slate-800'}`}>
-            <DataTableTemplate title="Master Area Operasional Wilayah (opr_m_earea)" columns={columns} data={data} loading={loading} isDarkMode={isDarkMode} onAdd={handleOpenAdd} onEdit={handleOpenEditCustom} onDelete={() => { }} />
+            <DataTableTemplate
+                title="Master Area Operasional Wilayah (opr_m_earea)"
+                columns={columns}
+                data={filteredData}
+                loading={loading}
+                isDarkMode={isDarkMode}
+                onAdd={handleOpenAdd}
+                onEdit={handleOpenEditCustom}
+                onDelete={() => { }}
+                searchValue={tableSearch}
+                onSearchChange={setTableSearch}
+            />
 
             {/* MODAL INPUT FORM INTEGRAL */}
             {isModalOpen && (
