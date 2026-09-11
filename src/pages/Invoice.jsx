@@ -845,8 +845,17 @@ const Invoice = () => {
                             <button type="button" onClick={() => { setPrintMode('TANDA_TERIMA'); setIsPrintModalOpen(true); }} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg uppercase cursor-pointer text-xs">
                                 Tanda Terima Tagihan
                             </button>
-                            <button type="button" onClick={() => { setPrintMode('MEMORIAL'); setIsPrintModalOpen(true); }} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-lg uppercase cursor-pointer text-xs">
-                                Voucher Memorial
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    // Prioritaskan nomor jurnal asli dari database; fallback ke format MEM jika belum terbawa
+                                    const memNo = activeInvoice?.artih_journalid
+                                        || (activeInvoice?.artih_id ? activeInvoice.artih_id.replace(/^[A-Za-z]{3}/, 'MEM') : '');
+                                    handlePrintVoucherMemorial(memNo);
+                                }}
+                                className="px-3 py-1.5 bg-slate-800 hover:bg-black text-white font-bold rounded-lg text-xs transition uppercase shadow cursor-pointer"
+                            >
+                                VOUCHER MEMORIAL
                             </button>
                             <button type="button" onClick={() => { setPrintMode('FAKTUR_2'); setIsPrintModalOpen(true); }} className="px-3 py-1.5 bg-sky-800 hover:bg-sky-900 text-white font-bold rounded-lg uppercase cursor-pointer text-xs">
                                 Faktur Tipe 2
@@ -1018,6 +1027,150 @@ const Invoice = () => {
         </div>
     );
 
+    const handlePrintVoucherMemorial = async (journalNo) => {
+        if (!journalNo) {
+            Swal.fire('Peringatan', 'Nomor jurnal belum tersedia atau invoice belum diposting!', 'warning');
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            const ptId = localStorage.getItem('pt_id') || 'C';
+
+            const res = await api.get(`/gl/jurnal/detail/${encodeURIComponent(journalNo)}?pt_id=${ptId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            const header = res.data?.header || {};
+            const details = res.data?.details || [];
+
+            if (details.length === 0) {
+                Swal.fire('Informasi', 'Data rincian jurnal belum ditemukan.', 'info');
+                return;
+            }
+
+            const totalDebet = details.reduce((sum, d) => sum + Number(d.tjurd_debet || 0), 0);
+            const totalKredit = details.reduce((sum, d) => sum + Number(d.tjurd_kredit || 0), 0);
+
+            const printWindow = window.open('', '_blank', 'width=950,height=700');
+            if (!printWindow) {
+                Swal.fire('Popup Diblokir', 'Mohon izinkan popup browser untuk mencetak dokumen ini.', 'warning');
+                return;
+            }
+
+            const rowsHtml = details.map((row, idx) => `
+                <tr style="font-family: monospace; font-size: 11px;">
+                    <td style="border: 1px solid #000; padding: 6px; text-align: center;">${idx + 1}</td>
+                    <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">${row.tjurd_acccode}</td>
+                    <td style="border: 1px solid #000; padding: 6px;">${row.sakun_nama || '-'}</td>
+                    <td style="border: 1px solid #000; padding: 6px;">${row.tjurd_keterangan || '-'}</td>
+                    <td style="border: 1px solid #000; padding: 6px; text-align: right;">${Number(row.tjurd_debet || 0).toLocaleString('id-ID')}</td>
+                    <td style="border: 1px solid #000; padding: 6px; text-align: right;">${Number(row.tjurd_kredit || 0).toLocaleString('id-ID')}</td>
+                </tr>
+            `).join('');
+
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Voucher Memorial - ${header.tjurh_no || journalNo}</title>
+                    <style>
+                        @page { size: A4 portrait; margin: 12mm; }
+                        body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #000; margin: 0; padding: 10px; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                        th { border: 1px solid #000; padding: 6px; background-color: #f2f2f2; font-size: 11px; }
+                    </style>
+                </head>
+                <body>
+                    <div style="border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 12px;">
+                        <table style="width: 100%; margin: 0; border: none;">
+                            <tr>
+                                <td style="width: 60%; vertical-align: top; border: none;">
+                                    <img id="logoDakota" src="${dakotaLogo}" alt="Logo Dakota Cargo" style="height: 38px; width: auto; object-fit: contain; display: block; margin-bottom: 4px;" />
+                                    <div style="font-size: 11px; color: #222; font-weight: bold; letter-spacing: 0.3px;">PT. DAKOTA LOGISTIK INDONESIA</div>
+                                    <div style="font-size: 10px; color: #555;">Jl. Wibawa Mukti II No. 99, Jatiasih, Bekasi</div>
+                                </td>
+                                <td style="width: 40%; text-align: right; vertical-align: top; border: none;">
+                                    <h3 style="margin: 0; font-size: 16px; font-weight: 900; text-decoration: underline; letter-spacing: 0.5px;">BUKTI MEMORIAL</h3>
+                                    <div style="font-family: monospace; font-size: 13px; font-weight: bold; margin-top: 5px;">NO: ${header.tjurh_no || journalNo}</div>
+                                    <div style="font-size: 11px; margin-top: 3px;">TANGGAL: ${(header.tjurh_tanggal || '').substring(0, 10)}</div>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <div style="margin-bottom: 10px; font-size: 11px;">
+                        <strong>Keterangan:</strong> ${header.tjurh_keterangan || '-'}
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 5%;">NO</th>
+                                <th style="width: 15%;">KODE AKUN</th>
+                                <th style="width: 25%;">NAMA PERKIRAAN</th>
+                                <th style="width: 25%;">URAIAN TRANSAKSI</th>
+                                <th style="width: 15%;">DEBET (RP)</th>
+                                <th style="width: 15%;">KREDIT (RP)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml}
+                        </tbody>
+                        <tfoot>
+                            <tr style="font-weight: bold; background-color: #fafafa; font-family: monospace; font-size: 12px;">
+                                <td colspan="4" style="border: 1px solid #000; padding: 6px; text-align: center;">TOTAL TRANSAKSI</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${totalDebet.toLocaleString('id-ID')}</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${totalKredit.toLocaleString('id-ID')}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                    <div style="margin-top: 40px;">
+                        <table style="width: 100%; border: none;">
+                            <tr style="text-align: center;">
+                                <td style="width: 25%; border: none;">
+                                    <div>Dibuat Oleh,</div>
+                                    <div style="height: 55px;"></div>
+                                    <div style="font-weight: bold; text-decoration: underline;">${header.tjurh_updateid || 'Accounting Staff'}</div>
+                                </td>
+                                <td style="width: 25%; border: none;">
+                                    <div>Diperiksa Oleh,</div>
+                                    <div style="height: 55px;"></div>
+                                    <div style="font-weight: bold; text-decoration: underline;">( ......................... )</div>
+                                </td>
+                                <td style="width: 25%; border: none;">
+                                    <div>Disetujui Oleh,</div>
+                                    <div style="height: 55px;"></div>
+                                    <div style="font-weight: bold; text-decoration: underline;">( ......................... )</div>
+                                </td>
+                                <td style="width: 25%; border: none;">
+                                    <div>Dibukukan Oleh,</div>
+                                    <div style="height: 55px;"></div>
+                                    <div style="font-weight: bold; text-decoration: underline;">( ......................... )</div>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <script>
+                        const img = document.getElementById('logoDakota');
+                        if (img && !img.complete) {
+                            img.onload = () => window.print();
+                        } else {
+                            window.onload = () => window.print();
+                        }
+                    </script>
+                </body>
+                </html>
+            `);
+
+            printWindow.document.close();
+        } catch (err) {
+            Swal.fire('Gagal', err.response?.data?.message || 'Gagal mengambil data voucher jurnal!', 'error');
+        }
+    };
+
     // Modal Cetak Dokumen
     const printDocElement = isPrintModalOpen && activeInvoice ? (
         <div className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs transition-opacity" style={{ zIndex: 999999 }}>
@@ -1036,19 +1189,25 @@ const Invoice = () => {
                         </div>
                     ) : (
                         <div className="space-y-5">
-                            <div className="flex justify-between items-start border-b pb-4">
-                                <div className="flex items-center gap-3">
-                                    <img src={dakotaLogo} alt="Logo Dakota" className="h-12 w-auto object-contain" />
-                                    <div className="space-y-0.5">
-                                        <h1 className="text-base font-black tracking-wider text-slate-900">PT. DAKOTA LOGISTIK INDONESIA</h1>
-                                        <p className="text-[11px] text-slate-600">Jl. Wibawa Mukti II No.99, Jatiasih, Bekasi</p>
-                                    </div>
-                                </div>
-                                <div className="text-right font-mono">
-                                    <h2 className="text-base font-black uppercase text-sky-800">FAKTUR PENAGIHAN</h2>
-                                    <p className="font-bold text-xs">NO. FAKTUR: {activeInvoice.artih_id}</p>
-                                    <p className="text-slate-600 text-[11px]">NO. KWITANSI: {activeInvoice.artih_nokw || '-'}</p>
-                                </div>
+                            <div style="border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 12px;">
+                                <table style="width: 100%; margin: 0; border: none;">
+                                    <tr>
+                                        <td style="width: 60%; vertical-align: middle; border: none;">
+                                            <div style="display: flex; align-items: center; gap: 14px;">
+                                                <img src="${dakotaLogo}" alt="Logo Dakota" style="height: 44px; width: auto; object-fit: contain;" />
+                                                <div>
+                                                    <div style="font-size: 11px; font-weight: bold; color: #111;">PT. DAKOTA LOGISTIK INDONESIA</div>
+                                                    <div style="font-size: 10px; color: #555; margin-top: 2px;">Jl. Wibawa Mukti II No. 99, Jatiasih, Bekasi</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td style="width: 40%; text-align: right; vertical-align: middle; border: none;">
+                                            <h3 style="margin: 0; font-size: 16px; font-weight: 900; text-decoration: underline;">BUKTI MEMORIAL</h3>
+                                            <div style="font-family: monospace; font-size: 13px; font-weight: bold; margin-top: 4px;">NO: ${header.tjurh_no || journalNo}</div>
+                                            <div style="font-size: 11px; margin-top: 2px;">TANGGAL: ${(header.tjurh_tanggal || '').substring(0, 10)}</div>
+                                        </td>
+                                    </tr>
+                                </table>
                             </div>
 
                             <table className="w-full text-left border-collapse text-[11px]">
