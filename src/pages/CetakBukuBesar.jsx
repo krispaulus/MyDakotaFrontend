@@ -3,6 +3,7 @@ import api from '../api/axios';
 import { useDarkMode } from '../context/DarkModeContext';
 import { Search, Printer, FileSpreadsheet, BookOpen, RefreshCw } from 'lucide-react';
 import Swal from 'sweetalert2';
+import dakotaLogo from '../assets/new_logo 2.png';
 
 const CetakBukuBesar = () => {
     const { isDarkMode } = useDarkMode();
@@ -147,6 +148,130 @@ const CetakBukuBesar = () => {
                 confirmButtonColor: '#ef4444'
             });
         }
+    };
+
+    // 🖨️ CETAK BUKU BESAR PERSIS STANDAR DAKOTA LAWAS
+    const handlePrintBukuBesar = () => {
+        if (!reportData || reportData.length === 0) {
+            Swal.fire({
+                title: 'DATA KOSONG',
+                text: 'Silakan klik PROSES LAPORAN terlebih dahulu sebelum mencetak.',
+                icon: 'warning',
+                confirmButtonColor: '#2563eb'
+            });
+            return;
+        }
+
+        const printWindow = window.open('', '_blank', 'width=1100,height=750');
+        if (!printWindow) {
+            Swal.fire('Popup Diblokir', 'Mohon izinkan popup browser untuk mencetak dokumen ini.', 'warning');
+            return;
+        }
+
+        const todayFormatted = new Date().toLocaleDateString('id-ID', {
+            day: '2-digit', month: '2-digit', year: 'numeric'
+        });
+
+        // Susun baris tiap akun sesuai struktur aplikasi lawas
+        const tableRowsHtml = reportData.map(account => {
+            const detailRows = (account.details && account.details.length > 0)
+                ? account.details.map(det => `
+                    <tr>
+                        <td valign="top" style="border-bottom: 1px solid #ddd; padding: 4px;">${det.tanggal || '-'}</td>
+                        <td valign="top" style="border-bottom: 1px solid #ddd; padding: 4px; font-family: monospace; font-weight: bold; color: #0284c7;">${det.no_jurnal || '-'}</td>
+                        <td valign="top" colspan="2" style="border-bottom: 1px solid #ddd; padding: 4px;">${det.keterangan || '-'}</td>
+                        <td valign="top" align="right" style="border-bottom: 1px solid #ddd; padding: 4px; font-family: monospace;">${(Number(det.debet) || 0).toLocaleString('id-ID')}</td>
+                        <td valign="top" align="right" style="border-bottom: 1px solid #ddd; padding: 4px; font-family: monospace;">${(Number(det.kredit) || 0).toLocaleString('id-ID')}</td>
+                        <td valign="top" align="right" style="border-bottom: 1px solid #ddd; padding: 4px; font-family: monospace;">-</td>
+                    </tr>
+                `).join('')
+                : ``;
+
+            return `
+                <!-- Baris Akun & Saldo Awal -->
+                <tr style="border-top: 1px solid #aaa;">
+                    <td valign="top" style="padding: 5px 4px;"><b>${account.ca_id}</b></td>
+                    <td valign="top" colspan="2" style="padding: 5px 4px;"><b>${account.ca_name}</b></td>
+                    <td valign="top" align="right" style="padding: 5px 4px;"><b>Saldo Awal :</b></td>
+                    <td valign="top" align="right" style="padding: 5px 4px; font-family: monospace;"><b>${(Number(account.saldo_awal) || 0).toLocaleString('id-ID')}</b></td>
+                    <td valign="top" align="right" style="padding: 5px 4px; font-family: monospace;"><b>0</b></td>
+                    <td></td>
+                </tr>
+
+                <!-- Rincian Mutasi Jurnal -->
+                ${detailRows}
+
+                <!-- Baris Saldo Akhir Akun (#EBEBEB) -->
+                <tr bgcolor="#EBEBEB" style="font-weight: bold;">
+                    <td colspan="4" align="right" style="padding: 5px 4px;">Saldo Akhir :</td>
+                    <td align="right" style="padding: 5px 4px; font-family: monospace;">${(Number(account.total_debet) || 0).toLocaleString('id-ID')}</td>
+                    <td align="right" style="padding: 5px 4px; font-family: monospace;">${(Number(account.total_kredit) || 0).toLocaleString('id-ID')}</td>
+                    <td align="right" style="padding: 5px 4px; font-family: monospace;">${(Number(account.saldo_akhir) || 0).toLocaleString('id-ID')}</td>
+                </tr>
+            `;
+        }).join('');
+
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Buku Besar - ${filterParams.tanggalStart} s/d ${filterParams.tanggalEnd}</title>
+                <style>
+                    @page { size: A4 landscape; margin: 10mm; }
+                    body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #000; margin: 0; padding: 10px; }
+                    table { width: 100%; border-collapse: collapse; }
+                </style>
+            </head>
+            <body>
+                <div style="position: relative; width: 100%; margin-bottom: 15px;">
+                    <div style="font-size: 13px; font-weight: bold;">
+                        DAKOTA LOGISTIK INDONESIA<br>
+                        <span style="font-size: 10px; font-weight: normal; color: #333;">
+                            Jl. Wibawa Mukti II No. 99 Jatiasih, Bekasi<br>
+                            BEKASI KOTA<br>
+                            (021) 8603278 / (021) 86608589
+                        </span>
+                    </div>
+                    <div style="position: absolute; top: 0; right: 0;">
+                        <img id="logoDakota" src="${dakotaLogo}" alt="Dakota Cargo" style="height: 42px; width: auto; object-fit: contain;" />
+                    </div>
+                </div>
+
+                <div style="text-align: center; margin-bottom: 12px;">
+                    <div style="font-size: 15px; font-weight: bold; letter-spacing: 0.5px;">BUKU BESAR</div>
+                    <div style="font-size: 12px; font-weight: bold; margin-top: 2px;">KONSOLIDASI</div>
+                    <div style="font-size: 11px; margin-top: 2px;">PERIODE ${filterParams.tanggalStart} - ${filterParams.tanggalEnd}</div>
+                    <div style="text-align: left; font-size: 10px; margin-top: 6px; color: #444;">Tanggal Cetak : ${todayFormatted}</div>
+                </div>
+
+                <table border="0" style="font-size: 10px;">
+                    <thead>
+                        <tr bgcolor="#CFCFCF" style="font-weight: bold; text-align: center;">
+                            <td style="padding: 6px; width: 10%;">Tanggal</td>
+                            <td style="padding: 6px; width: 14%;">No. Jurnal</td>
+                            <td colspan="2" style="padding: 6px; width: 40%;">Keterangan</td>
+                            <td style="padding: 6px; width: 12%;">Debet</td>
+                            <td style="padding: 6px; width: 12%;">Kredit</td>
+                            <td style="padding: 6px; width: 12%;">Saldo</td>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRowsHtml}
+                    </tbody>
+                </table>
+
+                <script>
+                    const img = document.getElementById('logoDakota');
+                    if (img && !img.complete) {
+                        img.onload = () => window.print();
+                    } else {
+                        window.onload = () => window.print();
+                    }
+                </script>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
     };
 
     return (
@@ -297,7 +422,7 @@ const CetakBukuBesar = () => {
                         </button>
                         <button
                             type="button"
-                            onClick={() => window.print()}
+                            onClick={handlePrintBukuBesar}
                             className="px-4 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-xl text-xs uppercase tracking-wider cursor-pointer flex items-center gap-2 transition"
                         >
                             <Printer size={14} /> CETAK BUKU BESAR
