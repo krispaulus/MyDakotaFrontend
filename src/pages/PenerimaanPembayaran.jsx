@@ -299,7 +299,7 @@ const PenerimaanPembayaran = () => {
             }`}>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-semibold">
                 <div>
-                    <label className={`block mb-1 flex items-center gap-1 ${isDarkMode ? 'text-gray-300' : 'text-slate-600'}`}>
+                    <label className={`mb-1 flex items-center gap-1 ${isDarkMode ? 'text-gray-300' : 'text-slate-600'}`}>
                         <Calendar size={13} /> DARI TANGGAL :
                     </label>
                     <input
@@ -311,7 +311,7 @@ const PenerimaanPembayaran = () => {
                     />
                 </div>
                 <div>
-                    <label className={`block mb-1 flex items-center gap-1 ${isDarkMode ? 'text-gray-300' : 'text-slate-600'}`}>
+                    <label className={`mb-1 flex items-center gap-1 ${isDarkMode ? 'text-gray-300' : 'text-slate-600'}`}>
                         <Calendar size={13} /> SAMPAI TANGGAL :
                     </label>
                     <input
@@ -323,7 +323,7 @@ const PenerimaanPembayaran = () => {
                     />
                 </div>
                 <div>
-                    <label className={`block mb-1 flex items-center gap-1 ${isDarkMode ? 'text-gray-300' : 'text-slate-600'}`}>
+                    <label className={`mb-1 flex items-center gap-1 ${isDarkMode ? 'text-gray-300' : 'text-slate-600'}`}>
                         <Building size={13} /> CABANG / AGEN :
                     </label>
                     <select
@@ -340,16 +340,21 @@ const PenerimaanPembayaran = () => {
                 </div>
                 <div>
                     <label className={`block mb-1 flex items-center gap-1 ${isDarkMode ? 'text-gray-300' : 'text-slate-600'}`}>
-                        <User size={13} /> CUSTOMER :
+                        <User size={13} /> PELANGGAN :
                     </label>
-                    <input
-                        type="text"
-                        placeholder="Nama pelanggan..."
+                    <select
                         value={filterCustomer}
                         onChange={(e) => setFilterCustomer(e.target.value)}
-                        className={`w-full p-2.5 border rounded-xl font-bold outline-none ${isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-white border-slate-300 text-slate-800'
+                        className={`w-full p-2.5 border rounded-xl font-bold outline-none cursor-pointer ${isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-white border-slate-300 text-slate-800'
                             }`}
-                    />
+                    >
+                        <option value="">-- SEMUA PELANGGAN --</option>
+                        {customers.map((c) => (
+                            <option key={c.cust_id} value={c.cust_name || c.cust_id}>
+                                {c.cust_name} [{c.cust_id}]
+                            </option>
+                        ))}
+                    </select>
                 </div>
             </div>
 
@@ -374,15 +379,7 @@ const PenerimaanPembayaran = () => {
     );
 
     return (
-        <div
-            className="space-y-4"
-            onClickCapture={(e) => {
-                const target = e.target;
-                if (target.closest('button') && target.closest('button').innerText?.includes('Filter')) {
-                    toggleFilterPanel();
-                }
-            }}
-        >
+        <div className="space-y-4">
             {showFilter && filterPanelContent}
 
             <DataTableTemplate
@@ -518,7 +515,7 @@ const PenerimaanPembayaran = () => {
             {isDetailModalOpen && selectedDetail && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
                     <div className="w-full max-w-2xl p-6 rounded-2xl shadow-2xl flex flex-col max-h-[90vh] bg-white text-black border border-slate-300">
-                        {/* Header Modal - Teks Hitam */}
+                        {/* Header Modal */}
                         <div className="flex justify-between items-center pb-3 border-b border-slate-300 mb-4 print:hidden">
                             <h3 className="text-base font-black uppercase text-black flex items-center gap-2 tracking-wide">
                                 <FileText size={18} className="text-black" /> BUKTI PENERIMAAN PEMBAYARAN (KWITANSI)
@@ -537,7 +534,7 @@ const PenerimaanPembayaran = () => {
                             </div>
                         </div>
 
-                        {/* Format Cetak Kwitansi Teks Hitam Pekat */}
+                        {/* Format Cetak Kwitansi */}
                         <div className="space-y-4 overflow-y-auto text-xs p-2 text-black">
                             <div className="border-b border-slate-300 pb-3 space-y-1.5">
                                 <div className="text-sm font-black uppercase text-black tracking-wider">
@@ -616,7 +613,7 @@ const PenerimaanPembayaran = () => {
                                 </div>
                             </div>
 
-                            {/* Rincian Faktur / Invoice yang Dilunasi (Jika Ada) */}
+                            {/* Rincian Faktur / Invoice yang Dilunasi */}
                             {(selectedDetail.invoices && selectedDetail.invoices.length > 0) && (
                                 <div className="space-y-2 pt-2">
                                     <div className="font-black uppercase tracking-wider text-[11px] text-black">

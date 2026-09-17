@@ -620,28 +620,29 @@ function App() {
       <Route path="/master/jenis-kendaraan-carter" element={<MainLayout><JenisKendaraanCarter menuName="JenisKendaraanCarter" /></MainLayout>} />
       <Route path="/master/master-vendor" element={<MainLayout><MasterVendor menuName="MasterVendor" /></MainLayout>} />
 
-      <Route path="/aging-hutang" element={<MainLayout><AgingHutang menuName="AgingHutang" /></MainLayout>} />
-      <Route path="/invoice-vendor" element={<MainLayout><InvoiceVendor menuName="InvoiceVendor" /></MainLayout>} />
+      <Route path="/hutang/aging-hutang" element={<MainLayout><AgingHutang menuName="AgingHutang" /></MainLayout>} />
+      <Route path="/hutang/invoice-vendor" element={<MainLayout><InvoiceVendor menuName="InvoiceVendor" /></MainLayout>} />
 
-      <Route path="/Piutang" element={<MainLayout><UnderConstruction menuName="Piutang" /></MainLayout>} />
+      <Route path="/Piutang" element={<MainLayout><AgingPiutang /></MainLayout>} />
+      <Route path="/piutang/agingpiutang" element={<MainLayout><AgingPiutang /></MainLayout>} />
       <Route path="/agingpiutang" element={<MainLayout><AgingPiutang /></MainLayout>} />
-      <Route path="/approval-customer" element={<MainLayout><ApprovalCustomer /></MainLayout>} />
-      <Route path="/BTTTagihTujuan" element={<MainLayout><BTTTagihTujuan /></MainLayout>} />
-      <Route path="/credit-note" element={<MainLayout><CreditNote /></MainLayout>} />
-      <Route path="/invoice" element={<MainLayout><Invoice /></MainLayout>} />
-      <Route path="/kondisi-btt" element={<MainLayout><KondisiBTT /></MainLayout>} />
-      <Route path="/faktur-pajak" element={<MainLayout><FakturPajak /></MainLayout>} />
-      <Route path="/mutasi-piutang" element={<MainLayout><MutasiPiutang menuName="MutasiPiutang" /></MainLayout>} />
-      <Route path="/tagih-invoice" element={<MainLayout><TagihInvoice menuName="TagihInvoice" /></MainLayout>} />
-      <Route path="/pencairan-giro" element={<MainLayout><UnderConstruction menuName="PencairanGiro" /></MainLayout>} />
-      <Route path="/penerimaan-pembayaran" element={<MainLayout><PenerimaanPembayaran menuName="PenerimaanPembayaran" /></MainLayout>} />
-      <Route path="/penerimaan-penagihan-kolektor" element={<MainLayout><PenerimaanPenagihanKolektor menuName="PenerimaanPenagihanKolektor" /></MainLayout>} />
-      <Route path="/penerimaan-setoran-agen" element={<MainLayout><PenerimaanSetoranAgen menuName="PenerimaanSetoranAgen" /></MainLayout>} />
-      <Route path="/proforma-invoice" element={<MainLayout><ProformaInvoice menuName="ProformaInvoice" /></MainLayout>} />
-      <Route path="/proses-piutang" element={<MainLayout><ProsesPiutang menuName="ProsesPiutang" /></MainLayout>} />
-      <Route path="/revisi-btt-apl" element={<MainLayout><RevisiBTTAPL menuName="RevisiBTTAPL" /></MainLayout>} />
-      <Route path="/saldo-awal-piutang" element={<MainLayout><SaldoAwalPiutang menuName="SaldoAwalPiutang" /></MainLayout>} />
-      <Route path="/tukar-faktur" element={<MainLayout><TukarFaktur /></MainLayout>} />
+      <Route path="/piutang/approval-customer" element={<MainLayout><ApprovalCustomer /></MainLayout>} />
+      <Route path="/piutang/BTTTagihTujuan" element={<MainLayout><BTTTagihTujuan /></MainLayout>} />
+      <Route path="/piutang/credit-note" element={<MainLayout><CreditNote /></MainLayout>} />
+      <Route path="/piutang/invoice" element={<MainLayout><Invoice /></MainLayout>} />
+      <Route path="/piutang/kondisi-btt" element={<MainLayout><KondisiBTT /></MainLayout>} />
+      <Route path="/piutang/faktur-pajak" element={<MainLayout><FakturPajak /></MainLayout>} />
+      <Route path="/piutang/mutasi-piutang" element={<MainLayout><MutasiPiutang menuName="MutasiPiutang" /></MainLayout>} />
+      <Route path="/piutang/tagih-invoice" element={<MainLayout><TagihInvoice menuName="TagihInvoice" /></MainLayout>} />
+      <Route path="/piutang/pencairan-giro" element={<MainLayout><UnderConstruction menuName="PencairanGiro" /></MainLayout>} />
+      <Route path="/piutang/penerimaan-pembayaran" element={<MainLayout><PenerimaanPembayaran menuName="PenerimaanPembayaran" /></MainLayout>} />
+      <Route path="/piutang/penerimaan-penagihan-kolektor" element={<MainLayout><PenerimaanPenagihanKolektor menuName="PenerimaanPenagihanKolektor" /></MainLayout>} />
+      <Route path="/piutang/penerimaan-setoran-agen" element={<MainLayout><PenerimaanSetoranAgen menuName="PenerimaanSetoranAgen" /></MainLayout>} />
+      <Route path="/piutang/proforma-invoice" element={<MainLayout><ProformaInvoice menuName="ProformaInvoice" /></MainLayout>} />
+      <Route path="/piutang/proses-piutang" element={<MainLayout><ProsesPiutang menuName="ProsesPiutang" /></MainLayout>} />
+      <Route path="/piutang/revisi-btt-apl" element={<MainLayout><RevisiBTTAPL menuName="RevisiBTTAPL" /></MainLayout>} />
+      <Route path="/piutang/saldo-awal-piutang" element={<MainLayout><SaldoAwalPiutang menuName="SaldoAwalPiutang" /></MainLayout>} />
+      <Route path="/piutang/tukar-faktur" element={<MainLayout><TukarFaktur /></MainLayout>} />
 
       <Route path="/klaim" element={<MainLayout><UnderConstruction menuName="Klaim" /></MainLayout>} />
 

@@ -4,6 +4,7 @@ import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
 import { Filter, CheckCircle2, XCircle, Search, RefreshCw, Printer, Truck, FileCheck, DollarSign } from 'lucide-react';
 import Swal from 'sweetalert2';
+import dakotaLogo from '../assets/new_logo 2.png';
 
 const KondisiBTT = () => {
     const { isDarkMode } = useDarkMode();
@@ -167,6 +168,245 @@ const KondisiBTT = () => {
         fetchData();
     };
 
+    // 🖨️ CETAK LAPORAN RESMI KONDISI BTT & ORDER JEMPUT (A4 LANDSCAPE POPUP)
+    const handlePrintReport = async () => {
+        if (!data || data.length === 0) {
+            Swal.fire({
+                title: 'DATA KOSONG',
+                text: 'Tidak ada data Kondisi BTT & Order Jemput yang dapat dicetak.',
+                icon: 'warning',
+                confirmButtonColor: '#2563eb'
+            });
+            return;
+        }
+
+        // Convert logo ke Base64 agar tampil di jendela baru
+        let base64Logo = '';
+        try {
+            const logoImg = new Image();
+            logoImg.src = dakotaLogo;
+            await new Promise((resolve) => {
+                if (logoImg.complete) {
+                    resolve();
+                } else {
+                    logoImg.onload = () => resolve();
+                    logoImg.onerror = () => resolve();
+                }
+            });
+
+            if (logoImg.naturalWidth > 0) {
+                const canvas = document.createElement('canvas');
+                canvas.width = logoImg.naturalWidth;
+                canvas.height = logoImg.naturalHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(logoImg, 0, 0);
+                base64Logo = canvas.toDataURL('image/png');
+            }
+        } catch {
+            base64Logo = dakotaLogo;
+        }
+
+        const width = 1150;
+        const height = 800;
+        const left = Math.max(0, Math.round((window.screen.width - width) / 2));
+        const top = Math.max(0, Math.round((window.screen.height - height) / 2));
+
+        const printWindow = window.open(
+            '',
+            '_blank',
+            `width=${width},height=${height},top=${top},left=${left},scrollbars=yes,resizable=yes`
+        );
+
+        if (!printWindow) {
+            Swal.fire('Popup Diblokir', 'Mohon izinkan popup browser untuk mencetak dokumen ini.', 'warning');
+            return;
+        }
+
+        const todayFormatted = new Date().toLocaleDateString('id-ID', {
+            day: '2-digit', month: '2-digit', year: 'numeric'
+        });
+
+        const activeFilterCabang = !isHoldingUser ? currentActiveAgen.id : selectedCabang;
+        const foundCabang = cabangList.find(c => String(c.agen_id || c.AgenID) === String(activeFilterCabang));
+        const namaCabang = activeFilterCabang ? (foundCabang?.agen_nama || foundCabang?.AgenNama || `CABANG ${activeFilterCabang}`) : 'KONSOLIDASI (SEMUA CABANG)';
+        const periodeStr = bypassTanggal ? 'SEMUA PERIODE (BYPASS TANGGAL)' : `${startDate} s/d ${endDate}`;
+
+        let totalKoliAll = 0;
+        let totalBeratAll = 0;
+        let totalBiayaAll = 0;
+
+        const rowsHtml = data.map((item, idx) => {
+            const koli = Number(item.koli || 0);
+            const berat = Number(item.berat || 0);
+            const biaya = Number(item.total_biaya || 0);
+
+            totalKoliAll += koli;
+            totalBeratAll += berat;
+            totalBiayaAll += biaya;
+
+            const isKembali = item.btt_kembali_yn === 'Y';
+            const isLunas = item.terbayar_yn === 'Y';
+            const isFaktur = item.sudah_invoice_yn === 'Y';
+
+            return `
+                <tr style="font-family: monospace; font-size: 10px;">
+                    <td style="border: 1px solid #333; padding: 5px; text-align: center;">${idx + 1}</td>
+                    <td style="border: 1px solid #333; padding: 5px; font-weight: bold; color: #0284c7;">
+                        ${item.no_dokumen || '-'}
+                        <span style="display: block; font-size: 9px; color: #64748b; font-family: sans-serif;">${item.tipe_dokumen || ''}</span>
+                    </td>
+                    <td style="border: 1px solid #333; padding: 5px; text-align: center;">${String(item.tgl_dokumen || '').split('T')[0] || '-'}</td>
+                    <td style="border: 1px solid #333; padding: 5px; font-family: sans-serif;">
+                        <div style="font-weight: bold; color: #111;">${item.cust_name || '-'}</div>
+                        <div style="font-size: 9px; color: #475569;">Tujuan: ${item.penerima || '-'} (${item.kota_tujuan || '-'})</div>
+                    </td>
+                    <td style="border: 1px solid #333; padding: 5px; text-align: center; text-transform: uppercase;">${item.pic || '-'}</td>
+                    <td style="border: 1px solid #333; padding: 5px; text-align: center;">${koli} Koli / ${berat} Kg</td>
+                    <td style="border: 1px solid #333; padding: 5px; text-align: center; font-weight: bold; font-size: 9.5px;">${item.metode_bayar || '-'}</td>
+                    <td style="border: 1px solid #333; padding: 5px; text-align: center; font-weight: bold; color: ${isKembali ? '#059669' : '#d97706'};">
+                        ${isKembali ? 'KEMBALI' : 'BELUM'}
+                    </td>
+                    <td style="border: 1px solid #333; padding: 5px; text-align: center;">
+                        ${isFaktur ? `<span style="color: #059669; font-weight: bold;">${item.no_invoice || 'FAKTUR'}</span>` : '<span style="color: #94a3b8;">UNBILLED</span>'}
+                    </td>
+                    <td style="border: 1px solid #333; padding: 5px; text-align: center; font-weight: bold; color: ${isLunas ? '#059669' : '#e11d48'};">
+                        ${isLunas ? 'LUNAS' : 'BELUM'}
+                    </td>
+                    <td style="border: 1px solid #333; padding: 5px; text-align: right; font-weight: bold;">
+                        Rp ${biaya.toLocaleString('id-ID')}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Laporan Kondisi BTT & Order Jemput - ${namaCabang}</title>
+                <style>
+                    @page { 
+                        margin: 8mm 10mm 10mm 10mm; 
+                    }
+                    * { 
+                        box-sizing: border-box; 
+                    }
+                    html, body { 
+                        width: 100%;
+                        margin: 0; 
+                        padding: 0; 
+                        font-family: Arial, Helvetica, sans-serif; 
+                        font-size: 11px; 
+                        color: #000; 
+                        -webkit-print-color-adjust: exact !important; 
+                        print-color-adjust: exact !important; 
+                    }
+                    table { 
+                        width: 100%; 
+                        border-collapse: collapse; 
+                    }
+                    th {
+                        padding: 7px 5px;
+                        font-size: 10px;
+                        background-color: #cbd5e1 !important;
+                    }
+                    td {
+                        padding: 6px 5px;
+                        font-size: 10px;
+                    }
+                    .header-kop {
+                        border-bottom: 2px solid #000;
+                        padding-bottom: 6px;
+                        margin-bottom: 12px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header-kop">
+                    <table style="width: 100%; border: none;">
+                        <tr>
+                            <td style="width: 55%; vertical-align: middle; border: none;">
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    ${base64Logo ? `<img src="${base64Logo}" alt="Logo Dakota" style="height: 42px; width: auto; object-fit: contain;" />` : ''}
+                                    <div>
+                                        <div style="font-size: 13px; font-weight: bold; color: #000; letter-spacing: 0.5px;">PT DAKOTA LOGISTIK INDONESIA</div>
+                                        <div style="font-size: 10px; color: #333; margin-top: 1px;">Jl. Wibawa Mukti II No. 99, Jatiasih, Bekasi - BEKASI KOTA</div>
+                                        <div style="font-size: 10px; color: #333;">Telp: (021) 8603278 / (021) 86608589</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td style="width: 45%; text-align: right; vertical-align: middle; border: none;">
+                                <div style="font-size: 14px; font-weight: 900; text-decoration: underline; letter-spacing: 0.5px;">LAPORAN KONDISI BTT & ORDER JEMPUT</div>
+                                <div style="font-size: 11px; margin-top: 2px; font-weight: bold; color: #111;">${namaCabang}</div>
+                                <div style="font-size: 10px; color: #222; margin-top: 2px;">PERIODE: ${periodeStr}</div>
+                                <div style="font-size: 9px; color: #555; margin-top: 1px;">Tanggal Cetak: ${todayFormatted}</div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr style="background-color: #cbd5e1; font-weight: bold; font-size: 10px; text-align: center;">
+                            <th style="border: 1px solid #475569; padding: 6px 4px; width: 3%;">NO</th>
+                            <th style="border: 1px solid #475569; padding: 6px 5px; width: 12%;">NO. DOKUMEN</th>
+                            <th style="border: 1px solid #475569; padding: 6px 4px; width: 8%;">TANGGAL</th>
+                            <th style="border: 1px solid #475569; padding: 6px 5px; width: 22%;">PELANGGAN / TUJUAN</th>
+                            <th style="border: 1px solid #475569; padding: 6px 4px; width: 10%;">PIC MARKETING</th>
+                            <th style="border: 1px solid #475569; padding: 6px 4px; width: 10%;">KOLI / BERAT</th>
+                            <th style="border: 1px solid #475569; padding: 6px 4px; width: 8%;">METODE</th>
+                            <th style="border: 1px solid #475569; padding: 6px 4px; width: 7%;">BTT FISIK</th>
+                            <th style="border: 1px solid #475569; padding: 6px 4px; width: 8%;">FAKTUR</th>
+                            <th style="border: 1px solid #475569; padding: 6px 4px; width: 6%;">LUNAS</th>
+                            <th style="border: 1px solid #475569; padding: 6px 5px; width: 11%; text-align: right;">TOTAL BIAYA</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                    </tbody>
+                    <tfoot>
+                        <tr style="background-color: #f1f5f9; font-weight: bold; font-size: 10px; font-family: monospace;">
+                            <td colspan="5" style="border: 1px solid #475569; padding: 6px; text-align: center;">TOTAL (${data.length} TRANSAKSI) :</td>
+                            <td style="border: 1px solid #475569; padding: 6px; text-align: center;">${totalKoliAll} Koli / ${totalBeratAll} Kg</td>
+                            <td colspan="4" style="border: 1px solid #475569; padding: 6px; text-align: center;">-</td>
+                            <td style="border: 1px solid #475569; padding: 6px; text-align: right; font-weight: 900; color: #e11d48;">Rp ${totalBiayaAll.toLocaleString('id-ID')}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <div style="margin-top: 25px; page-break-inside: avoid;">
+                    <table style="width: 100%; border: none; font-size: 11px;">
+                        <tr style="text-align: center; border: none;">
+                            <td style="width: 33%; border: none;">
+                                <div>Dibuat Oleh,</div>
+                                <div style="height: 44px;"></div>
+                                <div style="font-weight: bold; text-decoration: underline;">( Petugas Operasional / CS )</div>
+                            </td>
+                            <td style="width: 33%; border: none;">
+                                <div>Diperiksa Oleh,</div>
+                                <div style="height: 44px;"></div>
+                                <div style="font-weight: bold; text-decoration: underline;">( Koordinator Piutang )</div>
+                            </td>
+                            <td style="width: 33%; border: none;">
+                                <div>Disetujui Oleh,</div>
+                                <div style="height: 44px;"></div>
+                                <div style="font-weight: bold; text-decoration: underline;">( Kepala Cabang )</div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <script>
+                    window.onload = () => {
+                        window.print();
+                    };
+                </script>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+    };
+
     const columns = [
         {
             header: 'NO. DOKUMEN',
@@ -297,8 +537,8 @@ const KondisiBTT = () => {
                                 disabled={!isHoldingUser}
                                 onChange={(e) => setSelectedCabang(e.target.value)}
                                 className={`w-full p-2 border rounded-lg font-bold outline-none ${!isHoldingUser
-                                        ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed select-none'
-                                        : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500 cursor-pointer'
+                                    ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed select-none'
+                                    : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500 cursor-pointer'
                                     }`}
                                 title={!isHoldingUser ? 'Filter cabang terkunci sesuai lokasi login Anda' : 'Pilih cabang asal'}
                             >
@@ -440,7 +680,7 @@ const KondisiBTT = () => {
                     <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                         <button
                             type="button"
-                            onClick={() => window.print()}
+                            onClick={handlePrintReport}
                             className="px-5 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold rounded-xl transition flex items-center gap-1.5 uppercase cursor-pointer"
                         >
                             <Printer size={14} /> Cetak Laporan

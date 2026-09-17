@@ -303,7 +303,7 @@ const ProformaInvoice = () => {
             render: (item) => <span style={{ color: isDarkMode ? '#FFFFFF' : '#000000' }} className="font-mono font-bold">{item.pih_tanggal_str || '-'}</span>
         },
         {
-            header: 'CUSTOMER',
+            header: 'PELANGGAN',
             accessor: 'cust_name',
             render: (item) => <span style={{ color: isDarkMode ? '#FFFFFF' : '#000000' }} className="font-bold">{item.cust_name || item.pih_custid || '-'}</span>
         },
@@ -354,7 +354,6 @@ const ProformaInvoice = () => {
         }
     ];
 
-    // Kolom Aksi Lengkap: Edit, Print/View, Hapus (Batal)
     const renderCustomActions = (item) => (
         <div className="flex items-center gap-2">
             <button
@@ -432,16 +431,21 @@ const ProformaInvoice = () => {
                 </div>
                 <div>
                     <label className={`block mb-1 flex items-center gap-1 ${isDarkMode ? 'text-gray-300' : 'text-slate-600'}`}>
-                        <User size={13} /> CUSTOMER :
+                        <User size={13} /> PELANGGAN :
                     </label>
-                    <input
-                        type="text"
-                        placeholder="Ketik nama customer..."
+                    <select
                         value={filterCustomer}
                         onChange={(e) => setFilterCustomer(e.target.value)}
-                        className={`w-full p-2.5 border rounded-xl font-bold outline-none ${isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-white border-slate-300 text-slate-800'
+                        className={`w-full p-2.5 border rounded-xl font-bold outline-none cursor-pointer ${isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-white border-slate-300 text-slate-800'
                             }`}
-                    />
+                    >
+                        <option value="">-- SEMUA PELANGGAN --</option>
+                        {customers.map((c) => (
+                            <option key={c.cust_id} value={c.cust_name || c.cust_id}>
+                                {c.cust_name} [{c.cust_id}]
+                            </option>
+                        ))}
+                    </select>
                 </div>
             </div>
 
@@ -466,15 +470,7 @@ const ProformaInvoice = () => {
     );
 
     return (
-        <div
-            className="space-y-4"
-            onClickCapture={(e) => {
-                const target = e.target;
-                if (target.closest('button') && target.closest('button').innerText?.includes('Filter')) {
-                    toggleFilterPanel();
-                }
-            }}
-        >
+        <div className="space-y-4">
             {showFilter && filterPanelContent}
 
             <DataTableTemplate

@@ -13,7 +13,8 @@ const JurnalTidakSeimbang = () => {
     const [jurnalList, setJurnalList] = useState([]);
     const [globalSearch, setGlobalSearch] = useState('');
 
-    // 🔍 State Filter
+    // 🔍 State Filter & Toggle Panel
+    const [showFilter, setShowFilter] = useState(true);
     const todayStr = new Date().toISOString().split('T')[0];
     const [filterParams, setFilterParams] = useState({
         useTanggal: true,
@@ -74,16 +75,61 @@ const JurnalTidakSeimbang = () => {
     };
 
     // 📥 Handler Download CSV
-    const handleDownloadCSV = (type) => {
+    // 📥 Handler Download CSV Nyata
+    const handleDownloadCSV = async (type) => {
         const jenisLabel = type === 'coa' ? 'Jurnal + COA' : 'Jurnal + Selisih';
-        Swal.fire({
-            title: 'MEMPROSES DOWNLOAD',
-            text: `Sedang mengunduh file CSV ${jenisLabel}...`,
-            icon: 'info',
-            timer: 2000,
-            showConfirmButton: false
-        });
-        // Logika download CSV dapat disesuaikan dengan endpoint export backend
+
+        try {
+            Swal.fire({
+                title: 'MEMPROSES DOWNLOAD',
+                text: `Sedang menyiapkan file CSV ${jenisLabel}...`,
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
+
+            const token = localStorage.getItem('token');
+            const params = { type };
+
+            if (filterParams.useTanggal) {
+                params.tanggalStart = filterParams.tanggalStart;
+                params.tanggalEnd = filterParams.tanggalEnd;
+            }
+            if (filterParams.useNoJurnal && filterParams.noJurnal) {
+                params.noJurnal = filterParams.noJurnal.trim();
+            }
+
+            const response = await api.get('/gl/jurnal-tidak-seimbang/export-csv', {
+                params,
+                headers: { Authorization: `Bearer ${token}` },
+                responseType: 'blob'
+            });
+
+            // Eksekusi trigger download di browser
+            const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.setAttribute('download', `JURNAL_UNBALANCED_${type.toUpperCase()}_${filterParams.tanggalStart || 'ALL'}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(downloadUrl);
+
+            Swal.fire({
+                title: 'BERHASIL',
+                text: `File CSV ${jenisLabel} berhasil diunduh.`,
+                icon: 'success',
+                confirmButtonColor: '#059669'
+            });
+        } catch (err) {
+            console.error("Gagal export CSV:", err);
+            Swal.fire({
+                title: 'GAGAL DOWNLOAD',
+                text: err.response?.data?.message || 'Terjadi kesalahan saat mengunduh file CSV.',
+                icon: 'error',
+                confirmButtonColor: '#ef4444'
+            });
+        }
     };
 
     // 📌 Definisi Kolom Tabel (Replika gl_t_jurnal_unbalanced.asp)
@@ -167,7 +213,7 @@ const JurnalTidakSeimbang = () => {
     return (
         <div className={`p-6 space-y-6 min-h-screen ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-slate-50 text-slate-800'}`}>
 
-            {/* Header Page - Warna Tema Biru Elegan */}
+            {/* Header Page */}
             <div className="flex items-center justify-between border-b border-gray-200 pb-3">
                 <div>
                     <h1 className="text-base font-black uppercase tracking-wider text-blue-600 flex items-center gap-2">
@@ -179,118 +225,118 @@ const JurnalTidakSeimbang = () => {
                 </div>
             </div>
 
-            {/* 🔍 PANEL FILTER REPLIKA ASP LAWAS */}
-            <div className={`p-5 rounded-2xl border shadow-xs space-y-4 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-slate-200'}`}>
-                <div className="flex items-center gap-2 text-blue-600 font-black tracking-wider border-b border-slate-100 pb-2 text-xs">
-                    <Search size={16} />
-                    <span>PANEL FILTER AUDIT JURNAL</span>
-                </div>
+            {/* 🔍 PANEL FILTER (TOGGLE SESUAI TOMBOL FILTER) */}
+            {showFilter && (
+                <div className={`p-5 rounded-2xl border shadow-xs space-y-4 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-slate-200'}`}>
+                    <div className="flex items-center gap-2 text-blue-600 font-black tracking-wider border-b border-slate-100 pb-2 text-xs">
+                        <Search size={16} />
+                        <span>PANEL FILTER AUDIT JURNAL</span>
+                    </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
-                    {/* Filter No Jurnal */}
-                    <div className="space-y-1.5">
-                        <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-600 uppercase">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
+                        {/* Filter No Jurnal */}
+                        <div className="space-y-1.5">
+                            <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-600 uppercase">
+                                <input
+                                    type="checkbox"
+                                    checked={filterParams.useNoJurnal}
+                                    onChange={e => setFilterParams({ ...filterParams, useNoJurnal: e.target.checked })}
+                                    className="rounded text-blue-600 cursor-pointer"
+                                />
+                                No. Jurnal
+                            </label>
                             <input
-                                type="checkbox"
-                                checked={filterParams.useNoJurnal}
-                                onChange={e => setFilterParams({ ...filterParams, useNoJurnal: e.target.checked })}
-                                className="rounded text-blue-600 cursor-pointer"
+                                type="text"
+                                placeholder="Masukkan No Jurnal..."
+                                value={filterParams.noJurnal}
+                                disabled={!filterParams.useNoJurnal}
+                                onChange={e => setFilterParams({ ...filterParams, noJurnal: e.target.value.toUpperCase() })}
+                                className="w-full p-2.5 border border-slate-300 rounded-lg bg-white font-mono font-bold text-slate-900 uppercase disabled:opacity-40 outline-none"
                             />
-                            No. Jurnal
-                        </label>
-                        <input
-                            type="text"
-                            placeholder="Masukkan No Jurnal..."
-                            value={filterParams.noJurnal}
-                            disabled={!filterParams.useNoJurnal}
-                            onChange={e => setFilterParams({ ...filterParams, noJurnal: e.target.value.toUpperCase() })}
-                            className="w-full p-2.5 border border-slate-300 rounded-lg bg-white font-mono font-bold text-slate-900 uppercase disabled:opacity-40 outline-none"
-                        />
-                    </div>
+                        </div>
 
-                    {/* Filter Tanggal Start */}
-                    <div className="space-y-1.5">
-                        <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-600 uppercase">
+                        {/* Filter Tanggal Start */}
+                        <div className="space-y-1.5">
+                            <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-600 uppercase">
+                                <input
+                                    type="checkbox"
+                                    checked={filterParams.useTanggal}
+                                    onChange={e => setFilterParams({ ...filterParams, useTanggal: e.target.checked })}
+                                    className="rounded text-blue-600 cursor-pointer"
+                                />
+                                Tanggal Awal
+                            </label>
                             <input
-                                type="checkbox"
-                                checked={filterParams.useTanggal}
-                                onChange={e => setFilterParams({ ...filterParams, useTanggal: e.target.checked })}
-                                className="rounded text-blue-600 cursor-pointer"
+                                type="date"
+                                value={filterParams.tanggalStart}
+                                disabled={!filterParams.useTanggal}
+                                onChange={e => setFilterParams({ ...filterParams, tanggalStart: e.target.value })}
+                                className="w-full p-2.5 border border-slate-300 rounded-lg bg-white font-bold text-slate-900 disabled:opacity-40 outline-none"
                             />
-                            Tanggal Awal
-                        </label>
-                        <input
-                            type="date"
-                            value={filterParams.tanggalStart}
-                            disabled={!filterParams.useTanggal}
-                            onChange={e => setFilterParams({ ...filterParams, tanggalStart: e.target.value })}
-                            className="w-full p-2.5 border border-slate-300 rounded-lg bg-white font-bold text-slate-900 disabled:opacity-40 outline-none"
-                        />
+                        </div>
+
+                        {/* Filter Tanggal End */}
+                        <div className="space-y-1.5">
+                            <label className="font-bold text-slate-600 uppercase block pt-0.5">
+                                Sampai Tanggal
+                            </label>
+                            <input
+                                type="date"
+                                value={filterParams.tanggalEnd}
+                                disabled={!filterParams.useTanggal}
+                                onChange={e => setFilterParams({ ...filterParams, tanggalEnd: e.target.value })}
+                                className="w-full p-2.5 border border-slate-300 rounded-lg bg-white font-bold text-slate-900 disabled:opacity-40 outline-none"
+                            />
+                        </div>
                     </div>
 
-                    {/* Filter Tanggal End */}
-                    <div className="space-y-1.5">
-                        <label className="font-bold text-slate-600 uppercase block pt-0.5">
-                            Sampai Tanggal
-                        </label>
-                        <input
-                            type="date"
-                            value={filterParams.tanggalEnd}
-                            disabled={!filterParams.useTanggal}
-                            onChange={e => setFilterParams({ ...filterParams, tanggalEnd: e.target.value })}
-                            className="w-full p-2.5 border border-slate-300 rounded-lg bg-white font-bold text-slate-900 disabled:opacity-40 outline-none"
-                        />
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                onClick={fetchJurnalTidakSeimbang}
+                                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow-xs cursor-pointer flex items-center gap-2 transition"
+                            >
+                                <RefreshCw size={14} /> REFRESH
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => handleDownloadCSV('coa')}
+                                className="px-4 py-2.5 bg-cyan-600 hover:bg-cyan-700 active:scale-98 text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow-xs cursor-pointer flex items-center gap-2 transition"
+                            >
+                                <FileSpreadsheet size={14} /> DOWNLOAD CSV JURNAL + COA
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => handleDownloadCSV('selisih')}
+                                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow-xs cursor-pointer flex items-center gap-2 transition"
+                            >
+                                <Download size={14} /> DOWNLOAD CSV JURNAL + SELISIH
+                            </button>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => window.history.back()}
+                            className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-98 text-white font-bold rounded-xl text-xs uppercase tracking-wider cursor-pointer transition"
+                        >
+                            KELUAR
+                        </button>
                     </div>
                 </div>
+            )}
 
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
-                    <div className="flex flex-wrap gap-2">
-                        {/* Tombol Refresh (Hijau / Blue) */}
-                        <button
-                            type="button"
-                            onClick={fetchJurnalTidakSeimbang}
-                            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow-xs cursor-pointer flex items-center gap-2 transition"
-                        >
-                            <RefreshCw size={14} /> REFRESH
-                        </button>
-
-                        {/* Tombol Download CSV Jurnal + COA (Sesuai Gambar 2) */}
-                        <button
-                            type="button"
-                            onClick={() => handleDownloadCSV('coa')}
-                            className="px-4 py-2.5 bg-cyan-600 hover:bg-cyan-700 active:scale-98 text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow-xs cursor-pointer flex items-center gap-2 transition"
-                        >
-                            <FileSpreadsheet size={14} /> DOWNLOAD CSV JURNAL + COA
-                        </button>
-
-                        {/* Tombol Download CSV Jurnal + Selisih (Sesuai Gambar 2) */}
-                        <button
-                            type="button"
-                            onClick={() => handleDownloadCSV('selisih')}
-                            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow-xs cursor-pointer flex items-center gap-2 transition"
-                        >
-                            <Download size={14} /> DOWNLOAD CSV JURNAL + SELISIH
-                        </button>
-                    </div>
-
-                    {/* Tombol Keluar (Rose Red) */}
-                    <button
-                        type="button"
-                        onClick={() => window.history.back()}
-                        className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-98 text-white font-bold rounded-xl text-xs uppercase tracking-wider cursor-pointer transition"
-                    >
-                        KELUAR
-                    </button>
-                </div>
-            </div>
-
-            {/* 📋 DATATABLE JURNAL TIDAK SEIMBANG */}
+            {/* 📋 DATATABLE (TERHUBUNG KE TOGGLE FILTER & TANPA TOMBOL TAMBAH) */}
             <DataTableTemplate
                 title={`DATALIST JURNAL TIDAK SEIMBANG (${filteredData.length} ITEMS)`}
                 columns={columns}
                 data={filteredData}
                 loading={loading}
                 isDarkMode={isDarkMode}
+                hideAddButton={true}
+                onFilter={() => setShowFilter(prev => !prev)}
                 searchValue={globalSearch}
                 onSearchChange={(e) => setGlobalSearch(e.target.value)}
             />

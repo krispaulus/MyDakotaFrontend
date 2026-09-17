@@ -162,7 +162,6 @@ const TagihInvoice = () => {
         }
     };
 
-    // Ambil detail menggunakan Query Param ?id=... (Aman dari issue slash)
     const handleViewDetail = async (item) => {
         try {
             const token = localStorage.getItem('token');
@@ -261,7 +260,6 @@ const TagihInvoice = () => {
         }
     ];
 
-    // Kolom ACTION dengan icon Edit3 (Biru) dan Trash2 (Merah) sesuai screenshot referensi
     const renderCustomActions = (item) => (
         <div className="flex items-center gap-3">
             <button
@@ -362,15 +360,7 @@ const TagihInvoice = () => {
     );
 
     return (
-        <div
-            className="space-y-4"
-            onClickCapture={(e) => {
-                const target = e.target;
-                if (target.closest('button') && target.closest('button').innerText?.includes('Filter')) {
-                    toggleFilterPanel();
-                }
-            }}
-        >
+        <div className="space-y-4">
             {showFilter && filterPanelContent}
 
             <DataTableTemplate

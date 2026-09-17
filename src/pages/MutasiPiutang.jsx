@@ -3,6 +3,7 @@ import api from '../api/axios';
 import { useDarkMode } from '../context/DarkModeContext';
 import { FileText, Search, Printer, Calendar, Building, User, Layers } from 'lucide-react';
 import Swal from 'sweetalert2';
+import dakotaLogo from '../assets/new_logo 2.png';
 
 const MutasiPiutang = () => {
     const { isDarkMode } = useDarkMode();
@@ -74,7 +75,10 @@ const MutasiPiutang = () => {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            setReportData(res.data?.data || []);
+            // Normalisasi array secara aman
+            const raw = res.data?.data;
+            const dataArr = Array.isArray(raw) ? raw : (raw?.items || raw?.groups || []);
+            setReportData(dataArr);
         } catch (err) {
             console.error("Gagal load mutasi piutang:", err);
             Swal.fire('Error', 'Gagal memuat data mutasi piutang.', 'error');
@@ -87,8 +91,318 @@ const MutasiPiutang = () => {
         fetchReport();
     }, [modeLaporan]);
 
-    const handlePrint = () => {
-        window.print();
+    // 🖨️ CETAK DOKUMEN MUTASI PIUTANG (DENGAN BASE64 LOGO DAKOTA & LANDSCAPE RESMI)
+    const handlePrint = async () => {
+        const currentData = Array.isArray(reportData)
+            ? reportData
+            : (reportData?.items || reportData?.groups || []);
+
+        if (!currentData || currentData.length === 0) {
+            Swal.fire({
+                title: 'DATA KOSONG',
+                text: 'Silakan klik PROSES FILTER terlebih dahulu sebelum mencetak.',
+                icon: 'warning',
+                confirmButtonColor: '#2563eb'
+            });
+            return;
+        }
+
+        // 🖼️ Convert Asset Logo ke DataURL Base64 agar pasti muncul di about:blank
+        let base64Logo = '';
+        try {
+            const logoImg = new Image();
+            logoImg.src = dakotaLogo;
+            await new Promise((resolve) => {
+                if (logoImg.complete) {
+                    resolve();
+                } else {
+                    logoImg.onload = () => resolve();
+                    logoImg.onerror = () => resolve();
+                }
+            });
+
+            if (logoImg.naturalWidth > 0) {
+                const canvas = document.createElement('canvas');
+                canvas.width = logoImg.naturalWidth;
+                canvas.height = logoImg.naturalHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(logoImg, 0, 0);
+                base64Logo = canvas.toDataURL('image/png');
+            }
+        } catch {
+            base64Logo = dakotaLogo;
+        }
+
+        const printWindow = window.open('', '_blank', 'width=1150,height=800');
+        if (!printWindow) {
+            Swal.fire('Popup Diblokir', 'Mohon izinkan popup browser untuk mencetak dokumen ini.', 'warning');
+            return;
+        }
+
+        const todayFormatted = new Date().toLocaleDateString('id-ID', {
+            day: '2-digit', month: '2-digit', year: 'numeric'
+        });
+
+        const selectedCabang = agens.find(a => String(a.agen_id) === String(cabangId));
+        const namaCabang = cabangId === 'ALL' ? 'KONSOLIDASI (SEMUA CABANG)' : (selectedCabang?.agen_nama || 'CABANG ' + cabangId);
+
+        let judulLaporan = 'LAPORAN MUTASI PIUTANG DETAIL';
+        if (modeLaporan === '2') judulLaporan = 'LAPORAN REKAP MUTASI PIUTANG PELANGGAN';
+        if (modeLaporan === '3') judulLaporan = 'LAPORAN KARTU PIUTANG PELANGGAN';
+
+        let tabelHtml = '';
+
+        // 1. FORMAT DETAIL TRANSAKSI
+        if (modeLaporan === '1') {
+            tabelHtml = currentData.map((group) => {
+                const rows = (group.details || []).map(d => `
+                    <tr style="font-family: monospace; font-size: 10px;">
+                        <td style="border: 1px solid #000; padding: 5px;">${d.tanggal || '-'}</td>
+                        <td style="border: 1px solid #000; padding: 5px; font-weight: bold;">${d.no_bukti || '-'}</td>
+                        <td style="border: 1px solid #000; padding: 5px; text-align: right;">${(Number(d.invoice_nominal) || 0).toLocaleString('id-ID')}</td>
+                        <td style="border: 1px solid #000; padding: 5px; text-align: right;">${(Number(d.total_terbayar) || 0).toLocaleString('id-ID')}</td>
+                        <td style="border: 1px solid #000; padding: 5px; text-align: right;">${(Number(d.pengurang_piutang) || 0).toLocaleString('id-ID')}</td>
+                        <td style="border: 1px solid #000; padding: 5px; text-align: right; font-weight: bold;">${(Number(d.bayar_kwitansi) || 0).toLocaleString('id-ID')}</td>
+                        <td style="border: 1px solid #000; padding: 5px; text-align: right;">${(Number(d.selisih_penambah) || 0).toLocaleString('id-ID')}</td>
+                    </tr>
+                `).join('');
+
+                return `
+                    <div style="margin-bottom: 20px; page-break-inside: avoid;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr style="background-color: #f1f5f9; font-weight: bold; font-size: 11px;">
+                                <td colspan="5" style="border: 1px solid #000; padding: 6px;">
+                                    <b>CUSTOMER:</b> ${group.cust_name || '-'} [${group.cust_id || '-'}]
+                                </td>
+                                <td colspan="2" style="border: 1px solid #000; padding: 6px; text-align: right; font-family: monospace;">
+                                    Saldo Awal: Rp ${(Number(group.saldo_awal) || 0).toLocaleString('id-ID')}
+                                </td>
+                            </tr>
+                            <tr style="background-color: #cfcfcf; font-weight: bold; font-size: 10px; text-align: center;">
+                                <th style="border: 1px solid #000; padding: 6px; width: 12%;">TANGGAL</th>
+                                <th style="border: 1px solid #000; padding: 6px; width: 18%;">NO. BUKTI</th>
+                                <th style="border: 1px solid #000; padding: 6px; width: 14%; text-align: right;">INVOICE (RP)</th>
+                                <th style="border: 1px solid #000; padding: 6px; width: 14%; text-align: right;">TOTAL TERBAYAR (RP)</th>
+                                <th style="border: 1px solid #000; padding: 6px; width: 14%; text-align: right;">PENGURANG (RP)</th>
+                                <th style="border: 1px solid #000; padding: 6px; width: 14%; text-align: right;">KWITANSI (RP)</th>
+                                <th style="border: 1px solid #000; padding: 6px; width: 14%; text-align: right;">SELISIH (RP)</th>
+                            </tr>
+                            <tbody>
+                                ${rows || `<tr><td colspan="7" style="border: 1px solid #000; padding: 7px; text-align: center; font-style: italic; color: #555;">Tidak ada mutasi transaksi pada periode ini.</td></tr>`}
+                            </tbody>
+                            <tfoot>
+                                <tr style="font-weight: bold; background-color: #f8fafc; font-size: 10px; font-family: monospace;">
+                                    <td colspan="2" style="border: 1px solid #000; padding: 5px; text-align: right;">SUBTOTAL :</td>
+                                    <td style="border: 1px solid #000; padding: 5px; text-align: right;">${(Number(group.subtotal_invoice) || 0).toLocaleString('id-ID')}</td>
+                                    <td style="border: 1px solid #000; padding: 5px; text-align: right;">${(Number(group.subtotal_terbayar) || 0).toLocaleString('id-ID')}</td>
+                                    <td style="border: 1px solid #000; padding: 5px; text-align: right;">${(Number(group.subtotal_potongan) || 0).toLocaleString('id-ID')}</td>
+                                    <td style="border: 1px solid #000; padding: 5px; text-align: right;">${(Number(group.subtotal_kwitansi) || 0).toLocaleString('id-ID')}</td>
+                                    <td style="border: 1px solid #000; padding: 5px; text-align: right;">${(Number(group.subtotal_penambah) || 0).toLocaleString('id-ID')}</td>
+                                </tr>
+                                <tr style="font-weight: bold; background-color: #e2e8f0; font-size: 11px; font-family: monospace;">
+                                    <td colspan="5" style="border: 1px solid #000; padding: 6px; text-align: right;">SALDO AKHIR CUSTOMER :</td>
+                                    <td colspan="2" style="border: 1px solid #000; padding: 6px; text-align: right;">
+                                        Rp ${(Number(group.saldo_akhir) || 0).toLocaleString('id-ID')}
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 2. FORMAT REKAP PELANGGAN
+        else if (modeLaporan === '2') {
+            const rows = currentData.map((row, idx) => `
+                <tr style="font-family: monospace; font-size: 10px;">
+                    <td style="border: 1px solid #000; padding: 5px; text-align: center;">${idx + 1}</td>
+                    <td style="border: 1px solid #000; padding: 5px;">${row.cabang_nama || '-'}</td>
+                    <td style="border: 1px solid #000; padding: 5px; font-weight: bold;">${row.cust_id || '-'}</td>
+                    <td style="border: 1px solid #000; padding: 5px; font-family: sans-serif;">${row.cust_name || '-'}</td>
+                    <td style="border: 1px solid #000; padding: 5px; text-align: right;">${(Number(row.saldo_awal) || 0).toLocaleString('id-ID')}</td>
+                    <td style="border: 1px solid #000; padding: 5px; text-align: right; font-weight: bold;">${(Number(row.transaksi) || 0).toLocaleString('id-ID')}</td>
+                    <td style="border: 1px solid #000; padding: 5px; text-align: right; font-weight: bold;">${(Number(row.pembayaran) || 0).toLocaleString('id-ID')}</td>
+                    <td style="border: 1px solid #000; padding: 5px; text-align: right; font-weight: bold;">Rp ${(Number(row.saldo_akhir) || 0).toLocaleString('id-ID')}</td>
+                </tr>
+            `).join('');
+
+            tabelHtml = `
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background-color: #cfcfcf; font-weight: bold; font-size: 10px; text-align: center;">
+                            <th style="border: 1px solid #000; padding: 6px; width: 4%;">NO</th>
+                            <th style="border: 1px solid #000; padding: 6px; width: 14%;">CABANG</th>
+                            <th style="border: 1px solid #000; padding: 6px; width: 12%;">KODE</th>
+                            <th style="border: 1px solid #000; padding: 6px; width: 28%;">NAMA PELANGGAN</th>
+                            <th style="border: 1px solid #000; padding: 6px; width: 10%; text-align: right;">SALDO AWAL</th>
+                            <th style="border: 1px solid #000; padding: 6px; width: 10%; text-align: right;">TRANSAKSI</th>
+                            <th style="border: 1px solid #000; padding: 6px; width: 10%; text-align: right;">PEMBAYARAN</th>
+                            <th style="border: 1px solid #000; padding: 6px; width: 12%; text-align: right;">SALDO AKHIR</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows}
+                    </tbody>
+                    <tfoot>
+                        <tr style="background-color: #ebebeb; font-weight: bold; font-size: 11px; font-family: monospace;">
+                            <td colspan="4" style="border: 1px solid #000; padding: 6px; text-align: center;">GRAND TOTAL :</td>
+                            <td style="border: 1px solid #000; padding: 6px; text-align: right;">${grand.awal.toLocaleString('id-ID')}</td>
+                            <td style="border: 1px solid #000; padding: 6px; text-align: right;">${grand.trans.toLocaleString('id-ID')}</td>
+                            <td style="border: 1px solid #000; padding: 6px; text-align: right;">${grand.bayar.toLocaleString('id-ID')}</td>
+                            <td style="border: 1px solid #000; padding: 6px; text-align: right;">Rp ${grand.akhir.toLocaleString('id-ID')}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            `;
+        }
+
+        // 3. FORMAT KARTU PIUTANG
+        else if (modeLaporan === '3') {
+            tabelHtml = currentData.map((group) => {
+                const rows = (group.rows || []).map(r => `
+                    <tr style="font-family: monospace; font-size: 10px;">
+                        <td style="border: 1px solid #000; padding: 5px;">${r.tanggal || '-'}</td>
+                        <td style="border: 1px solid #000; padding: 5px; font-weight: bold;">${r.no_bukti || '-'}</td>
+                        <td style="border: 1px solid #000; padding: 5px; font-family: sans-serif;">${r.keterangan || '-'}</td>
+                        <td style="border: 1px solid #000; padding: 5px; text-align: right;">${r.penjualan ? (Number(r.penjualan) || 0).toLocaleString('id-ID') : '-'}</td>
+                        <td style="border: 1px solid #000; padding: 5px; text-align: right;">${r.pembayaran ? (Number(r.pembayaran) || 0).toLocaleString('id-ID') : '-'}</td>
+                        <td style="border: 1px solid #000; padding: 5px; text-align: right; font-weight: bold;">Rp ${(Number(r.saldo) || 0).toLocaleString('id-ID')}</td>
+                    </tr>
+                `).join('');
+
+                return `
+                    <div style="margin-bottom: 20px; page-break-inside: avoid;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr style="background-color: #f1f5f9; font-weight: bold; font-size: 11px;">
+                                <td colspan="4" style="border: 1px solid #000; padding: 6px;">
+                                    <b>KARTU PIUTANG:</b> ${group.cust_name || '-'} [${group.cust_id || '-'}]
+                                </td>
+                                <td colspan="2" style="border: 1px solid #000; padding: 6px; text-align: right; font-family: monospace;">
+                                    Saldo Awal: Rp ${(Number(group.saldo_awal) || 0).toLocaleString('id-ID')}
+                                </td>
+                            </tr>
+                            <tr style="background-color: #cfcfcf; font-weight: bold; font-size: 10px; text-align: center;">
+                                <th style="border: 1px solid #000; padding: 6px; width: 12%;">TANGGAL</th>
+                                <th style="border: 1px solid #000; padding: 6px; width: 18%;">NO. BUKTI</th>
+                                <th style="border: 1px solid #000; padding: 6px; width: 34%;">KETERANGAN</th>
+                                <th style="border: 1px solid #000; padding: 6px; width: 12%; text-align: right;">PENJUALAN (DEBET)</th>
+                                <th style="border: 1px solid #000; padding: 6px; width: 12%; text-align: right;">PEMBAYARAN (KREDIT)</th>
+                                <th style="border: 1px solid #000; padding: 6px; width: 12%; text-align: right;">SALDO PIUTANG</th>
+                            </tr>
+                            <tbody>
+                                ${rows || `<tr><td colspan="6" style="border: 1px solid #000; padding: 7px; text-align: center; font-style: italic; color: #555;">Tidak ada transaksi kartu piutang pada periode ini.</td></tr>`}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>${judulLaporan} - Periode ${startDate} s/d ${endDate}</title>
+                <style>
+                    @page { 
+                        size: landscape; 
+                        margin: 8mm 10mm 10mm 10mm; 
+                    }
+                    * { 
+                        box-sizing: border-box; 
+                    }
+                    body { 
+                        font-family: Arial, Helvetica, sans-serif; 
+                        font-size: 10px; 
+                        color: #000; 
+                        margin: 0; 
+                        padding: 0; 
+                        -webkit-print-color-adjust: exact !important; 
+                        print-color-adjust: exact !important; 
+                    }
+                    table { 
+                        width: 100%; 
+                        border-collapse: collapse; 
+                    }
+                    .header-kop {
+                        border-bottom: 2px solid #000;
+                        padding-bottom: 6px;
+                        margin-bottom: 12px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header-kop">
+                    <table style="width: 100%; border: none;">
+                        <tr>
+                            <td style="width: 55%; vertical-align: middle; border: none;">
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    ${base64Logo ? `<img src="${base64Logo}" alt="Logo Dakota" style="height: 44px; width: auto; object-fit: contain;" />` : ''}
+                                    <div>
+                                        <div style="font-size: 13px; font-weight: bold; color: #000; letter-spacing: 0.5px;">
+                                            PT DAKOTA LOGISTIK INDONESIA
+                                        </div>
+                                        <div style="font-size: 10px; color: #333; margin-top: 1px;">
+                                            Jl. Wibawa Mukti II No. 99, Jatiasih, Bekasi - BEKASI KOTA
+                                        </div>
+                                        <div style="font-size: 10px; color: #333;">
+                                            Telp: (021) 8603278 / (021) 86608589
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td style="width: 45%; text-align: right; vertical-align: middle; border: none;">
+                                <div style="font-size: 14px; font-weight: 900; text-decoration: underline; letter-spacing: 0.5px;">
+                                    ${judulLaporan}
+                                </div>
+                                <div style="font-size: 11px; margin-top: 2px; font-weight: bold; color: #111;">
+                                    ${namaCabang}
+                                </div>
+                                <div style="font-size: 10px; color: #222; margin-top: 2px;">
+                                    PERIODE: ${startDate} s/d ${endDate}
+                                </div>
+                                <div style="font-size: 9px; color: #555; margin-top: 1px;">
+                                    Tanggal Cetak: ${todayFormatted}
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                ${tabelHtml}
+
+                <div style="margin-top: 25px; page-break-inside: avoid;">
+                    <table style="width: 100%; border: none; font-size: 11px;">
+                        <tr style="text-align: center; border: none;">
+                            <td style="width: 33%; border: none;">
+                                <div>Dibuat Oleh,</div>
+                                <div style="height: 45px;"></div>
+                                <div style="font-weight: bold; text-decoration: underline;">( Staff Piutang / AR )</div>
+                            </td>
+                            <td style="width: 33%; border: none;">
+                                <div>Diperiksa Oleh,</div>
+                                <div style="height: 45px;"></div>
+                                <div style="font-weight: bold; text-decoration: underline;">( Supervisor Piutang )</div>
+                            </td>
+                            <td style="width: 33%; border: none;">
+                                <div>Disetujui Oleh,</div>
+                                <div style="height: 45px;"></div>
+                                <div style="font-weight: bold; text-decoration: underline;">( Manager Keuangan )</div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <script>
+                    window.onload = () => {
+                        window.print();
+                    };
+                </script>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
     };
 
     // Kalkulasi Total Grand

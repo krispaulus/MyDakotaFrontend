@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api/axios';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
+import { Calendar, Building, RotateCcw, Search } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 const SaldoAwalPiutang = () => {
@@ -10,6 +11,9 @@ const SaldoAwalPiutang = () => {
     const [loading, setLoading] = useState(false);
     const [agens, setAgens] = useState([]);
     const [customers, setCustomers] = useState([]);
+
+    // 🔍 State Toggle Panel Filter
+    const [showFilter, setShowFilter] = useState(false);
 
     const currentYear = new Date().getFullYear();
     const [selectedTahun, setSelectedTahun] = useState(String(currentYear));
@@ -63,6 +67,11 @@ const SaldoAwalPiutang = () => {
     useEffect(() => {
         fetchSaldoAwal();
     }, [selectedAgen, selectedTahun]);
+
+    const handleResetFilter = () => {
+        setSelectedTahun(String(new Date().getFullYear()));
+        setSelectedAgen('ALL');
+    };
 
     const handleFormSubmit = async (item = null) => {
         const isEdit = Boolean(item);
@@ -208,16 +217,87 @@ const SaldoAwalPiutang = () => {
         }
     ];
 
+    // Array pilihan tahun (dari tahun sekarang mundur ke 2017)
+    const listTahun = useMemo(() => {
+        const arr = [];
+        for (let y = currentYear; y >= 2017; y--) {
+            arr.push(String(y));
+        }
+        return arr;
+    }, [currentYear]);
+
     return (
-        <DataTableTemplate
-            title={`SET SALDO AWAL PIUTANG PER CUSTOMER (${selectedTahun})`}
-            columns={columns}
-            data={data}
-            loading={loading}
-            isDarkMode={isDarkMode}
-            onAdd={handleAdd}
-            onEdit={handleEdit}
-        />
+        <div className="space-y-4">
+            {/* 🔍 PANEL FILTER (TOGGLE) */}
+            {showFilter && (
+                <div className={`p-5 rounded-2xl border shadow-sm transition-all mb-4 ${isDarkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-slate-200 text-slate-800'
+                    }`}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold">
+                        <div>
+                            <label className={`block mb-1 flex items-center gap-1 ${isDarkMode ? 'text-gray-300' : 'text-slate-600'}`}>
+                                <Calendar size={13} /> TAHUN PEMBUKUAN :
+                            </label>
+                            <select
+                                value={selectedTahun}
+                                onChange={(e) => setSelectedTahun(e.target.value)}
+                                className={`w-full p-2.5 border rounded-xl font-bold font-mono outline-none cursor-pointer ${isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-white border-slate-300 text-slate-800'
+                                    }`}
+                            >
+                                {listTahun.map((thn) => (
+                                    <option key={thn} value={thn}>{thn}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className={`block mb-1 flex items-center gap-1 ${isDarkMode ? 'text-gray-300' : 'text-slate-600'}`}>
+                                <Building size={13} /> CABANG / AGEN :
+                            </label>
+                            <select
+                                value={selectedAgen}
+                                onChange={(e) => setSelectedAgen(e.target.value)}
+                                className={`w-full p-2.5 border rounded-xl font-bold outline-none cursor-pointer ${isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-white border-slate-300 text-slate-800'
+                                    }`}
+                            >
+                                <option value="ALL">-- SEMUA CABANG / AGEN --</option>
+                                <option value="1">KANTOR PUSAT</option>
+                                {agens.map((a) => (
+                                    <option key={a.agen_id} value={a.agen_id}>{a.agen_nama}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-4 mt-4 border-t border-slate-100 dark:border-gray-700">
+                        <button
+                            type="button"
+                            onClick={handleResetFilter}
+                            className="px-4 py-2 border rounded-xl font-bold text-xs flex items-center gap-1.5 transition text-slate-600 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-gray-700 cursor-pointer"
+                        >
+                            <RotateCcw size={14} /> Reset
+                        </button>
+                        <button
+                            type="button"
+                            onClick={fetchSaldoAwal}
+                            disabled={loading}
+                            className="px-6 py-2 bg-[#2563eb] hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer disabled:opacity-50"
+                        >
+                            <Search size={15} /> {loading ? 'MEMUAT...' : 'CARI DATA'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            <DataTableTemplate
+                title={`SET SALDO AWAL PIUTANG PER CUSTOMER (${selectedTahun})`}
+                columns={columns}
+                data={data}
+                loading={loading}
+                isDarkMode={isDarkMode}
+                onAdd={handleAdd}
+                onEdit={handleEdit}
+                onFilter={() => setShowFilter(prev => !prev)}
+            />
+        </div>
     );
 };
 
