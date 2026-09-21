@@ -540,9 +540,10 @@ function App() {
       <Route path="/dashboard" element={<MainLayout><Dashboard /></MainLayout>} />
       <Route path="/account" element={<MainLayout><Account /></MainLayout>} />
 
-      <Route path="/marketing" element={<MainLayout><UnderConstruction menuName="Marketing" /></MainLayout>} />
+      {/* <Route path="/marketing" element={<MainLayout><UnderConstruction menuName="Marketing" /></MainLayout>} /> */}
+      <Route path="/marketing" element={<Navigate to="/marketing/master-customer" replace />} />
       <Route path="/marketing/master-customer" element={<MainLayout><MasterCustomer /></MainLayout>} />
-      <Route path="/marketing/btt" element={<MainLayout><MarketingBTT /></MainLayout>} />
+      <Route path="/marketing/BTT" element={<MainLayout><MarketingBTT /></MainLayout>} />
       <Route path="/marketing/btt/print" element={<BttPrintPage />} />
       <Route path="/marketing/bdb" element={<MainLayout><MarketingBDB /></MainLayout>} />
       <Route path="/marketing/cetak-btt" element={<MainLayout><MarketingBTT /></MainLayout>} />
@@ -588,8 +589,6 @@ function App() {
       <Route path="/operasional/pembongkaran-barang" element={<MainLayout><PembongkaranBarang menuName="PembongkaranBarang" /></MainLayout>} />
       <Route path="/operasional/stok/stok-barang-gudang" element={<MainLayout><StokBarangGudang /></MainLayout>} />
       <Route path="/operasional/voucher-bbm" element={<MainLayout><VoucherBBM /></MainLayout>} />
-
-      <Route path="/general-ledger" element={<MainLayout><UnderConstruction menuName="General Ledger" /></MainLayout>} />
 
       <Route path="/Master" element={<MainLayout><UnderConstruction menuName="Master Data" /></MainLayout>} />
       <Route path="/master/master-dalam-kota" element={<MainLayout><MasterDalamKota /></MainLayout>} />
@@ -646,12 +645,12 @@ function App() {
 
       <Route path="/klaim" element={<MainLayout><UnderConstruction menuName="Klaim" /></MainLayout>} />
 
-      <Route path="/hrd" element={<MainLayout><UnderConstruction menuName="HRD" /></MainLayout>} />
+      <Route path="/hrd" element={<Navigate to="/hrd/karyawan" replace />} />
       <Route path="/hrd/karyawan" element={<MainLayout><MasterKaryawan /></MainLayout>} />
       <Route path="/hrd/MasterKaryawan" element={<MainLayout><MasterKaryawan /></MainLayout>} />
       <Route path="/hrd/form" element={<MainLayout><DaftarFormHRD /></MainLayout>} />
 
-      <Route path="/Settings" element={<MainLayout><UnderConstruction menuName="Settings" /></MainLayout>} />
+      <Route path="/Settings" element={<Navigate to="/settings/users" replace />} />
       <Route path="/settings/users" element={<MainLayout><UserManagement menuName="UserManagement" /></MainLayout>} />
       <Route path="/settings/configurasi" element={<MainLayout><MasterConfigParam menuName="configurasi" /></MainLayout>} />
       <Route path="/settings/security" element={<MainLayout><SecuritySettings menuName="SecuritySettings" /></MainLayout>} />
@@ -659,20 +658,25 @@ function App() {
       <Route path="/pengambilan/barang-sendiri" element={<MainLayout><Pengambilan /></MainLayout>} />
       <Route path="/pengambilan/pengambilan-retur" element={<MainLayout><PengambilanRetur /></MainLayout>} />
 
-      <Route path="/general-ledger/jurnal-tidak-seimbang" element={<MainLayout><JurnalTidakSeimbang /></MainLayout>} />
-      <Route path="/general-ledger/cetak-buku-besar" element={<MainLayout><CetakBukuBesar /></MainLayout>} />
-      <Route path="/general-ledger/cetak-neraca-saldo" element={<MainLayout><CetakNeracaSaldo /></MainLayout>} />
-      <Route path="/general-ledger/cetak-neraca" element={<MainLayout><CetakNeraca /></MainLayout>} />
-      <Route path="/general-ledger/cetak-rugi-laba" element={<MainLayout><CetakRugiLaba /></MainLayout>} />
-      <Route path="/general-ledger/cetak-posisi-keuangan" element={<MainLayout><CetakPosisiKeuangan /></MainLayout>} />
-      <Route path="/general-ledger/cetak-rugi-laba-komprehensif" element={<MainLayout><CetakLabaRugiKomprehensif /></MainLayout>} />
+      <Route path="/general-ledger" element={<Navigate to="/general-ledger/jurnal-tidak-seimbang" replace />} />
+      {/* <Route path="/general-ledger" element={<MainLayout><UnderConstruction menuName="General Ledger" /></MainLayout>} /> */}
 
-      <Route path="/general-ledger/daftar-bank" element={<MainLayout><DaftarBank /></MainLayout>} />
-      <Route path="/general-ledger/daftar-pemasukan-pengeluaran" element={<MainLayout><DaftarPemasukanPengeluaran /></MainLayout>} />
-      <Route path="/general-ledger/daftar-kelompok-perkiraan" element={<MainLayout><DaftarKelompokPerkiraan /></MainLayout>} />
-      <Route path="/general-ledger/daftar-kode-perkiraan" element={<MainLayout><DaftarKodePerkiraan /></MainLayout>} />
-      <Route path="/general-ledger/daftar-sgu" element={<MainLayout><DaftarSGU /></MainLayout>} />
-      <Route path="/general-ledger/daftar-akun-piutang-setoran" element={<MainLayout><DaftarAkunPiutangSetoran /></MainLayout>} />
+      <Route path="/general-ledger/jurnal-tidak-seimbang" element={<MainLayout><JurnalTidakSeimbang /></MainLayout>} />
+      <Route path="/general-ledger/cetak" element={<Navigate to="/general-ledger/cetak/cetak-buku-besar" replace />} />
+      <Route path="/general-ledger/cetak/cetak-buku-besar" element={<MainLayout><CetakBukuBesar /></MainLayout>} />
+      <Route path="/general-ledger/cetak/cetak-neraca-saldo" element={<MainLayout><CetakNeracaSaldo /></MainLayout>} />
+      <Route path="/general-ledger/cetak/cetak-neraca" element={<MainLayout><CetakNeraca /></MainLayout>} />
+      <Route path="/general-ledger/cetak/cetak-rugi-laba" element={<MainLayout><CetakRugiLaba /></MainLayout>} />
+      <Route path="/general-ledger/cetak/cetak-posisi-keuangan" element={<MainLayout><CetakPosisiKeuangan /></MainLayout>} />
+      <Route path="/general-ledger/cetak/cetak-rugi-laba-komprehensif" element={<MainLayout><CetakLabaRugiKomprehensif /></MainLayout>} />
+
+      <Route path="/general-ledger/daftar" element={<Navigate to="/general-ledger/daftar/daftar-bank" replace />} />
+      <Route path="/general-ledger/daftar/daftar-bank" element={<MainLayout><DaftarBank /></MainLayout>} />
+      <Route path="/general-ledger/daftar/daftar-pemasukan-pengeluaran" element={<MainLayout><DaftarPemasukanPengeluaran /></MainLayout>} />
+      <Route path="/general-ledger/daftar/daftar-kelompok-perkiraan" element={<MainLayout><DaftarKelompokPerkiraan /></MainLayout>} />
+      <Route path="/general-ledger/daftar/daftar-kode-perkiraan" element={<MainLayout><DaftarKodePerkiraan /></MainLayout>} />
+      <Route path="/general-ledger/daftar/daftar-sgu" element={<MainLayout><DaftarSGU /></MainLayout>} />
+      <Route path="/general-ledger/daftar/daftar-akun-piutang-setoran" element={<MainLayout><DaftarAkunPiutangSetoran /></MainLayout>} />
 
       <Route path="/general-ledger/insentif-loper" element={<MainLayout><InsentifLoper /></MainLayout>} />
       <Route path="/general-ledger/jurnal" element={<MainLayout><Jurnal /></MainLayout>} />
@@ -692,11 +696,11 @@ function App() {
       <Route path="/laporan/btt-outstanding" element={<MainLayout><BttOutstanding /></MainLayout>} />
       <Route path="/laporan/monitoring-btt" element={<MainLayout><MonitoringBtt /></MainLayout>} />
 
-      <Route path="/marketing/packing-list" element={<MainLayout><PackingList /></MainLayout>} />
-      <Route path="/marketing/asuransi" element={<MainLayout><Asuransi /></MainLayout>} />
-
-      <Route path="/marketing/order-jemput" element={<MainLayout><OrderJemput /></MainLayout>} />
-      <Route path="/marketing/terima-btt-kembali" element={<MainLayout><TerimaBTTKembali /></MainLayout>} />
+      <Route path="/marketing/pengajuan-khusus" element={<MainLayout><Asuransi /></MainLayout>} />
+      <Route path="/marketing/pengajuan-khusus/packing-list" element={<MainLayout><PackingList /></MainLayout>} />
+      <Route path="/marketing/pengajuan-khusus/asuransi" element={<MainLayout><Asuransi /></MainLayout>} />
+      <Route path="/marketing/pengajuan-khusus/order-jemput" element={<MainLayout><OrderJemput /></MainLayout>} />
+      <Route path="/marketing/penerimaan-btt/terima-btt-kembali" element={<MainLayout><TerimaBTTKembali /></MainLayout>} />
 
       {/* Jika nanti ada halaman lain, tinggal bungkus lagi pakai MainLayout 
       <Route

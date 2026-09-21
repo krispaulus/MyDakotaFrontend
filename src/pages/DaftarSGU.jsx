@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import api from '../api/axios';
 import { useDarkMode } from '../context/DarkModeContext';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
-import { X, FileText } from 'lucide-react';
+import { X, FileText, Filter, RefreshCw, RotateCcw } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 const DaftarSGU = () => {
@@ -11,6 +11,14 @@ const DaftarSGU = () => {
     const [data, setData] = useState([]);
     const [coaList, setCoaList] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    // 🌟 STATE TOGGLE FILTER & PARAMETER FILTER
+    const [showFilter, setShowFilter] = useState(false);
+    const [filterCOA, setFilterCOA] = useState('');
+    const [filterAktif, setFilterAktif] = useState('');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
 
     // 🌟 STATE MODAL FORM & ERRORS
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -43,7 +51,15 @@ const DaftarSGU = () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await api.get('/gl/daftar-sgu?limit=500', {
+            let url = `/gl/daftar-sgu?limit=500`;
+
+            if (filterCOA) url += `&ca_id=${encodeURIComponent(filterCOA)}`;
+            if (filterAktif) url += `&aktif_yn=${encodeURIComponent(filterAktif)}`;
+            if (startDate) url += `&start_date=${encodeURIComponent(startDate)}`;
+            if (endDate) url += `&end_date=${encodeURIComponent(endDate)}`;
+            if (searchQuery) url += `&q=${encodeURIComponent(searchQuery)}`;
+
+            const res = await api.get(url, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setData(res.data?.data || []);
@@ -58,6 +74,28 @@ const DaftarSGU = () => {
         fetchSGUData();
         fetchCOAList();
     }, []);
+
+    const handleApplyFilter = (e) => {
+        e.preventDefault();
+        fetchSGUData();
+    };
+
+    const handleResetFilter = () => {
+        setFilterCOA('');
+        setFilterAktif('');
+        setStartDate('');
+        setEndDate('');
+        setSearchQuery('');
+
+        const token = localStorage.getItem('token');
+        setLoading(true);
+        api.get('/gl/daftar-sgu?limit=500', {
+            headers: { Authorization: `Bearer ${token}` }
+        })
+            .then(res => setData(res.data?.data || []))
+            .catch(err => console.error(err))
+            .finally(() => setLoading(false));
+    };
 
     const handleAdd = () => {
         setModalMode('ADD');
@@ -381,7 +419,102 @@ const DaftarSGU = () => {
     ) : null;
 
     return (
-        <>
+        <div className="space-y-4">
+            {/* 🌟 PANEL FILTER KONDISIONAL */}
+            {showFilter && (
+                <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all">
+                    <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
+                        <Filter size={16} className="text-sky-600" />
+                        FILTER DAFTAR SGU (SEWA GUNA USAHA / LEASING)
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        {/* Pencarian Kode / Nama SGU */}
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">CARI KODE / LEASING</label>
+                            <input
+                                type="text"
+                                placeholder="Ketik kode SGU atau nama leasing..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            />
+                        </div>
+
+                        {/* Filter Akun COA */}
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">AKUN COA</label>
+                            <select
+                                value={filterCOA}
+                                onChange={(e) => setFilterCOA(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500 cursor-pointer"
+                            >
+                                <option value="">-- SEMUA AKUN COA --</option>
+                                {coaList.map((c) => (
+                                    <option key={c.ca_id} value={c.ca_id}>
+                                        {c.ca_name} ({c.ca_id})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Filter Tanggal Kontrak Awal */}
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">TGL KONTRAK AWAL</label>
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            />
+                        </div>
+
+                        {/* Filter Tanggal Kontrak Akhir */}
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">TGL KONTRAK AKHIR</label>
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            />
+                        </div>
+
+                        {/* Filter Status Aktif */}
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">STATUS AKTIF</label>
+                            <select
+                                value={filterAktif}
+                                onChange={(e) => setFilterAktif(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500 cursor-pointer"
+                            >
+                                <option value="">-- SEMUA STATUS --</option>
+                                <option value="Y">YA (AKTIF)</option>
+                                <option value="N">TIDAK (NON-AKTIF)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Tombol Aksi Filter */}
+                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={handleResetFilter}
+                            className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer flex items-center gap-1.5"
+                        >
+                            <RotateCcw size={14} /> RESET
+                        </button>
+                        <button
+                            type="submit"
+                            className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5"
+                        >
+                            <RefreshCw size={14} /> REFRESH DATA
+                        </button>
+                    </div>
+                </form>
+            )}
+
+            {/* TABEL DATA DENGAN EVENT onFilter */}
             <DataTableTemplate
                 title="DAFTAR SGU (SEWA GUNA USAHA / LEASING)"
                 columns={columns}
@@ -391,10 +524,11 @@ const DaftarSGU = () => {
                 onAdd={handleAdd}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
+                onFilter={() => setShowFilter(prev => !prev)}
             />
 
             {modalElement && ReactDOM.createPortal(modalElement, document.body)}
-        </>
+        </div>
     );
 };
 

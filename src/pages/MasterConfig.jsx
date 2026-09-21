@@ -2,12 +2,18 @@ import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
+import { Filter, RotateCcw, RefreshCw, X } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 const MasterConfigParam = () => {
     const { isDarkMode } = useDarkMode();
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    // 🌟 STATE TOGGLE FILTER & PARAMETER PENCARIAN
+    const [showFilter, setShowFilter] = useState(false);
+    const [searchVarName, setSearchVarName] = useState('');
+    const [filterVarType, setFilterVarType] = useState('');
 
     // State Modal CRUD
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -29,7 +35,12 @@ const MasterConfigParam = () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await api.get(`/config/params`, {
+            let queryUrl = `/config/params?limit=500`;
+
+            if (searchVarName) queryUrl += `&search=${encodeURIComponent(searchVarName)}`;
+            if (filterVarType) queryUrl += `&vartype=${encodeURIComponent(filterVarType)}`;
+
+            const res = await api.get(queryUrl, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
@@ -54,6 +65,27 @@ const MasterConfigParam = () => {
     useEffect(() => {
         fetchConfigParams();
     }, []);
+
+    const handleApplyFilter = (e) => {
+        e.preventDefault();
+        fetchConfigParams();
+    };
+
+    const handleResetFilter = () => {
+        setSearchVarName('');
+        setFilterVarType('');
+
+        const token = localStorage.getItem('token');
+        setLoading(true);
+        api.get(`/config/params?limit=500`, {
+            headers: { Authorization: `Bearer ${token}` }
+        })
+            .then(res => {
+                setData(res.data?.data || res.data || []);
+            })
+            .catch(err => console.error(err))
+            .finally(() => setLoading(false));
+    };
 
     // Handlers Modal
     const handleAdd = () => {
@@ -96,7 +128,6 @@ const MasterConfigParam = () => {
             if (result.isConfirmed) {
                 try {
                     const token = localStorage.getItem('token');
-                    // Mengirim set_varname sebagai pengganti ID
                     await api.delete(`/config/params/${item.set_varname}`, {
                         headers: { Authorization: `Bearer ${token}` }
                     });
@@ -141,7 +172,6 @@ const MasterConfigParam = () => {
 
             setIsModalOpen(false);
 
-            // Pop-up Sukses
             Swal.fire({
                 icon: 'success',
                 title: 'Berhasil!',
@@ -153,8 +183,6 @@ const MasterConfigParam = () => {
             fetchConfigParams();
         } catch (err) {
             console.error("Gagal menyimpan data:", err);
-
-            // Pop-up Error jika Server melempar error 500 / 400
             const errorMsg = err.response?.data?.message || 'Terjadi kesalahan pada server. Silakan coba lagi.';
             Swal.fire({
                 icon: 'error',
@@ -167,7 +195,7 @@ const MasterConfigParam = () => {
         }
     };
 
-    // Definisi Kolom Tabel - Pakai !text-black & !text-slate-900
+    // Definisi Kolom Tabel
     const columns = [
         {
             header: 'DESKRIPSI',
@@ -211,7 +239,61 @@ const MasterConfigParam = () => {
     ];
 
     return (
-        <>
+        <div className="space-y-4">
+            {/* 🌟 PANEL FILTER BERSYARAT (TOGGLE BUKA/TUTUP) */}
+            {showFilter && (
+                <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all">
+                    <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
+                        <Filter size={16} className="text-sky-600" />
+                        FILTER KONFIGURASI SISTEM
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">CARI VARIABEL / DESKRIPSI</label>
+                            <input
+                                type="text"
+                                placeholder="Ketik nama variabel atau deskripsi..."
+                                value={searchVarName}
+                                onChange={(e) => setSearchVarName(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">TIPE PARAMETER</label>
+                            <select
+                                value={filterVarType}
+                                onChange={(e) => setFilterVarType(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500 cursor-pointer"
+                            >
+                                <option value="">-- SEMUA TIPE --</option>
+                                <option value="1">1 - String / Teks</option>
+                                <option value="2">2 - Number / Angka</option>
+                                <option value="3">3 - Boolean / Flag</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={handleResetFilter}
+                            className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer flex items-center gap-1.5"
+                        >
+                            <RotateCcw size={14} /> RESET
+                        </button>
+                        <button
+                            type="submit"
+                            className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5"
+                        >
+                            <RefreshCw size={14} /> REFRESH DATA
+                        </button>
+                    </div>
+                </form>
+            )}
+
+            {/* 🌟 TEMPLATE UTAMA DENGAN PROP onFilter */}
             <DataTableTemplate
                 title="KONFIGURASI SISTEM"
                 columns={columns}
@@ -221,14 +303,13 @@ const MasterConfigParam = () => {
                 onAdd={handleAdd}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
+                onFilter={() => setShowFilter(prev => !prev)}
             />
 
             {/* Modal Form CRUD */}
             {isModalOpen && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
                     <div className="w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden !bg-white border !border-gray-200 p-8 transition-all">
-
-                        {/* Header Modal Clean & Judul Jelas */}
                         <div className="border-b border-gray-200 pb-4 mb-6 flex justify-between items-center">
                             <div>
                                 <h3 className="text-lg font-black tracking-wider uppercase !text-slate-900">
@@ -243,13 +324,12 @@ const MasterConfigParam = () => {
                                 onClick={() => setIsModalOpen(false)}
                                 className="!text-slate-400 hover:!text-slate-700 transition font-bold text-base p-1 rounded-lg hover:bg-gray-100"
                             >
-                                ✕
+                                <X size={18} />
                             </button>
                         </div>
 
                         <form onSubmit={handleSubmit} className="space-y-5">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* Input Nama Variabel */}
                                 <div className="space-y-1.5">
                                     <label className="block text-xs font-bold !text-slate-800">
                                         Nama Variabel (VarName)
@@ -268,7 +348,6 @@ const MasterConfigParam = () => {
                                     />
                                 </div>
 
-                                {/* Input Tipe Parameter */}
                                 <div className="space-y-1.5">
                                     <label className="block text-xs font-bold !text-slate-800">
                                         Tipe Parameter
@@ -285,7 +364,6 @@ const MasterConfigParam = () => {
                                 </div>
                             </div>
 
-                            {/* Input Deskripsi Parameter */}
                             <div className="space-y-1.5">
                                 <label className="block text-xs font-bold !text-slate-800">
                                     Deskripsi Parameter
@@ -300,7 +378,6 @@ const MasterConfigParam = () => {
                                 />
                             </div>
 
-                            {/* Input Nilai / Parameter */}
                             <div className="space-y-1.5">
                                 <label className="block text-xs font-bold !text-slate-800">
                                     Nilai / Parameter (VarValue)
@@ -315,19 +392,18 @@ const MasterConfigParam = () => {
                                 />
                             </div>
 
-                            {/* Action Buttons Clean */}
                             <div className="flex justify-end items-center gap-3 pt-5 border-t border-gray-200 mt-6">
                                 <button
                                     type="button"
                                     onClick={() => setIsModalOpen(false)}
-                                    className="px-5 py-2.5 text-xs font-bold !text-slate-700 !bg-gray-100 hover:!bg-gray-200 rounded-xl transition uppercase tracking-wider"
+                                    className="px-5 py-2.5 text-xs font-bold !text-slate-700 !bg-gray-100 hover:!bg-gray-200 rounded-xl transition uppercase tracking-wider cursor-pointer"
                                 >
                                     CANCEL
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={submitting}
-                                    className="px-6 py-2.5 text-xs font-bold !text-white !bg-blue-600 hover:!bg-blue-700 active:scale-95 rounded-xl shadow-md transition uppercase tracking-wider disabled:opacity-50"
+                                    className="px-6 py-2.5 text-xs font-bold !text-white !bg-blue-600 hover:!bg-blue-700 active:scale-95 rounded-xl shadow-md transition uppercase tracking-wider disabled:opacity-50 cursor-pointer"
                                 >
                                     {submitting ? 'SAVING...' : 'SAVE CHANGE'}
                                 </button>
@@ -336,7 +412,7 @@ const MasterConfigParam = () => {
                     </div>
                 </div>
             )}
-        </>
+        </div>
     );
 };
 

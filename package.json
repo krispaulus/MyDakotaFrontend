@@ -20,6 +20,7 @@
     "react-dom": "^19.2.4",
     "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.14.0",
+    "recharts": "^3.10.1",
     "sweetalert2": "^11.26.24",
     "xlsx": "^0.18.5"
   },

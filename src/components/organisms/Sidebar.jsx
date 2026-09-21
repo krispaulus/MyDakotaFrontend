@@ -355,7 +355,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
       children: [
         // { name: 'Dasboard', path: '/marketing/dashboard', roles: ['S'] },
         { name: 'Master Customer', path: '/marketing/master-customer', roles: ['S'] },
-        { name: 'Bukti Tanda Terima(BTT)', path: '/marketing/btt', roles: ['S'] },
+        { name: 'Bukti Tanda Terima(BTT)', path: '/marketing/BTT', roles: ['S'] },
         { name: 'Bebas Dari Biaya (Bdb) - Pengiriman', path: '/marketing/bdb' },
         { name: 'Cek BTT Dari No BTT Manual', path: '/marketing/cek-nobtt-manual', roles: ['S'] },
         { name: 'Cetak BTT / Resi', path: '#print-btt', roles: ['S'] },
@@ -384,9 +384,9 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
           icon: <Truck size={18} />,
           roles: ['S'],
           children: [
-            { name: 'Asuransi', path: '/marketing/asuransi', roles: ['S'] },
-            { name: 'Order Jemput', path: '/marketing/order-jemput' },
-            { name: 'Packing', path: '/marketing/packing-list' },
+            { name: 'Asuransi', path: '/marketing/pengajuan-khusus/asuransi', roles: ['S'] },
+            { name: 'Order Jemput', path: '/marketing/pengajuan-khusus/order-jemput', roles: ['S'] },
+            { name: 'Packing', path: '/marketing/pengajuan-khusus/packing-list', roles: ['S'] },
           ]
         },
         {
@@ -394,7 +394,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
           icon: <Truck size={18} />,
           path: '', roles: ['S'],
           children: [
-            { name: 'BTT Kembali', path: '/marketing/terima-btt-kembali', roles: ['S'] },
+            { name: 'BTT Kembali', path: '/marketing/penerimaan-btt/terima-btt-kembali', roles: ['S'] },
             { name: 'BTT / Barang Retur', path: '/penerimaan/btt-retur' },
             { name: 'Penerimaan Pembayaran Kasir', path: '/penerimaan/pembayaran-kasir' },
             { name: 'Pengembalian Surat Jalan Customer', path: '/penerimaan/pengembalian-surat-jalan', roles: ['S'] },
@@ -460,12 +460,12 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
           name: 'Cetak',
           icon: <Printer size={18} />,
           children: [
-            { name: 'Cetak Buku Besar', path: '/general-ledger/cetak-buku-besar', roles: ['S'] },
-            { name: 'Cetak Neraca Saldo', path: '/general-ledger/cetak-neraca-saldo', roles: ['S'] },
-            { name: 'Cetak Neraca', path: '/general-ledger/cetak-neraca', roles: ['S'] },
-            { name: 'Cetak Rugi Laba', path: '/general-ledger/cetak-rugi-laba', roles: ['S'] },
-            { name: 'Cetak Posisi Keuangan', path: '/general-ledger/cetak-posisi-keuangan', roles: ['S'] },
-            { name: 'Cetak Rugi Laba Komprehensif', path: '/general-ledger/cetak-rugi-laba-komprehensif', roles: ['S'] }
+            { name: 'Cetak Buku Besar', path: '/general-ledger/cetak/cetak-buku-besar', roles: ['S'] },
+            { name: 'Cetak Neraca Saldo', path: '/general-ledger/cetak/cetak-neraca-saldo', roles: ['S'] },
+            { name: 'Cetak Neraca', path: '/general-ledger/cetak/cetak-neraca', roles: ['S'] },
+            { name: 'Cetak Rugi Laba', path: '/general-ledger/cetak/cetak-rugi-laba', roles: ['S'] },
+            { name: 'Cetak Posisi Keuangan', path: '/general-ledger/cetak/cetak-posisi-keuangan', roles: ['S'] },
+            { name: 'Cetak Rugi Laba Komprehensif', path: '/general-ledger/cetak/cetak-rugi-laba-komprehensif', roles: ['S'] }
           ]
         },
         {
@@ -473,12 +473,12 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
           icon: <List size={18} />,
           roles: ['S'],
           children: [
-            { name: 'Daftar Bank', path: '/general-ledger/daftar-bank', roles: ['S'] },
-            { name: 'Daftar Pemasukan & Pengeluaran', path: '/general-ledger/daftar-pemasukan-pengeluaran', roles: ['S', 'A'] },
-            { name: 'Daftar Kelompok Perkiraan', path: '/general-ledger/daftar-kelompok-perkiraan', roles: ['S', 'A'] },
-            { name: 'Daftar Kode Perkiraan', path: '/general-ledger/daftar-kode-perkiraan', roles: ['S', 'A'] },
-            { name: 'Daftar SGU', path: '/general-ledger/daftar-sgu', roles: ['S', 'A'] },
-            { name: 'Daftar Akun Piutang Setoran', path: '/general-ledger/daftar-akun-piutang-setoran', roles: ['S', 'A'] },
+            { name: 'Daftar Bank', path: '/general-ledger/daftar/daftar-bank', roles: ['S'] },
+            { name: 'Daftar Pemasukan & Pengeluaran', path: '/general-ledger/daftar/daftar-pemasukan-pengeluaran', roles: ['S', 'A'] },
+            { name: 'Daftar Kelompok Perkiraan', path: '/general-ledger/daftar/daftar-kelompok-perkiraan', roles: ['S', 'A'] },
+            { name: 'Daftar Kode Perkiraan', path: '/general-ledger/daftar/daftar-kode-perkiraan', roles: ['S', 'A'] },
+            { name: 'Daftar SGU', path: '/general-ledger/daftar/daftar-sgu', roles: ['S', 'A'] },
+            { name: 'Daftar Akun Piutang Setoran', path: '/general-ledger/daftar/daftar-akun-piutang-setoran', roles: ['S', 'A'] },
           ]
         },
         { name: 'Insentif Loper', path: '/general-ledger/insentif-loper', roles: ['S', 'A'] },

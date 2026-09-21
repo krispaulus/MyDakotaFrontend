@@ -1,139 +1,111 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
-import { Save, Search, RefreshCw, Edit, Trash2, X as XIcon, Plus, Download } from 'lucide-react';
+import { Filter, RotateCcw, RefreshCw, X as XIcon, Save, Download, MapPin, Plus } from 'lucide-react';
 import { useDarkMode } from '../context/DarkModeContext';
+import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import Swal from 'sweetalert2';
 
 const MasterHargaPerwilayah = () => {
     const { isDarkMode } = useDarkMode();
 
-    // State Data Table & Pagination
+    // State Data Table
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [page, setPage] = useState(1);
-    const [limit] = useState(15);
-    const [totalRecords, setTotalRecords] = useState(0);
 
-    // State Dropdown Master Options
-    const [provinsiOptions, setProvinsiOptions] = useState([]);
-    const [kotaAsalSuggestions, setKotaAsalSuggestions] = useState([]);
-    const [kotaTujuanSuggestions, setKotaTujuanSuggestions] = useState([]);
-
-    // State Form Input Utama (Tambah)
-    const initialForm = {
-        provinsi_asal: '',
-        kota_asal: '',
-        provinsi_tujuan: '',
-        kota_tujuan: '',
-        kategori: 0, // 0: Surat Perintah, 1: Loper
-        service: 1,  // 1: Darat, 2: Laut, 3: Udara
-        nominal: ''
-    };
-    const [formData, setFormData] = useState(initialForm);
-
-    // State Form Filter Search
+    // State Filter Panel (Collapsible)
+    const [showFilter, setShowFilter] = useState(true);
     const [filterInput, setFilterInput] = useState({
         search_provinsiAsal: '',
         search_kotaAsal: '',
         search_provinsiTujuan: '',
         search_kotaTujuan: '',
-        search_kategori: [], // array untuk multi-check [0, 1]
-        search_service: []   // array untuk multi-check [1, 2, 3]
+        search_kategori: [],
+        search_service: []
     });
+
+    // State Modal Input (Tambah Data)
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const initialForm = {
+        kota_asal: '',
+        kota_tujuan: '',
+        kategori: 0,
+        service: 1,
+        nominal: ''
+    };
+    const [formData, setFormData] = useState(initialForm);
 
     // State Modal Edit
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editData, setEditData] = useState(null);
     const [editForm, setEditForm] = useState(initialForm);
-    const [editKotaAsalSuggestions, setEditKotaAsalSuggestions] = useState([]);
-    const [editKotaTujuanSuggestions, setEditKotaTujuanSuggestions] = useState([]);
 
     useEffect(() => {
-        fetchProvinsiList();
         fetchData();
-    }, [page]);
+    }, []);
 
-    // 1. FETCH API PROVINSI
-    const fetchProvinsiList = async () => {
-        try {
-            const token = localStorage.getItem('token');
-            const res = await api.get('/master/tarif-transit/provinsi', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setProvinsiOptions(res.data.data || []);
-        } catch (err) {
-            console.error("Gagal load data provinsi:", err);
-        }
-    };
-
-    // 2. FETCH DATA TABLE (LIST TARIF TRANSIT)
+    // 1. Fetch Data Tarif Transit
     const fetchData = async () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const params = {
-                page,
-                limit,
-                search_provinsiAsal: filterInput.search_provinsiAsal,
-                search_kotaAsal: filterInput.search_kotaAsal,
-                search_provinsiTujuan: filterInput.search_provinsiTujuan,
-                search_kotaTujuan: filterInput.search_kotaTujuan,
-                search_kategori: filterInput.search_kategori.join(','),
-                search_service: filterInput.search_service.join(',')
-            };
+            const params = new URLSearchParams();
 
-            const res = await api.get('/master/tarif-transit/list', {
-                params,
+            if (filterInput.search_provinsiAsal?.trim()) {
+                params.append('search_provinsiAsal', filterInput.search_provinsiAsal.trim());
+            }
+            if (filterInput.search_kotaAsal?.trim()) {
+                params.append('search_kotaAsal', filterInput.search_kotaAsal.trim());
+            }
+            if (filterInput.search_provinsiTujuan?.trim()) {
+                params.append('search_provinsiTujuan', filterInput.search_provinsiTujuan.trim());
+            }
+            if (filterInput.search_kotaTujuan?.trim()) {
+                params.append('search_kotaTujuan', filterInput.search_kotaTujuan.trim());
+            }
+            if (filterInput.search_kategori?.length > 0) {
+                params.append('search_kategori', filterInput.search_kategori.join(','));
+            }
+            if (filterInput.search_service?.length > 0) {
+                params.append('search_service', filterInput.search_service.join(','));
+            }
+
+            const res = await api.get(`/master/tarif-transit/list?${params.toString()}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            setData(res.data.data || []);
-            setTotalRecords(res.data.total_records || 0);
+            let rows = [];
+            if (Array.isArray(res.data)) {
+                rows = res.data;
+            } else if (Array.isArray(res.data?.data)) {
+                rows = res.data.data;
+            } else if (Array.isArray(res.data?.data?.data)) {
+                rows = res.data.data.data;
+            }
+
+            setData(rows);
         } catch (err) {
-            console.error("Gagal load tarif transit:", err);
-            Swal.fire('Error', 'Gagal memuat data tarif transit', 'error');
+            console.error("Gagal load data tarif transit:", err);
+            setData([]);
         } finally {
             setLoading(false);
         }
     };
 
-    // 3. AUTOCOMPLETE KOTA HANDLERS
-    const handleKotaSearch = async (prov, query, targetType, isEdit = false) => {
-        if (!prov) return;
-        try {
-            const token = localStorage.getItem('token');
-            const res = await api.get('/master/tarif-transit/kota-by-provinsi', {
-                params: { provinsi: prov, query },
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            const results = res.data.data || [];
-            if (isEdit) {
-                if (targetType === 'asal') setEditKotaAsalSuggestions(results);
-                else setEditKotaTujuanSuggestions(results);
-            } else {
-                if (targetType === 'asal') setKotaAsalSuggestions(results);
-                else setKotaTujuanSuggestions(results);
-            }
-        } catch (err) {
-            console.error("Error autocomplete kota:", err);
-        }
-    };
-
-    // 4. SUBMIT FORM TAMBAH DATA
-    const handleSubmitForm = async (e) => {
+    // 2. Submit Form Tambah Data
+    const handleSubmitAdd = async (e) => {
         e.preventDefault();
         if (!formData.kota_asal || !formData.kota_tujuan || !formData.nominal) {
-            Swal.fire('Warning', 'Mohon lengkapi semua field required!', 'warning');
+            Swal.fire('Warning', 'Mohon lengkapi seluruh field wajib!', 'warning');
             return;
         }
 
         try {
             const token = localStorage.getItem('token');
             const payload = {
-                ...formData,
-                kategori: parseInt(formData.kategori),
-                service: parseInt(formData.service),
+                kota_asal: formData.kota_asal,
+                kota_tujuan: formData.kota_tujuan,
+                kategori: parseInt(formData.kategori, 10),
+                service: parseInt(formData.service, 10),
                 nominal: parseFloat(formData.nominal)
             };
 
@@ -141,43 +113,41 @@ const MasterHargaPerwilayah = () => {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            Swal.fire('Sukses', res.data.message || 'Data tarif transit berhasil disimpan', 'success');
+            Swal.fire('Sukses', res.data?.message || 'Data tarif transit berhasil disimpan', 'success');
             setFormData(initialForm);
+            setIsAddModalOpen(false);
             fetchData();
         } catch (err) {
-            const msg = err.response?.data?.message || 'Gagal menyimpan data';
-            Swal.fire('Error', msg, 'error');
+            Swal.fire('Error', err.response?.data?.message || 'Gagal menyimpan data', 'error');
         }
     };
 
-    // 5. OPEN EDIT MODAL
+    // 3. Modal Edit & Update Form
     const handleOpenEdit = (item) => {
         setEditData(item);
         setEditForm({
-            provinsi_asal: item.provinsi_asal || '',
-            kota_asal: item.tr_kotaasal || '',
-            provinsi_tujuan: item.provinsi_tujuan || '',
-            kota_tujuan: item.tr_kotatujuan || '',
-            kategori: item.tr_kategori || 0,
-            service: item.tr_servicetype || 1,
-            nominal: item.tr_nominal || 0
+            kota_asal: item.tr_kotaasal || item.TrKotaAsal || '',
+            kota_tujuan: item.tr_kotatujuan || item.TrKotaTujuan || '',
+            kategori: item.tr_kategori ?? item.TrKategori ?? 0,
+            service: item.tr_servicetype ?? item.TrServiceType ?? 1,
+            nominal: item.tr_nominal ?? item.TrNominal ?? 0
         });
         setIsEditModalOpen(true);
     };
 
-    // 6. SUBMIT EDIT DATA
     const handleUpdateForm = async (e) => {
         e.preventDefault();
         try {
             const token = localStorage.getItem('token');
             const payload = {
-                ...editForm,
-                kategori: parseInt(editForm.kategori),
-                service: parseInt(editForm.service),
+                kota_asal: editForm.kota_asal,
+                kota_tujuan: editForm.kota_tujuan,
+                kategori: parseInt(editForm.kategori, 10),
+                service: parseInt(editForm.service, 10),
                 nominal: parseFloat(editForm.nominal)
             };
 
-            await api.put(`/master/tarif-transit/update/${editData.id}`, payload, {
+            await api.put(`/master/tarif-transit/update/${editData.id || editData.ID}`, payload, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
@@ -185,19 +155,21 @@ const MasterHargaPerwilayah = () => {
             setIsEditModalOpen(false);
             fetchData();
         } catch (err) {
-            Swal.fire('Error', 'Gagal memperbarui data', 'error');
+            Swal.fire('Error', err.response?.data?.message || 'Gagal memperbarui data', 'error');
         }
     };
 
-    // 7. DELETE DATA
-    const handleDelete = (id, rute) => {
+    // 4. Hapus Data
+    const handleDelete = (item) => {
+        const id = item.id || item.ID;
+        const rute = `${item.tr_kotaasal || item.TrKotaAsal} -> ${item.tr_kotatujuan || item.TrKotaTujuan}`;
         Swal.fire({
-            title: 'Apakah Anda Yakin?',
-            text: `Menghapus tarif transit rute ${rute}?`,
+            title: 'Hapus Tarif Transit?',
+            text: `Yakin ingin menghapus tarif transit rute ${rute}?`,
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#3085d6',
+            confirmButtonColor: '#e11d48',
+            cancelButtonColor: '#64748b',
             confirmButtonText: 'Ya, Hapus!',
             cancelButtonText: 'Batal'
         }).then(async (result) => {
@@ -210,392 +182,417 @@ const MasterHargaPerwilayah = () => {
                     Swal.fire('Terhapus!', 'Data berhasil dihapus.', 'success');
                     fetchData();
                 } catch (err) {
-                    Swal.fire('Error', 'Gagal menghapus data', 'error');
+                    Swal.fire('Error', err.response?.data?.message || 'Gagal menghapus data', 'error');
                 }
             }
         });
     };
 
-    // Helper text formatter
-    const getKategoriLabel = (val) => (parseInt(val) === 1 ? 'Loper' : 'Surat Perintah');
-    const getServiceLabel = (val) => {
-        switch (parseInt(val)) {
-            case 1: return 'Darat';
-            case 2: return 'Laut';
-            case 3: return 'Udara';
-            default: return 'Darat';
+    // 5. Export ke CSV / Excel
+    const handleExportExcel = () => {
+        if (!data || data.length === 0) {
+            Swal.fire('Data Kosong', 'Tidak ada data untuk diekspor.', 'warning');
+            return;
         }
+
+        const headers = ["Provinsi Asal", "Kota Asal", "Provinsi Tujuan", "Kota Tujuan", "Kategori", "Service", "Nominal"];
+        const rows = data.map(item => [
+            `"${item.provinsi_asal || '-'}"`,
+            `"${item.tr_kotaasal || item.TrKotaAsal || '-'}"`,
+            `"${item.provinsi_tujuan || '-'}"`,
+            `"${item.tr_kotatujuan || item.TrKotaTujuan || '-'}"`,
+            `"${Number(item.tr_kategori ?? item.TrKategori) === 1 ? 'Loper' : 'Surat Perintah'}"`,
+            `"${Number(item.tr_servicetype ?? item.TrServiceType) === 2 ? 'Laut' : Number(item.tr_servicetype ?? item.TrServiceType) === 3 ? 'Udara' : 'Darat'}"`,
+            `"Rp ${Number(item.tr_nominal || item.TrNominal || 0).toLocaleString('id-ID')}"`
+        ]);
+
+        const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `Tarif_Transit_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
-    // Total Halaman
-    const totalPages = Math.ceil(totalRecords / limit) || 1;
+    // Reset Form Filter
+    const handleResetFilter = () => {
+        setFilterInput({
+            search_provinsiAsal: '',
+            search_kotaAsal: '',
+            search_provinsiTujuan: '',
+            search_kotaTujuan: '',
+            search_kategori: [],
+            search_service: []
+        });
+        const token = localStorage.getItem('token');
+        setLoading(true);
+        api.get('/master/tarif-transit/list', { headers: { Authorization: `Bearer ${token}` } })
+            .then(res => {
+                const rows = res.data?.data || [];
+                setData(Array.isArray(rows) ? rows : []);
+            })
+            .finally(() => setLoading(false));
+    };
+
+    // Konfigurasi Kolom Tabel
+    const columns = [
+        {
+            header: 'PROVINSI ASAL',
+            accessor: 'provinsi_asal',
+            render: (i) => <span className="font-semibold text-xs uppercase !text-slate-800">{i.provinsi_asal || '-'}</span>
+        },
+        {
+            header: 'KOTA ASAL',
+            accessor: 'tr_kotaasal',
+            render: (i) => <span className="font-bold text-xs uppercase !text-slate-900">{i.tr_kotaasal || i.TrKotaAsal || '-'}</span>
+        },
+        {
+            header: 'PROVINSI TUJUAN',
+            accessor: 'provinsi_tujuan',
+            render: (i) => <span className="font-semibold text-xs uppercase !text-slate-800">{i.provinsi_tujuan || '-'}</span>
+        },
+        {
+            header: 'KOTA TUJUAN',
+            accessor: 'tr_kotatujuan',
+            render: (i) => <span className="font-bold text-xs uppercase !text-sky-700">{i.tr_kotatujuan || i.TrKotaTujuan || '-'}</span>
+        },
+        {
+            header: 'KATEGORI',
+            accessor: 'tr_kategori',
+            render: (i) => {
+                const isLoper = Number(i.tr_kategori ?? i.TrKategori) === 1;
+                return (
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${isLoper ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-blue-100 text-blue-800 border border-blue-200'
+                        }`}>
+                        {isLoper ? 'Loper' : 'Surat Perintah'}
+                    </span>
+                );
+            }
+        },
+        {
+            header: 'SERVICE',
+            accessor: 'tr_servicetype',
+            render: (i) => {
+                const s = Number(i.tr_servicetype ?? i.TrServiceType);
+                const label = s === 2 ? 'Laut' : s === 3 ? 'Udara' : 'Darat';
+                return <span className="font-bold text-xs uppercase !text-slate-800">{label}</span>;
+            }
+        },
+        {
+            header: 'NOMINAL',
+            accessor: 'tr_nominal',
+            render: (i) => (
+                <span className="font-mono font-black text-xs !text-emerald-600">
+                    Rp {Number(i.tr_nominal || i.TrNominal || 0).toLocaleString('id-ID')}
+                </span>
+            )
+        }
+    ];
 
     return (
-        <div className="min-h-screen p-4 space-y-6 bg-slate-50 text-slate-800">
+        <div className="space-y-4 master-transit-wrapper">
+            <style>
+                {`
+                .master-transit-wrapper table tbody tr td {
+                    color: #0f172a !important;
+                    font-weight: 600 !important;
+                }
+                `}
+            </style>
 
-            {/* HEADER TITLE */}
-            <div className="flex justify-between items-center border-b pb-3 border-slate-200">
-                <div>
-                    <h1 className="text-xl font-bold tracking-wide uppercase text-slate-800">
-                        MANAJEMEN TARIF TRANSIT (HARGA PERWILAYAH)
-                    </h1>
-                    <p className="text-xs text-slate-500">
-                        Pengelolaan tarif transit operasional kargo antar kota & kabupaten se-Indonesia
-                    </p>
-                </div>
-            </div>
-
-            {/* 📋 AREA 1: FORM INPUT UTAMA (TAMBAH DATA - STYLE BERSIH DAKOTA) */}
-            <div className="p-5 rounded-xl border border-slate-200 bg-white shadow-sm">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-4 flex items-center gap-2">
-                    <Plus size={16} /> INPUT TARIF TRANSIT BARU
-                </h3>
-                <form onSubmit={handleSubmitForm} className="space-y-4 text-xs">
-                    <div className="grid grid-cols-2 gap-4">
-
-                        {/* WILAYAH ASAL */}
-                        <div className="p-3 border border-slate-200 rounded-lg space-y-3 bg-white">
-                            <span className="font-bold text-blue-600 uppercase block text-[11px]">📍 WILAYAH ASAL</span>
-                            <div>
-                                <label className="font-semibold text-slate-600 block mb-1">Provinsi Asal</label>
-                                <select
-                                    className="w-full p-2.5 border border-slate-300 rounded text-xs font-semibold bg-white text-slate-800 focus:outline-none focus:border-blue-500"
-                                    value={formData.provinsi_asal}
-                                    onChange={(e) => {
-                                        setFormData({ ...formData, provinsi_asal: e.target.value, kota_asal: '' });
-                                        handleKotaSearch(e.target.value, '', 'asal');
-                                    }}
-                                >
-                                    <option value="">-- Pilih Provinsi Asal --</option>
-                                    {provinsiOptions.map((p, idx) => <option key={idx} value={p}>{p}</option>)}
-                                </select>
-                            </div>
-                            <div className="relative">
-                                <label className="font-semibold text-slate-600 block mb-1">Kota Asal</label>
-                                <input
-                                    type="text"
-                                    disabled={!formData.provinsi_asal}
-                                    placeholder={formData.provinsi_asal ? "Ketik nama kota..." : "PILIH PROVINSI TERLEBIH DAHULU"}
-                                    className="w-full p-2.5 border border-slate-300 rounded text-xs uppercase font-bold bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 disabled:bg-slate-100 disabled:text-slate-400"
-                                    value={formData.kota_asal}
-                                    onChange={(e) => {
-                                        setFormData({ ...formData, kota_asal: e.target.value });
-                                        handleKotaSearch(formData.provinsi_asal, e.target.value, 'asal');
-                                    }}
-                                />
-                                {kotaAsalSuggestions.length > 0 && (
-                                    <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded shadow-lg max-h-40 overflow-y-auto z-20">
-                                        {kotaAsalSuggestions.map((k, idx) => (
-                                            <div
-                                                key={idx}
-                                                className="p-2 hover:bg-blue-50 cursor-pointer font-semibold text-slate-700"
-                                                onClick={() => {
-                                                    setFormData({ ...formData, kota_asal: k });
-                                                    setKotaAsalSuggestions([]);
-                                                }}
-                                            >
-                                                {k}
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* WILAYAH TUJUAN */}
-                        <div className="p-3 border border-slate-200 rounded-lg space-y-3 bg-white">
-                            <span className="font-bold text-purple-600 uppercase block text-[11px]">🎯 WILAYAH TUJUAN</span>
-                            <div>
-                                <label className="font-semibold text-slate-600 block mb-1">Provinsi Tujuan</label>
-                                <select
-                                    className="w-full p-2.5 border border-slate-300 rounded text-xs font-semibold bg-white text-slate-800 focus:outline-none focus:border-purple-500"
-                                    value={formData.provinsi_tujuan}
-                                    onChange={(e) => {
-                                        setFormData({ ...formData, provinsi_tujuan: e.target.value, kota_tujuan: '' });
-                                        handleKotaSearch(e.target.value, '', 'tujuan');
-                                    }}
-                                >
-                                    <option value="">-- Pilih Provinsi Tujuan --</option>
-                                    {provinsiOptions.map((p, idx) => <option key={idx} value={p}>{p}</option>)}
-                                </select>
-                            </div>
-                            <div className="relative">
-                                <label className="font-semibold text-slate-600 block mb-1">Kota Tujuan</label>
-                                <input
-                                    type="text"
-                                    disabled={!formData.provinsi_tujuan}
-                                    placeholder={formData.provinsi_tujuan ? "Ketik nama kota..." : "PILIH PROVINSI TERLEBIH DAHULU"}
-                                    className="w-full p-2.5 border border-slate-300 rounded text-xs uppercase font-bold bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-purple-500 disabled:bg-slate-100 disabled:text-slate-400"
-                                    value={formData.kota_tujuan}
-                                    onChange={(e) => {
-                                        setFormData({ ...formData, kota_tujuan: e.target.value });
-                                        handleKotaSearch(formData.provinsi_tujuan, e.target.value, 'tujuan');
-                                    }}
-                                />
-                                {kotaTujuanSuggestions.length > 0 && (
-                                    <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded shadow-lg max-h-40 overflow-y-auto z-20">
-                                        {kotaTujuanSuggestions.map((k, idx) => (
-                                            <div
-                                                key={idx}
-                                                className="p-2 hover:bg-purple-50 cursor-pointer font-semibold text-slate-700"
-                                                onClick={() => {
-                                                    setFormData({ ...formData, kota_tujuan: k });
-                                                    setKotaTujuanSuggestions([]);
-                                                }}
-                                            >
-                                                {k}
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+            {/* Panel Filter Pencarian */}
+            {showFilter && (
+                <form onSubmit={(e) => { e.preventDefault(); fetchData(); }} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all">
+                    <div className="flex items-center gap-2 font-black uppercase text-slate-800 tracking-wider text-sm">
+                        <Filter size={16} className="text-sky-600" />
+                        Pencarian Tarif Transit
                     </div>
 
-                    {/* PARAMETER & NOMINAL */}
-                    <div className="grid grid-cols-3 gap-4 border-t border-slate-200 pt-3">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div>
-                            <label className="font-semibold text-slate-600 block mb-1">Kategori</label>
-                            <select
-                                className="w-full p-2.5 border border-slate-300 rounded text-xs font-semibold bg-white text-slate-800 focus:outline-none"
-                                value={formData.kategori}
-                                onChange={(e) => setFormData({ ...formData, kategori: e.target.value })}
-                            >
-                                <option value={0}>Surat Perintah</option>
-                                <option value={1}>Loper</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="font-semibold text-slate-600 block mb-1">Service Layanan</label>
-                            <select
-                                className="w-full p-2.5 border border-slate-300 rounded text-xs font-semibold bg-white text-slate-800 focus:outline-none"
-                                value={formData.service}
-                                onChange={(e) => setFormData({ ...formData, service: e.target.value })}
-                            >
-                                <option value={1}>Darat</option>
-                                <option value={2}>Laut</option>
-                                <option value={3}>Udara</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="font-semibold text-slate-600 block mb-1">Nominal Tarif Transit (Rp)</label>
+                            <label className="font-bold text-slate-600 block mb-1">Provinsi Asal:</label>
                             <input
-                                type="number"
-                                placeholder="Masukkan nominal Rp..."
-                                className="w-full p-2.5 border border-slate-300 rounded text-xs font-mono font-bold text-emerald-600 bg-white placeholder-slate-400 focus:outline-none"
-                                value={formData.nominal}
-                                onChange={(e) => setFormData({ ...formData, nominal: e.target.value })}
+                                type="text"
+                                placeholder="Provinsi Asal..."
+                                value={filterInput.search_provinsiAsal}
+                                onChange={(e) => setFilterInput({ ...filterInput, search_provinsiAsal: e.target.value })}
+                                className="w-full p-2.5 border border-slate-300 rounded-lg font-semibold text-slate-800 outline-none focus:border-sky-500 uppercase"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-600 block mb-1">Kota Asal:</label>
+                            <input
+                                type="text"
+                                placeholder="Kota Asal..."
+                                value={filterInput.search_kotaAsal}
+                                onChange={(e) => setFilterInput({ ...filterInput, search_kotaAsal: e.target.value })}
+                                className="w-full p-2.5 border border-slate-300 rounded-lg font-semibold text-slate-800 outline-none focus:border-sky-500 uppercase"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-600 block mb-1">Provinsi Tujuan:</label>
+                            <input
+                                type="text"
+                                placeholder="Provinsi Tujuan..."
+                                value={filterInput.search_provinsiTujuan}
+                                onChange={(e) => setFilterInput({ ...filterInput, search_provinsiTujuan: e.target.value })}
+                                className="w-full p-2.5 border border-slate-300 rounded-lg font-semibold text-slate-800 outline-none focus:border-sky-500 uppercase"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-600 block mb-1">Kota Tujuan:</label>
+                            <input
+                                type="text"
+                                placeholder="Kota Tujuan..."
+                                value={filterInput.search_kotaTujuan}
+                                onChange={(e) => setFilterInput({ ...filterInput, search_kotaTujuan: e.target.value })}
+                                className="w-full p-2.5 border border-slate-300 rounded-lg font-semibold text-slate-800 outline-none focus:border-sky-500 uppercase"
                             />
                         </div>
                     </div>
 
-                    <div className="flex justify-end gap-2 pt-2">
-                        <button type="submit" className="px-5 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 shadow-sm">
-                            <Save size={14} /> Simpan Tarif Transit
-                        </button>
+                    <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-3">
+                        <div className="flex flex-wrap items-center gap-6">
+                            <div className="flex items-center gap-4">
+                                <span className="font-bold text-slate-600">Kategori:</span>
+                                {[
+                                    { label: 'Surat Perintah', val: '0' },
+                                    { label: 'Loper', val: '1' }
+                                ].map((k) => (
+                                    <label key={k.val} className="flex items-center gap-1.5 cursor-pointer font-semibold text-slate-700">
+                                        <input
+                                            type="checkbox"
+                                            checked={filterInput.search_kategori.includes(k.val)}
+                                            onChange={(e) => {
+                                                const updated = e.target.checked
+                                                    ? [...filterInput.search_kategori, k.val]
+                                                    : filterInput.search_kategori.filter(x => x !== k.val);
+                                                setFilterInput({ ...filterInput, search_kategori: updated });
+                                            }}
+                                            className="w-4 h-4 rounded text-sky-600 accent-sky-600 cursor-pointer"
+                                        />
+                                        <span>{k.label}</span>
+                                    </label>
+                                ))}
+                            </div>
+
+                            <div className="flex items-center gap-4">
+                                <span className="font-bold text-slate-600">Service:</span>
+                                {[
+                                    { label: 'Darat', val: '1' },
+                                    { label: 'Laut', val: '2' },
+                                    { label: 'Udara', val: '3' }
+                                ].map((s) => (
+                                    <label key={s.val} className="flex items-center gap-1.5 cursor-pointer font-semibold text-slate-700">
+                                        <input
+                                            type="checkbox"
+                                            checked={filterInput.search_service.includes(s.val)}
+                                            onChange={(e) => {
+                                                const updated = e.target.checked
+                                                    ? [...filterInput.search_service, s.val]
+                                                    : filterInput.search_service.filter(x => x !== s.val);
+                                                setFilterInput({ ...filterInput, search_service: updated });
+                                            }}
+                                            className="w-4 h-4 rounded text-sky-600 accent-sky-600 cursor-pointer"
+                                        />
+                                        <span>{s.label}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="submit"
+                                className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5"
+                            >
+                                <RefreshCw size={14} /> Cari
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleResetFilter}
+                                className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer flex items-center gap-1.5"
+                            >
+                                <RotateCcw size={14} /> Reset
+                            </button>
+                        </div>
                     </div>
                 </form>
+            )}
+
+            {/* 🌟 CONTAINER WRAPPER */}
+            <div className="relative">
+                {/* Turunkan ke top-[34px] atau top-8 agar satu garis horizontal sempurna */}
+                <div className="absolute right-0 top-[34px] z-10">
+                    <button
+                        type="button"
+                        onClick={handleExportExcel}
+                        className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm cursor-pointer transition active:scale-95"
+                        title="Export Data ke Excel/CSV"
+                    >
+                        <Download size={16} /> Export to Excel
+                    </button>
+                </div>
+
+                {/* TABEL UTAMA */}
+                <DataTableTemplate
+                    title="DAFTAR TARIF TRANSIT"
+                    columns={columns}
+                    data={data}
+                    loading={loading}
+                    isDarkMode={isDarkMode}
+                    onAdd={() => {
+                        setFormData(initialForm);
+                        setIsAddModalOpen(true);
+                    }}
+                    onFilter={() => setShowFilter(prev => !prev)}
+                    onEdit={handleOpenEdit}
+                    onDelete={handleDelete}
+                />
             </div>
 
-            {/* 🔍 AREA 2: FORM PENCARIAN & MULTI-FILTER */}
-            <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-2">
-                    <Search size={14} /> FILTER & PENCARIAN TARIF TRANSIT
-                </h3>
-                <div className="grid grid-cols-2 gap-3 text-xs mb-3">
-                    <input
-                        type="text"
-                        placeholder="CARI KOTA ASAL..."
-                        className="p-2.5 border border-slate-300 rounded bg-white text-slate-800 placeholder-slate-400 uppercase text-xs focus:outline-none"
-                        value={filterInput.search_kotaAsal}
-                        onChange={(e) => setFilterInput({ ...filterInput, search_kotaAsal: e.target.value })}
-                    />
-                    <input
-                        type="text"
-                        placeholder="CARI KOTA TUJUAN..."
-                        className="p-2.5 border border-slate-300 rounded bg-white text-slate-800 placeholder-slate-400 uppercase text-xs focus:outline-none"
-                        value={filterInput.search_kotaTujuan}
-                        onChange={(e) => setFilterInput({ ...filterInput, search_kotaTujuan: e.target.value })}
-                    />
-                </div>
-
-                <div className="flex justify-between items-center text-xs border-t border-slate-200 pt-3">
-                    <div className="flex gap-6">
-                        {/* Filter Kategori Checkboxes */}
-                        <div className="flex items-center gap-3">
-                            <span className="font-bold text-slate-600">Kategori:</span>
-                            {[
-                                { label: 'Surat Perintah', val: '0' },
-                                { label: 'Loper', val: '1' }
-                            ].map((k) => (
-                                <label key={k.val} className="flex items-center gap-1 cursor-pointer text-slate-700">
-                                    <input
-                                        type="checkbox"
-                                        checked={filterInput.search_kategori.includes(k.val)}
-                                        onChange={(e) => {
-                                            const updated = e.target.checked
-                                                ? [...filterInput.search_kategori, k.val]
-                                                : filterInput.search_kategori.filter(x => x !== k.val);
-                                            setFilterInput({ ...filterInput, search_kategori: updated });
-                                        }}
-                                        className="accent-blue-600"
-                                    />
-                                    <span>{k.label}</span>
-                                </label>
-                            ))}
-                        </div>
-
-                        {/* Filter Service Checkboxes */}
-                        <div className="flex items-center gap-3">
-                            <span className="font-bold text-slate-600">Service:</span>
-                            {[
-                                { label: 'Darat', val: '1' },
-                                { label: 'Laut', val: '2' },
-                                { label: 'Udara', val: '3' }
-                            ].map((s) => (
-                                <label key={s.val} className="flex items-center gap-1 cursor-pointer text-slate-700">
-                                    <input
-                                        type="checkbox"
-                                        checked={filterInput.search_service.includes(s.val)}
-                                        onChange={(e) => {
-                                            const updated = e.target.checked
-                                                ? [...filterInput.search_service, s.val]
-                                                : filterInput.search_service.filter(x => x !== s.val);
-                                            setFilterInput({ ...filterInput, search_service: updated });
-                                        }}
-                                        className="accent-blue-600"
-                                    />
-                                    <span>{s.label}</span>
-                                </label>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="flex gap-2">
-                        <button
-                            type="button"
-                            onClick={() => { setPage(1); fetchData(); }}
-                            className="px-4 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1 shadow-sm"
-                        >
-                            <Search size={14} /> Cari
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setFilterInput({
-                                    search_kotaAsal: '', search_kotaTujuan: '',
-                                    search_kategori: [], search_service: []
-                                });
-                                setPage(1);
-                                fetchData();
-                            }}
-                            className="px-4 py-1.5 rounded border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs flex items-center gap-1"
-                        >
-                            <RefreshCw size={14} /> Reset
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {/* 📊 AREA 3: TABEL DAFTAR TARIF TRANSIT */}
-            <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
-                        <thead>
-                            <tr className="bg-blue-600 text-white font-bold uppercase tracking-wider text-[11px]">
-                                <th className="p-2.5 border-r border-white">Kota Asal</th>
-                                <th className="p-2.5 border-r border-white">Kota Tujuan</th>
-                                <th className="p-2.5 border-r border-white text-center">Kategori</th>
-                                <th className="p-2.5 border-r border-white text-center">Service</th>
-                                <th className="p-2.5 border-r border-white text-right">Nominal (Rp)</th>
-                                <th className="p-2.5 text-center">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loading ? (
-                                <tr><td colSpan={6} className="text-center p-8 text-gray-400 font-bold">Memuat data tarif transit...</td></tr>
-                            ) : data.length === 0 ? (
-                                <tr><td colSpan={6} className="text-center p-8 text-gray-400 font-bold">Tidak ada data ditemukan</td></tr>
-                            ) : (
-                                data.map((row) => (
-                                    <tr key={row.id} className="border-b border-slate-200 hover:bg-slate-50 transition">
-                                        <td className="p-2.5 border-r border-slate-200 font-bold text-slate-800">{row.tr_kotaasal}</td>
-                                        <td className="p-2.5 border-r border-slate-200 font-bold text-purple-700">{row.tr_kotatujuan}</td>
-                                        <td className="p-2.5 border-r border-slate-200 text-center">
-                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${row.tr_kategori === 1 ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}`}>
-                                                {getKategoriLabel(row.tr_kategori)}
-                                            </span>
-                                        </td>
-                                        <td className="p-2.5 border-r border-slate-200 text-center font-bold text-slate-700">{getServiceLabel(row.tr_servicetype)}</td>
-                                        <td className="p-2.5 border-r border-slate-200 text-right font-mono font-bold text-emerald-600">
-                                            Rp {row.tr_nominal?.toLocaleString()}
-                                        </td>
-                                        <td className="p-2.5 text-center">
-                                            <div className="flex justify-center gap-1">
-                                                <button onClick={() => handleOpenEdit(row)} className="p-1.5 rounded bg-amber-500 hover:bg-amber-600 text-white"><Edit size={13} /></button>
-                                                <button onClick={() => handleDelete(row.id, `${row.tr_kotaasal} -> ${row.tr_kotatujuan}`)} className="p-1.5 rounded bg-red-600 hover:bg-red-700 text-white"><Trash2 size={13} /></button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* PAGINATION FOOTER */}
-                <div className="flex justify-between items-center mt-4 text-xs font-semibold">
-                    <span className="text-slate-500">Total: {totalRecords} Data (Halaman {page} dari {totalPages})</span>
-                    <div className="flex gap-1">
-                        <button
-                            disabled={page <= 1}
-                            onClick={() => setPage(p => p - 1)}
-                            className="px-3 py-1 border border-slate-300 rounded bg-white hover:bg-slate-50 disabled:opacity-50"
-                        >
-                            &laquo; Prev
-                        </button>
-                        <span className="px-3 py-1 bg-blue-600 text-white rounded font-bold">{page}</span>
-                        <button
-                            disabled={page >= totalPages}
-                            onClick={() => setPage(p => p + 1)}
-                            className="px-3 py-1 border border-slate-300 rounded bg-white hover:bg-slate-50 disabled:opacity-50"
-                        >
-                            Next &raquo;
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {/* MODAL EDIT (CLEAN WHITE STYLE SAMA DENGAN GAMBAR 2) */}
-            {isEditModalOpen && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-                    <div className="w-full max-w-2xl p-6 rounded-xl bg-white shadow-2xl text-slate-800">
+            {/* Modal Tambah Data */}
+            {isAddModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+                    <div className="w-full max-w-2xl p-6 rounded-2xl bg-white shadow-2xl border border-slate-200 text-slate-800">
                         <div className="flex justify-between items-center pb-3 border-b border-slate-200">
-                            <h3 className="font-bold text-slate-800 text-sm uppercase">EDIT TARIF TRANSIT</h3>
-                            <button onClick={() => setIsEditModalOpen(false)} className="text-slate-400 hover:text-slate-600"><XIcon size={18} /></button>
+                            <h3 className="font-black text-sm uppercase text-slate-800 flex items-center gap-2">
+                                <MapPin size={18} className="text-sky-600" />
+                                INPUT TARIF TRANSIT BARU
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={() => setIsAddModalOpen(false)}
+                                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                            >
+                                <XIcon size={18} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSubmitAdd} className="space-y-4 my-4 text-xs">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="font-bold text-slate-600 block">Kota Asal <span className="text-rose-500">*</span></label>
+                                    <input
+                                        type="text"
+                                        placeholder="Ketik nama kota asal (misal: BEKASI KOTA)..."
+                                        className="w-full p-2.5 border border-slate-300 rounded-lg text-xs uppercase font-bold bg-white text-slate-900 outline-none focus:border-sky-500"
+                                        value={formData.kota_asal}
+                                        onChange={(e) => setFormData({ ...formData, kota_asal: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="font-bold text-slate-600 block">Kota Tujuan <span className="text-rose-500">*</span></label>
+                                    <input
+                                        type="text"
+                                        placeholder="Ketik nama kota tujuan (misal: AGAM)..."
+                                        className="w-full p-2.5 border border-slate-300 rounded-lg text-xs uppercase font-bold bg-white text-slate-900 outline-none focus:border-sky-500"
+                                        value={formData.kota_tujuan}
+                                        onChange={(e) => setFormData({ ...formData, kota_tujuan: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                                <div>
+                                    <label className="font-bold text-slate-600 block mb-1">Kategori</label>
+                                    <select
+                                        className="w-full p-2.5 border border-slate-300 rounded-lg font-bold bg-white text-slate-800 outline-none focus:border-sky-500 cursor-pointer"
+                                        value={formData.kategori}
+                                        onChange={(e) => setFormData({ ...formData, kategori: e.target.value })}
+                                    >
+                                        <option value={0}>Surat Perintah</option>
+                                        <option value={1}>Loper</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="font-bold text-slate-600 block mb-1">Service Layanan</label>
+                                    <select
+                                        className="w-full p-2.5 border border-slate-300 rounded-lg font-bold bg-white text-slate-800 outline-none focus:border-sky-500 cursor-pointer"
+                                        value={formData.service}
+                                        onChange={(e) => setFormData({ ...formData, service: e.target.value })}
+                                    >
+                                        <option value={1}>Darat</option>
+                                        <option value={2}>Laut</option>
+                                        <option value={3}>Udara</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="font-bold text-slate-600 block mb-1">Nominal (Rp) <span className="text-rose-500">*</span></label>
+                                    <input
+                                        type="number"
+                                        placeholder="Masukkan nominal Rp..."
+                                        className="w-full p-2.5 border border-slate-300 rounded-lg font-mono font-bold text-emerald-600 bg-white outline-none focus:border-sky-500"
+                                        value={formData.nominal}
+                                        onChange={(e) => setFormData({ ...formData, nominal: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsAddModalOpen(false)}
+                                    className="px-5 py-2.5 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold rounded-xl text-xs uppercase cursor-pointer"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs uppercase shadow-md flex items-center gap-1.5 cursor-pointer"
+                                >
+                                    <Save size={14} /> Simpan Tarif Transit
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Edit Data */}
+            {isEditModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+                    <div className="w-full max-w-xl p-6 rounded-2xl bg-white shadow-2xl border border-slate-200 text-slate-800">
+                        <div className="flex justify-between items-center pb-3 border-b border-slate-200">
+                            <h3 className="font-black text-sm uppercase text-slate-800">EDIT TARIF TRANSIT</h3>
+                            <button
+                                type="button"
+                                onClick={() => setIsEditModalOpen(false)}
+                                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                            >
+                                <XIcon size={18} />
+                            </button>
                         </div>
                         <form onSubmit={handleUpdateForm} className="space-y-4 my-4 text-xs">
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="font-bold block mb-1 text-slate-600">Kota Asal</label>
-                                    <input type="text" className="w-full p-2.5 border border-slate-300 rounded font-bold uppercase bg-slate-100 text-slate-600" value={editForm.kota_asal} readOnly />
+                                    <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg font-bold uppercase bg-slate-100 text-slate-600" value={editForm.kota_asal} readOnly />
                                 </div>
                                 <div>
                                     <label className="font-bold block mb-1 text-slate-600">Kota Tujuan</label>
-                                    <input type="text" className="w-full p-2.5 border border-slate-300 rounded font-bold uppercase bg-slate-100 text-slate-600" value={editForm.kota_tujuan} readOnly />
+                                    <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg font-bold uppercase bg-slate-100 text-slate-600" value={editForm.kota_tujuan} readOnly />
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 gap-3">
                                 <div>
                                     <label className="font-bold block mb-1 text-slate-600">Kategori</label>
-                                    <select className="w-full p-2.5 border border-slate-300 rounded font-bold bg-white text-slate-800" value={editForm.kategori} onChange={e => setEditForm({ ...editForm, kategori: e.target.value })}>
+                                    <select className="w-full p-2.5 border border-slate-300 rounded-lg font-bold bg-white text-slate-800 outline-none cursor-pointer" value={editForm.kategori} onChange={e => setEditForm({ ...editForm, kategori: e.target.value })}>
                                         <option value={0}>Surat Perintah</option>
                                         <option value={1}>Loper</option>
                                     </select>
                                 </div>
                                 <div>
                                     <label className="font-bold block mb-1 text-slate-600">Service</label>
-                                    <select className="w-full p-2.5 border border-slate-300 rounded font-bold bg-white text-slate-800" value={editForm.service} onChange={e => setEditForm({ ...editForm, service: e.target.value })}>
+                                    <select className="w-full p-2.5 border border-slate-300 rounded-lg font-bold bg-white text-slate-800 outline-none cursor-pointer" value={editForm.service} onChange={e => setEditForm({ ...editForm, service: e.target.value })}>
                                         <option value={1}>Darat</option>
                                         <option value={2}>Laut</option>
                                         <option value={3}>Udara</option>
@@ -603,12 +600,12 @@ const MasterHargaPerwilayah = () => {
                                 </div>
                                 <div>
                                     <label className="font-bold block mb-1 text-slate-600">Nominal (Rp)</label>
-                                    <input type="number" className="w-full p-2.5 border border-slate-300 rounded font-mono font-bold text-emerald-600 bg-white" value={editForm.nominal} onChange={e => setEditForm({ ...editForm, nominal: e.target.value })} />
+                                    <input type="number" className="w-full p-2.5 border border-slate-300 rounded-lg font-mono font-bold text-emerald-600 bg-white outline-none" value={editForm.nominal} onChange={e => setEditForm({ ...editForm, nominal: e.target.value })} required />
                                 </div>
                             </div>
-                            <div className="flex justify-end gap-2 border-t border-slate-200 pt-3">
-                                <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-4 py-1.5 rounded border border-slate-300 bg-white text-slate-700 font-bold">Batal</button>
-                                <button type="submit" className="px-5 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold">Simpan Perubahan</button>
+                            <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+                                <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 font-bold uppercase hover:bg-slate-100 cursor-pointer">Batal</button>
+                                <button type="submit" className="px-6 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold uppercase shadow-md cursor-pointer">Simpan Perubahan</button>
                             </div>
                         </form>
                     </div>

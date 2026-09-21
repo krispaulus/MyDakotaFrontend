@@ -3,13 +3,18 @@ import ReactDOM from 'react-dom';
 import api from '../api/axios';
 import { useDarkMode } from '../context/DarkModeContext';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
-import { X, Layers } from 'lucide-react';
+import { X, Layers, Filter, RefreshCw, RotateCcw } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 const DaftarKelompokPerkiraan = () => {
     const { isDarkMode } = useDarkMode();
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    // 🌟 STATE TOGGLE FILTER & PARAMETER FILTER
+    const [showFilter, setShowFilter] = useState(false);
+    const [filterAktif, setFilterAktif] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
 
     // 🌟 STATE MODAL FORM & ERRORS
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -25,7 +30,12 @@ const DaftarKelompokPerkiraan = () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await api.get('/gl/kelompok-perkiraan?limit=500', {
+            let url = `/gl/kelompok-perkiraan?limit=500`;
+
+            if (filterAktif) url += `&aktif_yn=${encodeURIComponent(filterAktif)}`;
+            if (searchQuery) url += `&q=${encodeURIComponent(searchQuery)}`;
+
+            const res = await api.get(url, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setData(res.data?.data || []);
@@ -39,6 +49,25 @@ const DaftarKelompokPerkiraan = () => {
     useEffect(() => {
         fetchKelompokData();
     }, []);
+
+    const handleApplyFilter = (e) => {
+        e.preventDefault();
+        fetchKelompokData();
+    };
+
+    const handleResetFilter = () => {
+        setFilterAktif('');
+        setSearchQuery('');
+
+        const token = localStorage.getItem('token');
+        setLoading(true);
+        api.get('/gl/kelompok-perkiraan?limit=500', {
+            headers: { Authorization: `Bearer ${token}` }
+        })
+            .then(res => setData(res.data?.data || []))
+            .catch(err => console.error(err))
+            .finally(() => setLoading(false));
+    };
 
     const handleAdd = () => {
         setModalMode('ADD');
@@ -286,7 +315,63 @@ const DaftarKelompokPerkiraan = () => {
     ) : null;
 
     return (
-        <>
+        <div className="space-y-4">
+            {/* 🌟 PANEL FILTER KONDISIONAL */}
+            {showFilter && (
+                <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all">
+                    <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
+                        <Filter size={16} className="text-sky-600" />
+                        FILTER KELOMPOK PERKIRAAN
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Pencarian Kode / Nama Kelompok */}
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">CARI KODE / NAMA KELOMPOK</label>
+                            <input
+                                type="text"
+                                placeholder="Ketik kode atau nama kelompok..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            />
+                        </div>
+
+                        {/* Filter Status Aktif */}
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">STATUS AKTIF</label>
+                            <select
+                                value={filterAktif}
+                                onChange={(e) => setFilterAktif(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500 cursor-pointer"
+                            >
+                                <option value="">-- SEMUA STATUS --</option>
+                                <option value="Y">YA (AKTIF)</option>
+                                <option value="N">TIDAK (NON-AKTIF)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Tombol Aksi Filter */}
+                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={handleResetFilter}
+                            className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer flex items-center gap-1.5"
+                        >
+                            <RotateCcw size={14} /> RESET
+                        </button>
+                        <button
+                            type="submit"
+                            className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5"
+                        >
+                            <RefreshCw size={14} /> REFRESH DATA
+                        </button>
+                    </div>
+                </form>
+            )}
+
+            {/* TABEL DATA DENGAN EVENT onFilter */}
             <DataTableTemplate
                 title="MASTER KELOMPOK PERKIRAAN"
                 columns={columns}
@@ -296,10 +381,11 @@ const DaftarKelompokPerkiraan = () => {
                 onAdd={handleAdd}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
+                onFilter={() => setShowFilter(prev => !prev)}
             />
 
             {modalElement && ReactDOM.createPortal(modalElement, document.body)}
-        </>
+        </div>
     );
 };
 

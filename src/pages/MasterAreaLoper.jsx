@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api/axios';
-import { Save, X as XIcon, Search, AlertCircle, MapPin, Plus, FolderPlus } from 'lucide-react';
+import { Save, X as XIcon, Search, AlertCircle, MapPin, Plus, FolderPlus, Filter, RotateCcw, RefreshCw } from 'lucide-react';
 import { useDarkMode } from '../context/DarkModeContext';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import Swal from 'sweetalert2';
@@ -10,32 +10,36 @@ const MasterAreaLoper = () => {
     const [data, setData] = useState([]);
     const [unregistered, setUnregistered] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [tableSearch, setTableSearch] = useState('');
 
-    // Filter lokal case-insensitive multi-kolom
+    // 🌟 State Toggle Filter & Filter Parameters
+    const [showFilter, setShowFilter] = useState(false);
+    const [filterKode, setFilterKode] = useState('');
+    const [filterNama, setFilterNama] = useState('');
+    const [filterKota, setFilterKota] = useState('');
+
+    // Filter lokal reaktif multi-kriteria
     const filteredData = useMemo(() => {
-        if (!tableSearch.trim()) return data;
-        const q = tableSearch.toLowerCase().trim();
         return data.filter(item => {
-            const nama = (item.agen_nama || '').toLowerCase();
-            const kode = (item.agen_kode || '').toLowerCase();
-            const kota = (item.agen_kota || '').toLowerCase();
-            const alamat = (item.agen_alamat || '').toLowerCase();
-            const id = (item.agen_id || '').toString().toLowerCase();
-            const telp = (item.agen_phone || '').toLowerCase();
-            return nama.includes(q) || kode.includes(q) || kota.includes(q) || alamat.includes(q) || id.includes(q) || telp.includes(q);
+            const matchAgen = !filterKode || (item.agen_kode === filterKode || item.agen_nama === filterKode);
+            const matchNama = !filterNama || (item.agen_nama || '').toLowerCase().includes(filterNama.trim().toLowerCase());
+            const matchKota = !filterKota || (item.agen_kota || '').toLowerCase().includes(filterKota.trim().toLowerCase());
+            return matchAgen && matchNama && matchKota;
         });
-    }, [data, tableSearch]);
+    }, [data, filterKode, filterNama, filterKota]);
 
+    const handleResetFilter = () => {
+        setFilterKode('');
+        setFilterNama('');
+        setFilterKota('');
+    };
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [showUnregisteredTab, setShowUnregisteredTab] = useState(false);
     const [editData, setEditData] = useState(null);
 
-    // State manajemen Sub-Modal Editor Ganti Area Loper (Gambar 2)
+    // State manajemen Sub-Modal Editor Ganti Area Loper
     const [isGantiModalOpen, setIsGantiModalOpen] = useState(false);
-    const [gantiActiveItem, setGantiActiveItem] = useState(null); // Menyimpan baris area terpilih yang diklik
+    const [gantiActiveItem, setGantiActiveItem] = useState(null);
     const [gantiPayload, setGantiPayload] = useState({ id: 0, penerusyn: 'N', kgmin: 0, hrgpenerus: 0, leadtime: 1, new_agen_kode: '' });
 
     // State manajemen Sub-Modal Batch Area Loper
@@ -89,11 +93,6 @@ const MasterAreaLoper = () => {
             });
             setUnregistered(res.data.data);
         } catch (err) { console.error(err); }
-    };
-
-    const handleSearch = (e) => {
-        e.preventDefault();
-        fetchData(searchQuery);
     };
 
     const handleOpenAdd = () => {
@@ -166,7 +165,6 @@ const MasterAreaLoper = () => {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            // 🚀 SUNTIKAN SAKTI: Map data agar memiliki property value input operasional default
             const rawData = res.data.data || [];
             const mappedData = rawData.map(item => ({
                 ...item,
@@ -242,33 +240,53 @@ const MasterAreaLoper = () => {
         {
             header: 'KODE',
             accessor: 'agen_kode',
-            render: (i) => <span className="font-mono font-bold text-blue-600 text-[11px]">{i.agen_kode}</span>
+            render: (i) => (
+                <span className="font-mono font-bold text-sky-600 text-[11px]">
+                    {i.agen_kode || '-'}
+                </span>
+            )
         },
         {
             header: 'NAMA AGEN',
             accessor: 'agen_nama',
-            render: (i) => <span className="font-bold text-[11px] text-slate-800">{i.agen_nama}</span>
+            render: (i) => (
+                <span className="font-bold text-[11px] uppercase block" style={{ color: '#0f172a' }}>
+                    {i.agen_nama || '-'}
+                </span>
+            )
         },
         {
             header: 'ALAMAT',
             accessor: 'agen_alamat',
-            render: (i) => <span className="text-[11px] block max-w-sm font-medium text-slate-700">{i.agen_alamat}</span>
+            render: (i) => (
+                <span className="text-[11px] block max-w-sm font-medium uppercase" style={{ color: '#334155' }}>
+                    {i.agen_alamat || '-'}
+                </span>
+            )
         },
         {
             header: 'KOTA',
             accessor: 'agen_kota',
-            render: (i) => <span className="font-bold text-[11px] text-slate-800">{i.agen_kota}</span>
+            render: (i) => (
+                <span className="font-bold text-[11px] uppercase block" style={{ color: '#0f172a' }}>
+                    {i.agen_kota || '-'}
+                </span>
+            )
         },
         {
             header: 'TELP',
             accessor: 'agen_phone',
-            render: (i) => <span className="font-mono text-[11px]">{i.agen_phone || '-'}</span>
+            render: (i) => (
+                <span className="font-mono text-[11px] font-semibold" style={{ color: '#334155' }}>
+                    {i.agen_phone || '-'}
+                </span>
+            )
         },
         {
             header: 'JUMLAH',
             accessor: 'jumlah_wilayah',
             render: (i) => (
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-50 text-blue-600 border border-blue-200">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-sky-100 text-sky-800 border border-sky-200">
                     {i.jumlah_wilayah || 0} Wilayah
                 </span>
             )
@@ -314,7 +332,6 @@ const MasterAreaLoper = () => {
             return updated;
         });
 
-        // Sinkronkan juga data yang ada di dalam checklist selectedMasterRows jika baris tersebut sudah dicentang
         setSelectedMasterRows(prev => {
             const targetRow = searchResultMaster[idx];
             return prev.map(r => {
@@ -326,11 +343,9 @@ const MasterAreaLoper = () => {
         });
     };
 
-    // 🚀 ENGINE DELETION MASSAL: Melepas keterikatan wilayah loper aktif dari agen (Gambar 1)
     const handleDeleteMassalTerpilih = async () => {
         if (selectedRows.length === 0) return;
 
-        // Beri konfirmasi peringatan keras khas ERP Dakota Cargo
         Swal.fire({
             title: 'Apakah Anda Yakin?',
             text: `Melepas ${selectedRows.length} wilayah operasional dari keterikatan agen ini?`,
@@ -344,21 +359,14 @@ const MasterAreaLoper = () => {
             if (result.isConfirmed) {
                 try {
                     const token = localStorage.getItem('token');
-
-                    // Tembak endpoint delete massal ke Golang
                     await api.delete(`/area-loper/remove-wilayah-massal`, {
                         headers: { Authorization: `Bearer ${token}` },
-                        data: { ids: selectedRows } // Kirim array ID yang dicentang
+                        data: { ids: selectedRows }
                     });
 
                     Swal.fire({ title: 'Berhasil!', text: 'Wilayah sukses dilepas dari agen', icon: 'success', timer: 1200, showConfirmButton: false });
-
-                    // Reset checkbox state kembali kosong
                     setSelectedRows([]);
-
-                    // Refresh total tabel Daftar Area Loper Terpilih bawah biar langsung hilang barisnya
                     fetchAgenProfilHeader(agenProfil.kode);
-                    // Refresh data tabel rekap utama depan
                     fetchData();
                 } catch (err) {
                     Swal.fire('Error', 'Gagal melepaskan wilayah operasional', 'error');
@@ -367,7 +375,6 @@ const MasterAreaLoper = () => {
         });
     };
 
-    // Trigger saat tombol "Ganti" biru di baris area aktif diklik (Gambar 1)
     const handleOpenGantiSubModal = (row) => {
         setGantiActiveItem(row);
         setGantiPayload({
@@ -376,12 +383,11 @@ const MasterAreaLoper = () => {
             kgmin: row.kgmin || 0,
             hrgpenerus: row.hrgpenerus || 0,
             leadtime: row.leadtime || 1,
-            new_agen_kode: agenProfil.kode // Default ke kode agen saat ini
+            new_agen_kode: agenProfil.kode
         });
         setIsGantiModalOpen(true);
     };
 
-    // Eksekusi tombol Simpan pada sub-modal Ganti Area Loper (Gambar 2)
     const handleSaveGantiAtribut = async () => {
         try {
             const token = localStorage.getItem('token');
@@ -391,17 +397,97 @@ const MasterAreaLoper = () => {
 
             Swal.fire({ title: 'Sukses!', text: 'Parameter wilayah loper berhasil diperbarui', icon: 'success', timer: 1200, showConfirmButton: false });
             setIsGantiModalOpen(false);
-
-            // Refresh ulang data tabel Daftar Area Loper Terpilih bawah biar nilainya langsung berubah
             fetchAgenProfilHeader(agenProfil.kode);
-            fetchData(); // Refresh table utama depan
+            fetchData();
         } catch (err) {
             Swal.fire('Error', 'Gagal memperbarui parameter wilayah loper', 'error');
         }
     };
 
     return (
-        <div className={`min-h-screen p-4 space-y-4 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-slate-50 text-slate-800'}`}>
+        <div className="space-y-4 master-loper-wrapper">
+            {/* 🌟 FORCE CSS: Menjamin teks tabel selalu tegas dan kontras */}
+            <style>
+                {`
+                .master-loper-wrapper table tbody tr td {
+                    color: #0f172a !important;
+                    font-weight: 600 !important;
+                }
+                .master-loper-wrapper table tbody tr td span {
+                    opacity: 1 !important;
+                }
+                `}
+            </style>
+
+            {/* 🌟 PANEL FILTER BERSYARAT (COLLAPSIBLE) */}
+            {showFilter && (
+                <form onSubmit={(e) => e.preventDefault()} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all">
+                    <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
+                        <Filter size={16} className="text-sky-600" />
+                        FILTER DATA AREA LOPER
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* 🌟 DROPDOWN AGEN / CABANG PELOPER (SESUAI GAMBAR 2) */}
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">AGEN / CABANG PELOPER</label>
+                            <select
+                                value={filterKode}
+                                onChange={(e) => setFilterKode(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500 uppercase bg-white cursor-pointer"
+                            >
+                                <option value="">-- SEMUA AGEN / CABANG --</option>
+                                {data.map((item, idx) => (
+                                    <option key={idx} value={item.agen_kode || item.agen_nama}>
+                                        {item.agen_nama} {item.agen_kode ? `(${item.agen_kode})` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">NAMA AGEN</label>
+                            <input
+                                type="text"
+                                placeholder="Cari nama agen..."
+                                value={filterNama}
+                                onChange={(e) => setFilterNama(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500 uppercase"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">KOTA</label>
+                            <input
+                                type="text"
+                                placeholder="Cari kota..."
+                                value={filterKota}
+                                onChange={(e) => setFilterKota(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500 uppercase"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={handleResetFilter}
+                            className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer flex items-center gap-1.5"
+                        >
+                            <RotateCcw size={14} /> RESET
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => fetchData()}
+                            className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5"
+                        >
+                            <RefreshCw size={14} /> REFRESH DATA
+                        </button>
+                    </div>
+                </form>
+            )}
+
+            {/* TABEL DATA TEMPLATE DENGAN onFilter */}
             <DataTableTemplate
                 title="Master Area Operasional Wilayah (opr_m_earea)"
                 columns={columns}
@@ -410,20 +496,18 @@ const MasterAreaLoper = () => {
                 isDarkMode={isDarkMode}
                 onAdd={handleOpenAdd}
                 onEdit={handleOpenEditCustom}
-                onDelete={() => { }}
-                searchValue={tableSearch}
-                onSearchChange={setTableSearch}
+                onFilter={() => setShowFilter(prev => !prev)}
             />
 
             {/* MODAL INPUT FORM INTEGRAL */}
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
                     <div className={`w-full max-w-6xl p-6 rounded-2xl shadow-2xl h-[95vh] flex flex-col ${isDarkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900'}`}>
                         <div className="flex justify-between items-center pb-2 border-b dark:border-slate-700">
                             <h3 className="text-lg font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
                                 {editData ? 'EDIT MASTER AREA LOPER' : 'TAMBAH MASTER AREA LOPER'}
                             </h3>
-                            <button onClick={() => setIsModalOpen(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full"><XIcon size={20} /></button>
+                            <button onClick={() => setIsModalOpen(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full cursor-pointer"><XIcon size={20} /></button>
                         </div>
 
                         <div className="flex-1 overflow-y-auto pr-1 space-y-4 my-3 text-xs min-h-0">
@@ -466,7 +550,7 @@ const MasterAreaLoper = () => {
                                         <button
                                             type="button"
                                             onClick={handleAssignMassalKeTerpilih}
-                                            className="px-4 py-1 rounded bg-purple-600 hover:bg-purple-700 text-white font-black text-xs flex items-center gap-1.5 shadow-md transition-all hover:scale-105 active:scale-95"
+                                            className="px-4 py-1 rounded bg-purple-600 hover:bg-purple-700 text-white font-black text-xs flex items-center gap-1.5 shadow-md transition-all hover:scale-105 active:scale-95 cursor-pointer"
                                         >
                                             <FolderPlus size={14} />
                                             Tambahkan Wilayah Terpilih ({selectedMasterRows.length})
@@ -481,12 +565,10 @@ const MasterAreaLoper = () => {
                                                     <th className="p-2 border-r border-purple-500">Kota/Kabupaten</th>
                                                     <th className="p-2 border-r border-purple-500">Kecamatan</th>
                                                     <th className="p-2 border-r border-purple-500">Kelurahan</th>
-
                                                     <th className="p-2 border-r border-purple-500 min-w-[90px]">Penerus Y/N</th>
                                                     <th className="p-2 border-r border-purple-500 min-w-[80px]">Kg Minimal</th>
                                                     <th className="p-2 border-r border-purple-500 min-w-[100px]">Harga (Rp.)</th>
                                                     <th className="p-2 border-r border-purple-500 min-w-[70px]">LeadTime</th>
-
                                                     <th className="p-2 border-r border-purple-500">Cabang Loper</th>
                                                     <th className="p-2 text-center flex flex-col items-center justify-center gap-0.5 min-w-[70px] bg-purple-700 rounded-tr-lg">
                                                         <input type="checkbox" className="w-3.5 h-3.5 cursor-pointer accent-white" onChange={handleSelectAllMaster} checked={searchResultMaster.length > 0 && selectedMasterRows.length === searchResultMaster.length} />
@@ -507,10 +589,8 @@ const MasterAreaLoper = () => {
                                                             <td className="p-2 border-r dark:border-slate-800" style={{ color: isDarkMode ? '#ffffff' : '#000000' }}>{row.kabupaten}</td>
                                                             <td className="p-2 border-r dark:border-slate-800" style={{ color: isDarkMode ? '#ffffff' : '#000000' }}>{row.kecamatan}</td>
                                                             <td className="p-2 font-bold border-r dark:border-slate-800" style={{ color: isDarkMode ? '#c084fc' : '#6b21a8' }}>{row.kelurahan}</td>
-
-                                                            {/* 🟢 BARIS CELL INPUT BARU (Gambar 1) */}
                                                             <td className="p-1 border-r dark:border-slate-800 text-center">
-                                                                <select className="p-1 border rounded font-bold bg-white text-slate-800 text-[11px] outline-none" value={row.penerusyn} onChange={e => handleMasterRowInputChange(idx, 'penerusyn', e.target.value)}>
+                                                                <select className="p-1 border rounded font-bold bg-white text-slate-800 text-[11px] outline-none cursor-pointer" value={row.penerusyn} onChange={e => handleMasterRowInputChange(idx, 'penerusyn', e.target.value)}>
                                                                     <option value="N">N</option>
                                                                     <option value="Y">Y</option>
                                                                 </select>
@@ -524,11 +604,9 @@ const MasterAreaLoper = () => {
                                                             <td className="p-1 border-r dark:border-slate-800">
                                                                 <input type="number" className="w-full p-1 border rounded text-center font-mono text-slate-800 text-[11px] bg-slate-50/50" value={row.leadtime} onChange={e => handleMasterRowInputChange(idx, 'leadtime', parseInt(e.target.value) || 0)} />
                                                             </td>
-
                                                             <td className="p-1 text-center border-r dark:border-slate-800" style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff' }}>
-                                                                <button type="button" onClick={() => handleOpenBatchSubModal(row)} className="px-2.5 py-0.5 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] shadow-sm transition">Batch</button>
+                                                                <button type="button" onClick={() => handleOpenBatchSubModal(row)} className="px-2.5 py-0.5 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] shadow-sm transition cursor-pointer">Batch</button>
                                                             </td>
-
                                                             <td className="p-2 text-center" style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff' }}>
                                                                 <input type="checkbox" className="w-3.5 h-3.5 cursor-pointer accent-purple-600" checked={isChecked} onChange={() => { handleToggleMasterRow(row); }} />
                                                             </td>
@@ -580,11 +658,10 @@ const MasterAreaLoper = () => {
                                                         <td className="p-2 text-right font-mono font-bold text-emerald-600 border-r dark:border-slate-800">Rp {row.hrgpenerus?.toLocaleString()}</td>
                                                         <td className="p-2 text-center font-mono border-r dark:border-slate-800" style={{ color: isDarkMode ? '#ffffff' : '#000000' }}>{row.leadtime} Hari</td>
                                                         <td className="p-1 text-center border-r dark:border-slate-800">
-                                                            {/* 🟢 SUNTIKAN SAKTI: Menghubungkan klik ke sub-modal editor ganti (Gambar 1) */}
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleOpenGantiSubModal(row)}
-                                                                className="px-2.5 py-0.5 rounded bg-blue-500 hover:bg-blue-600 text-white font-bold text-[10px] shadow-sm transition"
+                                                                className="px-2.5 py-0.5 rounded bg-blue-500 hover:bg-blue-600 text-white font-bold text-[10px] shadow-sm transition cursor-pointer"
                                                             >
                                                                 Ganti
                                                             </button>
@@ -603,30 +680,29 @@ const MasterAreaLoper = () => {
                         {/* FOOTER ACTION BUTTON */}
                         <div className={`flex justify-end gap-3 p-4 border-t sticky bottom-0 -mx-6 -mb-6 mt-auto rounded-b-2xl ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-gray-100'}`}>
                             {selectedRows.length > 0 && (
-                                /* 🟢 SUNTIKAN SAKTI: Menghubungkan fungsi klik hapus massal dari checkbox area terpilih */
                                 <button
                                     type="button"
                                     onClick={handleDeleteMassalTerpilih}
-                                    className="mr-auto px-4 py-2 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 font-bold text-xs transition-all shadow-xs"
+                                    className="mr-auto px-4 py-2 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 font-bold text-xs transition-all shadow-xs cursor-pointer"
                                 >
                                     🗑️ Hapus Dari Agen ({selectedRows.length})
                                 </button>
                             )}
-                            <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 rounded-lg border bg-white dark:bg-slate-700 font-bold text-slate-600 dark:text-slate-200 text-xs">Keluar</button>
-                            <button type="button" className="px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white flex items-center gap-2 font-black shadow-md text-xs">💾 Simpan Massal</button>
+                            <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 rounded-lg border bg-white dark:bg-slate-700 font-bold text-slate-600 dark:text-slate-200 text-xs cursor-pointer">Keluar</button>
+                            <button type="button" className="px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white flex items-center gap-2 font-black shadow-md text-xs cursor-pointer">💾 Simpan Massal</button>
                         </div>
 
                     </div>
                 </div>
             )}
 
-            {/* 📋 SUB-MODAL POP-UP: BATCH AREA LOPER MASSAL */}
+            {/* SUB-MODAL BATCH */}
             {isBatchModalOpen && batchActiveItem && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-[60] p-4">
                     <div className="w-full max-w-xl bg-white text-slate-900 p-6 rounded-xl shadow-2xl border border-gray-100 flex flex-col relative animate-in zoom-in-95 duration-150">
                         <div className="flex justify-between items-center pb-2 border-b">
                             <h4 className="text-base font-black text-slate-800 flex items-center gap-1.5">📦 Batch Area Loper</h4>
-                            <button onClick={() => setIsBatchModalOpen(false)} className="p-1 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600"><XIcon size={18} /></button>
+                            <button onClick={() => setIsBatchModalOpen(false)} className="p-1 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 cursor-pointer"><XIcon size={18} /></button>
                         </div>
                         <div className="my-4 space-y-4 text-xs">
                             <div className="space-y-1.5">
@@ -662,25 +738,22 @@ const MasterAreaLoper = () => {
                             </div>
                         </div>
                         <div className="flex justify-end gap-2 border-t pt-3 mt-2">
-                            <button type="button" onClick={() => setIsBatchModalOpen(false)} className="px-4 py-1.5 rounded border bg-slate-100 font-bold text-slate-700 text-xs hover:bg-slate-200 transition">Batal</button>
-                            <button type="button" onClick={handleSaveBatchMassal} className="px-5 py-1.5 rounded bg-amber-500 hover:bg-amber-600 text-white font-black text-xs shadow-md transition">Simpan Batch</button>
+                            <button type="button" onClick={() => setIsBatchModalOpen(false)} className="px-4 py-1.5 rounded border bg-slate-100 font-bold text-slate-700 text-xs hover:bg-slate-200 transition cursor-pointer">Batal</button>
+                            <button type="button" onClick={handleSaveBatchMassal} className="px-5 py-1.5 rounded bg-amber-500 hover:bg-amber-600 text-white font-black text-xs shadow-md transition cursor-pointer">Simpan Batch</button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* 📋 SUB-MODAL POP-UP: GANTI AREA LOPER (ATRIBUT EDITOR - PERSIS GAMBAR 2) */}
+            {/* SUB-MODAL GANTI ATRIBUT */}
             {isGantiModalOpen && gantiActiveItem && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-[60] p-4">
                     <div className="w-full max-w-2xl bg-white text-slate-900 p-6 rounded-xl shadow-2xl border border-gray-100 flex flex-col relative animate-in zoom-in-95 duration-150">
-
-                        {/* Close Button X */}
                         <div className="flex justify-between items-center pb-2 border-b mb-4">
                             <h4 className="text-base font-black text-slate-800 uppercase tracking-wide">⚙️ Ganti Area Loper</h4>
-                            <button onClick={() => setIsGantiModalOpen(false)} className="p-1 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600"><XIcon size={18} /></button>
+                            <button onClick={() => setIsGantiModalOpen(false)} className="p-1 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 cursor-pointer"><XIcon size={18} /></button>
                         </div>
 
-                        {/* RENDER ROW GEOGRAFIS SIFATNYA READONLY (Kunci Data Wilayah Terpilih) */}
                         <div className="grid grid-cols-3 gap-3 text-xs mb-3">
                             <div>
                                 <label className="font-black text-gray-500 uppercase block mb-0.5">PROPINSI</label>
@@ -701,8 +774,6 @@ const MasterAreaLoper = () => {
                                 <label className="font-black text-gray-500 uppercase block mb-0.5">KELURAHAN</label>
                                 <input type="text" className="w-full p-2 border bg-gray-50 font-bold uppercase rounded text-slate-500" value={gantiActiveItem.tujuan_kelurahan} readOnly />
                             </div>
-
-                            {/* PENERUS Y/N INPUT RADIO BUTTON (Gambar 2) */}
                             <div>
                                 <label className="font-black text-gray-500 uppercase block mb-1">PENERUS Y/N</label>
                                 <div className="flex items-center gap-4 p-2 border rounded bg-white h-[34px] font-bold">
@@ -716,8 +787,6 @@ const MasterAreaLoper = () => {
                                     </label>
                                 </div>
                             </div>
-
-                            {/* KG MINIMAL */}
                             <div>
                                 <label className="font-black text-gray-500 uppercase block mb-0.5">KG MINIMAL</label>
                                 <input type="number" placeholder="Masukan Minimal" className="w-full p-2 border rounded font-mono font-bold text-slate-800" value={gantiPayload.kgmin} onChange={e => setGantiPayload(prev => ({ ...prev, kgmin: parseFloat(e.target.value) || 0 }))} />
@@ -725,19 +794,16 @@ const MasterAreaLoper = () => {
                         </div>
 
                         <div className="grid grid-cols-2 gap-4 text-xs mb-4">
-                            {/* HARGA */}
                             <div>
                                 <label className="font-black text-gray-500 uppercase block mb-0.5">HARGA (RP.)</label>
                                 <input type="number" placeholder="Masukan Harga Minimal" className="w-full p-2 border rounded font-mono font-bold text-emerald-600" value={gantiPayload.hrgpenerus} onChange={e => setGantiPayload(prev => ({ ...prev, hrgpenerus: parseFloat(e.target.value) || 0 }))} />
                             </div>
-                            {/* LEADTIME */}
                             <div>
                                 <label className="font-black text-gray-500 uppercase block mb-0.5">LEADTIME</label>
                                 <input type="number" placeholder="Masukan Leadtime" className="w-full p-2 border rounded font-mono font-bold text-slate-800" value={gantiPayload.leadtime} onChange={e => setGantiPayload(prev => ({ ...prev, leadtime: parseInt(e.target.value) || 1 }))} />
                             </div>
                         </div>
 
-                        {/* GANTI PETUGAS AGEN PENERUS (Gambar 2 Bawah) */}
                         <div className="text-xs border-t pt-3 mb-2">
                             <label className="font-black text-blue-600 dark:text-blue-400 uppercase tracking-wide block mb-1">PILIH CABANG/AGEN PETUGAS LOPER BARU :</label>
                             <select className="w-full p-2 border rounded font-bold bg-white text-slate-800 shadow-sm focus:border-blue-500 outline-none cursor-pointer text-xs" value={gantiPayload.new_agen_kode} onChange={e => setGantiPayload(prev => ({ ...prev, new_agen_kode: e.target.value }))}>
@@ -749,10 +815,9 @@ const MasterAreaLoper = () => {
                             </select>
                         </div>
 
-                        {/* Action Trigger Footer Sub-Modal */}
                         <div className="flex justify-end gap-2 border-t pt-3 mt-4">
-                            <button type="button" onClick={() => setIsGantiModalOpen(false)} className="px-4 py-1.5 rounded border bg-slate-100 font-bold text-slate-700 text-xs hover:bg-slate-200 transition">Batal</button>
-                            <button type="button" onClick={handleSaveGantiAtribut} className="px-5 py-1.5 rounded bg-amber-500 hover:bg-amber-600 text-white font-black text-xs shadow-md transition">Simpan</button>
+                            <button type="button" onClick={() => setIsGantiModalOpen(false)} className="px-4 py-1.5 rounded border bg-slate-100 font-bold text-slate-700 text-xs hover:bg-slate-200 transition cursor-pointer">Batal</button>
+                            <button type="button" onClick={handleSaveGantiAtribut} className="px-5 py-1.5 rounded bg-amber-500 hover:bg-amber-600 text-white font-black text-xs shadow-md transition cursor-pointer">Simpan</button>
                         </div>
 
                     </div>

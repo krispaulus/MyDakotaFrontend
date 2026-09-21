@@ -207,11 +207,19 @@ const Header = () => {
                             const to = `/${pathnames.slice(0, index + 1).join('/')}`;
                             const name = value.charAt(0).toUpperCase() + value.slice(1);
 
+                            // Daftar modul induk yang hanya berfungsi sebagai kategori di sidebar (bukan halaman)
+                            const isCategoryGroup = ['marketing', 'master', 'operasional', 'piutang', 'hutang', 'laporan'].includes(value.toLowerCase());
+
                             return (
                                 <span key={to} className="flex items-center">
                                     <span className="mx-2">|</span>
                                     {last ? (
-                                        <span className="text-[#2b3674] font-medium">{name}</span>
+                                        <span className="text-[#2b3674] font-medium select-none">{name}</span>
+                                    ) : isCategoryGroup ? (
+                                        /* Jika kategori induk, render sebagai teks biasa yang tidak bisa diklik */
+                                        <span className="text-slate-500 font-semibold cursor-default select-none">
+                                            {name}
+                                        </span>
                                     ) : (
                                         <Link to={to} className="hover:text-[#2170f4] transition-colors">
                                             {name}

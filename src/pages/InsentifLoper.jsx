@@ -12,6 +12,9 @@ const InsentifLoper = () => {
     const [driverList, setDriverList] = useState([]);
     const [loading, setLoading] = useState(false);
 
+    // 🌟 State Buka-Tutup (Toggle) Filter
+    const [showFilter, setShowFilter] = useState(false);
+
     // Filter State
     const today = new Date().toISOString().split('T')[0];
     const [startDate, setStartDate] = useState(today);
@@ -266,6 +269,7 @@ const InsentifLoper = () => {
             accessor: 'print_action',
             render: (item) => (
                 <button
+                    type="button"
                     onClick={() => handlePrint(item)}
                     className="p-1.5 bg-sky-50 text-sky-600 border border-sky-200 rounded-lg hover:bg-sky-100 transition cursor-pointer flex items-center gap-1 mx-auto font-bold text-xs"
                 >
@@ -275,24 +279,20 @@ const InsentifLoper = () => {
         }
     ];
 
-    // 🌟 UI/UX MODAL DENGAN DESAIN TEMPLATE GAMBAR 2
     const modalElement = isModalOpen ? (
         <div
             className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs transition-opacity"
             style={{ zIndex: 99999 }}
         >
             <div className={`w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden transition-all transform ${isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-slate-800'}`}>
-                {/* Header Modal Standar Gambar 2 */}
                 <div className="px-8 py-6 border-b border-slate-100">
                     <h2 className="text-base font-black uppercase tracking-wider text-slate-800">
                         {isEditMode ? `EDIT INSENTIF LOPER INFO (${formData.lopins_id})` : 'ADD INSENTIF LOPER INFO'}
                     </h2>
                 </div>
 
-                {/* Form Body 2 Kolom Standar Template */}
                 <form onSubmit={handleSaveForm} className="p-8 space-y-5 text-xs">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        {/* Driver / Sopir Dropdown */}
                         <div className="md:col-span-2">
                             <label className="font-bold text-slate-700 block mb-1.5">
                                 Pilih Driver / Sopir
@@ -312,7 +312,6 @@ const InsentifLoper = () => {
                             </select>
                         </div>
 
-                        {/* Tanggal Transaksi */}
                         <div>
                             <label className="font-bold text-slate-700 block mb-1.5">
                                 Tanggal Transaksi
@@ -326,7 +325,6 @@ const InsentifLoper = () => {
                             />
                         </div>
 
-                        {/* Kas Keluar (CBID) */}
                         <div>
                             <label className="font-bold text-slate-700 block mb-1.5">
                                 Kas Keluar (CBID)
@@ -340,7 +338,6 @@ const InsentifLoper = () => {
                             />
                         </div>
 
-                        {/* Periode Mulai */}
                         <div>
                             <label className="font-bold text-slate-700 block mb-1.5">
                                 Periode Mulai
@@ -354,7 +351,6 @@ const InsentifLoper = () => {
                             />
                         </div>
 
-                        {/* Periode Selesai */}
                         <div>
                             <label className="font-bold text-slate-700 block mb-1.5">
                                 Periode Selesai
@@ -369,7 +365,6 @@ const InsentifLoper = () => {
                         </div>
                     </div>
 
-                    {/* Footer Buttons Standar Gambar 2 */}
                     <div className="flex items-center justify-center gap-3 pt-6">
                         <button
                             type="button"
@@ -392,70 +387,72 @@ const InsentifLoper = () => {
 
     return (
         <div className="space-y-4">
-            {/* Filter Panel */}
-            <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs">
-                <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
-                    <Filter size={16} className="text-sky-600" />
-                    FILTER INSENTIF LOPER
-                </div>
+            {/* 🌟 Panel Filter Bersyarat (Toggle Show/Hide) */}
+            {showFilter && (
+                <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all">
+                    <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
+                        <Filter size={16} className="text-sky-600" />
+                        FILTER INSENTIF LOPER
+                    </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                            <label className="font-bold text-slate-500 block mb-1">TGL MULAI</label>
-                            <input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                            />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                                <label className="font-bold text-slate-500 block mb-1">TGL MULAI</label>
+                                <input
+                                    type="date"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                                />
+                            </div>
+                            <div className="flex-1">
+                                <label className="font-bold text-slate-500 block mb-1">TGL SAMPAI</label>
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                                />
+                            </div>
                         </div>
-                        <div className="flex-1">
-                            <label className="font-bold text-slate-500 block mb-1">TGL SAMPAI</label>
-                            <input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">DRIVER / SOPIR</label>
+                            <select
+                                value={selectedDriver}
+                                onChange={(e) => setSelectedDriver(e.target.value)}
                                 className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                            />
+                            >
+                                <option value="">-- SEMUA DRIVER --</option>
+                                {driverList.map((driver, idx) => (
+                                    <option key={idx} value={driver.nip_sopir}>
+                                        {driver.display}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="flex items-end gap-2">
+                            <button
+                                type="submit"
+                                className="flex-1 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer"
+                            >
+                                TAMPILKAN
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleResetFilter}
+                                className="px-4 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer"
+                            >
+                                RESET
+                            </button>
                         </div>
                     </div>
+                </form>
+            )}
 
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">DRIVER / SOPIR</label>
-                        <select
-                            value={selectedDriver}
-                            onChange={(e) => setSelectedDriver(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                        >
-                            <option value="">-- SEMUA DRIVER --</option>
-                            {driverList.map((driver, idx) => (
-                                <option key={idx} value={driver.nip_sopir}>
-                                    {driver.display}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="flex items-end gap-2">
-                        <button
-                            type="submit"
-                            className="flex-1 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer"
-                        >
-                            TAMPILKAN
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleResetFilter}
-                            className="px-4 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer"
-                        >
-                            RESET
-                        </button>
-                    </div>
-                </div>
-            </form>
-
-            {/* DataTableTemplate Standar */}
+            {/* 🌟 DataTableTemplate dengan Event Handler onFilter */}
             <DataTableTemplate
                 title="INSENTIF LOPER / DRIVER"
                 columns={columns}
@@ -465,6 +462,7 @@ const InsentifLoper = () => {
                 onAdd={handleAdd}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
+                onFilter={() => setShowFilter(prev => !prev)}
             />
 
             {modalElement && ReactDOM.createPortal(modalElement, document.body)}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api/axios';
-import { MapPin, Building2, Edit, Trash2, Save, X as XIcon, Phone, DollarSign, Layers, Shield } from 'lucide-react';
+import { MapPin, Building2, Edit, Trash2, Save, X as XIcon, Phone, DollarSign, Layers, Shield, Filter, RotateCcw, RefreshCw } from 'lucide-react';
 import { useDarkMode } from '../context/DarkModeContext';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import Swal from 'sweetalert2';
@@ -10,16 +10,22 @@ const MasterAgen = () => {
     const [agens, setAgens] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    // 🌟 State Toggle Filter & Parameter Pencarian
+    const [showFilter, setShowFilter] = useState(false);
+    const [filterKode, setFilterKode] = useState('');
+    const [filterNama, setFilterNama] = useState('');
+    const [filterKota, setFilterKota] = useState('');
+    const [filterStatus, setFilterStatus] = useState('');
+
     // --- State untuk Modal (Tambah/Edit) ---
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editData, setEditData] = useState(null);
     const [activeTab, setActiveTab] = useState('umum');
 
-    // 🚀 RACIKAN FORM NUSANTARA: Bersih total dari hardcode kota/cabang kaku
     const defaultForm = {
         agen_id: '',
-        agen_kotaid: '',       // Di-nol-kan agar wajib dipilih/diisi sesuai regional asli
-        agen_cabangid: '',     // Di-nol-kan agar fleksibel mengikuti cabang induk pelapor
+        agen_kotaid: '',
+        agen_cabangid: '',
         agen_tlc: '',
         agen_kode: '',
         agen_nama: '',
@@ -95,21 +101,82 @@ const MasterAgen = () => {
         return String(Math.max(...daftarAngka) + 1).padStart(4, '0');
     }, [agens]);
 
+    // 🌟 Saring Data Secara Reaktif Berdasarkan Filter
+    const filteredAgens = useMemo(() => {
+        return agens.filter(item => {
+            const matchKode = !filterKode || (item.agen_kode || '').toLowerCase().includes(filterKode.trim().toLowerCase());
+            const matchNama = !filterNama || (item.agen_nama || '').toLowerCase().includes(filterNama.trim().toLowerCase());
+            const matchKota = !filterKota || (item.agen_kota || '').toLowerCase().includes(filterKota.trim().toLowerCase());
+            const matchStatus = !filterStatus || item.agen_aktifyn === filterStatus;
+            return matchKode && matchNama && matchKota && matchStatus;
+        });
+    }, [agens, filterKode, filterNama, filterKota, filterStatus]);
+
+    const handleResetFilter = () => {
+        setFilterKode('');
+        setFilterNama('');
+        setFilterKota('');
+        setFilterStatus('');
+    };
+
     const columns = [
         {
-            header: 'ID Agen',
+            header: 'ID AGEN',
             accessor: 'agen_id',
             render: (i) => (
-                <span className={`font-mono text-xs font-bold px-2 py-1 rounded-md border tracking-wider shadow-sm ${isDarkMode ? 'bg-slate-800 text-slate-200 border-slate-700' : 'bg-white text-slate-700 border-slate-200'
-                    }`}>
-                    {i.agen_id}
+                <span className="font-mono text-xs font-bold px-2 py-1 rounded-md border tracking-wider bg-slate-100 text-slate-900 border-slate-300">
+                    {i.agen_id || i.Agen_ID || i.id || '-'}
                 </span>
             )
         },
-        { header: 'Kode', accessor: 'agen_kode', render: (i) => <span className="font-mono font-bold text-blue-600">{i.agen_kode}</span> },
-        { header: 'Nama Agen', accessor: 'agen_nama', render: (i) => <span className="font-semibold">{i.agen_nama}</span> },
-        { header: 'Kota', accessor: 'agen_kota', render: (i) => <span className="font-medium text-slate-700 dark:text-slate-300">{i.agen_kota}</span> },
-        { header: 'Status', render: (i) => <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${i.agen_aktifyn === 'Y' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{i.agen_aktifyn === 'Y' ? 'AKTIF' : 'NON'}</span> }
+        {
+            header: 'KODE',
+            accessor: 'agen_kode',
+            render: (i) => (
+                <span className="font-mono font-bold text-blue-600" style={{ color: '#2563eb' }}>
+                    {i.agen_kode || i.Agen_Kode || i.kode || '-'}
+                </span>
+            )
+        },
+        {
+            header: 'NAMA AGEN',
+            accessor: 'agen_nama',
+            render: (i) => (
+                <span
+                    className="font-bold uppercase block text-xs"
+                    style={{ color: '#0f172a', fontWeight: 800 }}
+                >
+                    {i.agen_nama || i.Agen_Nama || i.nama_agen || '-'}
+                </span>
+            )
+        },
+        {
+            header: 'KOTA',
+            accessor: 'agen_kota',
+            render: (i) => (
+                <span
+                    className="font-bold uppercase block text-xs"
+                    style={{ color: '#1e293b', fontWeight: 700 }}
+                >
+                    {i.agen_kota || i.Agen_Kota || i.kota || '-'}
+                </span>
+            )
+        },
+        {
+            header: 'STATUS',
+            accessor: 'agen_aktifyn',
+            render: (i) => {
+                const status = (i.agen_aktifyn || i.Agen_AktifYN || i.status || 'N').toString().toUpperCase();
+                return (
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${status === 'Y' || status === 'AKTIF'
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                        : 'bg-rose-100 text-rose-800 border border-rose-200'
+                        }`}>
+                        {status === 'Y' || status === 'AKTIF' ? 'AKTIF' : 'NON-AKTIF'}
+                    </span>
+                );
+            }
+        }
     ];
 
     const handleAdd = () => {
@@ -119,7 +186,6 @@ const MasterAgen = () => {
         setIsModalOpen(true);
     };
 
-    // 🚀 ENGINE DETAIL NUSANTARA: Mengunci Parameter Kontak & Finansial Akunting
     const handleEdit = async (item) => {
         setEditData(item);
         setActiveTab('umum');
@@ -129,15 +195,12 @@ const MasterAgen = () => {
         const backupKecamatan = item.agen_kecamatan || item.AgenKecamatan || '';
         const backupPropinsi = item.agen_propinsi || item.AgenPropinsi || '';
         const backupAlamat = item.agen_alamat || item.AgenAlamat || '';
-
         const backupCP = item.agen_contactperson || '';
         const backupPhone1 = item.agen_phone1 || '';
         const backupPhone2 = item.agen_phone2 || '';
         const backupPhone3 = item.agen_phone3 || '';
         const backupDial = item.agen_dialstring || '';
         const backupStt = item.agen_stt || '';
-
-        // 🟢 BACKUP BARU UNTUK AKUNTING & CONTACT
         const backupKaAkunting = item.agen_kaakunting || '';
         const backupKaContact = item.agen_kacontact || '';
 
@@ -149,8 +212,6 @@ const MasterAgen = () => {
 
             if (res.data && res.data.data) {
                 const d = res.data.data;
-                console.log("🔍 RESPONS LURUS DARI GOLANG BACKEND:", d);
-
                 setFormData({
                     ...defaultForm,
                     ...item,
@@ -169,8 +230,6 @@ const MasterAgen = () => {
                     agen_phone3: d.agen_phone3 || backupPhone3,
                     agen_dialstring: d.agen_dialstring || backupDial,
                     agen_stt: d.agen_stt || backupStt,
-
-                    // 🟢 IKAT VALUE MANUALLY BIAR KAWIN 100% SAMA POSTGRES
                     agen_kaakunting: d.agen_kaakunting || backupKaAkunting,
                     agen_kacontact: d.agen_kacontact || backupKaContact
                 });
@@ -235,12 +294,111 @@ const MasterAgen = () => {
     };
 
     return (
-        <div className={`min-h-screen p-4 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-slate-50 text-slate-800'}`}>
-            <DataTableTemplate title="Master Agen (Full Fields)" columns={columns} data={agens} loading={loading} isDarkMode={isDarkMode} onAdd={handleAdd} onEdit={handleEdit} onDelete={handleDelete} />
+        <div className="space-y-4 master-agen-wrapper">
+            {/* 🌟 FORCE CSS: Menjamin semua teks cell di tabel ini berwarna hitam pekat */}
+            <style>
+                {`
+                .master-agen-wrapper table tbody tr td {
+                    color: #0f172a !important;
+                    font-weight: 600 !important;
+                }
+                .master-agen-wrapper table tbody tr td span {
+                    opacity: 1 !important;
+                }
+                `}
+            </style>
 
-            {/* MODAL CONTAINER DENGAN SUNTIKAN UI RESPONSIF COMPACT ANTIMELAR */}
+            {/* Panel Filter Collapsible */}
+            {showFilter && (
+                <form onSubmit={(e) => { e.preventDefault(); }} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all">
+                    <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
+                        <Filter size={16} className="text-sky-600" />
+                        FILTER DATA AGEN
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">KODE AGEN</label>
+                            <input
+                                type="text"
+                                placeholder="Cari kode agen..."
+                                value={filterKode}
+                                onChange={(e) => setFilterKode(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500 uppercase font-mono"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">NAMA AGEN</label>
+                            <input
+                                type="text"
+                                placeholder="Cari nama agen..."
+                                value={filterNama}
+                                onChange={(e) => setFilterNama(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500 uppercase"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">KOTA</label>
+                            <input
+                                type="text"
+                                placeholder="Cari nama kota..."
+                                value={filterKota}
+                                onChange={(e) => setFilterKota(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500 uppercase"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">STATUS AKTIF</label>
+                            <select
+                                value={filterStatus}
+                                onChange={(e) => setFilterStatus(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500 cursor-pointer"
+                            >
+                                <option value="">-- SEMUA STATUS --</option>
+                                <option value="Y">AKTIF</option>
+                                <option value="N">NON-AKTIF</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={handleResetFilter}
+                            className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer flex items-center gap-1.5"
+                        >
+                            <RotateCcw size={14} /> RESET
+                        </button>
+                        <button
+                            type="button"
+                            onClick={fetchAgens}
+                            className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5"
+                        >
+                            <RefreshCw size={14} /> REFRESH DATA
+                        </button>
+                    </div>
+                </form>
+            )}
+
+            {/* TABEL DATA TEMPLATE */}
+            <DataTableTemplate
+                title="Master Agen (Full Fields)"
+                columns={columns}
+                data={filteredAgens}
+                loading={loading}
+                isDarkMode={isDarkMode}
+                onAdd={handleAdd}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                onFilter={() => setShowFilter(prev => !prev)}
+            />
+
+            {/* MODAL CONTAINER */}
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
                     <div className={`w-full max-w-4xl p-6 rounded-2xl shadow-2xl transition-all border flex flex-col min-h-0 max-h-[85vh] ${isDarkMode ? 'bg-slate-800 text-white border-slate-700' : 'bg-white text-slate-900 border-slate-200'
                         }`}>
                         {/* Title Header */}
@@ -249,10 +407,12 @@ const MasterAgen = () => {
                                 <Building2 size={18} />
                                 {editData ? `EDIT DATA AGEN: ${formData.agen_nama} - ${formData.agen_id} - ${formData.agen_kecamatan}` : 'TAMBAH AGEN BARU'}
                             </h3>
-                            <button onClick={() => setIsModalOpen(false)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full transition"><XIcon size={18} /></button>
+                            <button onClick={() => setIsModalOpen(false)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full transition cursor-pointer">
+                                <XIcon size={18} />
+                            </button>
                         </div>
 
-                        {/* TABS HEADER TABEL */}
+                        {/* TABS HEADER */}
                         <div className="flex gap-1.5 my-3 border-b dark:border-slate-700 pb-2 overflow-x-auto text-xs">
                             {[
                                 { id: 'umum', label: 'Data Umum', icon: Building2 },
@@ -267,7 +427,7 @@ const MasterAgen = () => {
                                         key={tab.id}
                                         type="button"
                                         onClick={() => setActiveTab(tab.id)}
-                                        className={`flex items-center gap-2 px-3 py-2 rounded-lg font-bold transition-all duration-150 ${isCurrentActive
+                                        className={`flex items-center gap-2 px-3 py-2 rounded-lg font-bold transition-all duration-150 cursor-pointer ${isCurrentActive
                                             ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
                                             : isDarkMode
                                                 ? 'text-slate-400 hover:bg-slate-700 hover:text-white'
@@ -281,11 +441,11 @@ const MasterAgen = () => {
                             })}
                         </div>
 
-                        {/* FORM INPUT BODY - REKAYASA TOTAL ANTI-GELAP SE-NUSANTARA */}
+                        {/* FORM INPUT BODY */}
                         <form onSubmit={handleSubmitForm} className="flex-1 flex flex-col min-h-0 text-xs">
                             <div className="flex-1 overflow-y-auto space-y-4 pr-1 pb-4">
 
-                                {/* 📋 TAB 1: DATA UMUM */}
+                                {/* TAB 1: DATA UMUM */}
                                 {activeTab === 'umum' && (
                                     <div className="grid grid-cols-2 gap-4 p-4 rounded-xl border transition-colors duration-150" style={{ backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc', borderColor: isDarkMode ? '#334155' : '#e2e8f0' }}>
                                         <div>
@@ -294,11 +454,11 @@ const MasterAgen = () => {
                                         </div>
                                         <div>
                                             <label className="font-black text-gray-400 block mb-1">NAMA AGEN</label>
-                                            <input type="text" className="w-full p-2 border rounded font-bold outline-none" style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', color: isDarkMode ? '#ffffff' : '#000000', borderColor: isDarkMode ? '#475569' : '#cbd5e1' }} value={formData.agen_nama} onChange={e => updateField('agen_nama', e.target.value)} required />
+                                            <input type="text" className="w-full p-2 border rounded font-bold outline-none uppercase" style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', color: isDarkMode ? '#ffffff' : '#000000', borderColor: isDarkMode ? '#475569' : '#cbd5e1' }} value={formData.agen_nama} onChange={e => updateField('agen_nama', e.target.value)} required />
                                         </div>
                                         <div className="col-span-2">
                                             <label className="font-black text-gray-400 block mb-1">ALAMAT LENGKAP</label>
-                                            <textarea className="w-full p-2 border rounded font-medium leading-relaxed outline-none" rows={2} style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', color: isDarkMode ? '#ffffff' : '#000000', borderColor: isDarkMode ? '#475569' : '#cbd5e1' }} value={formData.agen_alamat || ''} onChange={e => updateField('agen_alamat', e.target.value)} required />
+                                            <textarea className="w-full p-2 border rounded font-medium leading-relaxed outline-none uppercase" rows={2} style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', color: isDarkMode ? '#ffffff' : '#000000', borderColor: isDarkMode ? '#475569' : '#cbd5e1' }} value={formData.agen_alamat || ''} onChange={e => updateField('agen_alamat', e.target.value)} required />
                                         </div>
                                         <div>
                                             <label className="font-black text-gray-400 block mb-1">KOTA ID</label>
@@ -318,7 +478,7 @@ const MasterAgen = () => {
                                                     color: isDarkMode ? '#ffffff' : '#000000',
                                                     borderColor: isDarkMode ? '#475569' : '#cbd5e1'
                                                 }}
-                                                value={formData.agen_kecamatan || ''} // 🟢 PASTIKAN INI SINKRON LOWERCASE
+                                                value={formData.agen_kecamatan || ''}
                                                 onChange={e => updateField('agen_kecamatan', e.target.value)}
                                             />
                                         </div>
@@ -332,18 +492,16 @@ const MasterAgen = () => {
                                                     color: isDarkMode ? '#ffffff' : '#000000',
                                                     borderColor: isDarkMode ? '#475569' : '#cbd5e1'
                                                 }}
-                                                value={formData.agen_propinsi || ''} // 🟢 PASTIKAN INI SINKRON LOWERCASE
+                                                value={formData.agen_propinsi || ''}
                                                 onChange={e => updateField('agen_propinsi', e.target.value)}
                                             />
                                         </div>
                                     </div>
                                 )}
 
-                                {/* 📞 TAB 2: KONTAK & PHONE */}
+                                {/* TAB 2: KONTAK & PHONE */}
                                 {activeTab === 'kontak' && (
                                     <div className="grid grid-cols-2 gap-4 p-4 rounded-xl border transition-colors duration-150" style={{ backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc', borderColor: isDarkMode ? '#334155' : '#e2e8f0' }}>
-
-                                        {/* Baris 1: Contact Person & Phone 1 */}
                                         <div>
                                             <label className="font-black text-gray-400 block mb-1">CONTACT PERSON</label>
                                             <input type="text" className="w-full p-2 border rounded font-bold outline-none" style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', color: isDarkMode ? '#ffffff' : '#000000', borderColor: isDarkMode ? '#475569' : '#cbd5e1' }} value={formData.agen_contactperson || ''} onChange={e => updateField('agen_contactperson', e.target.value)} />
@@ -352,8 +510,6 @@ const MasterAgen = () => {
                                             <label className="font-black text-gray-400 block mb-1">PHONE 1</label>
                                             <input type="text" className="w-full p-2 border rounded font-mono outline-none" style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', color: isDarkMode ? '#ffffff' : '#000000', borderColor: isDarkMode ? '#475569' : '#cbd5e1' }} value={formData.agen_phone1 || ''} onChange={e => updateField('agen_phone1', e.target.value)} />
                                         </div>
-
-                                        {/* 🟢 Baris 2: KA AKUNTING & KA CONTACT (PERSIS FORMAT TERBARU NUSANTARA GAMBAR 1 & 3) */}
                                         <div>
                                             <label className="font-black text-gray-400 block mb-1">KA AKUNTING</label>
                                             <input type="text" className="w-full p-2 border rounded font-bold outline-none text-indigo-600 dark:text-indigo-400" style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', color: isDarkMode ? '#4f46e5' : '#000000', borderColor: isDarkMode ? '#475569' : '#cbd5e1' }} value={formData.agen_kaakunting || ''} onChange={e => updateField('agen_kaakunting', e.target.value)} />
@@ -362,8 +518,6 @@ const MasterAgen = () => {
                                             <label className="font-black text-gray-400 block mb-1">KA CONTACT</label>
                                             <input type="text" className="w-full p-2 border rounded font-mono font-bold outline-none" style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', color: isDarkMode ? '#ffffff' : '#000000', borderColor: isDarkMode ? '#475569' : '#cbd5e1' }} value={formData.agen_kacontact || ''} onChange={e => updateField('agen_kacontact', e.target.value)} />
                                         </div>
-
-                                        {/* Baris 3: Phone 2 & Phone 3 */}
                                         <div>
                                             <label className="font-black text-gray-400 block mb-1">PHONE 2</label>
                                             <input type="text" className="w-full p-2 border rounded font-mono outline-none" style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', color: isDarkMode ? '#ffffff' : '#000000', borderColor: isDarkMode ? '#475569' : '#cbd5e1' }} value={formData.agen_phone2 || ''} onChange={e => updateField('agen_phone2', e.target.value)} />
@@ -372,8 +526,6 @@ const MasterAgen = () => {
                                             <label className="font-black text-gray-400 block mb-1">PHONE 3</label>
                                             <input type="text" className="w-full p-2 border rounded font-mono outline-none" style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', color: isDarkMode ? '#ffffff' : '#000000', borderColor: isDarkMode ? '#475569' : '#cbd5e1' }} value={formData.agen_phone3 || ''} onChange={e => updateField('agen_phone3', e.target.value)} />
                                         </div>
-
-                                        {/* Baris 4: Dial String & STT No */}
                                         <div>
                                             <label className="font-black text-gray-400 block mb-1">DIAL STRING</label>
                                             <input type="text" className="w-full p-2 border rounded font-mono outline-none" style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', color: isDarkMode ? '#ffffff' : '#000000', borderColor: isDarkMode ? '#475569' : '#cbd5e1' }} value={formData.agen_dialstring || ''} onChange={e => updateField('agen_dialstring', e.target.value)} />
@@ -382,11 +534,10 @@ const MasterAgen = () => {
                                             <label className="font-black text-gray-400 block mb-1">STT NO</label>
                                             <input type="text" className="w-full p-2 border rounded font-mono outline-none" style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', color: isDarkMode ? '#ffffff' : '#000000', borderColor: isDarkMode ? '#475569' : '#cbd5e1' }} value={formData.agen_stt || ''} onChange={e => updateField('agen_stt', e.target.value)} />
                                         </div>
-
                                     </div>
                                 )}
 
-                                {/* 💰 TAB 3: KOMISI & TARIF */}
+                                {/* TAB 3: KOMISI & TARIF */}
                                 {activeTab === 'komisi' && (
                                     <div className="grid grid-cols-3 gap-4 p-4 rounded-xl border transition-colors duration-150" style={{ backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc', borderColor: isDarkMode ? '#334155' : '#e2e8f0' }}>
                                         <div>
@@ -428,7 +579,7 @@ const MasterAgen = () => {
                                     </div>
                                 )}
 
-                                {/* 🛡️ TAB 4: PAJAK & LIMIT */}
+                                {/* TAB 4: PAJAK & LIMIT */}
                                 {activeTab === 'pajak' && (
                                     <div className="grid grid-cols-2 gap-4 p-4 rounded-xl border transition-colors duration-150" style={{ backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc', borderColor: isDarkMode ? '#334155' : '#e2e8f0' }}>
                                         <div>
@@ -441,11 +592,11 @@ const MasterAgen = () => {
                                         </div>
                                         <div className="col-span-2">
                                             <label className="font-black text-gray-400 block mb-1">ALAMAT NPWP</label>
-                                            <textarea className="w-full p-2 border rounded font-medium outline-none" rows={2} style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', color: isDarkMode ? '#ffffff' : '#000000', borderColor: isDarkMode ? '#475569' : '#cbd5e1' }} value={formData.agen_alamatnpwp || ''} onChange={e => updateField('agen_alamatnpwp', e.target.value)} />
+                                            <textarea className="w-full p-2 border rounded font-medium outline-none uppercase" rows={2} style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', color: isDarkMode ? '#ffffff' : '#000000', borderColor: isDarkMode ? '#475569' : '#cbd5e1' }} value={formData.agen_alamatnpwp || ''} onChange={e => updateField('agen_alamatnpwp', e.target.value)} />
                                         </div>
                                         <div>
                                             <label className="font-black text-gray-400 block mb-1">STATUS NPWP</label>
-                                            <select className="w-full p-2 border rounded font-bold outline-none" style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', color: isDarkMode ? '#indigo-400' : '#000000', borderColor: isDarkMode ? '#475569' : '#cbd5e1' }} value={formData.agen_npwppribadyn} onChange={e => updateField('agen_npwppribadyn', e.target.value)}>
+                                            <select className="w-full p-2 border rounded font-bold outline-none cursor-pointer" style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', color: isDarkMode ? '#ffffff' : '#000000', borderColor: isDarkMode ? '#475569' : '#cbd5e1' }} value={formData.agen_npwppribadyn} onChange={e => updateField('agen_npwppribadyn', e.target.value)}>
                                                 <option value="Y">Pribadi (PPh 21)</option>
                                                 <option value="N">Badan Usaha (PPh 23)</option>
                                             </select>
@@ -465,7 +616,7 @@ const MasterAgen = () => {
                                     </div>
                                 )}
 
-                                {/* ⚙️ TAB 5: PARAMETER SISTEM */}
+                                {/* TAB 5: PARAMETER SISTEM */}
                                 {activeTab === 'sistem' && (
                                     <div className="grid grid-cols-2 gap-4 p-4 rounded-xl border transition-colors duration-150" style={{ backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc', borderColor: isDarkMode ? '#334155' : '#e2e8f0' }}>
                                         <div>
@@ -478,7 +629,7 @@ const MasterAgen = () => {
                                         </div>
                                         <div>
                                             <label className="font-black text-gray-400 block mb-1">STATUS AKTIF (Y/N)</label>
-                                            <select className="w-full p-2 border rounded font-bold outline-none" style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', color: isDarkMode ? '#ffffff' : '#000000', borderColor: isDarkMode ? '#475569' : '#cbd5e1' }} value={formData.agen_aktifyn} onChange={e => updateField('agen_aktifyn', e.target.value)}>
+                                            <select className="w-full p-2 border rounded font-bold outline-none cursor-pointer" style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', color: isDarkMode ? '#ffffff' : '#000000', borderColor: isDarkMode ? '#475569' : '#cbd5e1' }} value={formData.agen_aktifyn} onChange={e => updateField('agen_aktifyn', e.target.value)}>
                                                 <option value="Y">✅ AKTIF OPERASIONAL</option>
                                                 <option value="N">❌ NON-AKTIF (SUSPEND)</option>
                                             </select>
@@ -509,7 +660,7 @@ const MasterAgen = () => {
                                         </div>
                                         <div>
                                             <label className="font-black text-gray-400 block mb-1">JEMPUT PUSAT Y/N</label>
-                                            <select className="w-full p-2 border rounded font-bold outline-none" style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', color: isDarkMode ? '#ffffff' : '#000000', borderColor: isDarkMode ? '#475569' : '#cbd5e1' }} value={formData.agen_jemputpusatyn} onChange={e => updateField('agen_jemputpusatyn', e.target.value)}>
+                                            <select className="w-full p-2 border rounded font-bold outline-none cursor-pointer" style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', color: isDarkMode ? '#ffffff' : '#000000', borderColor: isDarkMode ? '#475569' : '#cbd5e1' }} value={formData.agen_jemputpusatyn} onChange={e => updateField('agen_jemputpusatyn', e.target.value)}>
                                                 <option value="Y">YES</option>
                                                 <option value="N">NO</option>
                                             </select>
@@ -518,7 +669,7 @@ const MasterAgen = () => {
                                 )}
                             </div>
 
-                            {/* 🚀 FOOTER ACTION STICKY - CERAH TOTAL 100% (ANTI-HITAM) */}
+                            {/* FOOTER ACTION */}
                             <div
                                 className="flex justify-end gap-3 pt-3 border-t mt-auto rounded-b-xl transition-all duration-150"
                                 style={{
@@ -526,10 +677,10 @@ const MasterAgen = () => {
                                     borderColor: isDarkMode ? '#334155' : '#e2e8f0'
                                 }}
                             >
-                                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 rounded-lg border font-bold hover:scale-105 active:scale-95 transition" style={{ backgroundColor: isDarkMode ? '#334155' : '#f1f5f9', color: isDarkMode ? '#e2e8f0' : '#475569', borderColor: isDarkMode ? '#475569' : '#cbd5e1' }}>
+                                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 rounded-lg border font-bold hover:scale-105 active:scale-95 transition cursor-pointer" style={{ backgroundColor: isDarkMode ? '#334155' : '#f1f5f9', color: isDarkMode ? '#e2e8f0' : '#475569', borderColor: isDarkMode ? '#475569' : '#cbd5e1' }}>
                                     Batal
                                 </button>
-                                <button type="submit" className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2 font-black shadow-md transition hover:scale-105 active:scale-95">
+                                <button type="submit" className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2 font-black shadow-md transition hover:scale-105 active:scale-95 cursor-pointer">
                                     <Save size={14} />
                                     Simpan Agen
                                 </button>

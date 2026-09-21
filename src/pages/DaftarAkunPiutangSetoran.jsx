@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import api from '../api/axios';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
-import { X, Building2, Edit3 } from 'lucide-react';
+import { X, Building2, Edit3, Filter, RefreshCw, RotateCcw } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 const DaftarAkunPiutangSetoran = () => {
@@ -11,6 +11,11 @@ const DaftarAkunPiutangSetoran = () => {
     const [stt, setStt] = useState('2'); // '2' = Cabang, '3' = Agen
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    // 🌟 STATE TOGGLE FILTER & PARAMETER FILTER
+    const [showFilter, setShowFilter] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filterMappingStatus, setFilterMappingStatus] = useState('');
 
     // Dropdown Data
     const [coaList, setCoaList] = useState([]);
@@ -47,7 +52,12 @@ const DaftarAkunPiutangSetoran = () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await api.get(`/gl/agen-ca?stt=${statusType}`, {
+            let url = `/gl/agen-ca?stt=${statusType}`;
+
+            if (searchQuery) url += `&q=${encodeURIComponent(searchQuery)}`;
+            if (filterMappingStatus) url += `&mapping_status=${encodeURIComponent(filterMappingStatus)}`;
+
+            const res = await api.get(url, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setData(res.data?.data || []);
@@ -65,6 +75,25 @@ const DaftarAkunPiutangSetoran = () => {
     useEffect(() => {
         fetchAgenCA(stt);
     }, [stt]);
+
+    const handleApplyFilter = (e) => {
+        e.preventDefault();
+        fetchAgenCA(stt);
+    };
+
+    const handleResetFilter = () => {
+        setSearchQuery('');
+        setFilterMappingStatus('');
+
+        const token = localStorage.getItem('token');
+        setLoading(true);
+        api.get(`/gl/agen-ca?stt=${stt}`, {
+            headers: { Authorization: `Bearer ${token}` }
+        })
+            .then(res => setData(res.data?.data || []))
+            .catch(err => console.error(err))
+            .finally(() => setLoading(false));
+    };
 
     const handleOpenEdit = (agen, targetType, currentCode) => {
         let title = '';
@@ -116,7 +145,6 @@ const DaftarAkunPiutangSetoran = () => {
         }
     };
 
-    // 🌟 Definisi Kolom Sesuai Standard DataTableTemplate
     const columns = [
         {
             header: 'KODE',
@@ -138,6 +166,7 @@ const DaftarAkunPiutangSetoran = () => {
             accessor: 'agenc_caid',
             render: (item) => item.agenc_caid ? (
                 <button
+                    type="button"
                     onClick={() => handleOpenEdit(item, 'P', item.agenc_caid)}
                     className="font-mono font-bold text-indigo-600 hover:underline cursor-pointer"
                 >
@@ -145,6 +174,7 @@ const DaftarAkunPiutangSetoran = () => {
                 </button>
             ) : (
                 <button
+                    type="button"
                     onClick={() => handleOpenEdit(item, 'P', '')}
                     className="px-2.5 py-1 bg-sky-50 text-sky-600 border border-sky-200 rounded-lg text-[11px] font-bold hover:bg-sky-100 transition cursor-pointer flex items-center gap-1 mx-auto"
                 >
@@ -157,6 +187,7 @@ const DaftarAkunPiutangSetoran = () => {
             accessor: 'agenc_caid_setoran',
             render: (item) => item.agenc_caid_setoran ? (
                 <button
+                    type="button"
                     onClick={() => handleOpenEdit(item, 'S', item.agenc_caid_setoran)}
                     className="font-mono font-bold text-indigo-600 hover:underline cursor-pointer"
                 >
@@ -164,6 +195,7 @@ const DaftarAkunPiutangSetoran = () => {
                 </button>
             ) : (
                 <button
+                    type="button"
                     onClick={() => handleOpenEdit(item, 'S', '')}
                     className="px-2.5 py-1 bg-sky-50 text-sky-600 border border-sky-200 rounded-lg text-[11px] font-bold hover:bg-sky-100 transition cursor-pointer flex items-center gap-1 mx-auto"
                 >
@@ -176,6 +208,7 @@ const DaftarAkunPiutangSetoran = () => {
             accessor: 'agenc_item_id',
             render: (item) => item.agenc_item_id ? (
                 <button
+                    type="button"
                     onClick={() => handleOpenEdit(item, 'I', item.agenc_item_id)}
                     className="font-mono font-bold text-indigo-600 hover:underline cursor-pointer"
                 >
@@ -183,6 +216,7 @@ const DaftarAkunPiutangSetoran = () => {
                 </button>
             ) : (
                 <button
+                    type="button"
                     onClick={() => handleOpenEdit(item, 'I', '')}
                     className="px-2.5 py-1 bg-sky-50 text-sky-600 border border-sky-200 rounded-lg text-[11px] font-bold hover:bg-sky-100 transition cursor-pointer flex items-center gap-1 mx-auto"
                 >
@@ -192,7 +226,6 @@ const DaftarAkunPiutangSetoran = () => {
         },
     ];
 
-    // Modal Portal Edit Mapping
     const modalElement = isModalOpen ? (
         <div
             className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/70"
@@ -277,7 +310,6 @@ const DaftarAkunPiutangSetoran = () => {
         </div>
     ) : null;
 
-    // 🎯 Handler khusus untuk tombol aksi bawaan template
     const handleEditAction = (item) => {
         Swal.fire({
             title: 'INFO MAPPING',
@@ -302,14 +334,12 @@ const DaftarAkunPiutangSetoran = () => {
             confirmButtonText: 'Ya, Reset!',
             cancelButtonText: 'Batal',
             didOpen: () => {
-                // Memastikan Swal selalu paling depan dan bisa diklik
                 const container = document.querySelector('.swal2-container');
                 if (container) container.style.zIndex = '9999999';
             }
         }).then(async (result) => {
             if (result.isConfirmed) {
                 try {
-                    // Panggil Endpoint DELETE
                     await api.delete(`/gl/agen-ca/${item.agen_id}`);
 
                     Swal.fire({
@@ -322,7 +352,6 @@ const DaftarAkunPiutangSetoran = () => {
                         }
                     });
 
-                    // Reload data tabel
                     fetchAgenCA(stt);
                 } catch (err) {
                     Swal.fire({
@@ -370,6 +399,61 @@ const DaftarAkunPiutangSetoran = () => {
                 </div>
             </div>
 
+            {/* 🌟 PANEL FILTER KONDISIONAL */}
+            {showFilter && (
+                <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all">
+                    <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
+                        <Filter size={16} className="text-sky-600" />
+                        FILTER AKUN PIUTANG & SETORAN
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Input Pencarian */}
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">CARI KODE / NAMA {stt === '2' ? 'CABANG' : 'AGEN'}</label>
+                            <input
+                                type="text"
+                                placeholder="Ketik kode atau nama..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            />
+                        </div>
+
+                        {/* Filter Kelengkapan Mapping */}
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">STATUS KELENGKAPAN MAPPING</label>
+                            <select
+                                value={filterMappingStatus}
+                                onChange={(e) => setFilterMappingStatus(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500 cursor-pointer"
+                            >
+                                <option value="">-- SEMUA STATUS MAPPING --</option>
+                                <option value="COMPLETE">Lengkap (Semua Terisi)</option>
+                                <option value="INCOMPLETE">Belum Lengkap / Kosong</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Tombol Aksi Filter */}
+                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={handleResetFilter}
+                            className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer flex items-center gap-1.5"
+                        >
+                            <RotateCcw size={14} /> RESET
+                        </button>
+                        <button
+                            type="submit"
+                            className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5"
+                        >
+                            <RefreshCw size={14} /> REFRESH DATA
+                        </button>
+                    </div>
+                </form>
+            )}
+
             {/* DataTableTemplate Standar */}
             <DataTableTemplate
                 title="DAFTAR KODE AKUN PIUTANG & SETORAN CABANG / AGEN"
@@ -379,6 +463,7 @@ const DaftarAkunPiutangSetoran = () => {
                 isDarkMode={isDarkMode}
                 onEdit={handleEditAction}
                 onDelete={handleDeleteMapping}
+                onFilter={() => setShowFilter(prev => !prev)}
             />
 
             {modalElement && ReactDOM.createPortal(modalElement, document.body)}

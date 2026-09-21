@@ -3,13 +3,17 @@ import ReactDOM from 'react-dom';
 import api from '../api/axios';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
-import { Filter, Scan, CheckCircle2, X } from 'lucide-react';
+import { Filter, Scan, CheckCircle2, X, RefreshCw, RotateCcw } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 const KalkulasiKomisiSopir = () => {
     const { isDarkMode } = useDarkMode();
     const [data, setData] = useState([]);
+    const [driverList, setDriverList] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    // 🌟 State Buka-Tutup (Toggle) Filter
+    const [showFilter, setShowFilter] = useState(false);
 
     // Filter State
     const today = new Date().toISOString().split('T')[0];
@@ -24,6 +28,18 @@ const KalkulasiKomisiSopir = () => {
     const [spDetail, setSpDetail] = useState(null);
     const [inputKomisi, setInputKomisi] = useState(0);
     const [inputKeterangan, setInputKeterangan] = useState('');
+
+    const fetchDriverList = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await api.get('/gl/insentif-loper/driver-options', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setDriverList(res.data?.data || []);
+        } catch (err) {
+            console.error("Gagal load driver options:", err);
+        }
+    };
 
     const fetchKomisiData = async () => {
         setLoading(true);
@@ -46,6 +62,10 @@ const KalkulasiKomisiSopir = () => {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        fetchDriverList();
+    }, []);
 
     useEffect(() => {
         fetchKomisiData();
@@ -198,7 +218,6 @@ const KalkulasiKomisiSopir = () => {
         return dateString;
     };
 
-    // 🌟 DEFINISI KOLOM DISESUAIKAN DENGAN ACCESSOR UB_...
     const columns = [
         {
             header: 'NO. SP / BTT',
@@ -232,7 +251,6 @@ const KalkulasiKomisiSopir = () => {
         }
     ];
 
-    // Modal Popup
     const modalElement = isModalOpen ? (
         <div
             className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs transition-opacity"
@@ -334,64 +352,67 @@ const KalkulasiKomisiSopir = () => {
 
     return (
         <div className="space-y-4">
-            {/* Filter Panel */}
-            <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs">
-                <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
-                    <Filter size={16} className="text-sky-600" />
-                    FILTER KALKULASI KOMISI SOPIR
-                </div>
+            {/* 🌟 Panel Filter Bersyarat (Toggle Show/Hide) */}
+            {showFilter && (
+                <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all">
+                    <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
+                        <Filter size={16} className="text-sky-600" />
+                        FILTER KALKULASI KOMISI SOPIR
+                    </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                            <label className="font-bold text-slate-500 block mb-1">TGL MULAI</label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                                <label className="font-bold text-slate-500 block mb-1">TGL MULAI</label>
+                                <input
+                                    type="date"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                                />
+                            </div>
+                            <div className="flex-1">
+                                <label className="font-bold text-slate-500 block mb-1">TGL SAMPAI</label>
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">CARI NO. SP / BTT</label>
                             <input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
+                                type="text"
+                                placeholder="Ketik Nomor SP..."
+                                value={searchNoSP}
+                                onChange={(e) => setSearchNoSP(e.target.value)}
                                 className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
                             />
                         </div>
-                        <div className="flex-1">
-                            <label className="font-bold text-slate-500 block mb-1">TGL SAMPAI</label>
-                            <input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                            />
+
+                        <div className="flex items-end gap-2">
+                            <button
+                                type="submit"
+                                className="flex-1 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center justify-center gap-1.5"
+                            >
+                                <RefreshCw size={14} /> TAMPILKAN
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleResetFilter}
+                                className="px-4 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer flex items-center gap-1.5"
+                            >
+                                <RotateCcw size={14} /> RESET
+                            </button>
                         </div>
                     </div>
+                </form>
+            )}
 
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">CARI NO. SP / BTT</label>
-                        <input
-                            type="text"
-                            placeholder="Ketik Nomor SP..."
-                            value={searchNoSP}
-                            onChange={(e) => setSearchNoSP(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                        />
-                    </div>
-
-                    <div className="flex items-end gap-2">
-                        <button
-                            type="submit"
-                            className="flex-1 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer"
-                        >
-                            TAMPILKAN
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleResetFilter}
-                            className="px-4 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer"
-                        >
-                            RESET
-                        </button>
-                    </div>
-                </div>
-            </form>
-
+            {/* 🌟 DataTableTemplate dengan Event Handler onFilter */}
             <DataTableTemplate
                 title="KALKULASI KOMISI SOPIR"
                 columns={columns}
@@ -400,6 +421,7 @@ const KalkulasiKomisiSopir = () => {
                 isDarkMode={isDarkMode}
                 onAdd={handleAdd}
                 onDelete={handleDelete}
+                onFilter={() => setShowFilter(prev => !prev)}
             />
 
             {modalElement && ReactDOM.createPortal(modalElement, document.body)}

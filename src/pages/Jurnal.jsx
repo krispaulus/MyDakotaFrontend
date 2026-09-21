@@ -13,6 +13,9 @@ const Jurnal = () => {
     const [cabangList, setCabangList] = useState([]);
     const [loading, setLoading] = useState(false);
 
+    // 🌟 STATE TOGGLE FILTER (BUKA / TUTUP)
+    const [showFilter, setShowFilter] = useState(false);
+
     // Filter State
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
@@ -186,7 +189,7 @@ const Jurnal = () => {
         });
     };
 
-    // ➕ Tambah / Simpan Perubahan Baris Rincian (Dengan Auto-Merge Akun yang Sama)
+    // ➕ Tambah / Simpan Perubahan Baris Rincian
     const handleAddRow = (e) => {
         if (e) e.preventDefault();
 
@@ -228,24 +231,20 @@ const Jurnal = () => {
         };
 
         if (editingIndex !== null) {
-            // Mode Edit: Perbarui baris yang sedang diedit
             setDetails(details.map((item, idx) => (idx === editingIndex ? updatedItem : item)));
             setEditingIndex(null);
         } else {
-            // Mode Tambah: Cek apakah Kode Akun & Cabang sudah ada di tabel
             const existingIndex = details.findIndex(
                 d => d.tjurd_acccode === entryRow.tjurd_acccode &&
                     String(d.tjurd_agenid) === String(entryRow.tjurd_agenid)
             );
 
             if (existingIndex !== -1) {
-                // 💡 JIKA SUDAH ADA: Gabungkan nominal Debet & Kredit
                 const updatedDetails = [...details];
                 updatedDetails[existingIndex] = {
                     ...updatedDetails[existingIndex],
                     tjurd_debet: (parseFloat(updatedDetails[existingIndex].tjurd_debet) || 0) + debet,
                     tjurd_kredit: (parseFloat(updatedDetails[existingIndex].tjurd_kredit) || 0) + kredit,
-                    // Gabungkan keterangan jika berbeda
                     tjurd_keterangan: updatedDetails[existingIndex].tjurd_keterangan || entryRow.tjurd_keterangan
                 };
                 setDetails(updatedDetails);
@@ -262,12 +261,10 @@ const Jurnal = () => {
                     }
                 });
             } else {
-                // Jika belum ada, tambahkan sebagai baris baru
                 setDetails((prevDetails) => [...prevDetails, updatedItem]);
             }
         }
 
-        // Reset Form Input
         setCoaKeyword('');
         setEntryRow({
             tjurd_acccode: '',
@@ -280,7 +277,7 @@ const Jurnal = () => {
         });
     };
 
-    // 🗑️ Hapus Baris Rincian dengan Konfirmasi Swal
+    // 🗑️ Hapus Baris Rincian
     const handleDeleteRow = (index) => {
         const row = details[index];
         const accLabel = row ? `${row.tjurd_acccode} (${row.ca_name})` : 'baris ini';
@@ -300,7 +297,6 @@ const Jurnal = () => {
             }
         }).then((result) => {
             if (result.isConfirmed) {
-                // Jika sedang mengedit baris yang dihapus, batalkan mode edit
                 if (editingIndex === index) {
                     setEditingIndex(null);
                     setCoaKeyword('');
@@ -393,7 +389,6 @@ const Jurnal = () => {
         setIsModalOpen(true);
     };
 
-    // Hitung Total Debet, Kredit & Selisih
     const totalDebet = details.reduce((acc, curr) => acc + (parseFloat(curr.tjurd_debet) || 0), 0);
     const totalKredit = details.reduce((acc, curr) => acc + (parseFloat(curr.tjurd_kredit) || 0), 0);
     const selisih = Math.abs(totalDebet - totalKredit);
@@ -402,7 +397,6 @@ const Jurnal = () => {
     const handleSaveForm = async (e) => {
         e.preventDefault();
 
-        // Validasi Mandatory Keterangan Header
         if (!formData.tjurh_keterangan || !formData.tjurh_keterangan.trim()) {
             Swal.fire({
                 title: 'Peringatan',
@@ -740,7 +734,6 @@ const Jurnal = () => {
                                             </td>
                                             <td className="p-2.5 text-center">
                                                 <div className="flex items-center justify-center gap-1.5">
-                                                    {/* Tombol Edit Baris */}
                                                     <button
                                                         type="button"
                                                         onClick={() => handleEditRow(idx)}
@@ -749,8 +742,6 @@ const Jurnal = () => {
                                                     >
                                                         <Edit size={14} />
                                                     </button>
-
-                                                    {/* Tombol Hapus Baris */}
                                                     <button
                                                         type="button"
                                                         onClick={() => handleDeleteRow(idx)}
@@ -797,7 +788,6 @@ const Jurnal = () => {
                         <div className="p-4 bg-sky-50/50 border border-sky-200 rounded-xl space-y-3">
                             <div className="font-bold text-sky-900 text-xs">TAMBAH BARIS RINCIAN:</div>
                             <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
-                                {/* Autocomplete COA */}
                                 <div className="md:col-span-2 relative">
                                     <label className="font-bold text-slate-700 block mb-1">KODE PERKIRAAN (COA):</label>
                                     <div className="relative">
@@ -814,7 +804,6 @@ const Jurnal = () => {
                                         <Search size={14} className="absolute right-3 top-2.5 text-slate-400" />
                                     </div>
 
-                                    {/* Dropdown COA */}
                                     {showCoaDropdown && coaList.length > 0 && (
                                         <div
                                             className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-y-auto divide-y divide-slate-100 max-h-48"
@@ -921,7 +910,7 @@ const Jurnal = () => {
         </div>
     ) : null;
 
-    // Print Voucher Handler Murni Dinamis dari Database
+    // Print Voucher Handler
     const handlePrint = async (item) => {
         try {
             const token = localStorage.getItem('token');
@@ -933,7 +922,6 @@ const Jurnal = () => {
 
             const jDetails = res.data?.details || [];
 
-            // Validasi: jika tidak ada rincian baris di database, hentikan proses cetak
             if (jDetails.length === 0) {
                 Swal.fire({
                     title: 'Rincian Kosong',
@@ -947,16 +935,13 @@ const Jurnal = () => {
                 return;
             }
 
-            // Pisahkan baris Debet & Kredit murni dari data database
             const creditRows = jDetails.filter(d => Number(d.tjurd_kredit) > 0);
             const debitRows = jDetails.filter(d => Number(d.tjurd_debet) > 0);
 
-            // Tentukan akun lawan/sumber dana utama
             const mainCredit = creditRows[0] || {};
             const lawanCode = mainCredit.tjurd_acccode || '-';
             const lawanName = mainCredit.ca_name || '-';
 
-            // Petakan rincian baris transaksi (Debet)
             const details = debitRows.map(d => ({
                 code: d.tjurd_acccode,
                 nama: d.ca_name,
@@ -964,7 +949,6 @@ const Jurnal = () => {
                 nominal: Number(d.tjurd_debet) || 0
             }));
 
-            // Hitung total nilai transaksi
             const totalAmount = item.total_amount ||
                 debitRows.reduce((sum, d) => sum + Number(d.tjurd_debet || 0), 0) ||
                 creditRows.reduce((sum, d) => sum + Number(d.tjurd_kredit || 0), 0);
@@ -996,96 +980,99 @@ const Jurnal = () => {
 
     return (
         <div className="space-y-4">
-            {/* Filter Panel */}
-            <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs">
-                <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
-                    <Filter size={16} className="text-sky-600" />
-                    FILTER JURNAL KEUANGAN
-                </div>
+            {/* 🌟 PANEL FILTER BERSYARAT (TOGGLE BUKA/TUTUP) */}
+            {showFilter && (
+                <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all">
+                    <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
+                        <Filter size={16} className="text-sky-600" />
+                        FILTER JURNAL KEUANGAN
+                    </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                            <label className="font-bold text-slate-500 block mb-1">TGL MULAI</label>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                                <label className="font-bold text-slate-500 block mb-1">TGL MULAI</label>
+                                <input
+                                    type="date"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                                />
+                            </div>
+                            <div className="flex-1">
+                                <label className="font-bold text-slate-500 block mb-1">TGL SAMPAI</label>
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">CABANG / AGEN</label>
+                            <select
+                                value={selectedCabang}
+                                onChange={(e) => setSelectedCabang(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            >
+                                <option value="">-- SEMUA CABANG --</option>
+                                {cabangList.map((cabang, idx) => (
+                                    <option key={idx} value={cabang.agen_nama || cabang.AgenNama}>
+                                        {cabang.agen_nama || cabang.AgenNama}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">TIPE JURNAL</label>
+                            <select
+                                value={selectedType}
+                                onChange={(e) => setSelectedType(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            >
+                                <option value="">-- SEMUA TIPE --</option>
+                                <option value="B">Pembelian (B)</option>
+                                <option value="J">Penjualan (J)</option>
+                                <option value="T">Terima Kas (T)</option>
+                                <option value="K">Keluar Kas (K)</option>
+                                <option value="M">Memorial (M)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">CARI NO. JURNAL</label>
                             <input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
+                                type="text"
+                                placeholder="Ketik Nomor Jurnal..."
+                                value={searchNoJurnal}
+                                onChange={(e) => setSearchNoJurnal(e.target.value)}
                                 className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
                             />
                         </div>
-                        <div className="flex-1">
-                            <label className="font-bold text-slate-500 block mb-1">TGL SAMPAI</label>
-                            <input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                            />
-                        </div>
                     </div>
 
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">CABANG / AGEN</label>
-                        <select
-                            value={selectedCabang}
-                            onChange={(e) => setSelectedCabang(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={handleResetFilter}
+                            className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer"
                         >
-                            <option value="">-- SEMUA CABANG --</option>
-                            {cabangList.map((cabang, idx) => (
-                                <option key={idx} value={cabang.agen_nama || cabang.AgenNama}>
-                                    {cabang.agen_nama || cabang.AgenNama}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">TIPE JURNAL</label>
-                        <select
-                            value={selectedType}
-                            onChange={(e) => setSelectedType(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            RESET
+                        </button>
+                        <button
+                            type="submit"
+                            className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer"
                         >
-                            <option value="">-- SEMUA TIPE --</option>
-                            <option value="B">Pembelian (B)</option>
-                            <option value="J">Penjualan (J)</option>
-                            <option value="T">Terima Kas (T)</option>
-                            <option value="K">Keluar Kas (K)</option>
-                            <option value="M">Memorial (M)</option>
-                        </select>
+                            TAMPILKAN JURNAL
+                        </button>
                     </div>
+                </form>
+            )}
 
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">CARI NO. JURNAL</label>
-                        <input
-                            type="text"
-                            placeholder="Ketik Nomor Jurnal..."
-                            value={searchNoJurnal}
-                            onChange={(e) => setSearchNoJurnal(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                        />
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                    <button
-                        type="button"
-                        onClick={handleResetFilter}
-                        className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer"
-                    >
-                        RESET
-                    </button>
-                    <button
-                        type="submit"
-                        className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer"
-                    >
-                        TAMPILKAN JURNAL
-                    </button>
-                </div>
-            </form>
-
+            {/* 🌟 DATA TABLE TEMPLATE DENGAN PROP onFilter */}
             <DataTableTemplate
                 title="JURNAL KEUANGAN GENERAL LEDGER"
                 columns={columns}
@@ -1095,9 +1082,11 @@ const Jurnal = () => {
                 onAdd={handleAdd}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
+                onFilter={() => setShowFilter(prev => !prev)}
             />
 
             {modalElement && ReactDOM.createPortal(modalElement, document.body)}
+
             {/* MODAL PRINT VOUCHER */}
             {isPrintOpen && printData && ReactDOM.createPortal(
                 <div className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs transition-opacity" style={{ zIndex: 999999 }}>
@@ -1119,7 +1108,7 @@ const Jurnal = () => {
                             </button>
                         </div>
 
-                        {/* Layout Voucher Sesuai Gambar */}
+                        {/* Layout Voucher */}
                         <div className="border border-slate-300 rounded-xl p-8 space-y-6 bg-white text-xs">
                             <div className="flex justify-between items-start">
                                 <div>
@@ -1135,7 +1124,6 @@ const Jurnal = () => {
                                         className="h-10 w-auto object-contain"
                                     />
                                 </div>
-
                             </div>
 
                             <div className="text-center">
@@ -1161,7 +1149,6 @@ const Jurnal = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {/* Baris Kredit (Sumber Bank/Kas) */}
                                     <tr>
                                         <td className="p-2 border border-slate-400 font-mono">{printData.lawanCode}</td>
                                         <td className="p-2 border border-slate-400 text-center">1</td>
@@ -1169,7 +1156,6 @@ const Jurnal = () => {
                                         <td className="p-2 border border-slate-400 text-right font-mono">0.00</td>
                                         <td className="p-2 border border-slate-400 text-right font-mono">{printData.total.toLocaleString('id-ID')},00</td>
                                     </tr>
-                                    {/* Baris Debet (Rincian Biaya/Uang Muka) */}
                                     {printData.details.map((d, i) => (
                                         <tr key={i}>
                                             <td className="p-2 border border-slate-400 font-mono">{d.code}</td>

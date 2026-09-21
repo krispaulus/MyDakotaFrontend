@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import api from '../api/axios';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
-import { Filter, Printer, X, ArrowLeft, Search, Trash2 } from 'lucide-react';
+import { Filter, Printer, X, ArrowLeft, Search, Trash2, RotateCcw, RefreshCw } from 'lucide-react';
 import Swal from 'sweetalert2';
 import logoDakota from '../assets/new_logo 2.png';
 
@@ -31,6 +31,9 @@ const KasMasukKeluar = () => {
     const [data, setData] = useState([]);
     const [cabangList, setCabangList] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    // 🌟 STATE TOGGLE FILTER (BUKA / TUTUP)
+    const [showFilter, setShowFilter] = useState(false);
 
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
@@ -328,7 +331,6 @@ const KasMasukKeluar = () => {
 
             const res = await api.post(endpoint, payload, { headers: { Authorization: `Bearer ${token}` } });
 
-            // Update ID transaksi yang baru di-generate dari backend
             const savedNoTrans = res.data?.cb_id || res.data?.no_trans || formData.cb_id;
             setFormData(prev => ({ ...prev, cb_id: savedNoTrans }));
             setIsEditMode(true);
@@ -349,7 +351,6 @@ const KasMasukKeluar = () => {
         }
     };
 
-    // Modal Posting & Search Bank
     const openPostingModal = (item) => {
         setSelectedItemForPosting(item);
         setSumberDana('kas operasional dk');
@@ -359,7 +360,6 @@ const KasMasukKeluar = () => {
         setIsPostingModalOpen(true);
     };
 
-    // 🏦 Ambil List Bank Dinamis dari Database (Kirimkan PT-ID Aktif)
     const handleSearchBank = async (query = '') => {
         setBankSearch(query);
         setShowBankDropdown(true);
@@ -371,7 +371,6 @@ const KasMasukKeluar = () => {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const resultData = res.data?.data || [];
-            console.log("Daftar Bank dari Database:", resultData);
             setBankOptions(Array.isArray(resultData) ? resultData : []);
         } catch (err) {
             console.error("Gagal memuat bank dari database:", err);
@@ -455,8 +454,6 @@ const KasMasukKeluar = () => {
         });
     };
 
-    // Print Handler
-    // Print Voucher Handler 100% Dinamis Tanpa Hardcode
     const handlePrint = async (item) => {
         try {
             const token = localStorage.getItem('token');
@@ -467,7 +464,6 @@ const KasMasukKeluar = () => {
             let lawanCode = '-';
             let totalAmount = Number(item.total_amount || item.cb_total || 0);
 
-            // 1. Jika sudah posting dan memiliki Nomor Jurnal
             if (item.cb_nojurnal && item.cb_nojurnal !== '-' && item.cb_nojurnal !== '') {
                 const jRes = await api.get(`/gl/jurnal/detail/${encodeURIComponent(item.cb_nojurnal)}?pt_id=${encodeURIComponent(ptId)}`, {
                     headers: { Authorization: `Bearer ${token}` }
@@ -475,7 +471,6 @@ const KasMasukKeluar = () => {
 
                 const jDetails = jRes.data?.details || [];
 
-                // Cari baris akun lawan / sumber dana
                 const lawanRow = item.cb_tipe === 'K'
                     ? jDetails.find(d => Number(d.tjurd_kredit) > 0)
                     : jDetails.find(d => Number(d.tjurd_debet) > 0);
@@ -485,7 +480,6 @@ const KasMasukKeluar = () => {
                     lawanCode = lawanRow.tjurd_acccode || '-';
                 }
 
-                // Ambil baris rincian transaksi
                 const detailRows = item.cb_tipe === 'K'
                     ? jDetails.filter(d => Number(d.tjurd_debet) > 0)
                     : jDetails.filter(d => Number(d.tjurd_kredit) > 0);
@@ -501,7 +495,6 @@ const KasMasukKeluar = () => {
                     totalAmount = details.reduce((sum, d) => sum + Number(d.nominal), 0);
                 }
             } else {
-                // 2. Jika belum posting (ambil rincian dari data item kas aktif)
                 const rawDetails = item.details || item.rincian || [];
                 if (rawDetails.length > 0) {
                     details = rawDetails.map(d => ({
@@ -512,7 +505,6 @@ const KasMasukKeluar = () => {
                     }));
                     totalAmount = details.reduce((sum, d) => sum + Number(d.nominal), 0);
                 } else {
-                    // Validasi: jika tidak ada detail sama sekali
                     Swal.fire({
                         title: 'Data Belum Lengkap',
                         text: 'Transaksi ini belum diposting dan tidak memiliki rincian biaya.',
@@ -640,7 +632,6 @@ const KasMasukKeluar = () => {
         }
     ];
 
-    // Modal Input & Wizard
     const modalElement = isModalOpen ? (
         <div className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs transition-opacity" style={{ zIndex: 99999 }}>
             <div className={`w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden transition-all transform ${isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-slate-800'}`}>
@@ -836,10 +827,8 @@ const KasMasukKeluar = () => {
                             )}
                         </div>
 
-                        {/* Tombol Aksi Utama (SIMPAN, POSTING, CETAK, KELUAR) */}
                         <div className="flex items-center justify-between pt-6 border-t border-slate-100">
                             <div className="flex items-center gap-3">
-                                {/* Tombol SIMPAN selalu aktif */}
                                 <button
                                     type="button"
                                     onClick={handleSaveForm}
@@ -848,12 +837,11 @@ const KasMasukKeluar = () => {
                                     SIMPAN
                                 </button>
 
-                                {/* Tombol POSTING: Hanya ENABLE jika sudah ada nomor transaksi (tersimpan) dan belum diposting */}
                                 <button
                                     type="button"
                                     disabled={!formData.cb_id || formData.cb_id === 'AUTO GENERATE' || formData.cb_postyn === 'Y'}
                                     onClick={(e) => {
-                                        e.currentTarget.blur(); // Mencegah focus trap aria-hidden
+                                        e.currentTarget.blur();
                                         openPostingModal(formData);
                                     }}
                                     className={`px-8 py-2.5 font-bold rounded-lg transition uppercase ${!formData.cb_id || formData.cb_id === 'AUTO GENERATE' || formData.cb_postyn === 'Y'
@@ -865,7 +853,6 @@ const KasMasukKeluar = () => {
                                     POSTING
                                 </button>
 
-                                {/* Tombol CETAK: Hanya ENABLE jika transaksi sudah tersimpan */}
                                 <button
                                     type="button"
                                     disabled={!formData.cb_id || formData.cb_id === 'AUTO GENERATE'}
@@ -890,14 +877,12 @@ const KasMasukKeluar = () => {
                                 KELUAR
                             </button>
                         </div>
-
                     </div>
                 )}
             </div>
         </div>
     ) : null;
 
-    // Modal Konfirmasi Posting dengan Search Bank
     const postingModalElement = isPostingModalOpen ? (
         <div className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs transition-opacity" style={{ zIndex: 999999 }}>
             <div className="w-full max-w-md rounded-2xl shadow-2xl bg-white text-slate-800 p-6 space-y-4">
@@ -918,7 +903,6 @@ const KasMasukKeluar = () => {
                         </label>
                     ))}
 
-                    {/* Radio Bank dengan Dropdown Dinamis dari Database */}
                     <div className={`p-3 rounded-xl border transition ${sumberDana === 'bank' ? 'border-sky-500 bg-sky-50/50' : 'border-slate-200'}`}>
                         <label className="flex items-center gap-3 cursor-pointer">
                             <input
@@ -930,14 +914,13 @@ const KasMasukKeluar = () => {
                                     setSumberDana('bank');
                                     setSelectedBank(null);
                                     setBankSearch('');
-                                    handleSearchBank(''); // 👈 Tarik data langsung saat radio di klik
+                                    handleSearchBank('');
                                 }}
                                 className="w-4 h-4 text-sky-600 cursor-pointer"
                             />
                             <span className="font-bold text-slate-800">BANK</span>
                         </label>
 
-                        {/* Indikator Bank yang Dipilih */}
                         {selectedBank && (
                             <div className="text-xs text-sky-600 font-bold italic mt-2 ml-7 bg-white p-2 rounded-lg border border-sky-200 flex items-center justify-between shadow-xs">
                                 <span>✓ {selectedBank.name} ({selectedBank.code})</span>
@@ -978,13 +961,9 @@ const KasMasukKeluar = () => {
                                         )}
                                     </div>
                                 )}
-
                             </div>
                         )}
                     </div>
-
-
-
                 </div>
 
                 <div className="flex items-center justify-center gap-3 pt-4 border-t border-slate-100">
@@ -999,7 +978,6 @@ const KasMasukKeluar = () => {
         </div>
     ) : null;
 
-    // Template Print Voucher
     const printModalElement = isPrintOpen && printData ? (
         <div className="fixed inset-0 z-50 bg-white overflow-y-auto p-8 print:p-0">
             <div className="max-w-4xl mx-auto flex justify-between items-center mb-6 pb-4 border-b print:hidden">
@@ -1091,7 +1069,6 @@ const KasMasukKeluar = () => {
         </div>
     ) : null;
 
-    // 🗑️ Fungsi Batalkan / Void Transaksi Kas
     const handleDelete = (item) => {
         Swal.fire({
             title: 'Batalkan Transaksi Kas?',
@@ -1141,59 +1118,63 @@ const KasMasukKeluar = () => {
 
     return (
         <div className="space-y-4">
-            <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs">
-                <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
-                    <Filter size={16} className="text-sky-600" />
-                    FILTER PENCATATAN CASH - BANK
-                </div>
+            {/* 🌟 PANEL FILTER BERSYARAT (TOGGLE BUKA/TUTUP) */}
+            {showFilter && (
+                <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all">
+                    <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
+                        <Filter size={16} className="text-sky-600" />
+                        FILTER PENCATATAN CASH - BANK
+                    </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                            <label className="font-bold text-slate-500 block mb-1">TGL MULAI</label>
-                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500" />
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                                <label className="font-bold text-slate-500 block mb-1">TGL MULAI</label>
+                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500" />
+                            </div>
+                            <div className="flex-1">
+                                <label className="font-bold text-slate-500 block mb-1">TGL SAMPAI</label>
+                                <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500" />
+                            </div>
                         </div>
-                        <div className="flex-1">
-                            <label className="font-bold text-slate-500 block mb-1">TGL SAMPAI</label>
-                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500" />
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">CABANG / TRANSAKSI</label>
+                            <select value={selectedCabang} onChange={(e) => setSelectedCabang(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500">
+                                <option value="">-- SEMUA CABANG --</option>
+                                {cabangList.map((cabang, idx) => (
+                                    <option key={idx} value={cabang.agen_nama || cabang.AgenNama}>{cabang.agen_nama || cabang.AgenNama}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">JENIS TRANSAKSI</label>
+                            <select value={selectedTipe} onChange={(e) => setSelectedTipe(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500">
+                                <option value="">-- SEMUA TIPE --</option>
+                                <option value="K">Keluar Kas (K)</option>
+                                <option value="T">Terima Kas (T)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">NO. TRANSAKSI</label>
+                            <input type="text" placeholder="Ketik No Transaksi..." value={searchNoTrans} onChange={(e) => setSearchNoTrans(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500" />
                         </div>
                     </div>
 
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">CABANG / TRANSAKSI</label>
-                        <select value={selectedCabang} onChange={(e) => setSelectedCabang(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500">
-                            <option value="">-- SEMUA CABANG --</option>
-                            {cabangList.map((cabang, idx) => (
-                                <option key={idx} value={cabang.agen_nama || cabang.AgenNama}>{cabang.agen_nama || cabang.AgenNama}</option>
-                            ))}
-                        </select>
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                        <button type="button" onClick={handleResetFilter} className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer flex items-center gap-1.5">
+                            <RotateCcw size={14} /> RESET
+                        </button>
+                        <button type="submit" className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5">
+                            <RefreshCw size={14} /> TAMPILKAN TRANSAKSI
+                        </button>
                     </div>
+                </form>
+            )}
 
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">JENIS TRANSAKSI</label>
-                        <select value={selectedTipe} onChange={(e) => setSelectedTipe(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500">
-                            <option value="">-- SEMUA TIPE --</option>
-                            <option value="K">Keluar Kas (K)</option>
-                            <option value="T">Terima Kas (T)</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">NO. TRANSAKSI</label>
-                        <input type="text" placeholder="Ketik No Transaksi..." value={searchNoTrans} onChange={(e) => setSearchNoTrans(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500" />
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                    <button type="button" onClick={handleResetFilter} className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer">
-                        RESET
-                    </button>
-                    <button type="submit" className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer">
-                        TAMPILKAN TRANSAKSI
-                    </button>
-                </div>
-            </form>
-
+            {/* 🌟 DataTableTemplate dengan Event onFilter */}
             <DataTableTemplate
                 title="PENCATATAN CASH - BANK"
                 columns={columns}
@@ -1203,6 +1184,7 @@ const KasMasukKeluar = () => {
                 onAdd={handleAdd}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
+                onFilter={() => setShowFilter(prev => !prev)}
             />
 
             {modalElement && ReactDOM.createPortal(modalElement, document.body)}

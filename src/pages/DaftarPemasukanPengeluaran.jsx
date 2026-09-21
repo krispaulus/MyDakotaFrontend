@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import api from '../api/axios';
 import { useDarkMode } from '../context/DarkModeContext';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
-import { X, Receipt } from 'lucide-react';
+import { X, Receipt, Filter, RefreshCw, RotateCcw } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 const DaftarPemasukanPengeluaran = () => {
@@ -11,6 +11,13 @@ const DaftarPemasukanPengeluaran = () => {
     const [data, setData] = useState([]);
     const [catList, setCatList] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    // 🌟 STATE TOGGLE FILTER & PARAMETER FILTER
+    const [showFilter, setShowFilter] = useState(false);
+    const [filterCategory, setFilterCategory] = useState('');
+    const [filterStatus, setFilterStatus] = useState('');
+    const [filterAktif, setFilterAktif] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
 
     // 🌟 STATE MODAL FORM
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -43,7 +50,14 @@ const DaftarPemasukanPengeluaran = () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await api.get('/gl/pemasukan-pengeluaran?limit=500', {
+            let url = `/gl/pemasukan-pengeluaran?limit=500`;
+
+            if (filterCategory) url += `&cat_id=${encodeURIComponent(filterCategory)}`;
+            if (filterStatus) url += `&status=${encodeURIComponent(filterStatus)}`;
+            if (filterAktif) url += `&aktif_yn=${encodeURIComponent(filterAktif)}`;
+            if (searchQuery) url += `&q=${encodeURIComponent(searchQuery)}`;
+
+            const res = await api.get(url, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setData(res.data?.data || []);
@@ -58,6 +72,27 @@ const DaftarPemasukanPengeluaran = () => {
         fetchItems();
         fetchCategories();
     }, []);
+
+    const handleApplyFilter = (e) => {
+        e.preventDefault();
+        fetchItems();
+    };
+
+    const handleResetFilter = () => {
+        setFilterCategory('');
+        setFilterStatus('');
+        setFilterAktif('');
+        setSearchQuery('');
+
+        const token = localStorage.getItem('token');
+        setLoading(true);
+        api.get('/gl/pemasukan-pengeluaran?limit=500', {
+            headers: { Authorization: `Bearer ${token}` }
+        })
+            .then(res => setData(res.data?.data || []))
+            .catch(err => console.error(err))
+            .finally(() => setLoading(false));
+    };
 
     const handleAdd = () => {
         setModalMode('ADD');
@@ -206,7 +241,7 @@ const DaftarPemasukanPengeluaran = () => {
     // Definisi Kolom Tabel
     const columns = [
         { header: 'Kode', accessor: 'item_id', render: (item) => <span className="font-mono font-bold text-sky-600">{item.item_id}</span> },
-        { header: 'Kategori', accessor: 'cat_name', render: (item) => <span className="font-bold text-slate-700">{item.cat_name}</span> },
+        { header: 'Kategori', accessor: 'cat_name', render: (item) => <span className="font-bold text-slate-700">{item.cat_name || '-'}</span> },
         { header: 'Nama Item', accessor: 'item_name', render: (item) => <span className="font-bold uppercase text-slate-800">{item.item_name}</span> },
         {
             header: 'Status',
@@ -394,7 +429,94 @@ const DaftarPemasukanPengeluaran = () => {
     ) : null;
 
     return (
-        <>
+        <div className="space-y-4">
+            {/* 🌟 PANEL FILTER KONDISIONAL */}
+            {showFilter && (
+                <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all">
+                    <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
+                        <Filter size={16} className="text-sky-600" />
+                        FILTER DATA PEMASUKAN DAN PENGELUARAN
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        {/* Pencarian Nama / Kode */}
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">CARI KODE / NAMA ITEM</label>
+                            <input
+                                type="text"
+                                placeholder="Ketik kode atau nama item..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            />
+                        </div>
+
+                        {/* Filter Kategori */}
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">KATEGORI</label>
+                            <select
+                                value={filterCategory}
+                                onChange={(e) => setFilterCategory(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500 cursor-pointer"
+                            >
+                                <option value="">-- SEMUA KATEGORI --</option>
+                                {catList.map((c) => (
+                                    <option key={c.cat_id} value={c.cat_id}>
+                                        {c.cat_name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Filter Status Jenis */}
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">JENIS ITEM</label>
+                            <select
+                                value={filterStatus}
+                                onChange={(e) => setFilterStatus(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500 cursor-pointer"
+                            >
+                                <option value="">-- SEMUA JENIS --</option>
+                                <option value="L">LAIN-LAIN (OPERASIONAL)</option>
+                                <option value="A">AKTIVA TETAP (ASET)</option>
+                            </select>
+                        </div>
+
+                        {/* Filter Status Aktif */}
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">STATUS AKTIF</label>
+                            <select
+                                value={filterAktif}
+                                onChange={(e) => setFilterAktif(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500 cursor-pointer"
+                            >
+                                <option value="">-- SEMUA STATUS --</option>
+                                <option value="Y">AKTIF (YA)</option>
+                                <option value="N">NON-AKTIF (TIDAK)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Tombol Aksi Filter */}
+                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={handleResetFilter}
+                            className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer flex items-center gap-1.5"
+                        >
+                            <RotateCcw size={14} /> RESET
+                        </button>
+                        <button
+                            type="submit"
+                            className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5"
+                        >
+                            <RefreshCw size={14} /> REFRESH DATA
+                        </button>
+                    </div>
+                </form>
+            )}
+
+            {/* TABEL DATA DENGAN EVENT onFilter */}
             <DataTableTemplate
                 title="DAFTAR PEMASUKAN DAN PENGELUARAN"
                 columns={columns}
@@ -404,10 +526,11 @@ const DaftarPemasukanPengeluaran = () => {
                 onAdd={handleAdd}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
+                onFilter={() => setShowFilter(prev => !prev)}
             />
 
             {modalElement && ReactDOM.createPortal(modalElement, document.body)}
-        </>
+        </div>
     );
 };
 

@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import api from '../api/axios';
 import { useDarkMode } from '../context/DarkModeContext';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
-import { X, Building2 } from 'lucide-react';
+import { X, Building2, Filter, RefreshCw, RotateCcw } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 const DaftarBank = () => {
@@ -12,10 +12,16 @@ const DaftarBank = () => {
     const [kotaList, setKotaList] = useState([]);
     const [loading, setLoading] = useState(false);
 
+    // 🌟 STATE TOGGLE FILTER & PARAMETER FILTER
+    const [showFilter, setShowFilter] = useState(false);
+    const [filterStatus, setFilterStatus] = useState('');
+    const [filterKota, setFilterKota] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+
     // 🌟 STATE MODAL FORM & ERRORS VALIDASI
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState('ADD');
-    const [errors, setErrors] = useState({}); // State untuk menampung pesan error inline
+    const [errors, setErrors] = useState({});
     const [formData, setFormData] = useState({
         bank_id: '',
         bank_name: '',
@@ -43,7 +49,13 @@ const DaftarBank = () => {
         try {
             const token = localStorage.getItem('token');
             const headers = { Authorization: `Bearer ${token}` };
-            const resBank = await api.get('/gl/daftar-bank?limit=500', { headers });
+
+            let url = `/gl/daftar-bank?limit=500`;
+            if (filterStatus) url += `&aktif_yn=${filterStatus}`;
+            if (filterKota) url += `&kota_id=${encodeURIComponent(filterKota)}`;
+            if (searchQuery) url += `&q=${encodeURIComponent(searchQuery)}`;
+
+            const resBank = await api.get(url, { headers });
             setData(resBank.data?.data || resBank.data || []);
         } catch (err) {
             console.error("Gagal tarik data bank:", err);
@@ -56,6 +68,26 @@ const DaftarBank = () => {
         fetchBankData();
         fetchMasterKota();
     }, []);
+
+    const handleApplyFilter = (e) => {
+        e.preventDefault();
+        fetchBankData();
+    };
+
+    const handleResetFilter = () => {
+        setFilterStatus('');
+        setFilterKota('');
+        setSearchQuery('');
+
+        // Reload data tanpa filter
+        const token = localStorage.getItem('token');
+        const headers = { Authorization: `Bearer ${token}` };
+        setLoading(true);
+        api.get('/gl/daftar-bank?limit=500', { headers })
+            .then(res => setData(res.data?.data || res.data || []))
+            .catch(err => console.error(err))
+            .finally(() => setLoading(false));
+    };
 
     const handleAdd = () => {
         setModalMode('ADD');
@@ -89,7 +121,6 @@ const DaftarBank = () => {
         setIsModalOpen(true);
     };
 
-    // 🎯 VALIDASI FORM (INLINE & POPUP Z-INDEX FIX)
     const validateForm = () => {
         let newErrors = {};
         if (!formData.bank_id.trim()) newErrors.bank_id = 'Kode Bank wajib diisi!';
@@ -105,7 +136,6 @@ const DaftarBank = () => {
         e.preventDefault();
 
         if (!validateForm()) {
-            // Tampilkan SweetAlert DENGAN Z-INDEX DI ATAS MODAL
             Swal.fire({
                 title: 'FORM BELUM LENGKAP!',
                 text: 'Harap lengkapi semua field bertanda (*)',
@@ -381,7 +411,80 @@ const DaftarBank = () => {
     ) : null;
 
     return (
-        <>
+        <div className="space-y-4">
+            {/* 🌟 PANEL FILTER KONDISIONAL */}
+            {showFilter && (
+                <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all">
+                    <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
+                        <Filter size={16} className="text-sky-600" />
+                        FILTER DATA REKENING BANK
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Pencarian Nama / Kode / No Rek */}
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">CARI BANK / NO. REKENING</label>
+                            <input
+                                type="text"
+                                placeholder="Ketik nama bank, kode, atau rekening..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            />
+                        </div>
+
+                        {/* Filter Kota */}
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">KOTA</label>
+                            <select
+                                value={filterKota}
+                                onChange={(e) => setFilterKota(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500 cursor-pointer"
+                            >
+                                <option value="">-- SEMUA KOTA --</option>
+                                {kotaList.map((k) => (
+                                    <option key={k.kota_id} value={k.kota_id}>
+                                        {k.kota_nama} ({k.kota_id})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Filter Status */}
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">STATUS</label>
+                            <select
+                                value={filterStatus}
+                                onChange={(e) => setFilterStatus(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500 cursor-pointer"
+                            >
+                                <option value="">-- SEMUA STATUS --</option>
+                                <option value="Y">AKTIF</option>
+                                <option value="N">NON-AKTIF</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Tombol Aksi Filter */}
+                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={handleResetFilter}
+                            className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer flex items-center gap-1.5"
+                        >
+                            <RotateCcw size={14} /> RESET
+                        </button>
+                        <button
+                            type="submit"
+                            className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5"
+                        >
+                            <RefreshCw size={14} /> REFRESH DATA
+                        </button>
+                    </div>
+                </form>
+            )}
+
+            {/* TABEL DATA DENGAN EVENT onFilter */}
             <DataTableTemplate
                 title="DAFTAR REKENING BANK"
                 columns={columns}
@@ -391,10 +494,11 @@ const DaftarBank = () => {
                 onAdd={handleAdd}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
+                onFilter={() => setShowFilter(prev => !prev)}
             />
 
             {modalElement && ReactDOM.createPortal(modalElement, document.body)}
-        </>
+        </div>
     );
 };
 

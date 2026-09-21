@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import api from '../api/axios';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
-import { Filter, Printer, X, Plus, Trash2 } from 'lucide-react';
+import { Filter, Printer, X, Plus, Trash2, RefreshCw, RotateCcw } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 const SetoranCOD = () => {
@@ -11,6 +11,9 @@ const SetoranCOD = () => {
     const [data, setData] = useState([]);
     const [cabangList, setCabangList] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    // 🌟 State Buka-Tutup (Toggle) Filter
+    const [showFilter, setShowFilter] = useState(false);
 
     // Filter State
     const today = new Date().toISOString().split('T')[0];
@@ -57,6 +60,7 @@ const SetoranCOD = () => {
 
             if (isFilterActive) {
                 if (startDate && endDate) queryParams += `&start_date=${startDate}&end_date=${endDate}`;
+                if (selectedCabang) queryParams += `&cabang=${selectedCabang}`;
                 if (searchPenyetor) queryParams += `&penyetor=${searchPenyetor}`;
                 if (searchNoBTT) queryParams += `&no_btt=${searchNoBTT}`;
                 if (searchNoCOD) queryParams += `&no_cod=${searchNoCOD}`;
@@ -119,7 +123,6 @@ const SetoranCOD = () => {
 
             const rawDetails = res.data?.details || [];
 
-            // 🌟 Memastikan mapping key codd_bttid terambil dengan aman
             const formattedDetails = rawDetails.map(d => ({
                 codd_bttid: d.codd_bttid || d.CODD_BTTID || '',
                 codd_nilai: d.codd_nilai !== undefined ? d.codd_nilai : (d.CODD_Nilai || 0)
@@ -324,6 +327,7 @@ const SetoranCOD = () => {
             accessor: 'print_action',
             render: (item) => (
                 <button
+                    type="button"
                     onClick={() => handlePrint(item)}
                     className="p-1.5 bg-sky-50 text-sky-600 border border-sky-200 rounded-lg hover:bg-sky-100 transition cursor-pointer flex items-center gap-1 mx-auto font-bold text-xs"
                 >
@@ -333,7 +337,6 @@ const SetoranCOD = () => {
         }
     ];
 
-    // 🌟 Tentukan BTT List State & Fetch saat Cabang Berubah
     const [bttOptions, setBttOptions] = useState([]);
 
     const fetchBttOptions = async (cbId) => {
@@ -354,19 +357,17 @@ const SetoranCOD = () => {
         }
     }, [formData.cod_cbid, isModalOpen]);
 
-    // 🌟 Event Handler saat BTT Dipilih dari Dropdown
     const handleSelectBTT = (index, selectedBttNo) => {
         const selectedBttObj = bttOptions.find(b => b.btt_no === selectedBttNo);
         const newDetails = [...formData.details];
 
         newDetails[index].codd_bttid = selectedBttNo;
         if (selectedBttObj) {
-            newDetails[index].codd_nilai = selectedBttObj.nominal_cod; // 👈 Auto-fill Nominal COD
+            newDetails[index].codd_nilai = selectedBttObj.nominal_cod;
         }
         setFormData({ ...formData, details: newDetails });
     };
 
-    // Modal Popup Template
     const modalElement = isModalOpen ? (
         <div
             className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs transition-opacity"
@@ -388,7 +389,6 @@ const SetoranCOD = () => {
 
                 <form onSubmit={handleSaveForm} className="p-8 space-y-5 text-xs">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        {/* Kode Cabang */}
                         <div>
                             <label className="font-bold text-slate-700 block mb-1.5">Kode Cabang</label>
                             <select
@@ -409,7 +409,6 @@ const SetoranCOD = () => {
                             </select>
                         </div>
 
-                        {/* Tanggal Setoran */}
                         <div>
                             <label className="font-bold text-slate-700 block mb-1.5">Tanggal Setoran</label>
                             <input
@@ -421,7 +420,6 @@ const SetoranCOD = () => {
                             />
                         </div>
 
-                        {/* Nama Penyetor */}
                         <div className="md:col-span-2">
                             <label className="font-bold text-slate-700 block mb-1.5">Nama Penyetor (Kurir / Loper)</label>
                             <input
@@ -435,7 +433,6 @@ const SetoranCOD = () => {
                         </div>
                     </div>
 
-                    {/* Rincian Detail BTT */}
                     <div className="pt-3 border-t border-slate-100">
                         <div className="flex items-center justify-between mb-3">
                             <label className="font-black text-slate-700 uppercase tracking-wider">
@@ -465,7 +462,6 @@ const SetoranCOD = () => {
                                                 {btt.btt_no} - {btt.penerima} (Rp {btt.nominal_cod.toLocaleString('id-ID')})
                                             </option>
                                         ))}
-                                        {/* Tetap izinkan jika nomor BTT diketik manual */}
                                         {item.codd_bttid && !bttOptions.some(b => b.btt_no === item.codd_bttid) && (
                                             <option value={item.codd_bttid}>{item.codd_bttid} (Manual)</option>
                                         )}
@@ -493,7 +489,6 @@ const SetoranCOD = () => {
                             ))}
                         </div>
 
-                        {/* Total Summary */}
                         <div className="flex justify-end pt-3">
                             <div className="bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-xl text-right">
                                 <span className="text-[10px] font-bold text-emerald-700 uppercase block">GRAND TOTAL SETORAN COD</span>
@@ -526,86 +521,105 @@ const SetoranCOD = () => {
 
     return (
         <div className="space-y-4">
-            {/* Filter Panel */}
-            <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs">
-                <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
-                    <Filter size={16} className="text-sky-600" />
-                    FILTER SETORAN COD
-                </div>
+            {/* 🌟 PANEL FILTER BERSYARAT (TOGGLE BUKA/TUTUP) */}
+            {showFilter && (
+                <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all">
+                    <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
+                        <Filter size={16} className="text-sky-600" />
+                        FILTER SETORAN COD
+                    </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                            <label className="font-bold text-slate-500 block mb-1">TGL MULAI</label>
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                                <label className="font-bold text-slate-500 block mb-1">TGL MULAI</label>
+                                <input
+                                    type="date"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                                />
+                            </div>
+                            <div className="flex-1">
+                                <label className="font-bold text-slate-500 block mb-1">TGL SAMPAI</label>
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">CABANG / AGEN</label>
+                            <select
+                                value={selectedCabang}
+                                onChange={(e) => setSelectedCabang(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500 cursor-pointer"
+                            >
+                                <option value="">-- SEMUA CABANG --</option>
+                                {cabangList.map((cabang, idx) => (
+                                    <option key={idx} value={cabang.agen_id || cabang.agen_nama}>
+                                        {cabang.agen_nama}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">PENYETOR (LOPER/KURIR)</label>
                             <input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
+                                type="text"
+                                placeholder="Cari Penyetor..."
+                                value={searchPenyetor}
+                                onChange={(e) => setSearchPenyetor(e.target.value)}
                                 className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
                             />
                         </div>
-                        <div className="flex-1">
-                            <label className="font-bold text-slate-500 block mb-1">TGL SAMPAI</label>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">NO. BTT / STT</label>
                             <input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
+                                type="text"
+                                placeholder="Cari No BTT..."
+                                value={searchNoBTT}
+                                onChange={(e) => setSearchNoBTT(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">NO. SETORAN COD</label>
+                            <input
+                                type="text"
+                                placeholder="Cari No COD..."
+                                value={searchNoCOD}
+                                onChange={(e) => setSearchNoCOD(e.target.value)}
                                 className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
                             />
                         </div>
                     </div>
 
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">PENYETOR (LOPER/KURIR)</label>
-                        <input
-                            type="text"
-                            placeholder="Cari Penyetor..."
-                            value={searchPenyetor}
-                            onChange={(e) => setSearchPenyetor(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                        />
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={handleResetFilter}
+                            className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer flex items-center gap-1.5"
+                        >
+                            <RotateCcw size={14} /> RESET
+                        </button>
+                        <button
+                            type="submit"
+                            className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5"
+                        >
+                            <RefreshCw size={14} /> TAMPILKAN SETORAN
+                        </button>
                     </div>
+                </form>
+            )}
 
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">NO. BTT / STT</label>
-                        <input
-                            type="text"
-                            placeholder="Cari No BTT..."
-                            value={searchNoBTT}
-                            onChange={(e) => setSearchNoBTT(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">NO. SETORAN COD</label>
-                        <input
-                            type="text"
-                            placeholder="Cari No COD..."
-                            value={searchNoCOD}
-                            onChange={(e) => setSearchNoCOD(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                        />
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                    <button
-                        type="button"
-                        onClick={handleResetFilter}
-                        className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer"
-                    >
-                        RESET
-                    </button>
-                    <button
-                        type="submit"
-                        className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer"
-                    >
-                        TAMPILKAN SETORAN
-                    </button>
-                </div>
-            </form>
-
+            {/* 🌟 DATA TABLE TEMPLATE DENGAN PROP onFilter */}
             <DataTableTemplate
                 title="SETORAN COD"
                 columns={columns}
@@ -615,6 +629,7 @@ const SetoranCOD = () => {
                 onAdd={handleAdd}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
+                onFilter={() => setShowFilter(prev => !prev)}
             />
 
             {modalElement && ReactDOM.createPortal(modalElement, document.body)}

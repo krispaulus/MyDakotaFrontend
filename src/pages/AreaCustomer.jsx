@@ -4,7 +4,7 @@ import api from '../api/axios';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
 import Swal from 'sweetalert2';
-import { Filter, RefreshCw, Eye, X } from 'lucide-react';
+import { Filter, RefreshCw, RotateCcw, X } from 'lucide-react';
 
 const AreaCustomer = () => {
     const navigate = useNavigate();
@@ -62,20 +62,18 @@ const AreaCustomer = () => {
     });
     const [submitting, setSubmitting] = useState(false);
 
-    // 🌟 1. FETCH DATA BTT LIST DENGAN SINKRONISASI AGEN AKTIF DARI HEADER 🌟
+    // 🌟 1. FETCH DATA BTT LIST DENGAN SINKRONISASI AGEN AKTIF DARI HEADER
     const fetchEconoteList = async () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const activeAgen = localStorage.getItem('active_agen_id'); // 👈 AMBIL AGEN DARI HEADER
+            const activeAgen = localStorage.getItem('active_agen_id');
             const params = new URLSearchParams();
 
-            // Masukkan parameter filter bawaan form UI jika diisi
             Object.keys(filters).forEach(key => {
                 if (filters[key] !== '') params.append(key, filters[key]);
             });
 
-            // 🎯 FILTER SAKTI: Jika agen aktif bukan PUSAT DAKOTA, paksa kirim filter agen ke backend!
             if (activeAgen && activeAgen !== 'PUSAT DAKOTA' && activeAgen !== 'BKI0101' && activeAgen !== 'PST001' && activeAgen !== '1') {
                 params.append('agen', activeAgen);
             }
@@ -439,11 +437,10 @@ const AreaCustomer = () => {
         }
     ];
 
-    // 🌟 FILTER DATA DI FRONTEND (SAFETY GUARD): Jika backend mengirimkan semua data, saring lokal berdasarkan agen aktif
     const activeAgen = localStorage.getItem('active_agen_id');
     const filteredData = data.filter(item => {
         if (!activeAgen || activeAgen === 'PUSAT DAKOTA' || activeAgen === 'BKI0101' || activeAgen === 'PST001' || activeAgen === '1') {
-            return true; // Tampilkan seluruh BTT nasional jika di Holding Pusat
+            return true;
         }
 
         const target = activeAgen.toString().trim().toUpperCase();
@@ -453,30 +450,16 @@ const AreaCustomer = () => {
     });
 
     return (
-        <div className="space-y-3">
-            {/* Header Toolbar Ringkas */}
-            <div className="flex justify-between items-center bg-white p-3 rounded-2xl shadow-sm border border-gray-100">
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => setShowFilter(!showFilter)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition cursor-pointer ${showFilter ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                            }`}
-                    >
-                        <Filter size={14} /> Filter
-                    </button>
-                    <button
-                        onClick={fetchEconoteList}
-                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition cursor-pointer"
-                    >
-                        <RefreshCw size={13} /> Refresh
-                    </button>
-                </div>
-            </div>
-
-            {/* Panel Form Filter Dynamic */}
+        <div className="space-y-4">
+            {/* 🌟 Panel Form Filter Dynamic (Collapsible di atas tabel) */}
             {showFilter && (
-                <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl shadow-md border border-gray-100 space-y-3 animate-in fade-in duration-200">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-semibold text-slate-800">
+                <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-3 animate-in fade-in duration-200 text-xs">
+                    <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
+                        <Filter size={16} className="text-sky-600" />
+                        FILTER BUKTI TANDA TERIMA (BTT)
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 font-semibold text-slate-800">
                         <div>
                             <label className="block mb-1 text-slate-600">Mulai Tanggal</label>
                             <input
@@ -484,7 +467,7 @@ const AreaCustomer = () => {
                                 name="tanggalStart"
                                 value={filters.tanggalStart}
                                 onChange={handleFilterChange}
-                                className="w-full p-2 border border-gray-300 rounded-xl bg-white text-slate-900 outline-none focus:border-indigo-500"
+                                className="w-full p-2 border border-slate-300 rounded-xl bg-white text-slate-900 outline-none focus:border-indigo-500"
                             />
                         </div>
                         <div>
@@ -494,7 +477,7 @@ const AreaCustomer = () => {
                                 name="tanggalEnd"
                                 value={filters.tanggalEnd}
                                 onChange={handleFilterChange}
-                                className="w-full p-2 border border-gray-300 rounded-xl bg-white text-slate-900 outline-none focus:border-indigo-500"
+                                className="w-full p-2 border border-slate-300 rounded-xl bg-white text-slate-900 outline-none focus:border-indigo-500"
                             />
                         </div>
                         <div>
@@ -503,7 +486,7 @@ const AreaCustomer = () => {
                                 name="service"
                                 value={filters.service}
                                 onChange={handleFilterChange}
-                                className="w-full p-2 border border-gray-300 rounded-xl bg-white text-slate-900 outline-none focus:border-indigo-500"
+                                className="w-full p-2 border border-slate-300 rounded-xl bg-white text-slate-900 outline-none focus:border-indigo-500 cursor-pointer"
                             >
                                 <option value="">-- Semua Service --</option>
                                 <option value="1">1 - Darat</option>
@@ -517,7 +500,7 @@ const AreaCustomer = () => {
                                 name="pembayaran"
                                 value={filters.pembayaran}
                                 onChange={handleFilterChange}
-                                className="w-full p-2 border border-gray-300 rounded-xl bg-white text-slate-900 outline-none focus:border-indigo-500"
+                                className="w-full p-2 border border-slate-300 rounded-xl bg-white text-slate-900 outline-none focus:border-indigo-500 cursor-pointer"
                             >
                                 <option value="">-- Semua Pembayaran --</option>
                                 <option value="1">1 - Tunai</option>
@@ -533,7 +516,7 @@ const AreaCustomer = () => {
                                 placeholder="Ketik nama customer..."
                                 value={filters.customer}
                                 onChange={handleFilterChange}
-                                className="w-full p-2 border border-gray-300 rounded-xl bg-white text-slate-900 outline-none focus:border-indigo-500"
+                                className="w-full p-2 border border-slate-300 rounded-xl bg-white text-slate-900 outline-none focus:border-indigo-500"
                             />
                         </div>
                         <div>
@@ -544,7 +527,7 @@ const AreaCustomer = () => {
                                 placeholder="Contoh: AG0R..."
                                 value={filters.nobtt}
                                 onChange={handleFilterChange}
-                                className="w-full p-2 border border-gray-300 rounded-xl bg-white text-slate-900 outline-none focus:border-indigo-500"
+                                className="w-full p-2 border border-slate-300 rounded-xl bg-white text-slate-900 outline-none focus:border-indigo-500"
                             />
                         </div>
                         <div>
@@ -555,30 +538,30 @@ const AreaCustomer = () => {
                                 placeholder="Ketik no surat jalan..."
                                 value={filters.nosj}
                                 onChange={handleFilterChange}
-                                className="w-full p-2 border border-gray-300 rounded-xl bg-white text-slate-900 outline-none focus:border-indigo-500"
+                                className="w-full p-2 border border-slate-300 rounded-xl bg-white text-slate-900 outline-none focus:border-indigo-500"
                             />
                         </div>
                     </div>
 
-                    <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                    <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                         <button
                             type="button"
                             onClick={handleResetFilter}
-                            className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition cursor-pointer"
+                            className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition cursor-pointer flex items-center gap-1.5"
                         >
-                            Reset
+                            <RotateCcw size={14} /> Reset
                         </button>
                         <button
                             type="submit"
-                            className="px-5 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md transition cursor-pointer"
+                            className="px-5 py-2 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-xl shadow-md transition cursor-pointer flex items-center gap-1.5"
                         >
-                            Terapkan Filter
+                            <RefreshCw size={14} /> Terapkan Filter
                         </button>
                     </div>
                 </form>
             )}
 
-            {/* 🌟 DATATABLETEMPLATE MENGGUNAKAN DATA YANG SUDAH TERFILTER PRESISI 🌟 */}
+            {/* 🌟 DATATABLETEMPLATE DENGAN PROP onFilter TOGGLE */}
             <DataTableTemplate
                 title="BUKTI TANDA TERIMA (BTT)"
                 columns={columns}
@@ -589,9 +572,10 @@ const AreaCustomer = () => {
                 onView={(item) => handleSelectBTT(item)}
                 onEdit={(item) => handleOpenEdit(item)}
                 onDelete={(item) => handleDelete(item)}
+                onFilter={() => setShowFilter(prev => !prev)}
             />
 
-            {/* MODAL TAMBAH & EDIT TETAP PRESISI SEPERTI SEMULA */}
+            {/* MODAL TAMBAH */}
             {isAddModalOpen && (
                 <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
                     <div className="w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden bg-white border border-gray-100 p-8 transition-all">
@@ -676,7 +660,7 @@ const AreaCustomer = () => {
                                     <select
                                         value={addFormData.bttt_servid}
                                         onChange={(e) => setAddFormData({ ...addFormData, bttt_servid: Number(e.target.value) })}
-                                        className="w-full px-4 py-2.5 text-xs rounded-xl border border-gray-200 bg-white text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition"
+                                        className="w-full px-4 py-2.5 text-xs rounded-xl border border-gray-200 bg-white text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition cursor-pointer"
                                     >
                                         <option value={1}>1 - Darat</option>
                                         <option value={2}>2 - Laut</option>
@@ -691,7 +675,7 @@ const AreaCustomer = () => {
                                     <select
                                         value={addFormData.bttt_pembayaran}
                                         onChange={(e) => setAddFormData({ ...addFormData, bttt_pembayaran: Number(e.target.value) })}
-                                        className="w-full px-4 py-2.5 text-xs rounded-xl border border-gray-200 bg-white text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition"
+                                        className="w-full px-4 py-2.5 text-xs rounded-xl border border-gray-200 bg-white text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition cursor-pointer"
                                     >
                                         <option value={1}>1 - Tunai</option>
                                         <option value={2}>2 - Kredit</option>
@@ -719,7 +703,7 @@ const AreaCustomer = () => {
                                     </label>
                                     <input
                                         type="number"
-                                        value={addFormData.addFormData_berat || addFormData.bttt_berat}
+                                        value={addFormData.bttt_berat}
                                         onChange={(e) => setAddFormData({ ...addFormData, bttt_berat: Number(e.target.value) })}
                                         required
                                         min={1}
@@ -749,6 +733,7 @@ const AreaCustomer = () => {
                 </div>
             )}
 
+            {/* MODAL EDIT */}
             {isEditModalOpen && (
                 <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
                     <div className="w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden bg-white border border-gray-100 p-8 transition-all">

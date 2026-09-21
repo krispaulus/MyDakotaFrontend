@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import api from '../api/axios';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
-import { Filter, Printer, X } from 'lucide-react';
+import { Filter, Printer, X, RefreshCw, RotateCcw } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 const PembayaranVendor = () => {
@@ -12,6 +12,9 @@ const PembayaranVendor = () => {
     const [cabangList, setCabangList] = useState([]);
     const [vendorList, setVendorList] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    // 🌟 State Buka-Tutup (Toggle) Filter
+    const [showFilter, setShowFilter] = useState(false);
 
     // Filter State
     const today = new Date().toISOString().split('T')[0];
@@ -48,7 +51,6 @@ const PembayaranVendor = () => {
             const list = res.data?.data || [];
             setCabangList(list);
 
-            // Set default cabang jika ada
             if (list.length > 0 && !formData.tpayh_cbid) {
                 setFormData(prev => ({ ...prev, tpayh_cbid: list[0].agen_id || list[0].agen_nama }));
             }
@@ -136,11 +138,8 @@ const PembayaranVendor = () => {
         setIsModalOpen(true);
     };
 
-    // 🎯 Buka Modal untuk Edit
     const handleEdit = (item) => {
         setIsEditMode(true);
-
-        // Ambil string invoice (jika bernilai '-' atau kosong, jadikan string kosong)
         const rawInvoice = item.no_invoice && item.no_invoice !== '-' ? item.no_invoice : '';
 
         setFormData({
@@ -152,7 +151,7 @@ const PembayaranVendor = () => {
             total_dpp: item.total_dpp || 0,
             nilai_ppn: 0,
             nilai_pph: 0,
-            invoice_ids: rawInvoice // 👈 Populasikan nomor invoice yang tersimpan
+            invoice_ids: rawInvoice
         });
         setIsModalOpen(true);
     };
@@ -171,7 +170,6 @@ const PembayaranVendor = () => {
                 invoice_ids: invoiceArr
             };
 
-            // 🌟 JIKA EDIT MODE GUNAKAN PUT, JIKA ADD GUNAKAN POST
             if (isEditMode) {
                 await api.put('/gl/pembayaran-vendor/update', payload, {
                     headers: { Authorization: `Bearer ${token}` }
@@ -336,6 +334,7 @@ const PembayaranVendor = () => {
             accessor: 'print_action',
             render: (item) => (
                 <button
+                    type="button"
                     onClick={() => handlePrint(item)}
                     className="p-1.5 bg-sky-50 text-sky-600 border border-sky-200 rounded-lg hover:bg-sky-100 transition cursor-pointer flex items-center gap-1 mx-auto font-bold text-xs"
                 >
@@ -345,7 +344,6 @@ const PembayaranVendor = () => {
         }
     ];
 
-    // Modal Popup Template
     const modalElement = isModalOpen ? (
         <div
             className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs transition-opacity"
@@ -367,9 +365,6 @@ const PembayaranVendor = () => {
 
                 <form onSubmit={handleSaveForm} className="p-8 space-y-5 text-xs">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-
-                        {/* 🌟 1. KODE CABANG (POSISI PALING AWAL SEBELUM TANGGAL) */}
-                        {/* Kode Cabang Select Option */}
                         <div className="md:col-span-2">
                             <label className="font-bold text-slate-700 block mb-1.5">Kode Cabang</label>
                             <select
@@ -402,7 +397,6 @@ const PembayaranVendor = () => {
                             </div>
                         )}
 
-                        {/* 2. TANGGAL PEMBAYARAN */}
                         <div>
                             <label className="font-bold text-slate-700 block mb-1.5">Tanggal Pembayaran</label>
                             <input
@@ -414,7 +408,6 @@ const PembayaranVendor = () => {
                             />
                         </div>
 
-                        {/* 3. NAMA VENDOR */}
                         <div>
                             <label className="font-bold text-slate-700 block mb-1.5">Nama Vendor</label>
                             <select
@@ -432,7 +425,6 @@ const PembayaranVendor = () => {
                             </select>
                         </div>
 
-                        {/* 4. NOMINAL DPP */}
                         <div>
                             <label className="font-bold text-slate-700 block mb-1.5">Nominal DPP (Rp)</label>
                             <input
@@ -444,7 +436,6 @@ const PembayaranVendor = () => {
                             />
                         </div>
 
-                        {/* 5. NO. INVOICE VENDOR */}
                         <div>
                             <label className="font-bold text-slate-700 block mb-1.5">No. Invoice Vendor (Dipisah koma)</label>
                             <input
@@ -456,7 +447,6 @@ const PembayaranVendor = () => {
                             />
                         </div>
 
-                        {/* 6. KETERANGAN */}
                         <div className="md:col-span-2">
                             <label className="font-bold text-slate-700 block mb-1.5">Keterangan</label>
                             <textarea
@@ -491,96 +481,99 @@ const PembayaranVendor = () => {
 
     return (
         <div className="space-y-4">
-            {/* Filter Panel */}
-            <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs">
-                <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
-                    <Filter size={16} className="text-sky-600" />
-                    FILTER PEMBAYARAN VENDOR
-                </div>
+            {/* 🌟 PANEL FILTER BERSYARAT (TOGGLE BUKA/TUTUP) */}
+            {showFilter && (
+                <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all">
+                    <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
+                        <Filter size={16} className="text-sky-600" />
+                        FILTER PEMBAYARAN VENDOR
+                    </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                            <label className="font-bold text-slate-500 block mb-1">TGL MULAI</label>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                                <label className="font-bold text-slate-500 block mb-1">TGL MULAI</label>
+                                <input
+                                    type="date"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                                />
+                            </div>
+                            <div className="flex-1">
+                                <label className="font-bold text-slate-500 block mb-1">TGL SAMPAI</label>
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">CABANG / AGEN</label>
+                            <select
+                                value={selectedCabang}
+                                onChange={(e) => setSelectedCabang(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500 cursor-pointer"
+                            >
+                                <option value="">-- SEMUA CABANG --</option>
+                                {cabangList.map((cabang, idx) => (
+                                    <option key={idx} value={cabang.agen_nama}>
+                                        {cabang.agen_nama}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">NAMA VENDOR</label>
+                            <select
+                                value={searchVendor}
+                                onChange={(e) => setSearchVendor(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500 cursor-pointer"
+                            >
+                                <option value="">-- SEMUA VENDOR --</option>
+                                {vendorList.map((vendor, idx) => (
+                                    <option key={idx} value={vendor.vend_name}>
+                                        {vendor.vend_name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">NO. PEMBAYARAN</label>
                             <input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
+                                type="text"
+                                placeholder="Ketik No Pembayaran..."
+                                value={searchNoPayment}
+                                onChange={(e) => setSearchNoPayment(e.target.value)}
                                 className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
                             />
                         </div>
-                        <div className="flex-1">
-                            <label className="font-bold text-slate-500 block mb-1">TGL SAMPAI</label>
-                            <input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                            />
-                        </div>
                     </div>
 
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">CABANG / AGEN</label>
-                        <select
-                            value={selectedCabang}
-                            onChange={(e) => setSelectedCabang(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={handleResetFilter}
+                            className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer flex items-center gap-1.5"
                         >
-                            <option value="">-- SEMUA CABANG --</option>
-                            {cabangList.map((cabang, idx) => (
-                                <option key={idx} value={cabang.agen_nama}>
-                                    {cabang.agen_nama}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">NAMA VENDOR</label>
-                        <select
-                            value={searchVendor}
-                            onChange={(e) => setSearchVendor(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            <RotateCcw size={14} /> RESET
+                        </button>
+                        <button
+                            type="submit"
+                            className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5"
                         >
-                            <option value="">-- SEMUA VENDOR --</option>
-                            {vendorList.map((vendor, idx) => (
-                                <option key={idx} value={vendor.vend_name}>
-                                    {vendor.vend_name}
-                                </option>
-                            ))}
-                        </select>
+                            <RefreshCw size={14} /> TAMPILKAN TRANSAKSI
+                        </button>
                     </div>
+                </form>
+            )}
 
-                    <div>
-                        <label className="font-bold text-slate-500 block mb-1">NO. PEMBAYARAN</label>
-                        <input
-                            type="text"
-                            placeholder="Ketik No Pembayaran..."
-                            value={searchNoPayment}
-                            onChange={(e) => setSearchNoPayment(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                        />
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                    <button
-                        type="button"
-                        onClick={handleResetFilter}
-                        className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer"
-                    >
-                        RESET
-                    </button>
-                    <button
-                        type="submit"
-                        className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer"
-                    >
-                        TAMPILKAN TRANSAKSI
-                    </button>
-                </div>
-            </form>
-
+            {/* 🌟 DATA TABLE TEMPLATE DENGAN PROP onFilter */}
             <DataTableTemplate
                 title="PEMBAYARAN VENDOR"
                 columns={columns}
@@ -590,6 +583,7 @@ const PembayaranVendor = () => {
                 onAdd={handleAdd}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
+                onFilter={() => setShowFilter(prev => !prev)}
             />
 
             {modalElement && ReactDOM.createPortal(modalElement, document.body)}
