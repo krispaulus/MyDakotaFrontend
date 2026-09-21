@@ -111,23 +111,30 @@ const Dashboard = () => {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!inputChat.trim()) return;
+    if (!inputChat.trim() || chatLoading) return;
 
     const userText = inputChat;
     setMessages(prev => [...prev, { role: 'user', text: userText }]);
     setInputChat('');
     setChatLoading(true);
 
-    setTimeout(() => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await api.post('/ai/chat', { prompt: userText }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const aiReply = res.data?.reply || 'Maaf, saya belum dapat memproses pertanyaan tersebut.';
+      setMessages(prev => [...prev, { role: 'assistant', text: aiReply }]);
+    } catch (err) {
+      console.error("Gagal kontak AI:", err);
       setMessages(prev => [
         ...prev,
-        {
-          role: 'assistant',
-          text: `Berdasarkan data operasional DLI: Target bulan berjalan tercapai 88,4%, dengan 452 BTT sedang bergerak aktif di jalan, dan 12 BTT memerlukan perhatian di hub transit.`
-        }
+        { role: 'assistant', text: 'Maaf, terjadi kendala saat menghubungkan ke asisten AI.' }
       ]);
+    } finally {
       setChatLoading(false);
-    }, 1000);
+    }
   };
 
   const filteredDetailData = detailData.filter(item =>
