@@ -715,7 +715,7 @@ function App() {
 
       <Route path="/marketing/setoran-penjualan-tunai" element={<MainLayout><SetoranPenjualanTunai /></MainLayout>} />
       <Route path="/marketing/customer-upload-CSV/upload-transport-planning-csv" element={<MainLayout><UploadTransportPlanningCSV /></MainLayout>} />
-      <Route path="/marketing/customer-upload-CSV/upload-customer-khusus-csv" element={<MainLayout><CustomerKhusus /></MainLayout>} />
+      <Route path="/marketing/customer-upload-csv/customer-khusus" element={<MainLayout><CustomerKhusus /></MainLayout>} />
       <Route path="/marketing/customer-upload-CSV/upload-data-pembuatan-btt" element={<MainLayout><UploadDataPembuatanBTT /></MainLayout>} />
 
       <Route path="/marketing/btt-upload-v2" element={<MainLayout><BTTUploadV2 /></MainLayout>} />
