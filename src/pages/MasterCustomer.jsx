@@ -16,7 +16,7 @@ const MasterCustomer = () => {
     const token = localStorage.getItem('token');
 
     // 🌟 STATE TOGGLE FILTER & FILTER FIELDS
-    const [showFilter, setShowFilter] = useState(false);
+    const [showFilter, setShowFilter] = useState(true);
     const [searchNameOrId, setSearchNameOrId] = useState('');
     const [searchKota, setSearchKota] = useState('');
     const [searchTelp, setSearchTelp] = useState('');
@@ -568,6 +568,8 @@ const MasterCustomer = () => {
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 onFilter={() => setShowFilter(prev => !prev)}
+                onToggleFilter={() => setShowFilter(prev => !prev)}
+                isFilterOpen={showFilter}
             />
 
             {/* ============================================================== */}

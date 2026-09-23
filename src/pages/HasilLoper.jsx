@@ -11,6 +11,9 @@ const HasilLoper = () => {
     const [reasonList, setReasonList] = useState([]);
     const [loading, setLoading] = useState(false);
 
+    // Toggle Panel Filter: Default terbuka (true)
+    const [showFilter, setShowFilter] = useState(true);
+
     // Filter States
     const today = new Date().toISOString().split('T')[0];
     const [filterTgla, setFilterTgla] = useState('2017-01-01');
@@ -100,7 +103,7 @@ const HasilLoper = () => {
                     }));
                     Swal.fire('GPS Terdeteksi!', 'Koordinat lokasi berhasil dikunci.', 'success');
                 },
-                (error) => {
+                () => {
                     Swal.fire('GPS Gagal', 'Gagal mendeteksi lokasi otomatis.', 'warning');
                 }
             );
@@ -277,94 +280,96 @@ const HasilLoper = () => {
 
     return (
         <div className="space-y-4 font-sans">
-            {/* PANEL FILTER ATAS */}
-            <div className="p-4 bg-white rounded-2xl shadow-xs border border-slate-200 space-y-3 text-xs font-bold text-slate-600">
-                <div className="grid grid-cols-12 gap-3">
-                    <div className="col-span-3">
-                        <div className="flex items-center gap-1 mb-1">
-                            <input
-                                type="checkbox"
-                                id="chkTgl"
-                                checked={chkTgl}
-                                onChange={e => setChkTgl(e.target.checked)}
-                                className="w-3.5 h-3.5 text-indigo-600 rounded cursor-pointer"
-                            />
-                            <label htmlFor="chkTgl" className="text-slate-600 uppercase cursor-pointer">FILTER PERIODE TANGGAL</label>
+            {/* PANEL FILTER ATAS (TOGGLEABLE) */}
+            {showFilter && (
+                <div className="p-4 bg-white rounded-2xl shadow-xs border border-slate-200 space-y-3 text-xs font-bold text-slate-600 animate-in fade-in duration-200">
+                    <div className="grid grid-cols-12 gap-3">
+                        <div className="col-span-3">
+                            <div className="flex items-center gap-1 mb-1">
+                                <input
+                                    type="checkbox"
+                                    id="chkTgl"
+                                    checked={chkTgl}
+                                    onChange={e => setChkTgl(e.target.checked)}
+                                    className="w-3.5 h-3.5 text-indigo-600 rounded cursor-pointer"
+                                />
+                                <label htmlFor="chkTgl" className="text-slate-600 uppercase cursor-pointer">FILTER PERIODE TANGGAL</label>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <input
+                                    type="date"
+                                    disabled={!chkTgl}
+                                    className={`w-full p-2.5 border border-slate-200 rounded-lg outline-none font-medium ${!chkTgl ? 'bg-slate-100 text-slate-400' : 'bg-white'}`}
+                                    value={filterTgla}
+                                    onChange={e => setFilterTgla(e.target.value)}
+                                />
+                                <input
+                                    type="date"
+                                    disabled={!chkTgl}
+                                    className={`w-full p-2.5 border border-slate-200 rounded-lg outline-none font-medium ${!chkTgl ? 'bg-slate-100 text-slate-400' : 'bg-white'}`}
+                                    value={filterTgle}
+                                    onChange={e => setFilterTgle(e.target.value)}
+                                />
+                            </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
+
+                        <div className="col-span-2">
+                            <label className="block mb-1 text-slate-500 uppercase">NO. BTT / RESI</label>
                             <input
-                                type="date"
-                                disabled={!chkTgl}
-                                className={`w-full p-2.5 border border-slate-200 rounded-lg outline-none font-medium ${!chkTgl ? 'bg-slate-100 text-slate-400' : 'bg-white'}`}
-                                value={filterTgla}
-                                onChange={e => setFilterTgla(e.target.value)}
+                                type="text"
+                                placeholder="MASUKAN NO BTT..."
+                                className="w-full p-2.5 border border-slate-200 rounded-lg outline-none font-medium uppercase bg-white"
+                                value={filterNoBtt}
+                                onChange={e => setFilterNoBtt(e.target.value)}
                             />
+                        </div>
+
+                        <div className="col-span-2">
+                            <label className="block mb-1 text-slate-500 uppercase">PENGIRIM</label>
                             <input
-                                type="date"
-                                disabled={!chkTgl}
-                                className={`w-full p-2.5 border border-slate-200 rounded-lg outline-none font-medium ${!chkTgl ? 'bg-slate-100 text-slate-400' : 'bg-white'}`}
-                                value={filterTgle}
-                                onChange={e => setFilterTgle(e.target.value)}
+                                type="text"
+                                placeholder="MASUKAN PENGIRIM..."
+                                className="w-full p-2.5 border border-slate-200 rounded-lg outline-none font-medium uppercase bg-white"
+                                value={filterPengirim}
+                                onChange={e => setFilterPengirim(e.target.value)}
+                            />
+                        </div>
+
+                        <div className="col-span-2">
+                            <label className="block mb-1 text-slate-500 uppercase">STATUS LOPER</label>
+                            <select
+                                className="w-full p-2.5 border border-slate-200 rounded-lg outline-none font-medium bg-white"
+                                value={filterStatus}
+                                onChange={e => setFilterStatus(e.target.value)}
+                            >
+                                <option value="">-- SEMUA --</option>
+                                <option value="Y">DITERIMA</option>
+                                <option value="N">GAGAL</option>
+                            </select>
+                        </div>
+
+                        <div className="col-span-3">
+                            <label className="block mb-1 text-slate-500 uppercase">NO. LOPER</label>
+                            <input
+                                type="text"
+                                placeholder="CARI NOMOR LOPER..."
+                                className="w-full p-2.5 border border-slate-200 rounded-lg outline-none font-medium uppercase bg-white"
+                                value={filterNoLoper}
+                                onChange={e => setFilterNoLoper(e.target.value)}
                             />
                         </div>
                     </div>
 
-                    <div className="col-span-2">
-                        <label className="block mb-1 text-slate-500 uppercase">NO. BTT / RESI</label>
-                        <input
-                            type="text"
-                            placeholder="MASUKAN NO BTT..."
-                            className="w-full p-2.5 border border-slate-200 rounded-lg outline-none font-medium uppercase bg-white"
-                            value={filterNoBtt}
-                            onChange={e => setFilterNoBtt(e.target.value)}
-                        />
-                    </div>
-
-                    <div className="col-span-2">
-                        <label className="block mb-1 text-slate-500 uppercase">PENGIRIM</label>
-                        <input
-                            type="text"
-                            placeholder="MASUKAN PENGIRIM..."
-                            className="w-full p-2.5 border border-slate-200 rounded-lg outline-none font-medium uppercase bg-white"
-                            value={filterPengirim}
-                            onChange={e => setFilterPengirim(e.target.value)}
-                        />
-                    </div>
-
-                    <div className="col-span-2">
-                        <label className="block mb-1 text-slate-500 uppercase">STATUS LOPER</label>
-                        <select
-                            className="w-full p-2.5 border border-slate-200 rounded-lg outline-none font-medium bg-white"
-                            value={filterStatus}
-                            onChange={e => setFilterStatus(e.target.value)}
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                        <button
+                            onClick={fetchLoperData}
+                            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2 font-black transition cursor-pointer text-xs uppercase shadow-md"
                         >
-                            <option value="">-- SEMUA --</option>
-                            <option value="Y">DITERIMA</option>
-                            <option value="N">GAGAL</option>
-                        </select>
-                    </div>
-
-                    <div className="col-span-3">
-                        <label className="block mb-1 text-slate-500 uppercase">NO. LOPER</label>
-                        <input
-                            type="text"
-                            placeholder="CARI NOMOR LOPER..."
-                            className="w-full p-2.5 border border-slate-200 rounded-lg outline-none font-medium uppercase bg-white"
-                            value={filterNoLoper}
-                            onChange={e => setFilterNoLoper(e.target.value)}
-                        />
+                            <RefreshCw size={15} /> REFRESH HASIL LOPER
+                        </button>
                     </div>
                 </div>
-
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                    <button
-                        onClick={fetchLoperData}
-                        className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2 font-black transition cursor-pointer text-xs uppercase shadow-md"
-                    >
-                        <RefreshCw size={15} /> REFRESH HASIL LOPER
-                    </button>
-                </div>
-            </div>
+            )}
 
             <DataTableTemplate
                 title="HASIL LOPER (OPR_T_eBBL)"
@@ -377,6 +382,9 @@ const HasilLoper = () => {
                 onAdd={handleAdd}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
+                onFilter={() => setShowFilter(prev => !prev)}
+                onToggleFilter={() => setShowFilter(prev => !prev)}
+                isFilterOpen={showFilter}
             />
 
             {/* MODAL INPUT BBL HIGH QUALITY */}

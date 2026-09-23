@@ -9,6 +9,8 @@ const DataTableTemplate = ({
     onEdit,
     onDelete,
     onFilter, // <-- Tambahkan prop onFilter
+    onToggleFilter,
+    isFilterOpen = true,
     renderExtraActions,
     loading,
     isDarkMode,
@@ -84,10 +86,14 @@ const DataTableTemplate = ({
                     )}
                     <button
                         type="button"
-                        onClick={onFilter} // <-- Pasang handler onClick di sini
-                        className="bg-white border border-gray-200 text-blue-600 px-6 py-2.5 rounded-lg flex items-center gap-2 font-semibold shadow-sm hover:bg-gray-50 transition-all cursor-pointer"
+                        onClick={onFilter || onToggleFilter}
+                        className={`px-6 py-2.5 rounded-lg flex items-center gap-2 font-semibold shadow-sm transition-all cursor-pointer border ${isFilterOpen
+                                ? 'bg-blue-50 border-blue-300 text-blue-600 ring-2 ring-blue-100'
+                                : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                            }`}
                     >
-                        <Filter size={18} /> Filter
+                        <Filter size={18} className={isFilterOpen ? 'text-blue-600' : 'text-gray-500'} />
+                        <span>Filter</span>
                     </button>
                 </div>
             </div>
