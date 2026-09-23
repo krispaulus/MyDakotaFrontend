@@ -128,6 +128,15 @@ import PackingList from './pages/PackingList';
 import Asuransi from './pages/Asuransi';
 import OrderJemput from './pages/OrderJemput';
 import TerimaBTTKembali from './pages/TerimaBTTKembali';
+import PenerimaanRetur from "./pages/PenerimaanRetur";
+import PenerimaanPembayaranKasir from "./pages/PenerimaanPembayaranKasir";
+import SetoranPenjualanTunai from "./pages/SetoranPenjualanTunai";
+import UploadTransportPlanningCSV from "./pages/UploadTransportPlanningCSV";
+import UploadDataPembuatanBTT from "./pages/UploadDataPembuatanBTT";
+import CustomerKhusus from "./pages/CustomerKhusus";
+import BTTUploadV2 from "./pages/BTTUploadV2";
+import DNUpload from './pages/DNUpload';
+import UploadHasilLoperCSV from './pages/UploadHasilLoperCSV';
 
 const getCompanyName = (pt) => {
   if (pt === 'A') return 'Dakota Buana Sarana';
@@ -701,6 +710,17 @@ function App() {
       <Route path="/marketing/pengajuan-khusus/asuransi" element={<MainLayout><Asuransi /></MainLayout>} />
       <Route path="/marketing/pengajuan-khusus/order-jemput" element={<MainLayout><OrderJemput /></MainLayout>} />
       <Route path="/marketing/penerimaan-btt/terima-btt-kembali" element={<MainLayout><TerimaBTTKembali /></MainLayout>} />
+      <Route path="/marketing/penerimaan-btt/penerimaan-retur-btt" element={<MainLayout><PenerimaanRetur /></MainLayout>} />
+      <Route path="/marketing/penerimaan-btt/penerimaan-pembayaran-kasir" element={<MainLayout><PenerimaanPembayaranKasir /></MainLayout>} />
+
+      <Route path="/marketing/setoran-penjualan-tunai" element={<MainLayout><SetoranPenjualanTunai /></MainLayout>} />
+      <Route path="/marketing/customer-upload-CSV/upload-transport-planning-csv" element={<MainLayout><UploadTransportPlanningCSV /></MainLayout>} />
+      <Route path="/marketing/customer-upload-CSV/upload-customer-khusus-csv" element={<MainLayout><CustomerKhusus /></MainLayout>} />
+      <Route path="/marketing/customer-upload-CSV/upload-data-pembuatan-btt" element={<MainLayout><UploadDataPembuatanBTT /></MainLayout>} />
+
+      <Route path="/marketing/btt-upload-v2" element={<MainLayout><BTTUploadV2 /></MainLayout>} />
+      <Route path="/marketing/dn-upload" element={<MainLayout><DNUpload /></MainLayout>} />
+      <Route path="/marketing/hasil-loper/upload-hasil-loper-csv" element={<MainLayout><UploadHasilLoperCSV /></MainLayout>} />
 
       {/* Jika nanti ada halaman lain, tinggal bungkus lagi pakai MainLayout 
       <Route

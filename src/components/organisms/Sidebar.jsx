@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, NavLink } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
 import {
-  LayoutDashboard, Users, Book, Briefcase, List,
+  LayoutDashboard, Users, Book, Briefcase, List, Upload,
   Database, TrendingUp, Truck, DollarSign, LayersPlus, Printer, ReceiptPoundSterling, WalletMinimal,
   Settings, LogOut, ChevronRight, Menu, Backpack, ClipboardPen, HandCoins, Route, GitCompareArrows, FileArchive
 } from 'lucide-react';
@@ -395,17 +395,29 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
           path: '', roles: ['S'],
           children: [
             { name: 'BTT Kembali', path: '/marketing/penerimaan-btt/terima-btt-kembali', roles: ['S'] },
-            { name: 'BTT / Barang Retur', path: '/penerimaan/btt-retur' },
-            { name: 'Penerimaan Pembayaran Kasir', path: '/penerimaan/pembayaran-kasir' },
-            { name: 'Pengembalian Surat Jalan Customer', path: '/penerimaan/pengembalian-surat-jalan', roles: ['S'] },
-            { name: 'Setoran Penjualan Tunai', path: '/penerimaan/setoran-penjualan' },
+            { name: 'BTT / Barang Retur', path: '/marketing/penerimaan-btt/penerimaan-retur-btt' },
+            { name: 'Penerimaan Pembayaran Kasir', path: '/marketing/penerimaan-btt/penerimaan-pembayaran-kasir' },
           ]
         },
         { name: 'Pengembalian Surat Jalan Customer', path: '/marketing/pengembalian-surat-jalan-customer', roles: ['S'] },
+        { name: 'Setoran Penjualan Tunai', path: '/marketing/setoran-penjualan-tunai', roles: ['S'] },
         { name: 'Upload CSV', path: '/marketing/upload-csv' },
         { name: 'Proses Packing', path: '/marketing/proses-packing', roles: ['S'] },
         { name: 'Pengemasan Barang Kurir', path: '/marketing/pengemasan-barang-kurir' },
-        { name: 'Customer - Upload CSV', path: '/marketing/customer-upload-csv', roles: ['S'] },
+        {
+          name: 'Customer - Upload CSV',
+          icon: <Upload size={18} />,
+          path: '',
+          roles: ['S'],
+          children: [
+            { name: 'Upload Transport Planning (CSV)', path: '/marketing/customer-upload-csv/upload-transport-planning-csv', roles: ['S'] },
+            { name: 'Customer Khusus', path: '/marketing/customer-upload-csv/customer-khusus' },
+            { name: 'Upload Data Untuk Pembuatan BTT', path: '/marketing/customer-upload-CSV/upload-data-pembuatan-btt' },
+            { name: 'BTT Upload V2', path: '/marketing/btt-upload-v2', roles: ['S'] },
+            { name: 'DN Upload', path: '/marketing/dn-upload', roles: ['S'] },
+            { name: 'Hasil Loper Upload CSV', path: '/marketing/hasil-loper/upload-hasil-loper-csv', roles: ['S'] },
+          ]
+        },
       ]
 
     },
