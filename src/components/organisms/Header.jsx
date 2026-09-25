@@ -15,16 +15,22 @@ const Header = () => {
     const location = useLocation();
     const [searchTermAgen, setSearchTermAgen] = useState('');
     const [isOpenDropdownAgen, setIsOpenDropdownAgen] = useState(false);
-    const activeAgenId = localStorage.getItem('active_agen_id');
 
     const updateHeader = () => {
-        const ptId = localStorage.getItem('selected_pt') || localStorage.getItem('pt_ID');
+        const ptId = localStorage.getItem('selected_pt') || localStorage.getItem('pt_id') || localStorage.getItem('pt_ID') || 'C';
         const ptMapping = {
-            'A': 'Dakota Buana Sarana (DBS)',
-            'B': 'Dakota Lintas Buana',
-            'C': 'Dakota Logistik Indonesia'
+            'A': { corp: 'DBS', name: 'Dakota Buana Sarana (DBS)' },
+            'B': { corp: 'DLB', name: 'Dakota Lintas Buana (DLB)' },
+            'C': { corp: 'DLI', name: 'Dakota Logistik Indonesia (DLI)' }
         };
-        setCompanyName(ptMapping[ptId] || 'Dakota Group');
+
+        const currentConfig = ptMapping[ptId] || ptMapping['C'];
+
+        localStorage.setItem('selected_pt', ptId);
+        localStorage.setItem('pt_id', ptId);
+        localStorage.setItem('active_corporate', currentConfig.corp);
+
+        setCompanyName(currentConfig.name);
     };
 
     const pathnames = location.pathname.split('/').filter((x) => x);
@@ -64,7 +70,6 @@ const Header = () => {
                             finalData = [];
                         }
 
-                        // 🌟 KUNCI SAKTI 1: Jika Superadmin OR jika filter biasa menghasilkan 0, BUKA SEMUA AGEN!
                         let listAgenTampil = finalData;
 
                         if (!isCurrentUserSuperadmin && decoded.all_cabangyn !== 'Y') {
@@ -76,17 +81,14 @@ const Header = () => {
                                         cleanAllowedCabangs.includes(agen.agen_id?.toString().toUpperCase());
                                 });
 
-                                // Jika lolos filter, pakai hasil filter. Jika 0, gunakan finalData murni!
                                 if (filtered.length > 0) {
                                     listAgenTampil = filtered;
                                 }
                             }
                         }
 
-                        // Set state agens dengan jaminan tidak akan nol jika DB punya data
                         setAgens(listAgenTampil.length > 0 ? listAgenTampil : finalData);
 
-                        // 🌟 FIX NORMALIASI ID '1' / 'PST001'
                         let savedAgen = localStorage.getItem('active_agen_id');
                         if (savedAgen === '1' || savedAgen === 'PST001') {
                             savedAgen = 'PUSAT DAKOTA';
@@ -116,7 +118,6 @@ const Header = () => {
                     })
                     .catch(err => {
                         console.error("[Header] Gagal sinkronisasi data agen database:", err);
-                        // Fallback visual jika API bermasalah agar header tidak pernah hilang!
                         setAgens([{ agen_id: 'PUSAT DAKOTA', agen_kode: 'PUSAT', agen_nama: 'PUSAT DAKOTA' }]);
                     });
 
@@ -187,13 +188,69 @@ const Header = () => {
         });
     };
 
+    const handleSwitchCorporate = (targetPtId) => {
+        const ptMapping = {
+            'A': 'Dakota Buana Sarana (DBS)',
+            'B': 'Dakota Lintas Buana (DLB)',
+            'C': 'Dakota Logistik Indonesia (DLI)'
+        };
+
+        const targetName = ptMapping[targetPtId] || 'Dakota Group';
+
+        Swal.fire({
+            title: 'Ganti Unit Perusahaan?',
+            text: `Sistem akan dialihkan ke ${targetName}`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#4f46e5',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Ya, Ganti!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const corpMapping = { 'A': 'DBS', 'B': 'DLB', 'C': 'DLI' };
+                const corpCode = corpMapping[targetPtId] || 'DLI';
+
+                localStorage.setItem('selected_pt', targetPtId);
+                localStorage.setItem('pt_id', targetPtId);
+                localStorage.setItem('active_corporate', corpCode);
+
+                Swal.fire({
+                    title: 'Berhasil Dialihkan!',
+                    text: `Sistem sekarang memproses data untuk ${corpCode}`,
+                    icon: 'success',
+                    timer: 1200,
+                    showConfirmButton: false
+                }).then(() => {
+                    window.location.href = '/dashboard';
+                });
+            }
+        });
+    };
+
     return (
         <header className={`w-full h-24 border-b flex items-center justify-between px-8 sticky top-0 z-30 transition-colors ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
             <div className="flex items-center gap-6">
                 <div className="flex flex-col">
-                    <h1 className={`text-xl font-bold font-['Inter'] leading-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                        {companyName}
-                    </h1>
+                    <div className="flex items-center gap-2">
+                        <h1 className={`text-xl font-bold font-['Inter'] leading-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                            {companyName}
+                        </h1>
+
+                        {role === 'Superadmin' && (
+                            <select
+                                value={localStorage.getItem('selected_pt') || 'C'}
+                                onChange={(e) => handleSwitchCorporate(e.target.value)}
+                                className="ml-2 text-xs font-black bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg px-2 py-1 outline-none cursor-pointer hover:bg-indigo-100 transition shadow-xs"
+                                title="Pindah Corporate"
+                            >
+                                <option value="A">DBS</option>
+                                <option value="B">DLB</option>
+                                <option value="C">DLI</option>
+                            </select>
+                        )}
+                    </div>
+
                     <div className="text-xs font-black text-indigo-600">
                         {localStorage.getItem('active_agen_nama') || 'PUSAT DAKOTA'}
                     </div>
@@ -207,7 +264,6 @@ const Header = () => {
                             const to = `/${pathnames.slice(0, index + 1).join('/')}`;
                             const name = value.charAt(0).toUpperCase() + value.slice(1);
 
-                            // Daftar modul induk yang hanya berfungsi sebagai kategori di sidebar (bukan halaman)
                             const isCategoryGroup = ['marketing', 'master', 'operasional', 'piutang', 'hutang', 'laporan'].includes(value.toLowerCase());
 
                             return (
@@ -216,7 +272,6 @@ const Header = () => {
                                     {last ? (
                                         <span className="text-[#2b3674] font-medium select-none">{name}</span>
                                     ) : isCategoryGroup ? (
-                                        /* Jika kategori induk, render sebagai teks biasa yang tidak bisa diklik */
                                         <span className="text-slate-500 font-semibold cursor-default select-none">
                                             {name}
                                         </span>
@@ -233,7 +288,6 @@ const Header = () => {
             </div>
 
             <div className="flex items-center gap-6">
-                {/* 🌟 KUNCI SAKTI 2: SELALU RENDER DROPDOWN HEADER TANPA BARRIER LENGTH! */}
                 <div className="relative inline-block font-['Inter']">
                     <div
                         onClick={() => setIsOpenDropdownAgen(!isOpenDropdownAgen)}

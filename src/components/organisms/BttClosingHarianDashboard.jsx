@@ -211,7 +211,7 @@ const BttClosingHarianDashboard = () => {
       header: 'NO. LAPORAN',
       accessor: 'no_laporan',
       render: (item) => (
-        <span className="font-mono font-bold text-sky-600 select-all">
+        <span className="font-mono font-bold text-sky-700 select-all">
           {item.no_laporan || '-'}
         </span>
       )
@@ -220,7 +220,7 @@ const BttClosingHarianDashboard = () => {
       header: 'TANGGAL',
       accessor: 'tanggal',
       render: (item) => (
-        <span className="font-mono text-slate-600 dark:text-slate-300">
+        <span className="font-mono font-bold text-slate-900">
           {item.tanggal ? String(item.tanggal).substring(0, 10) : '-'}
         </span>
       )
@@ -230,9 +230,9 @@ const BttClosingHarianDashboard = () => {
       accessor: 'cabang',
       render: (item) => (
         <div className="flex items-center gap-1.5">
-          <Building2 size={13} className="text-slate-400" />
-          <span className="font-bold text-slate-800 dark:text-slate-200 uppercase">
-            {item.cabang || item.agen_nama || 'GORONTALO AGEN'}
+          <Building2 size={14} className="text-slate-700 shrink-0" />
+          <span className="font-black text-slate-900 uppercase">
+            {item.cabang || item.agen_nama || item.btth_agenid || 'SOL002'}
           </span>
         </div>
       )
@@ -241,8 +241,8 @@ const BttClosingHarianDashboard = () => {
       header: 'PEMBAYARAN OMSET (RP)',
       accessor: 'pembayaran',
       render: (item) => (
-        <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
-          Rp {Math.round(item.pembayaran || 0).toLocaleString('id-ID')}
+        <span className="font-mono font-black text-emerald-700 text-sm">
+          Rp {Math.round(item.pembayaran || item.btth_total || 0).toLocaleString('id-ID')}
         </span>
       )
     },
@@ -250,21 +250,21 @@ const BttClosingHarianDashboard = () => {
       header: 'NO. KAS MASUK / KELUAR',
       accessor: 'no_kas',
       render: (item) => (
-        <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
-          {item.no_kas || '-'}
+        <span className="font-mono font-bold text-slate-900">
+          {item.no_kas || item.btth_nokas || '-'}
         </span>
       )
     },
     {
       header: 'STATUS POSTING',
       accessor: 'posting',
-      render: (item) => item.posting === 'Y' ? (
-        <span className="inline-flex items-center gap-1 font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[10px]">
-          <CheckCircle2 size={12} /> POSTED
+      render: (item) => (item.posting === 'Y' || item.btth_postingyn === 'Y') ? (
+        <span className="inline-flex items-center gap-1 font-black text-emerald-800 bg-emerald-100 border border-emerald-300 px-2.5 py-1 rounded-md text-[10px] tracking-wide">
+          <CheckCircle2 size={12} className="stroke-[3]" /> POSTED
         </span>
       ) : (
-        <span className="inline-flex items-center gap-1 font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-[10px]">
-          <Clock size={12} /> OPEN
+        <span className="inline-flex items-center gap-1 font-black text-amber-900 bg-amber-100 border border-amber-300 px-2.5 py-1 rounded-md text-[10px] tracking-wide">
+          <Clock size={12} className="stroke-[3]" /> OPEN
         </span>
       )
     },
@@ -272,17 +272,21 @@ const BttClosingHarianDashboard = () => {
       header: 'NO. JURNAL GL',
       accessor: 'no_jurnal',
       render: (item) => (
-        <span className="font-mono text-slate-500 select-all">
-          {item.no_jurnal || '-'}
+        <span className="font-mono font-bold text-slate-800 select-all">
+          {item.no_jurnal || item.btth_nojurnal || '-'}
         </span>
       )
     },
     {
-      header: 'AKTIF',
+      header: 'STATUS DATA',
       accessor: 'aktif',
-      render: (item) => (
-        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-bold border border-blue-200 text-[10px] rounded-full">
-          {item.aktif || 'Y'}
+      render: (item) => (item.aktif === 'Y' || item.btth_activeyn === 'Y' || !item.aktif) ? (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 text-emerald-900 font-black border border-emerald-300 text-[10px] rounded-md tracking-wider">
+          <CheckCircle2 size={11} className="stroke-[3]" /> AKTIF
+        </span>
+      ) : (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-100 text-rose-900 font-black border border-rose-300 text-[10px] rounded-md tracking-wider">
+          <AlertCircle size={11} className="stroke-[3]" /> NONAKTIF
         </span>
       )
     }
@@ -335,8 +339,8 @@ const BttClosingHarianDashboard = () => {
               disabled={!isHoldingUser}
               onChange={(e) => setNewClosingForm({ ...newClosingForm, cabang_agen: e.target.value })}
               className={`w-full p-2.5 border rounded-lg font-bold outline-none ${!isHoldingUser
-                  ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed'
-                  : 'bg-white border-slate-300 text-slate-800 focus:border-blue-500 cursor-pointer'
+                ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed'
+                : 'bg-white border-slate-300 text-slate-800 focus:border-blue-500 cursor-pointer'
                 }`}
               required
             >
@@ -417,8 +421,8 @@ const BttClosingHarianDashboard = () => {
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
                   className={`w-full p-2 border rounded-lg font-bold outline-none ${bypassTanggal
-                      ? 'bg-slate-100 text-slate-400 border-slate-200'
-                      : 'bg-white text-slate-800 border-slate-300 focus:border-sky-500'
+                    ? 'bg-slate-100 text-slate-400 border-slate-200'
+                    : 'bg-white text-slate-800 border-slate-300 focus:border-sky-500'
                     }`}
                 />
               </div>
@@ -430,8 +434,8 @@ const BttClosingHarianDashboard = () => {
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
                   className={`w-full p-2 border rounded-lg font-bold outline-none ${bypassTanggal
-                      ? 'bg-slate-100 text-slate-400 border-slate-200'
-                      : 'bg-white text-slate-800 border-slate-300 focus:border-sky-500'
+                    ? 'bg-slate-100 text-slate-400 border-slate-200'
+                    : 'bg-white text-slate-800 border-slate-300 focus:border-sky-500'
                     }`}
                 />
               </div>
@@ -444,8 +448,8 @@ const BttClosingHarianDashboard = () => {
                 disabled={!isHoldingUser}
                 onChange={(e) => setSelectedCabang(e.target.value)}
                 className={`w-full p-2 border rounded-lg font-bold outline-none ${!isHoldingUser
-                    ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed select-none'
-                    : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500 cursor-pointer'
+                  ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed select-none'
+                  : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500 cursor-pointer'
                   }`}
                 title={!isHoldingUser ? "Filter cabang terkunci sesuai lokasi login Anda" : "Pilih cabang untuk monitoring"}
               >
