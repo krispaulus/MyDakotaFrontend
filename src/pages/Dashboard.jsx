@@ -33,21 +33,13 @@ const achievementData = [
   { tanggal: '30', pencapaian: 92, target: 65 },
 ];
 
-// Data BTT aktif berjalan
-const activeBTTList = [
-  { no_btt: 'BTT-260901-0012', asal: 'JAKARTA', tujuan: 'SURABAYA', status: 'IN TRANSIT', driver: 'Budi Santoso', waktu: '2 jam lalu' },
-  { no_btt: 'BTT-260901-0045', asal: 'BEKASI', tujuan: 'SEMARANG', status: 'DELIVERY LOPER', driver: 'Agus Prayitno', waktu: '45 menit lalu' },
-  { no_btt: 'BTT-260901-0078', asal: 'TANGERANG', tujuan: 'MEDAN', status: 'PORT TRANSIT', driver: 'Kapal Laut Express', waktu: '5 jam lalu' },
-  { no_btt: 'BTT-260901-0091', asal: 'BANDUNG', tujuan: 'DENPASAR', status: 'IN TRANSIT', driver: 'Rian Hidayat', waktu: '1 jam lalu' },
-];
-
 const Dashboard = () => {
   // State Summary Metrik
   const [summary, setSummary] = useState({
-    totalCargo: 1240,
-    inTransit: 452,
-    pending: 12,
-    completed: 776,
+    totalCargo: 0,
+    inTransit: 0,
+    pending: 0,
+    completed: 0,
     growthPercentage: 12
   });
 
@@ -57,6 +49,9 @@ const Dashboard = () => {
   const [detailData, setDetailData] = useState([]);
   const [modalLoading, setModalLoading] = useState(false);
   const [detailSearch, setDetailSearch] = useState('');
+
+  // State BTT Berjalan Sisi Kanan (Real DB)
+  const [recentBTTList, setRecentBTTList] = useState([]);
 
   // State Chatbot AI
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -68,6 +63,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchDashboardMetrics();
+    fetchRecentActiveBTT();
   }, []);
 
   const fetchDashboardMetrics = async () => {
@@ -79,12 +75,28 @@ const Dashboard = () => {
       if (res.data?.data) {
         setSummary(res.data.data);
       }
-    } catch {
-      // Menggunakan nilai inisial jika endpoint belum aktif
+    } catch (err) {
+      console.error("Gagal load metrik dashboard:", err);
     }
   };
 
-  // Handler klik kartu metrik
+  // Mengambil 5 BTT aktif terkini dari DB untuk widget kanan
+  const fetchRecentActiveBTT = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await api.get('/dashboard/btt-by-status?status=IN%20TRANSIT&limit=5', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      console.log("Data BTT Aktif Berjalan:", res.data);
+      if (res.data?.data && res.data.data.length > 0) {
+        setRecentBTTList(res.data.data);
+      }
+    } catch (err) {
+      console.error("Gagal load BTT aktif:", err);
+    }
+  };
+
+  // Handler klik kartu metrik (Mengambil TOP 5 Data Riil dari DB)
   const handleCardClick = async (categoryKey, categoryTitle, themeColor) => {
     setSelectedCategory({ key: categoryKey, title: categoryTitle, color: themeColor });
     setIsDetailModalOpen(true);
@@ -93,17 +105,17 @@ const Dashboard = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const res = await api.get(`/dashboard/btt-by-status?status=${categoryKey}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const ptId = localStorage.getItem('pt_id') || 'C';
+
+      const res = await api.get(
+        `/dashboard/btt-by-status?pt_id=${ptId}&status=${encodeURIComponent(categoryKey)}&limit=5`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
       setDetailData(res.data?.data || []);
-    } catch {
-      // Data cadangan sementara saat integrasi backend
-      setDetailData([
-        { no_btt: 'BTT-260901-001', tanggal: '2026-09-20', asal: 'JAKARTA', tujuan: 'SURABAYA', pengirim: 'PT INDO FOOD', penerima: 'CV BERKAH JAYA', armada: 'B 9281 UXT', status: categoryTitle },
-        { no_btt: 'BTT-260901-002', tanggal: '2026-09-21', asal: 'BEKASI', tujuan: 'SEMARANG', pengirim: 'PT ASTRA', penerima: 'PT MAJU MOTOR', armada: 'B 9112 KLO', status: categoryTitle },
-        { no_btt: 'BTT-260901-003', tanggal: '2026-09-21', asal: 'TANGERANG', tujuan: 'SOLO', pengirim: 'TOKO ELEKTRONIK', penerima: 'SINAR JAYA', armada: 'D 8812 AB', status: categoryTitle }
-      ]);
+    } catch (err) {
+      console.error("Gagal load detail BTT dari database:", err);
+      setDetailData([]);
     } finally {
       setModalLoading(false);
     }
@@ -149,7 +161,7 @@ const Dashboard = () => {
       {/* 🌟 1. KARTU STATISTIK (DAPAT DIKLIK) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div
-          onClick={() => handleCardClick('ALL', 'Semua Total Cargo', 'blue')}
+          onClick={() => handleCardClick('ALL', 'Top 5 BTT Keseluruhan', 'blue')}
           className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between cursor-pointer hover:border-blue-400 hover:shadow-md transition duration-200 group active:scale-[0.99]"
         >
           <div>
@@ -165,7 +177,7 @@ const Dashboard = () => {
         </div>
 
         <div
-          onClick={() => handleCardClick('IN_TRANSIT', 'BTT Sedang Dalam Perjalanan (In Transit)', 'amber')}
+          onClick={() => handleCardClick('IN_TRANSIT', 'Top 5 BTT Sedang Dalam Perjalanan', 'amber')}
           className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between cursor-pointer hover:border-amber-400 hover:shadow-md transition duration-200 group active:scale-[0.99]"
         >
           <div>
@@ -179,7 +191,7 @@ const Dashboard = () => {
         </div>
 
         <div
-          onClick={() => handleCardClick('PENDING', 'BTT Tertahan / Pending Hub', 'rose')}
+          onClick={() => handleCardClick('PENDING', 'Top 5 BTT Tertahan / Pending Hub', 'rose')}
           className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between cursor-pointer hover:border-rose-400 hover:shadow-md transition duration-200 group active:scale-[0.99]"
         >
           <div>
@@ -195,7 +207,7 @@ const Dashboard = () => {
         </div>
 
         <div
-          onClick={() => handleCardClick('COMPLETED', 'BTT Terkirim Sukses (POD Completed)', 'emerald')}
+          onClick={() => handleCardClick('COMPLETED', 'Top 5 BTT Terkirim Sukses (POD Completed)', 'emerald')}
           className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between cursor-pointer hover:border-emerald-400 hover:shadow-md transition duration-200 group active:scale-[0.99]"
         >
           <div>
@@ -247,40 +259,44 @@ const Dashboard = () => {
             <h3 className="font-black text-sm uppercase text-slate-800">BTT Aktif Berjalan</h3>
             <button
               type="button"
-              onClick={() => handleCardClick('IN_TRANSIT', 'Daftar Semua BTT Aktif Berjalan', 'amber')}
+              onClick={() => handleCardClick('IN_TRANSIT', 'Top 5 BTT Sedang Dalam Perjalanan', 'amber')}
               className="text-[11px] font-bold text-sky-600 hover:text-sky-800 hover:underline cursor-pointer bg-transparent border-0"
             >
-              Lihat Semua
+              Lihat 5 Teratas
             </button>
           </div>
 
           <div className="space-y-3 overflow-y-auto max-h-72 pr-1">
-            {activeBTTList.map((item, idx) => (
-              <div key={idx} className="p-3 bg-slate-50 hover:bg-sky-50/50 rounded-xl border border-slate-100 transition">
-                <div className="flex justify-between items-center mb-1">
-                  <span className="font-mono font-black text-xs text-sky-700">{item.no_btt}</span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                    {item.status}
-                  </span>
+            {recentBTTList.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-8 font-medium">Tidak ada BTT aktif berjalan saat ini.</p>
+            ) : (
+              recentBTTList.map((item, idx) => (
+                <div key={idx} className="p-3 bg-slate-50 hover:bg-sky-50/50 rounded-xl border border-slate-100 transition">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="font-mono font-black text-xs text-sky-700">{item.no_btt}</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                      {item.status || 'IN TRANSIT'}
+                    </span>
+                  </div>
+                  <p className="text-xs font-bold text-slate-700">{item.asal} &rarr; {item.tujuan}</p>
+                  <div className="flex justify-between text-[11px] text-slate-500 mt-1">
+                    <span>{item.armada || item.pengirim}</span>
+                    <span className="font-mono font-bold text-slate-700">Rp {Number(item.harga || 0).toLocaleString('id-ID')}</span>
+                  </div>
                 </div>
-                <p className="text-xs font-bold text-slate-700">{item.asal} &rarr; {item.tujuan}</p>
-                <div className="flex justify-between text-[11px] text-slate-400 mt-1">
-                  <span>{item.driver}</span>
-                  <span>{item.waktu}</span>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>
 
-      {/* 🌟 3. POP-UP DRILL-DOWN DATA RIIL */}
+      {/* 🌟 3. POP-UP DRILL-DOWN DATA RIIL (TOP 5 DATABASE) */}
       {isDetailModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
           <div className="w-full max-w-5xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[85vh]">
             <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/70">
               <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">DETAIL OPERASIONAL BTT</span>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">DETAIL OPERASIONAL BTT (TOP 5 TERATAS)</span>
                 <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
                   {selectedCategory.title}
                   <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">
@@ -328,6 +344,7 @@ const Dashboard = () => {
                       <th className="p-3">TANGGAL</th>
                       <th className="p-3">RUTE (ASAL &rarr; TUJUAN)</th>
                       <th className="p-3">PENGIRIM / PENERIMA</th>
+                      <th className="p-3 text-right">BERAT / BIAYA</th>
                       <th className="p-3">ARMADA / SUPIR</th>
                       <th className="p-3">STATUS</th>
                     </tr>
@@ -343,6 +360,10 @@ const Dashboard = () => {
                         <td className="p-3">
                           <p className="font-bold text-slate-800">{row.pengirim}</p>
                           <p className="text-[10px] text-slate-400">{row.penerima}</p>
+                        </td>
+                        <td className="p-3 text-right">
+                          <p className="font-mono font-bold text-slate-800">{row.berat} Kg</p>
+                          <p className="font-mono text-[10px] text-rose-600 font-bold">Rp {Number(row.harga || 0).toLocaleString('id-ID')}</p>
                         </td>
                         <td className="p-3 text-slate-700">{row.armada || '-'}</td>
                         <td className="p-3">

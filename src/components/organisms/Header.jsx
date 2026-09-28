@@ -10,6 +10,7 @@ const Header = () => {
     const { isDarkMode } = useDarkMode();
     const [role, setRole] = useState('');
     const [companyName, setCompanyName] = useState('Dakota Group');
+    const [corporateCode, setCorporateCode] = useState('DLI');
     const [agens, setAgens] = useState([]);
     const [selectedAgen, setSelectedAgen] = useState('');
     const location = useLocation();
@@ -31,6 +32,7 @@ const Header = () => {
         localStorage.setItem('active_corporate', currentConfig.corp);
 
         setCompanyName(currentConfig.name);
+        setCorporateCode(currentConfig.corp);
     };
 
     const pathnames = location.pathname.split('/').filter((x) => x);
@@ -188,75 +190,27 @@ const Header = () => {
         });
     };
 
-    const handleSwitchCorporate = (targetPtId) => {
-        const ptMapping = {
-            'A': 'Dakota Buana Sarana (DBS)',
-            'B': 'Dakota Lintas Buana (DLB)',
-            'C': 'Dakota Logistik Indonesia (DLI)'
-        };
-
-        const targetName = ptMapping[targetPtId] || 'Dakota Group';
-
-        Swal.fire({
-            title: 'Ganti Unit Perusahaan?',
-            text: `Sistem akan dialihkan ke ${targetName}`,
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonColor: '#4f46e5',
-            cancelButtonColor: '#d33',
-            confirmButtonText: 'Ya, Ganti!',
-            cancelButtonText: 'Batal'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                const corpMapping = { 'A': 'DBS', 'B': 'DLB', 'C': 'DLI' };
-                const corpCode = corpMapping[targetPtId] || 'DLI';
-
-                localStorage.setItem('selected_pt', targetPtId);
-                localStorage.setItem('pt_id', targetPtId);
-                localStorage.setItem('active_corporate', corpCode);
-
-                Swal.fire({
-                    title: 'Berhasil Dialihkan!',
-                    text: `Sistem sekarang memproses data untuk ${corpCode}`,
-                    icon: 'success',
-                    timer: 1200,
-                    showConfirmButton: false
-                }).then(() => {
-                    window.location.href = '/dashboard';
-                });
-            }
-        });
-    };
-
     return (
         <header className={`w-full h-24 border-b flex items-center justify-between px-8 sticky top-0 z-30 transition-colors ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
             <div className="flex items-center gap-6">
                 <div className="flex flex-col">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2.5">
                         <h1 className={`text-xl font-bold font-['Inter'] leading-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                             {companyName}
                         </h1>
 
-                        {role === 'Superadmin' && (
-                            <select
-                                value={localStorage.getItem('selected_pt') || 'C'}
-                                onChange={(e) => handleSwitchCorporate(e.target.value)}
-                                className="ml-2 text-xs font-black bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg px-2 py-1 outline-none cursor-pointer hover:bg-indigo-100 transition shadow-xs"
-                                title="Pindah Corporate"
-                            >
-                                <option value="A">DBS</option>
-                                <option value="B">DLB</option>
-                                <option value="C">DLI</option>
-                            </select>
-                        )}
+                        {/* Badge Corporate Read-Only (Non-Clickable) */}
+                        <span className="text-xs font-black bg-blue-50 text-blue-700 border border-blue-200 rounded-lg px-2 py-0.5 select-none shadow-2xs">
+                            {corporateCode}
+                        </span>
                     </div>
 
-                    <div className="text-xs font-black text-indigo-600">
+                    <div className="text-xs font-black text-indigo-600 mt-0.5">
                         {localStorage.getItem('active_agen_nama') || 'PUSAT DAKOTA'}
                     </div>
 
                     <nav className={`flex text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-400'}`}>
-                        <Link to="/dashboard" className={`hover:text-[#2170f4] transition-colors cursor-pointer`}>
+                        <Link to="/dashboard" className="hover:text-[#2170f4] transition-colors cursor-pointer">
                             Home
                         </Link>
                         {pathnames.map((value, index) => {
