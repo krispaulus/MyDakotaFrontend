@@ -1175,6 +1175,25 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
 
     const modalRoot = document.getElementById('modal-root') || document.body;
 
+    const handleApplyFilter = (e) => {
+        if (e) e.preventDefault();
+        fetchInvoiceList();
+    };
+
+    const handleResetFilter = () => {
+        setStartDate(firstDay);
+        setEndDate(today);
+        setBypassTanggal(false);
+        setSelectedCabang(isHoldingUser ? '' : currentActiveAgen.id);
+        setSelectedJenis('');
+        setSelectedTerbayar('');
+        setSearchCustomer('');
+        setSearchInvoice('');
+        setSearchKwitansi('');
+        setSearchBTT('');
+        fetchInvoiceList();
+    };
+
     return (
         <div className="space-y-5">
             {/* Panel Filter jika showFilter = true */}
