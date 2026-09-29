@@ -21,7 +21,7 @@ const Invoice = () => {
     const [custList, setCustList] = useState([]);
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [showFilter, setShowFilter] = useState(false);
+    const [showFilter, setShowFilter] = useState(true);
 
     // Dropdown Cetak di Kolom Aksi
     const [activePrintMenuId, setActivePrintMenuId] = useState(null);
@@ -39,7 +39,7 @@ const Invoice = () => {
 
         if (sessionCabangNama) {
             return {
-                id: activeCabangId || activeAgenId || '',
+                id: activeCabangId || activeAgenId || '001',
                 nama: sessionCabangNama.toUpperCase()
             };
         }
@@ -59,7 +59,7 @@ const Invoice = () => {
 
         if (found) {
             return {
-                id: String(found.agen_id || found.AgenID),
+                id: String(found.agen_id || found.AgenID).padStart(3, '0'),
                 nama: String(found.agen_nama || found.AgenNama).toUpperCase()
             };
         }
@@ -69,8 +69,8 @@ const Invoice = () => {
         }
 
         return {
-            id: activeCabangId || activeAgenId || '',
-            nama: activeAgenId ? `AGEN ${activeAgenId.toUpperCase()}` : ''
+            id: (activeCabangId || activeAgenId || '001').padStart(3, '0'),
+            nama: activeAgenId ? `AGEN ${activeAgenId.toUpperCase()}` : 'PUSAT DAKOTA'
         };
     }
 
@@ -100,7 +100,6 @@ const Invoice = () => {
         }
     }, [isHoldingUser, currentActiveAgen.id, cabangList]);
 
-    // Tutup dropdown saat klik sembarang tempat
     useEffect(() => {
         const handleOutsideClick = () => setActivePrintMenuId(null);
         window.addEventListener('click', handleOutsideClick);
@@ -114,8 +113,12 @@ const Invoice = () => {
     const [addStep, setAddStep] = useState(1);
     const [bttStartDate, setBttStartDate] = useState(firstDay);
     const [bttEndDate, setBttEndDate] = useState(today);
-    const [bttBypassTanggal, setBttBypassTanggal] = useState(false);
+    const [bttBypassTanggal, setBttBypassTanggal] = useState(true);
     const [bttDisplayType, setBttDisplayType] = useState('KREDIT');
+
+    // Penanda invoice aktif yang baru tersimpan
+    const [savedInvoiceId, setSavedInvoiceId] = useState(null);
+    const [savedKwitansiNo, setSavedKwitansiNo] = useState(null);
 
     const [newInvoiceForm, setNewInvoiceForm] = useState({
         artih_tanggal: today,
@@ -124,7 +127,7 @@ const Invoice = () => {
         artih_agenid: currentActiveAgen.id,
         artih_agenname: currentActiveAgen.nama,
         artih_jenis: 'K',
-        artih_fktpajak: '',
+        artih_fktpajak: '010.',
         artih_keterangan: '',
         selected_btts: []
     });
@@ -132,7 +135,7 @@ const Invoice = () => {
     const [unbilledBTTList, setUnbilledBTTList] = useState([]);
     const [loadingUnbilled, setLoadingUnbilled] = useState(false);
 
-    // Modal Edit Invoice
+    // Modal Edit Invoice dari List
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [activeInvoice, setActiveInvoice] = useState(null);
     const [activeBTTList, setActiveBTTList] = useState([]);
@@ -182,6 +185,305 @@ const Invoice = () => {
         fetchOptions();
         fetchInvoiceList();
     }, []);
+
+    const handleApplyFilter = (e) => {
+        if (e) e.preventDefault();
+        fetchInvoiceList();
+    };
+
+    const handleResetFilter = () => {
+        setStartDate(firstDay);
+        setEndDate(today);
+        setBypassTanggal(false);
+        setSelectedCabang(isHoldingUser ? '' : currentActiveAgen.id);
+        setSelectedJenis('');
+        setSelectedTerbayar('');
+        setSearchCustomer('');
+        setSearchInvoice('');
+        setSearchKwitansi('');
+        setSearchBTT('');
+        fetchInvoiceList();
+    };
+
+    // =========================================================================
+    // 🖨️ CETAK SUMMARY REKAP FAKTUR
+    // =========================================================================
+    const handlePrintRekapRingkas = () => {
+        if (!data || data.length === 0) {
+            Swal.fire('Peringatan', 'Tidak ada data invoice untuk dicetak.', 'warning');
+            return;
+        }
+
+        const printWindow = window.open('', '_blank', 'width=1200,height=800');
+        if (!printWindow) return;
+
+        let totalKoli = 0;
+        let totalBerat = 0;
+        let totalPacking = 0;
+        let totalPenerus = 0;
+        let totalBiayaKirim = 0;
+        let grandTotal = 0;
+
+        const rowsHtml = data.map((item, idx) => {
+            const total = Number(item.artih_total || 0);
+            const berat = Number(item.artih_berat || item.total_berat || 0);
+            const koli = Number(item.artih_koli || item.total_koli || 1);
+            const penerus = Number(item.artih_penerus || item.total_penerus || 0);
+            const packing = Number(item.artih_packing || item.total_packing || 0);
+            const biayaKirim = total - penerus - packing;
+
+            totalKoli += koli;
+            totalBerat += berat;
+            totalPenerus += penerus;
+            totalPacking += packing;
+            totalBiayaKirim += biayaKirim;
+            grandTotal += total;
+
+            return `
+                <tr style="font-family: monospace; font-size: 10px;">
+                    <td style="border: 1px solid #333; padding: 4px; text-align: center;">${idx + 1}</td>
+                    <td style="border: 1px solid #333; padding: 4px;">${item.artih_id}</td>
+                    <td style="border: 1px solid #333; padding: 4px;">${item.cust_name || item.artih_custname || '-'}</td>
+                    <td style="border: 1px solid #333; padding: 4px; font-weight: bold;">${item.bttt_id || item.artih_nobtt || '-'}</td>
+                    <td style="border: 1px solid #333; padding: 4px; text-align: center;">${String(item.artih_tanggal || '').substring(0, 10)}</td>
+                    <td style="border: 1px solid #333; padding: 4px;">${item.tujuan || item.artih_tujuan || '-'}</td>
+                    <td style="border: 1px solid #333; padding: 4px;">${item.penerima || item.artih_penerima || '-'}</td>
+                    <td style="border: 1px solid #333; padding: 4px; text-align: center;">DARAT</td>
+                    <td style="border: 1px solid #333; padding: 4px; text-align: center;">${koli}</td>
+                    <td style="border: 1px solid #333; padding: 4px; text-align: right;">${berat.toLocaleString('id-ID')}</td>
+                    <td style="border: 1px solid #333; padding: 4px; text-align: right;">0</td>
+                    <td style="border: 1px solid #333; padding: 4px; text-align: right;">${packing.toLocaleString('id-ID')}</td>
+                    <td style="border: 1px solid #333; padding: 4px; text-align: right;">${penerus.toLocaleString('id-ID')}</td>
+                    <td style="border: 1px solid #333; padding: 4px; text-align: right;">${biayaKirim.toLocaleString('id-ID')}</td>
+                    <td style="border: 1px solid #333; padding: 4px; text-align: right; font-weight: bold;">${total.toLocaleString('id-ID')}</td>
+                </tr>
+            `;
+        }).join('');
+
+        const headerFakturNo = data[0]?.artih_id || '-';
+        const headerKwitansiNo = data[0]?.artih_nokw || '-';
+        const headerCustomer = data.length === 1 ? (data[0]?.cust_name || data[0]?.artih_custname) : 'SEMUA CUSTOMER (TERFILTER)';
+
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>FAKTUR PENAGIHAN - DAKOTA LOGISTIK INDONESIA</title>
+                <style>
+                    @page { size: A4 landscape; margin: 8mm; }
+                    body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 10px; color: #000; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+                    th { border: 1px solid #000; padding: 6px 3px; background-color: #cbd5e1; font-size: 9px; text-align: center; }
+                    .btn-ctrl { padding: 7px 18px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; text-transform: uppercase; margin: 0 4px; }
+                    @media print { .no-print { display: none !important; } }
+                </style>
+            </head>
+            <body>
+                <div class="no-print" style="margin-bottom: 12px; text-align: right;">
+                    <button class="btn-ctrl" style="background:#16a34a; color:white;" onclick="window.print()">PRINT</button>
+                    <button class="btn-ctrl" style="background:#e11d48; color:white;" onclick="window.close()">TUTUP</button>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #000; padding-bottom:6px;">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <img src="${dakotaLogo}" alt="Logo Dakota" style="height:42px; object-fit:contain;" />
+                        <div>
+                            <h2 style="margin:0; font-size:14px; font-weight:900;">PT DAKOTA LOGISTIK INDONESIA</h2>
+                            <div style="font-size:10px; color:#444;">Jl. Wibawa Mukti II No. 99, Jatiasih, Bekasi</div>
+                        </div>
+                    </div>
+                    <div style="text-align:right;">
+                        <h2 style="margin:0; font-size:15px; font-weight:900; text-decoration:underline;">FAKTUR PENAGIHAN</h2>
+                        <div style="font-size:10px; font-weight:bold; margin-top:2px;">NO. FAKTUR: ${headerFakturNo}</div>
+                        <div style="font-size:10px; color:#444;">NO. KWITANSI: ${headerKwitansiNo}</div>
+                        <div style="font-size:10px; color:#444;">CUSTOMER: ${headerCustomer}</div>
+                    </div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:3%;">NO</th>
+                            <th style="width:11%;">NO. INVOICE</th>
+                            <th style="width:14%;">NAMA CUSTOMER</th>
+                            <th style="width:9%;">NO. BTT</th>
+                            <th style="width:8%;">TANGGAL</th>
+                            <th style="width:9%;">KOTA TUJUAN</th>
+                            <th style="width:12%;">PENERIMA</th>
+                            <th style="width:5%;">SERVICE</th>
+                            <th style="width:4%;">KOLI</th>
+                            <th style="width:5%;">BERAT</th>
+                            <th style="width:4%;">UKURAN</th>
+                            <th style="width:5%;">PACKING</th>
+                            <th style="width:5%;">PENERUS</th>
+                            <th style="width:6%;">BIAYA KIRIM</th>
+                            <th style="width:8%;">TOTAL BIAYA</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                    <tfoot>
+                        <tr style="background-color:#f1f5f9; font-weight:bold; font-family:monospace; font-size:10px;">
+                            <td colspan="8" style="border:1px solid #333; padding:6px; text-align:center;">JUMLAH TOTAL :</td>
+                            <td style="border:1px solid #333; padding:6px; text-align:center;">${totalKoli}</td>
+                            <td style="border:1px solid #333; padding:6px; text-align:right;">${totalBerat.toLocaleString('id-ID')}</td>
+                            <td style="border:1px solid #333; padding:6px; text-align:right;">0</td>
+                            <td style="border:1px solid #333; padding:6px; text-align:right;">${totalPacking.toLocaleString('id-ID')}</td>
+                            <td style="border:1px solid #333; padding:6px; text-align:right;">${totalPenerus.toLocaleString('id-ID')}</td>
+                            <td style="border:1px solid #333; padding:6px; text-align:right;">${totalBiayaKirim.toLocaleString('id-ID')}</td>
+                            <td style="border:1px solid #333; padding:6px; text-align:right; font-weight:900; color:#b91c1c;">Rp ${grandTotal.toLocaleString('id-ID')}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+    };
+
+    // =========================================================================
+    // 🖨️ CETAK REKAP FAKTUR PAJAK
+    // =========================================================================
+    const handlePrintRekapFakturPajak = () => {
+        if (!data || data.length === 0) {
+            Swal.fire('Peringatan', 'Tidak ada data faktur untuk membuat rekap.', 'warning');
+            return;
+        }
+
+        const printWindow = window.open('', '_blank', 'width=1350,height=850');
+        if (!printWindow) return;
+
+        let totalJasa = 0;
+        let totalDiskon = 0;
+        let totalPenerus = 0;
+        let totalPacking = 0;
+        let totalJumlah = 0;
+        let totalPPN = 0;
+        let totalPiutang = 0;
+        let totalDPP = 0;
+
+        const rowsHtml = data.map((item, idx) => {
+            const sub = Number(item.artih_total || 0);
+            const dpp = Number(item.artih_dpp || sub);
+            const ppn = Number(item.artih_ppn_nominal || (dpp * 0.011));
+            const piutang = sub + ppn;
+
+            totalJasa += sub;
+            totalJumlah += sub;
+            totalDPP += dpp;
+            totalPPN += ppn;
+            totalPiutang += piutang;
+
+            return `
+                <tr style="font-size: 10px; font-family: monospace;">
+                    <td style="border:1px solid #444; padding:3px; text-align:center;">${idx + 1}</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:center;">${item.artih_fktpajak || '010.'}</td>
+                    <td style="border:1px solid #444; padding:3px;">${item.artih_nokw || '-'}</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:center;">${String(item.artih_tanggal || '').substring(0, 10)}</td>
+                    <td style="border:1px solid #444; padding:3px;">${item.artih_id}</td>
+                    <td style="border:1px solid #444; padding:3px;">${item.cust_name || item.artih_custname || '-'}</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:center;">-</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:center;">-</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:right;">${sub.toLocaleString('id-ID')}</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:right;">0</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:right;">0</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:right;">0</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:right; font-weight:bold;">${sub.toLocaleString('id-ID')}</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:right;">${sub.toLocaleString('id-ID')}</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:right;">${ppn.toLocaleString('id-ID')}</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:right; font-weight:bold;">${piutang.toLocaleString('id-ID')}</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:right;">${dpp.toLocaleString('id-ID')}</td>
+                    <td style="border:1px solid #444; padding:3px;">${item.cust_name || item.artih_custname || '-'}</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:center;">-</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:center;">-</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:right;">0</td>
+                </tr>
+            `;
+        }).join('');
+
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>REKAP FAKTUR PAJAK - DAKOTA LOGISTIK INDONESIA</title>
+                <style>
+                    @page { size: A3 landscape; margin: 8mm; }
+                    body { font-family: Arial, sans-serif; font-size: 10px; margin: 10px; color: #000; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+                    th { border: 1px solid #000; background: #cbd5e1; padding: 5px 2px; text-align:center; font-size:9px; }
+                    .btn-print { background:#16a34a; color:#fff; border:none; padding:8px 18px; font-weight:bold; border-radius:6px; cursor:pointer; }
+                    @media print { .no-print { display:none !important; } }
+                </style>
+            </head>
+            <body>
+                <div class="no-print" style="margin-bottom:12px; text-align:right;">
+                    <button class="btn-print" onclick="window.print()">PRINT REKAP FAKTUR</button>
+                    <button class="btn-print" style="background:#e11d48;" onclick="window.close()">TUTUP</button>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px;">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <img src="${dakotaLogo}" alt="Logo Dakota" style="height:42px; object-fit:contain;" />
+                        <div>
+                            <h2 style="margin:0; font-size:14px; font-weight:900;">PT DAKOTA LOGISTIK INDONESIA</h2>
+                            <div style="font-size:10px; color:#444;">Jl. Wibawa Mukti II No. 99, Jatiasih, Bekasi</div>
+                        </div>
+                    </div>
+                    <div style="text-align:right;">
+                        <h2 style="margin:0; font-size:16px; font-weight:900; letter-spacing:0.5px;">REKAP FAKTUR PAJAK</h2>
+                        <div style="font-size:10px; font-weight:bold; color:#444; margin-top:2px;">Periode : ${startDate} - ${endDate}</div>
+                    </div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th rowspan="2" style="width:2%;">No</th>
+                            <th colspan="4">FAKTUR PAJAK</th>
+                            <th rowspan="2" style="width:12%;">CUSTOMER</th>
+                            <th rowspan="2" style="width:12%;">ALAMAT</th>
+                            <th rowspan="2" style="width:7%;">NPWP</th>
+                            <th colspan="5">RINCIAN</th>
+                            <th rowspan="2" style="width:6%;">Harga Jual</th>
+                            <th rowspan="2" style="width:5%;">UTANG PPN</th>
+                            <th rowspan="2" style="width:6%;">PIUTANG USAHA</th>
+                            <th style="width:5%;">PPN</th>
+                            <th rowspan="2" style="width:11%;">Nama di BTT</th>
+                            <th colspan="2">TUKAR FAKTUR</th>
+                            <th rowspan="2" style="width:3%;">Asuransi</th>
+                        </tr>
+                        <tr>
+                            <th style="width:4%;">No. Faktur</th>
+                            <th style="width:8%;">Kwitansi</th>
+                            <th style="width:5%;">Tanggal</th>
+                            <th style="width:8%;">No. Invoice</th>
+                            <th style="width:5%;">Jasa Kirim</th>
+                            <th style="width:3%;">Diskon</th>
+                            <th style="width:3%;">Penerus</th>
+                            <th style="width:3%;">Packing</th>
+                            <th style="width:5%;">JUMLAH</th>
+                            <th>DPP</th>
+                            <th style="width:4%;">Tanggal</th>
+                            <th style="width:5%;">Nama</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                    <tfoot>
+                        <tr style="background:#cbd5e1; font-weight:bold; font-size:10px; font-family:monospace;">
+                            <td colspan="8" style="border:1px solid #444; padding:5px; text-align:right;">TOTAL KESELURUHAN</td>
+                            <td style="border:1px solid #444; padding:5px; text-align:right;">${totalJasa.toLocaleString('id-ID')}</td>
+                            <td style="border:1px solid #444; padding:5px; text-align:right;">${totalDiskon.toLocaleString('id-ID')}</td>
+                            <td style="border:1px solid #444; padding:5px; text-align:right;">${totalPenerus.toLocaleString('id-ID')}</td>
+                            <td style="border:1px solid #444; padding:5px; text-align:right;">${totalPacking.toLocaleString('id-ID')}</td>
+                            <td style="border:1px solid #444; padding:5px; text-align:right;">${totalJumlah.toLocaleString('id-ID')}</td>
+                            <td style="border:1px solid #444; padding:5px; text-align:right;">${totalJumlah.toLocaleString('id-ID')}</td>
+                            <td style="border:1px solid #444; padding:5px; text-align:right;">${totalPPN.toLocaleString('id-ID')}</td>
+                            <td style="border:1px solid #444; padding:5px; text-align:right;">${totalPiutang.toLocaleString('id-ID')}</td>
+                            <td style="border:1px solid #444; padding:5px; text-align:right;">${totalDPP.toLocaleString('id-ID')}</td>
+                            <td colspan="4" style="border:1px solid #444;"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+    };
 
     const loadUnbilledBTTByDate = async (custId, start, end, bypass, displayType, custNameParam, jenisParam) => {
         if (!custId) return;
@@ -254,6 +556,9 @@ const Invoice = () => {
         );
     };
 
+    // =========================================================================
+    // 💾 SIMPAN INVOICE BARU
+    // =========================================================================
     const handleSaveNewInvoice = async (e) => {
         if (e) e.preventDefault();
 
@@ -266,15 +571,28 @@ const Invoice = () => {
             const token = localStorage.getItem('token');
             const ptId = localStorage.getItem('pt_id') || 'C';
 
+            const dateObj = new Date(newInvoiceForm.artih_tanggal);
+            const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const yyyy = String(dateObj.getFullYear());
+            const yy = yyyy.substring(2);
+            const agenKode = String(newInvoiceForm.artih_agenid || '001').padStart(3, '0');
+
             const payload = {
                 artih_tanggal: newInvoiceForm.artih_tanggal,
                 artih_custid: newInvoiceForm.artih_custid,
                 artih_custname: newInvoiceForm.artih_custname,
-                artih_agenid: newInvoiceForm.artih_agenid,
+                artih_agenid: agenKode,
                 artih_jenis: newInvoiceForm.artih_jenis,
-                artih_fktpajak: newInvoiceForm.artih_fktpajak,
+                artih_fktpajak: newInvoiceForm.artih_fktpajak || '010.',
                 artih_keterangan: newInvoiceForm.artih_keterangan,
-                btt_list: newInvoiceForm.selected_btts
+                btt_list: newInvoiceForm.selected_btts,
+                format_meta: {
+                    corp: 'DLI',
+                    agen: agenKode,
+                    month: mm,
+                    year_full: yyyy,
+                    year_short: yy
+                }
             };
 
             const res = await api.post(`/piutang/invoice/save?pt_id=${ptId}`, payload, {
@@ -282,21 +600,35 @@ const Invoice = () => {
             });
 
             const newInvoiceId = res.data?.invoice_id || res.data?.id;
+            const newNoKW = res.data?.nokw || res.data?.artih_nokw;
 
             Swal.fire({
                 title: 'BERHASIL DISIMPAN!',
-                text: res.data?.message || 'Invoice tersimpan dalam status Draft.',
+                text: `Invoice ${newInvoiceId || ''} berhasil disimpan sebagai Draft.`,
                 icon: 'success',
                 timer: 1500,
                 showConfirmButton: false
             });
 
-            setIsAddModalOpen(false);
-            fetchInvoiceList();
+            // Set state tersimpan agar tombol POSTING & CETAK langsung aktif
+            setSavedInvoiceId(newInvoiceId);
+            if (newNoKW) setSavedKwitansiNo(newNoKW);
 
-            if (newInvoiceId) {
-                handleOpenEditInvoice({ artih_id: newInvoiceId });
-            }
+            // Reset checklist pilihan BTT yang baru saja tersimpan
+            setNewInvoiceForm(prev => ({ ...prev, selected_btts: [] }));
+
+            // Refresh tabel background & refresh list unbilled BTT
+            fetchInvoiceList();
+            loadUnbilledBTTByDate(
+                newInvoiceForm.artih_custid,
+                bttStartDate,
+                bttEndDate,
+                bttBypassTanggal,
+                bttDisplayType,
+                newInvoiceForm.artih_custname,
+                newInvoiceForm.artih_jenis
+            );
+
         } catch (err) {
             Swal.fire('Gagal!', err.response?.data?.message || 'Gagal menyimpan invoice.', 'error');
         }
@@ -325,7 +657,7 @@ const Invoice = () => {
     };
 
     const handlePostingInvoice = (invoiceId) => {
-        const id = invoiceId || activeInvoice?.artih_id;
+        const id = invoiceId || activeInvoice?.artih_id || savedInvoiceId;
         Swal.fire({
             title: 'Posting Invoice?',
             text: `Invoice ${id} akan diposting dan jurnal memorial otomatis terbentuk. Lanjutkan?`,
@@ -350,6 +682,7 @@ const Invoice = () => {
 
                     Swal.fire('Berhasil!', response.data?.message || 'Invoice resmi diposting!', 'success');
                     setIsEditModalOpen(false);
+                    setIsAddModalOpen(false);
                     fetchInvoiceList();
                 } catch (err) {
                     Swal.fire('Gagal!', err.response?.data?.message || 'Gagal memposting invoice.', 'error');
@@ -387,7 +720,7 @@ const Invoice = () => {
     };
 
     // =========================================================================
-    // 🖨️ FUNGSI CETAK DOKUMEN FAKTUR, KWITANSI, DAN SUMMARY
+    // 🖨️ FUNGSI CETAK FAKTUR PENAGIHAN PER-BARIS INVOICE
     // =========================================================================
     const handlePrintDocument = async (invoiceItem, docType = 'FAKTUR') => {
         const item = invoiceItem || activeInvoice;
@@ -467,8 +800,6 @@ const Invoice = () => {
                     <div class="no-print no-print-bar">
                         <button class="btn-ctrl" style="background:#e11d48; color:white;" onclick="window.close()">BATAL</button>
                         <button class="btn-ctrl" style="background:#16a34a; color:white;" onclick="setJudulDoc('FAKTUR PENAGIHAN', ''); window.print();">PRINT</button>
-                        <button class="btn-ctrl" style="background:#0284c7; color:white;" onclick="exportTableToExcel('tableFaktur', 'Faktur-${header.artih_id}')">ExpToXLS</button>
-                        <button class="btn-ctrl" style="background:#eab308; color:black;" onclick="setJudulDoc('PROFORMA INVOICE', '* DRAF TAGIHAN SEMENTARA *'); window.print();">PROFORMA</button>
                     </div>
 
                     <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #000; padding-bottom:6px;">
@@ -481,7 +812,6 @@ const Invoice = () => {
                         </div>
                         <div style="text-align:right;">
                             <h2 id="judulDokumen" style="margin:0; font-size:15px; font-weight:900; text-decoration:underline;">${titleHeader}</h2>
-                            <div id="subJudulDokumen" style="font-size:10px; font-weight:bold; color:#d97706; margin-top:1px;"></div>
                             <div style="font-size:10px; font-weight:bold; margin-top:2px;">NO. FAKTUR: ${header.artih_id}</div>
                             <div style="font-size:10px; color:#555;">NO. KWITANSI: ${header.artih_nokw || '-'}</div>
                             <div style="font-size:10px; color:#555;">CUSTOMER: ${header.cust_name || header.artih_custname}</div>
@@ -508,9 +838,7 @@ const Invoice = () => {
                                 <th style="width:8%;">TOTAL BIAYA</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            ${rowsHtml}
-                        </tbody>
+                        <tbody>${rowsHtml}</tbody>
                         <tfoot>
                             <tr style="background-color:#f1f5f9; font-weight:bold; font-family:monospace; font-size:10px;">
                                 <td colspan="8" style="border:1px solid #333; padding:5px; text-align:center;">JUMLAH TOTAL :</td>
@@ -524,30 +852,6 @@ const Invoice = () => {
                             </tr>
                         </tfoot>
                     </table>
-
-                    <script>
-                        function setJudulDoc(judul, subjudul) {
-                            document.getElementById('judulDokumen').innerText = judul;
-                            document.getElementById('subJudulDokumen').innerText = subjudul;
-                        }
-                        function exportTableToExcel(tableID, filename = '') {
-                            var downloadLink;
-                            var dataType = 'application/vnd.ms-excel';
-                            var tableSelect = document.getElementById(tableID);
-                            var tableHTML = tableSelect.outerHTML.replace(/ /g, '%20');
-                            filename = filename ? filename + '.xls' : 'excel_data.xls';
-                            downloadLink = document.createElement("a");
-                            document.body.appendChild(downloadLink);
-                            if (navigator.msSaveOrOpenBlob) {
-                                var blob = new Blob(['\\ufeff', tableHTML], { type: dataType });
-                                navigator.msSaveOrOpenBlob(blob, filename);
-                            } else {
-                                downloadLink.href = 'data:' + dataType + ', ' + tableHTML;
-                                downloadLink.download = filename;
-                                downloadLink.click();
-                            }
-                        }
-                    </script>
                 </body>
                 </html>
             `);
@@ -585,7 +889,7 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
     };
 
     // =========================================================================
-    // DEFINISI KOLOM GRID DASHBOARD DENGAN 1 KOLOM AKSI LENGKAP
+    // DEFINISI KOLOM GRID DASHBOARD
     // =========================================================================
     const columns = [
         {
@@ -615,7 +919,7 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
         {
             header: 'NO. KWITANSI',
             accessor: 'artih_nokw',
-            render: (item) => <span className="font-mono font-bold text-emerald-700">{item.artih_nokw || '-'}</span>
+            render: (item) => <span className="font-mono font-bold text-emerald-700 select-all">{item.artih_nokw || '-'}</span>
         },
         {
             header: 'TOTAL TAGIHAN (RP)',
@@ -654,7 +958,6 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
             accessor: 'artih_id',
             render: (item) => (
                 <div className="flex items-center gap-1 justify-center relative" onClick={(e) => e.stopPropagation()}>
-                    {/* 1. Tombol Cetak Dokumen dengan Dropdown Menu */}
                     <div className="relative">
                         <button
                             type="button"
@@ -709,7 +1012,6 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                         )}
                     </div>
 
-                    {/* 2. Tombol Unduh RTF */}
                     <button
                         type="button"
                         onClick={() => handleDownloadRTF(item)}
@@ -719,7 +1021,6 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                         <Download size={13} />
                     </button>
 
-                    {/* 3. Tombol Edit Invoice */}
                     <button
                         type="button"
                         onClick={() => handleOpenEditInvoice(item)}
@@ -729,7 +1030,6 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                         <Edit3 size={13} />
                     </button>
 
-                    {/* 4. Tombol Posting (jika masih Draft) */}
                     {item.artih_postingyn !== 'Y' && (
                         <button
                             type="button"
@@ -741,7 +1041,6 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                         </button>
                     )}
 
-                    {/* 5. Tombol Hapus (jika masih Draft) */}
                     {item.artih_postingyn !== 'Y' && (
                         <button
                             type="button"
@@ -758,7 +1057,7 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
     ];
 
     // =========================================================================
-    // ELEMEN MODAL EDIT INVOICE (DIDEKLARASIKAN SEBELUM RETURN)
+    // ELEMEN MODAL EDIT INVOICE DARI LIST
     // =========================================================================
     const editModalElement = isEditModalOpen && activeInvoice ? (
         <div className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs transition-opacity z-[1000]">
@@ -861,21 +1160,27 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
     ) : null;
 
     // =========================================================================
-    // ELEMEN MODAL TAMBAH INVOICE (DIDEKLARASIKAN SEBELUM RETURN)
+    // ELEMEN MODAL TAMBAH INVOICE
     // =========================================================================
+    const currentSelectedTotal = unbilledBTTList
+        .filter(b => newInvoiceForm.selected_btts.includes(b.bttt_id))
+        .reduce((sum, b) => sum + Number(b.subtotal || b.bttt_harga || 0), 0);
+
     const addModalElement = isAddModalOpen ? (
-        <div className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs transition-opacity z-[1000]">
-            <div className={`w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white text-slate-800'}`}>
-                <div className="px-6 py-3.5 bg-blue-600 text-white flex items-center justify-between">
-                    <div className="font-black uppercase tracking-wider text-sm flex items-center gap-2">
-                        <Plus size={18} />
-                        {addStep === 1 ? 'PEMBUATAN INVOICE (LANGKAH 1 DARI 2)' : 'DAFTAR NOMOR BTT (LANGKAH 2 DARI 2)'}
+        <div className="fixed inset-0 flex items-center justify-center p-3 bg-slate-950/75 backdrop-blur-xs transition-opacity z-[1000]">
+            <div className={`w-full max-w-7xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[96vh] ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white text-slate-800'}`}>
+                {/* Header Modal */}
+                <div className="px-6 py-2.5 bg-[#004b84] text-white flex items-center justify-between">
+                    <div className="font-black uppercase tracking-wider text-xs flex items-center gap-2">
+                        <Plus size={16} />
+                        {addStep === 1 ? 'PEMBUATAN INVOICE (LANGKAH 1 DARI 2)' : 'BUAT INVOICE BARU'}
                     </div>
                     <button type="button" onClick={() => setIsAddModalOpen(false)} className="text-white/80 hover:text-white cursor-pointer">
-                        <X size={20} />
+                        <X size={18} />
                     </button>
                 </div>
 
+                {/* LANGKAH 1: PILIH CUSTOMER */}
                 {addStep === 1 && (
                     <div className="p-6 space-y-5 overflow-y-auto text-xs flex-1">
                         <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -999,204 +1304,554 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                     </div>
                 )}
 
-                {addStep === 2 && (
-                    <div className="p-6 space-y-4 overflow-y-auto text-xs flex-1">
-                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-                            <div className="flex flex-wrap items-center justify-between gap-4">
-                                <div className="flex items-center gap-2">
+                {/* LANGKAH 2: FORM LENGKAP IDENTIK DUA TABEL APLIKASI LAWAS */}
+                {addStep === 2 && (() => {
+                    // Filter BTT yang sudah dipilih oleh user
+                    const selectedBTTObjects = unbilledBTTList.filter(b => {
+                        const cleanBTTId = String(b.bttt_id || '').trim();
+                        return newInvoiceForm.selected_btts.some(id => String(id).trim() === cleanBTTId);
+                    });
+
+                    const totBiayaKirim = selectedBTTObjects.reduce((sum, b) => sum + Number(b.bttt_harga || 0), 0);
+                    const totPenerus = selectedBTTObjects.reduce((sum, b) => sum + Number(b.bttt_biayapenerus || 0), 0);
+                    const totPacking = selectedBTTObjects.reduce((sum, b) => sum + Number(b.biaya_packing || 0), 0);
+                    const grandTotalSelected = selectedBTTObjects.reduce((sum, b) => sum + Number(b.subtotal || b.bttt_harga || 0), 0);
+
+                    return (
+                        <div className="p-5 space-y-4 overflow-y-auto text-[11px] flex-1">
+                            {/* 1. KOTAK INFORMASI HEADER INVOICE */}
+                            <div className="border border-slate-300 rounded-xl p-4 bg-white space-y-3 shadow-xs">
+                                {/* Baris 1 */}
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                                     <div>
-                                        <label className="font-bold text-slate-700 block text-[11px] mb-1">TANGGAL BTT :</label>
+                                        <label className="font-bold text-slate-700 block mb-1">CABANG/AGEN :</label>
                                         <input
-                                            type="date"
-                                            value={bttStartDate}
-                                            onChange={(e) => handleFilterBTTChange(e.target.value, bttEndDate, bttBypassTanggal, bttDisplayType)}
-                                            className="p-2 bg-white border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-blue-500 cursor-pointer shadow-xs min-w-[145px]"
+                                            type="text"
+                                            readOnly
+                                            value={newInvoiceForm.artih_agenname || 'PUSAT DAKOTA'}
+                                            className="w-full p-1.5 bg-slate-50 border border-slate-300 rounded font-semibold text-slate-700"
                                         />
                                     </div>
                                     <div>
-                                        <label className="font-bold text-slate-700 block text-[11px] mb-1">SAMPAI :</label>
+                                        <label className="font-bold text-slate-700 block mb-1">NO. FAKTUR :</label>
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            value={savedInvoiceId || "0010006/09/2026/FP"}
+                                            className="w-full p-1.5 bg-slate-50 border border-slate-300 rounded font-mono font-bold text-sky-700"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="font-bold text-slate-700 block mb-1">NO. KWITANSI :</label>
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            value={savedKwitansiNo || "0006/DLI/001/09/26"}
+                                            className="w-full p-1.5 bg-slate-50 border border-slate-300 rounded font-mono font-bold text-emerald-700"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="font-bold text-slate-700 block mb-1">JENIS INVOICE :</label>
+                                        <div className="flex items-center gap-3 pt-1 font-bold text-slate-700">
+                                            <label className="flex items-center gap-1 cursor-pointer">
+                                                <input type="radio" checked readOnly className="text-blue-600" />
+                                                {newInvoiceForm.artih_jenis === 'B' ? 'Tunai' : newInvoiceForm.artih_jenis === 'T' ? 'Tagih Turun' : 'Kredit'}
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Baris 2 */}
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                    <div>
+                                        <label className="font-bold text-slate-700 block mb-1">CUSTOMER :</label>
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            value={newInvoiceForm.artih_custname || '-'}
+                                            className="w-full p-1.5 bg-slate-50 border border-slate-300 rounded font-bold text-slate-800"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="font-bold text-slate-700 block mb-1">CUST ID :</label>
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            value={newInvoiceForm.artih_custid || '-'}
+                                            className="w-full p-1.5 bg-slate-50 border border-slate-300 rounded font-mono font-bold text-slate-700"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="font-bold text-slate-700 block mb-1">TGL JATUH TEMPO :</label>
                                         <input
                                             type="date"
-                                            value={bttEndDate}
-                                            onChange={(e) => handleFilterBTTChange(bttStartDate, e.target.value, bttBypassTanggal, bttDisplayType)}
-                                            className="p-2 bg-white border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-blue-500 cursor-pointer shadow-xs min-w-[145px]"
+                                            value={newInvoiceForm.artih_tanggal}
+                                            onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, artih_tanggal: e.target.value })}
+                                            className="w-full p-1.5 bg-white border border-slate-300 rounded font-bold text-slate-800 outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="font-bold text-slate-700 block mb-1">NO JURNAL :</label>
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            placeholder="[Terbentuk Saat Posting]"
+                                            className="w-full p-1.5 bg-slate-50 border border-slate-300 rounded text-slate-400 font-mono"
                                         />
                                     </div>
                                 </div>
 
-                                <div className="flex flex-col gap-2">
-                                    <label className="flex items-center gap-2 font-bold text-slate-800 cursor-pointer select-none">
+                                {/* Baris 3 */}
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                    <div>
+                                        <label className="font-bold text-slate-700 block mb-1">NAMA :</label>
                                         <input
-                                            type="checkbox"
-                                            checked={bttBypassTanggal}
-                                            onChange={(e) => handleFilterBTTChange(bttStartDate, bttEndDate, e.target.checked, bttDisplayType)}
-                                            className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+                                            type="text"
+                                            readOnly
+                                            value={newInvoiceForm.artih_custname || '-'}
+                                            className="w-full p-1.5 bg-slate-50 border border-slate-300 rounded font-bold text-slate-800"
                                         />
-                                        <span>Bypass Filter Tanggal</span>
-                                    </label>
-
-                                    <div className="flex items-center gap-4 text-xs font-bold text-slate-700 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-xs">
-                                        <span className="text-slate-500 uppercase text-[10px]">Tampilkan Daftar :</span>
-                                        <label className="flex items-center gap-1.5 cursor-pointer">
-                                            <input
-                                                type="radio"
-                                                name="btt_display_option"
-                                                value="UTAMA"
-                                                checked={bttDisplayType !== 'PI'}
-                                                onChange={() => handleFilterBTTChange(bttStartDate, bttEndDate, bttBypassTanggal, 'UTAMA')}
-                                                className="text-blue-600 cursor-pointer"
-                                            />
-                                            {newInvoiceForm.artih_jenis === 'B' ? 'BTT Tunai' : newInvoiceForm.artih_jenis === 'T' ? 'BTT Tagih' : 'BTT Kredit'}
-                                        </label>
-                                        <label className="flex items-center gap-1.5 cursor-pointer">
-                                            <input
-                                                type="radio"
-                                                name="btt_display_option"
-                                                value="PI"
-                                                checked={bttDisplayType === 'PI'}
-                                                onChange={() => handleFilterBTTChange(bttStartDate, bttEndDate, bttBypassTanggal, 'PI')}
-                                                className="text-blue-600 cursor-pointer"
-                                            />
-                                            Proforma Invoice
-                                        </label>
+                                    </div>
+                                    <div>
+                                        <label className="font-bold text-slate-700 block mb-1">TANGGAL :</label>
+                                        <input
+                                            type="date"
+                                            value={newInvoiceForm.artih_tanggal}
+                                            onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, artih_tanggal: e.target.value })}
+                                            className="w-full p-1.5 bg-white border border-slate-300 rounded font-bold text-slate-800 outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="font-bold text-slate-700 block mb-1">KETERANGAN :</label>
+                                        <input
+                                            type="text"
+                                            value={newInvoiceForm.artih_keterangan}
+                                            onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, artih_keterangan: e.target.value })}
+                                            placeholder="Keterangan faktur..."
+                                            className="w-full p-1.5 bg-white border border-slate-300 rounded font-medium text-slate-800 outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="font-bold text-slate-700 block mb-1">FAKTUR PAJAK :</label>
+                                        <input
+                                            type="text"
+                                            value={newInvoiceForm.artih_fktpajak || '010.'}
+                                            onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, artih_fktpajak: e.target.value })}
+                                            className="w-full p-1.5 bg-white border border-slate-300 rounded font-mono font-bold text-slate-800 outline-none"
+                                        />
                                     </div>
                                 </div>
 
-                                <button
-                                    type="button"
-                                    onClick={() => loadUnbilledBTTByDate(newInvoiceForm.artih_custid, bttStartDate, bttEndDate, bttBypassTanggal, bttDisplayType)}
-                                    className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-lg uppercase flex items-center gap-1.5 cursor-pointer shadow-sm text-xs"
-                                >
-                                    <RefreshCw size={13} className={loadingUnbilled ? 'animate-spin' : ''} /> REFRESH BTT
-                                </button>
+                                {/* Baris 4: Perhitungan Nilai Finansial */}
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-1 border-t border-slate-200">
+                                    <div>
+                                        <label className="font-bold text-slate-700 block mb-1">TOTAL TAGIHAN :</label>
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            value={`Rp ${grandTotalSelected.toLocaleString('id-ID')}`}
+                                            className="w-full p-1.5 bg-slate-50 border border-slate-300 rounded font-mono font-black text-rose-600"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="font-bold text-slate-700 block mb-1">DPP (%) :</label>
+                                        <select
+                                            defaultValue="100"
+                                            className="w-full p-1.5 bg-white border border-slate-300 rounded font-bold text-slate-800 outline-none"
+                                        >
+                                            <option value="100">100 %</option>
+                                            <option value="11">11 %</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="font-bold text-slate-700 block mb-1">PPN (%) :</label>
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            value="1.1 %"
+                                            className="w-full p-1.5 bg-slate-50 border border-slate-300 rounded font-bold text-slate-700"
+                                        />
+                                    </div>
+                                </div>
                             </div>
-                        </div>
 
-                        <div className="border border-slate-200 rounded-xl max-h-72 overflow-y-auto shadow-inner">
-                            <table className="w-full text-left border-collapse text-[11px]">
-                                <thead className="bg-[#004b84] text-white uppercase font-bold sticky top-0 z-10">
-                                    <tr>
-                                        <th className="p-2.5">NO. BTT</th>
-                                        <th className="p-2.5">TANGGAL</th>
-                                        <th className="p-2.5">PENGIRIM</th>
-                                        <th className="p-2.5">ISI KIRIMAN</th>
-                                        <th className="p-2.5">KOTA TUJUAN</th>
-                                        <th className="p-2.5 font-mono text-center">BERAT</th>
-                                        <th className="p-2.5 text-right font-mono">HARGA</th>
-                                        <th className="p-2.5 text-right font-mono">PENERUS</th>
-                                        <th className="p-2.5 text-right font-mono">JUMLAH</th>
-                                        <th className="p-2.5 text-center w-14">
+                            {/* 2. TABEL ATAS: BTT YANG SUDAH DIPILIH (PERSIS GAMBAR 1 LAWAS) */}
+                            <div className="border border-emerald-400 rounded-xl p-3 bg-emerald-50/20 space-y-2">
+                                <div className="text-center font-bold text-emerald-800 uppercase tracking-wider text-xs">
+                                    BTT YANG SUDAH DIPILIH ({selectedBTTObjects.length} RESI)
+                                </div>
+                                <div className="border border-slate-300 rounded-lg max-h-48 overflow-y-auto bg-white shadow-inner">
+                                    <table className="w-full text-left border-collapse text-[10px]">
+                                        <thead className="bg-[#004b84] text-white uppercase font-bold sticky top-0 z-10 text-[9px]">
+                                            <tr>
+                                                <th className="p-2">NO. BTT</th>
+                                                <th className="p-2">TANGGAL</th>
+                                                <th className="p-2">PENGIRIM</th>
+                                                <th className="p-2">PENERIMA</th>
+                                                <th className="p-2">ISI KIRIMAN</th>
+                                                <th className="p-2">KOTA TUJUAN</th>
+                                                <th className="p-2 text-center">BERAT</th>
+                                                <th className="p-2 text-center">UKURAN</th>
+                                                <th className="p-2 text-right">HARGA</th>
+                                                <th className="p-2 text-right">DISKON</th>
+                                                <th className="p-2 text-right">PENERUS</th>
+                                                <th className="p-2 text-right">PACKING</th>
+                                                <th className="p-2 text-right">JUMLAH</th>
+                                                <th className="p-2 text-center w-12">HAPUS</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 font-medium">
+                                            {selectedBTTObjects.map((btt, idx) => (
+                                                <tr key={idx} className="hover:bg-emerald-50/50">
+                                                    <td className="p-2 font-mono font-bold text-sky-700">{btt.bttt_id}</td>
+                                                    <td className="p-2 font-mono text-slate-700">{String(btt.bttt_tanggal).split('T')[0]}</td>
+                                                    <td className="p-2 text-slate-800">{btt.bttt_asalname}</td>
+                                                    <td className="p-2 text-slate-700">{btt.bttt_tujuannama || '-'}</td>
+                                                    <td className="p-2 text-slate-700">{btt.bttt_namabarang || '-'}</td>
+                                                    <td className="p-2 text-slate-700">{btt.bttt_tujuankota}</td>
+                                                    <td className="p-2 text-center font-mono">{btt.bttt_berat}</td>
+                                                    <td className="p-2 text-center font-mono">0</td>
+                                                    <td className="p-2 text-right font-mono">{Number(btt.bttt_harga || 0).toLocaleString('id-ID')}</td>
+                                                    <td className="p-2 text-right font-mono">0.00</td>
+                                                    <td className="p-2 text-right font-mono">{Number(btt.bttt_biayapenerus || 0).toLocaleString('id-ID')}</td>
+                                                    <td className="p-2 text-right font-mono">{Number(btt.biaya_packing || 0).toLocaleString('id-ID')}</td>
+                                                    <td className="p-2 text-right font-mono font-bold text-emerald-700">
+                                                        {Number(btt.subtotal || btt.bttt_harga || 0).toLocaleString('id-ID')}
+                                                    </td>
+                                                    <td className="p-2 text-center">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setNewInvoiceForm(prev => ({
+                                                                    ...prev,
+                                                                    selected_btts: prev.selected_btts.filter(id => id !== btt.bttt_id)
+                                                                }));
+                                                            }}
+                                                            className="text-rose-600 hover:text-rose-800 p-1 cursor-pointer"
+                                                            title="Keluarkan dari invoice"
+                                                        >
+                                                            <Trash2 size={13} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {selectedBTTObjects.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={14} className="p-4 text-center text-slate-400 font-bold italic">
+                                                        Belum ada resi yang dipilih. Silakan centang nomor BTT pada tabel bawah.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {/* 3. KOTAK 4 REKAP BIAYA & TOMBOL CETAK KWITANSI DAN FAKTUR */}
+                            <div className="space-y-3">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-white p-3 rounded-xl border border-slate-300 text-xs shadow-xs">
+                                    <div>
+                                        <label className="font-bold text-slate-700 block text-[10px] mb-1">TOTAL BIAYA KIRIM :</label>
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            value={totBiayaKirim.toLocaleString('id-ID')}
+                                            className="w-full p-1.5 bg-cyan-50/50 border border-slate-300 rounded font-mono font-bold text-right text-slate-800"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="font-bold text-slate-700 block text-[10px] mb-1">TOTAL DISKON BIAYA KIRIM :</label>
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            value="0.00"
+                                            className="w-full p-1.5 bg-slate-50 border border-slate-300 rounded font-mono font-bold text-right text-slate-700"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="font-bold text-slate-700 block text-[10px] mb-1">TOTAL BIAYA PENERUS :</label>
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            value={totPenerus.toLocaleString('id-ID')}
+                                            className="w-full p-1.5 bg-slate-50 border border-slate-300 rounded font-mono font-bold text-right text-slate-700"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="font-bold text-slate-700 block text-[10px] mb-1">TOTAL PACKING :</label>
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            value={totPacking.toLocaleString('id-ID')}
+                                            className="w-full p-1.5 bg-slate-50 border border-slate-300 rounded font-mono font-bold text-right text-slate-700"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2 pt-1">
+                                    <div className="inline-block px-2.5 py-0.5 border border-sky-300 bg-sky-50 text-sky-800 font-bold text-[11px] rounded tracking-wide">
+                                        CETAK KWITANSI DAN FAKTUR
+                                    </div>
+
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <button
+                                            type="button"
+                                            disabled={!savedInvoiceId}
+                                            onClick={() => handlePrintDocument({ artih_id: savedInvoiceId, artih_nokw: savedKwitansiNo }, 'KWITANSI_1')}
+                                            className={`px-5 py-2 font-bold rounded text-xs transition uppercase ${savedInvoiceId
+                                                ? 'bg-amber-500 hover:bg-amber-600 text-white cursor-pointer shadow-sm'
+                                                : 'bg-amber-500/40 text-white/70 cursor-not-allowed'
+                                                }`}
+                                        >
+                                            Kwitansi Tipe 1
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            disabled={!savedInvoiceId}
+                                            onClick={() => handlePrintDocument({ artih_id: savedInvoiceId, artih_nokw: savedKwitansiNo }, 'KWITANSI_2')}
+                                            className={`px-5 py-2 font-bold rounded text-xs transition uppercase ${savedInvoiceId
+                                                ? 'bg-sky-500 hover:bg-sky-600 text-white cursor-pointer shadow-sm'
+                                                : 'bg-sky-500/40 text-white/70 cursor-not-allowed'
+                                                }`}
+                                        >
+                                            Kwitansi Tipe 2
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            disabled={!savedInvoiceId}
+                                            onClick={() => handlePrintDocument({ artih_id: savedInvoiceId, artih_nokw: savedKwitansiNo }, 'FAKTUR_2')}
+                                            className={`px-5 py-2 font-bold rounded text-xs transition uppercase ${savedInvoiceId
+                                                ? 'bg-[#0088cc] hover:bg-[#0077b3] text-white cursor-pointer shadow-sm'
+                                                : 'bg-[#0088cc]/40 text-white/70 cursor-not-allowed'
+                                                }`}
+                                        >
+                                            Faktur Tipe 2
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            disabled={!savedInvoiceId}
+                                            onClick={() => handlePrintDocument({ artih_id: savedInvoiceId, artih_nokw: savedKwitansiNo }, 'SUMMARY')}
+                                            className={`px-5 py-2 font-bold rounded text-xs transition uppercase ${savedInvoiceId
+                                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-sm'
+                                                : 'bg-emerald-600/40 text-white/70 cursor-not-allowed'
+                                                }`}
+                                        >
+                                            Summary Billing
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 4. TABEL BAWAH: DAFTAR NOMOR BTT (UNTUK DICARI & DICENTANG) */}
+                            <div className="border border-sky-300 rounded-xl p-3 bg-slate-50/60 space-y-3">
+                                <div className="text-center font-bold text-sky-800 uppercase tracking-wider text-xs">
+                                    DAFTAR NOMOR BTT
+                                </div>
+
+                                <div className="flex flex-wrap items-center justify-between gap-4">
+                                    <div className="flex items-center gap-2">
+                                        <div>
+                                            <label className="font-bold text-slate-700 block text-[10px] mb-1">TANGGAL BTT :</label>
+                                            <input
+                                                type="date"
+                                                value={bttStartDate}
+                                                onChange={(e) => handleFilterBTTChange(e.target.value, bttEndDate, bttBypassTanggal, bttDisplayType)}
+                                                className="p-1.5 bg-white border border-slate-300 rounded font-bold text-slate-800 outline-none cursor-pointer"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="font-bold text-slate-700 block text-[10px] mb-1">SAMPAI :</label>
+                                            <input
+                                                type="date"
+                                                value={bttEndDate}
+                                                onChange={(e) => handleFilterBTTChange(bttStartDate, e.target.value, bttBypassTanggal, bttDisplayType)}
+                                                className="p-1.5 bg-white border border-slate-300 rounded font-bold text-slate-800 outline-none cursor-pointer"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-wrap items-center gap-4">
+                                        <label className="flex items-center gap-1.5 font-bold text-slate-700 cursor-pointer">
                                             <input
                                                 type="checkbox"
-                                                checked={unbilledBTTList.length > 0 && newInvoiceForm.selected_btts.length === unbilledBTTList.length}
-                                                onChange={() => {
-                                                    if (newInvoiceForm.selected_btts.length === unbilledBTTList.length) {
-                                                        setNewInvoiceForm(p => ({ ...p, selected_btts: [] }));
-                                                    } else {
-                                                        setNewInvoiceForm(p => ({ ...p, selected_btts: unbilledBTTList.map(b => b.bttt_id) }));
-                                                    }
-                                                }}
-                                                className="w-4 h-4 rounded cursor-pointer"
+                                                checked={bttBypassTanggal}
+                                                onChange={(e) => handleFilterBTTChange(bttStartDate, bttEndDate, e.target.checked, bttDisplayType)}
+                                                className="w-4 h-4 text-blue-600 rounded"
                                             />
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 font-medium">
-                                    {unbilledBTTList.map((btt, idx) => {
-                                        const isChecked = newInvoiceForm.selected_btts.includes(btt.bttt_id);
-                                        return (
-                                            <tr key={idx} className={`hover:bg-blue-50/50 transition-colors ${isChecked ? 'bg-blue-50/80 font-bold' : ''}`}>
-                                                <td className="p-2.5 font-mono text-sky-700">{btt.bttt_id}</td>
-                                                <td className="p-2.5 font-mono text-slate-800">{String(btt.bttt_tanggal).split('T')[0]}</td>
-                                                <td className="p-2.5 text-slate-900">{btt.bttt_asalname}</td>
-                                                <td className="p-2.5 text-slate-800">{btt.bttt_namabarang || 'BARANG'}</td>
-                                                <td className="p-2.5 text-slate-800">{btt.bttt_tujuankota}</td>
-                                                <td className="p-2.5 font-mono text-center text-slate-800">{btt.bttt_berat} Kg</td>
-                                                <td className="p-2.5 text-right font-mono text-slate-800">Rp {Number(btt.bttt_harga || 0).toLocaleString('id-ID')}</td>
-                                                <td className="p-2.5 text-right font-mono text-slate-800">Rp {Number(btt.bttt_biayapenerus || 0).toLocaleString('id-ID')}</td>
-                                                <td className="p-2.5 text-right font-mono text-rose-600 font-bold">
-                                                    Rp {Number(btt.subtotal || btt.bttt_harga || 0).toLocaleString('id-ID')}
-                                                </td>
-                                                <td className="p-2.5 text-center">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={isChecked}
-                                                        onChange={() => {
-                                                            setNewInvoiceForm(prev => ({
-                                                                ...prev,
-                                                                selected_btts: isChecked
-                                                                    ? prev.selected_btts.filter(id => id !== btt.bttt_id)
-                                                                    : [...prev.selected_btts, btt.bttt_id]
-                                                            }));
-                                                        }}
-                                                        className="w-4 h-4 text-blue-600 rounded cursor-pointer"
-                                                    />
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                    {unbilledBTTList.length === 0 && (
-                                        <tr>
-                                            <td colSpan={10} className="p-8 text-center text-slate-400 font-bold">
-                                                {loadingUnbilled ? 'Memuat daftar BTT...' : 'Tidak ada resi BTT unbilled pada kriteria ini.'}
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                                            <span>Bypass Filter Tanggal</span>
+                                        </label>
 
-                        <div className="flex justify-between items-center pt-4 border-t border-slate-200">
-                            <div className="flex items-center gap-3">
-                                <button
-                                    type="button"
-                                    onClick={handleSaveNewInvoice}
-                                    className="px-6 py-2.5 bg-amber-400 hover:bg-amber-500 text-slate-900 font-black rounded-xl uppercase transition cursor-pointer shadow-md"
-                                >
-                                    SIMPAN INVOICE
-                                </button>
-                                <span className="text-slate-600 font-bold font-mono">
-                                    {newInvoiceForm.selected_btts.length} Resi Dipilih
-                                </span>
+                                        <div className="flex items-center gap-3 bg-white px-3 py-1 rounded border border-slate-200">
+                                            <span className="text-slate-500 font-bold uppercase text-[10px]">Tampilkan Daftar :</span>
+                                            <label className="flex items-center gap-1 cursor-pointer font-bold text-slate-700">
+                                                <input
+                                                    type="radio"
+                                                    name="btt_type_modal"
+                                                    checked={bttDisplayType !== 'PI'}
+                                                    onChange={() => handleFilterBTTChange(bttStartDate, bttEndDate, bttBypassTanggal, 'UTAMA')}
+                                                />
+                                                {newInvoiceForm.artih_jenis === 'B' ? 'BTT Tunai' : newInvoiceForm.artih_jenis === 'T' ? 'BTT Tagih' : 'BTT Kredit'}
+                                            </label>
+                                            <label className="flex items-center gap-1 cursor-pointer font-bold text-slate-700">
+                                                <input
+                                                    type="radio"
+                                                    name="btt_type_modal"
+                                                    checked={bttDisplayType === 'PI'}
+                                                    onChange={() => handleFilterBTTChange(bttStartDate, bttEndDate, bttBypassTanggal, 'PI')}
+                                                />
+                                                Proforma Invoice
+                                            </label>
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => loadUnbilledBTTByDate(newInvoiceForm.artih_custid, bttStartDate, bttEndDate, bttBypassTanggal, bttDisplayType)}
+                                            className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded uppercase flex items-center gap-1 cursor-pointer text-xs"
+                                        >
+                                            <RefreshCw size={12} className={loadingUnbilled ? 'animate-spin' : ''} /> REFRESH BTT
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* GRID TABLE DAFTAR RESI BTT UNBILLED */}
+                                <div className="border border-slate-300 rounded-lg max-h-56 overflow-y-auto bg-white shadow-inner">
+                                    <table className="w-full text-left border-collapse text-[11px]">
+                                        <thead className="bg-[#004b84] text-white uppercase font-bold sticky top-0 z-10 text-[10px]">
+                                            <tr>
+                                                <th className="p-2">NO. BTT</th>
+                                                <th className="p-2">TANGGAL</th>
+                                                <th className="p-2">PENGIRIM</th>
+                                                <th className="p-2">ISI KIRIMAN</th>
+                                                <th className="p-2">KOTA TUJUAN</th>
+                                                <th className="p-2 text-center">BERAT</th>
+                                                <th className="p-2 text-center">UKURAN</th>
+                                                <th className="p-2 text-right">HARGA</th>
+                                                <th className="p-2 text-right">PENERUS</th>
+                                                <th className="p-2 text-right">JUMLAH</th>
+                                                <th className="p-2 text-center w-14">PILIH</th>
+                                            </tr>
+                                        </thead>
+
+                                        <tbody className="divide-y divide-slate-100 font-medium">
+                                            {unbilledBTTList.map((btt, idx) => {
+                                                const cleanId = String(btt.bttt_id || '').trim();
+                                                const isChecked = newInvoiceForm.selected_btts.some(id => String(id).trim() === cleanId);
+
+                                                return (
+                                                    <tr
+                                                        key={idx}
+                                                        className={`transition-colors ${isChecked ? 'bg-emerald-50/70 font-semibold' : 'hover:bg-sky-50/50'}`}
+                                                    >
+                                                        <td className="p-2 font-mono text-sky-700">{btt.bttt_id}</td>
+                                                        <td className="p-2 font-mono text-slate-700">{String(btt.bttt_tanggal).split('T')[0]}</td>
+                                                        <td className="p-2 text-slate-800">{btt.bttt_asalname}</td>
+                                                        <td className="p-2 text-slate-700">{btt.bttt_namabarang || '-'}</td>
+                                                        <td className="p-2 text-slate-700">{btt.bttt_tujuankota}</td>
+                                                        <td className="p-2 text-center font-mono">{btt.bttt_berat}</td>
+                                                        <td className="p-2 text-center font-mono">0</td>
+                                                        <td className="p-2 text-right font-mono">{Number(btt.bttt_harga || 0).toLocaleString('id-ID')}</td>
+                                                        <td className="p-2 text-right font-mono">{Number(btt.bttt_biayapenerus || 0).toLocaleString('id-ID')}</td>
+                                                        <td className="p-2 text-right font-mono font-bold text-rose-600">
+                                                            {Number(btt.subtotal || btt.bttt_harga || 0).toLocaleString('id-ID')}
+                                                        </td>
+                                                        <td className="p-2 text-center">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isChecked}
+                                                                onChange={() => {
+                                                                    setNewInvoiceForm(prev => ({
+                                                                        ...prev,
+                                                                        selected_btts: isChecked
+                                                                            ? prev.selected_btts.filter(id => String(id).trim() !== cleanId)
+                                                                            : [...prev.selected_btts, cleanId]
+                                                                    }));
+                                                                }}
+                                                                className="w-4 h-4 text-emerald-600 rounded cursor-pointer accent-emerald-600"
+                                                            />
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+
+                                    </table>
+                                </div>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => setAddStep(1)}
-                                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl uppercase transition cursor-pointer"
-                            >
-                                KEMBALI
-                            </button>
+
+                            {/* 5. FOOTER TOMBOL AKSI PALING BAWAH */}
+                            <div className="flex justify-between items-center pt-3 border-t border-slate-200">
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveNewInvoice}
+                                        className="px-7 py-2 bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-black rounded uppercase transition cursor-pointer shadow-sm text-xs"
+                                    >
+                                        SIMPAN
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        disabled={!savedInvoiceId}
+                                        onClick={() => handlePostingInvoice(savedInvoiceId)}
+                                        className={`px-6 py-2 font-black rounded uppercase text-xs transition ${savedInvoiceId
+                                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-sm'
+                                            : 'bg-emerald-600/40 text-white/60 cursor-not-allowed'
+                                            }`}
+                                    >
+                                        POSTING
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        disabled={!savedInvoiceId}
+                                        onClick={() => handlePrintDocument({ artih_id: savedInvoiceId, artih_nokw: savedKwitansiNo }, 'FAKTUR')}
+                                        className={`px-6 py-2 font-black rounded uppercase text-xs transition ${savedInvoiceId
+                                            ? 'bg-sky-600 hover:bg-sky-700 text-white cursor-pointer shadow-sm'
+                                            : 'bg-sky-600/40 text-white/70 cursor-not-allowed'
+                                            }`}
+                                    >
+                                        CETAK
+                                    </button>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setAddStep(1)}
+                                        className="px-6 py-2 bg-slate-600 hover:bg-slate-700 text-white font-bold rounded uppercase transition cursor-pointer text-xs"
+                                    >
+                                        KEMBALI
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsAddModalOpen(false);
+                                            setSavedInvoiceId(null);
+                                            setSavedKwitansiNo(null);
+                                        }}
+                                        className="px-6 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded uppercase transition cursor-pointer text-xs"
+                                    >
+                                        BATAL
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                )}
+                    );
+                })()}
+
             </div>
         </div>
     ) : null;
 
     const modalRoot = document.getElementById('modal-root') || document.body;
 
-    const handleApplyFilter = (e) => {
-        if (e) e.preventDefault();
-        fetchInvoiceList();
-    };
-
-    const handleResetFilter = () => {
-        setStartDate(firstDay);
-        setEndDate(today);
-        setBypassTanggal(false);
-        setSelectedCabang(isHoldingUser ? '' : currentActiveAgen.id);
-        setSelectedJenis('');
-        setSelectedTerbayar('');
-        setSearchCustomer('');
-        setSearchInvoice('');
-        setSearchKwitansi('');
-        setSearchBTT('');
-        fetchInvoiceList();
-    };
-
     return (
         <div className="space-y-5">
-            {/* Panel Filter jika showFilter = true */}
+            {/* Panel Filter */}
             {showFilter && (
                 <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all">
                     <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
@@ -1309,8 +1964,19 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                             />
                         </div>
 
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">NO. BTT</label>
+                            <input
+                                type="text"
+                                placeholder="Cari nomor resi BTT..."
+                                value={searchBTT}
+                                onChange={(e) => setSearchBTT(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
+                            />
+                        </div>
+
                         <div className="flex items-center">
-                            <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700 mt-5">
+                            <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700 mt-2">
                                 <input
                                     type="checkbox"
                                     checked={bypassTanggal}
@@ -1322,25 +1988,45 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                         </div>
                     </div>
 
-                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                        <button
-                            type="button"
-                            onClick={handleResetFilter}
-                            className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer"
-                        >
-                            RESET
-                        </button>
-                        <button
-                            type="submit"
-                            className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5"
-                        >
-                            <RefreshCw size={14} /> REFRESH DATA
-                        </button>
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100">
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={handlePrintRekapRingkas}
+                                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl uppercase transition shadow-sm cursor-pointer flex items-center gap-1.5"
+                                title="Cetak Ringkasan Daftar Faktur Penagihan"
+                            >
+                                <Printer size={14} /> CETAK
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handlePrintRekapFakturPajak}
+                                className="px-5 py-2 bg-sky-700 hover:bg-sky-800 text-white font-bold rounded-xl uppercase transition shadow-sm cursor-pointer flex items-center gap-1.5"
+                                title="Cetak Rekap Faktur Pajak Komprehensif"
+                            >
+                                <FileText size={14} /> REKAP FAKTUR
+                            </button>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={handleResetFilter}
+                                className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer"
+                            >
+                                RESET
+                            </button>
+                            <button
+                                type="submit"
+                                className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5"
+                            >
+                                <RefreshCw size={14} /> REFRESH DATA
+                            </button>
+                        </div>
                     </div>
                 </form>
             )}
 
-            {/* Template Tabel Dashboard: HANYA 1 KOLOM AKSI (props onEdit dan onDelete dilepas agar tidak double) */}
             <DataTableTemplate
                 title="INVOICE PENAGIHAN"
                 columns={columns}
@@ -1352,6 +2038,8 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                 onFilter={() => setShowFilter(prev => !prev)}
                 onAdd={() => {
                     const currentAgen = getActiveAgen();
+                    setSavedInvoiceId(null);
+                    setSavedKwitansiNo(null);
                     setNewInvoiceForm({
                         artih_tanggal: today,
                         artih_custid: '',
@@ -1359,13 +2047,13 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                         artih_agenid: currentAgen.id,
                         artih_agenname: currentAgen.nama,
                         artih_jenis: 'K',
-                        artih_fktpajak: '',
+                        artih_fktpajak: '010.',
                         artih_keterangan: '',
                         selected_btts: []
                     });
                     setAddStep(1);
                     setUnbilledBTTList([]);
-                    setBttBypassTanggal(false);
+                    setBttBypassTanggal(true);
                     setIsAddModalOpen(true);
                 }}
             />
