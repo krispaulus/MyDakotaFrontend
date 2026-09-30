@@ -859,14 +859,37 @@ const Invoice = () => {
         try {
             const token = localStorage.getItem('token');
             const ptId = localStorage.getItem('pt_id') || 'C';
-            const res = await api.get(`/piutang/invoice/detail?id=${encodeURIComponent(item.artih_id)}&pt_id=${ptId}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+
+            // 🎯 Ambil detail invoice sekaligus parameter Acc_Head dari rute resmi /config/params
+            const [res, resParam] = await Promise.all([
+                api.get(`/piutang/invoice/detail?id=${encodeURIComponent(item.artih_id)}&pt_id=${ptId}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                }),
+                api.get(`/config/params?search=Acc_Head`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                }).catch(() => ({ data: null }))
+            ]);
 
             const header = res.data?.data?.header || res.data?.header || item;
             const btts = res.data?.data?.btt_list || res.data?.btt_list || persistedSelectedBtts || [];
 
-            // 🎯 Nomor Kwitansi bersih global untuk semua jenis cetakan
+            // 🎯 Prioritaskan pembacaan nama kepala akunting murni dari database
+            let dbAccHead = res.data?.acc_head || res.data?.data?.acc_head || '';
+
+            // Jika backend detail belum terupdate, ambil dari hasil /config/params
+            if (!dbAccHead && resParam?.data) {
+                const list = resParam.data.data || resParam.data;
+                if (Array.isArray(list)) {
+                    const found = list.find(p => String(p.set_varname || '').toLowerCase() === 'acc_head');
+                    if (found) dbAccHead = found.set_varvalue;
+                }
+            }
+
+            const pejabatAccounting = dbAccHead && dbAccHead.trim() !== ''
+                ? dbAccHead.trim()
+                : '( .................................... )';
+
+            // Bersihkan format nomor kwitansi
             const rawNoKW = header.artih_nokw || savedKwitansiNo || '';
             const kwitansiDisplayNo = String(rawNoKW).trim().replace(/\/OTA\//g, '/001/');
 
@@ -1039,9 +1062,9 @@ const Invoice = () => {
                             <!-- Sisi Tengah: Tanda Tangan -->
                             <div style="width: 35%; padding: 10px; text-align: center; display: flex; flex-direction: column; justify-content: space-between; border-right: 1px solid #cbd5e1;">
                                 <div style="font-weight:bold; color:#0f172a;">PT. DAKOTA LOGISTIK INDONESIA</div>
+                                <div style="height: 55px;"></div>
                                 <div>
-                                    <div style="font-weight:bold; text-decoration:underline; color:#0f172a; font-size:11px;">BAYYINATHUL RAHMATULLAH</div>
-                                    <div style="font-size:9.5px; color:#64748b;">Finance & Accounting</div>
+                                    <div style="font-weight:bold; text-decoration:underline; color:#0f172a; font-size:11px; text-transform:uppercase;">${pejabatAccounting}</div>
                                 </div>
                             </div>
 
@@ -1069,7 +1092,7 @@ const Invoice = () => {
                                         <td style="padding: 3px 6px; text-align: right; font-family: monospace; font-weight: bold; border-bottom: 1px solid #e2e8f0;">${nilaiJual.toLocaleString('id-ID')}.00</td>
                                     </tr>
                                     <tr>
-                                        <td style="padding: 2px 6px; border-bottom: 1px solid #e2e8f0; color:#64748b;">DPP 1.1%</td>
+                                        <td style="padding: 2px 6px; border-bottom: 1px solid #e2e8f0; color:#64748b;">DPP</td>
                                         <td style="padding: 2px 6px; text-align: right; font-family: monospace; border-bottom: 1px solid #e2e8f0;">${dpp.toLocaleString('id-ID')}.00</td>
                                     </tr>
                                     <tr>
@@ -1186,7 +1209,7 @@ const Invoice = () => {
                                     <td style="color:#334155; padding: 4px 0; vertical-align: top;">Banyaknya Uang</td>
                                     <td style="text-align: center; vertical-align: top;">:</td>
                                     <td style="font-style: italic; font-weight: 700; color:#1e293b; background: #f8fafc; padding: 5px 10px; border-radius: 4px; border-left: 3px solid #0284c7;">
-                                        # ${textTerbilang} #
+                                        ${textTerbilang}
                                     </td>
                                 </tr>
                                 <tr>
@@ -1237,14 +1260,11 @@ const Invoice = () => {
                                     Bekasi, ${tglCetakIndo}
                                 </div>
                                 <div style="font-weight: 800; color:#0f172a; font-size: 11.5px;">PT. DAKOTA LOGISTIK INDONESIA</div>
-                                
                                 <div style="height: 55px;"></div>
-
                                 <div>
-                                    <div style="font-weight: 900; text-decoration: underline; color:#0f172a; font-size: 12px; letter-spacing: 0.3px;">
-                                        BAYYINATHUL RAHMATULLAH
+                                    <div style="font-weight: 900; text-decoration: underline; color:#0f172a; font-size: 12px; letter-spacing: 0.3px; text-transform:uppercase;">
+                                        ${pejabatAccounting}
                                     </div>
-                                    <div style="font-size: 9.5px; color:#64748b; margin-top: 1px;">Finance & Accounting</div>
                                 </div>
                             </div>
                         </div>
@@ -1450,7 +1470,7 @@ const Invoice = () => {
                                     <td style="border: 1px solid #94a3b8; padding: 3px 6px; text-align: right; font-family: monospace; font-weight: bold; font-size: 9.5px; border-bottom: 1px solid #cbd5e1;">${subtotalNilaiJual.toLocaleString('id-ID')}.00</td>
                                 </tr>
                                 <tr>
-                                    <td colspan="3" style="border: 1px solid #94a3b8; padding: 3px 6px; font-size: 9.5px; color:#64748b; border-bottom: 1px solid #cbd5e1;">DPP 1.1%</td>
+                                    <td colspan="3" style="border: 1px solid #94a3b8; padding: 3px 6px; font-size: 9.5px; color:#64748b; border-bottom: 1px solid #cbd5e1;">DPP</td>
                                     <td style="border: 1px solid #94a3b8; padding: 3px 6px; text-align: right; font-family: monospace; font-size: 9.5px; border-bottom: 1px solid #cbd5e1;">${dpp.toLocaleString('id-ID')}.00</td>
                                 </tr>
                                 <tr>
@@ -1487,12 +1507,11 @@ const Invoice = () => {
 
                             <!-- Kolom 3: Tanda Tangan -->
                             <div style="width: 30%; text-align: center;">
-                                <div style="font-size:10.5px; color:#475569; margin-bottom:2px;">Bekasi, ${tglCetakIndo}</div>
+                                <div style="font-size: 10.5px; color:#475569; margin-bottom: 2px;">Bekasi, ${tglCetakIndo}</div>
                                 <div style="font-weight:bold; color:#0f172a; font-size:11px;">PT DAKOTA LOGISTIK INDONESIA</div>
-                                <div style="height: 48px;"></div>
+                                <div style="height: 55px;"></div>
                                 <div>
-                                    <div style="font-weight:bold; text-decoration:underline; color:#0f172a; font-size:11px;">TRI SUGIARTI</div>
-                                    <div style="font-size:9px; color:#64748b;">Finance & Accounting</div>
+                                    <div style="font-weight:bold; text-decoration:underline; color:#0f172a; font-size:11px; text-transform:uppercase;">${pejabatAccounting}</div>
                                 </div>
                             </div>
                         </div>
