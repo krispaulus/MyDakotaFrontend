@@ -11,6 +11,73 @@ import {
 import Swal from 'sweetalert2';
 import dakotaLogo from '../assets/new_logo 2.png';
 
+function terbilangIndonesia(angka) {
+    const bilangan = Math.floor(Math.abs(Number(angka) || 0));
+    const kata = ['', 'SATU', 'DUA', 'TIGA', 'EMPAT', 'LIMA', 'ENAM', 'TUJUH', 'DELAPAN', 'SEMBILAN', 'SEPULUH', 'SEBELAS'];
+
+    if (bilangan < 12) {
+        return kata[bilangan];
+    } else if (bilangan < 20) {
+        return terbilangIndonesia(bilangan - 10) + ' BELAS';
+    } else if (bilangan < 100) {
+        return terbilangIndonesia(Math.floor(bilangan / 10)) + ' PULUH ' + kata[bilangan % 10];
+    } else if (bilangan < 200) {
+        return 'SERATUS ' + terbilangIndonesia(bilangan - 100);
+    } else if (bilangan < 1000) {
+        return terbilangIndonesia(Math.floor(bilangan / 100)) + ' RATUS ' + terbilangIndonesia(bilangan % 100);
+    } else if (bilangan < 2000) {
+        return 'SERIBU ' + terbilangIndonesia(bilangan - 1000);
+    } else if (bilangan < 1000000) {
+        return terbilangIndonesia(Math.floor(bilangan / 1000)) + ' RIBU ' + terbilangIndonesia(bilangan % 1000);
+    } else if (bilangan < 1000000000) {
+        return terbilangIndonesia(Math.floor(bilangan / 1000000)) + ' JUTA ' + terbilangIndonesia(bilangan % 1000000);
+    } else if (bilangan < 1000000000000) {
+        return terbilangIndonesia(Math.floor(bilangan / 1000000000)) + ' MILYAR ' + terbilangIndonesia(bilangan % 1000000000);
+    }
+    return '';
+}
+
+// Helper format tanggal Indonesia formal (contoh: 29 September 2026)
+function formatTanggalIndonesia(dateStr) {
+    if (!dateStr) return '-';
+    const dateObj = new Date(dateStr);
+    if (isNaN(dateObj.getTime())) return dateStr;
+
+    const bulanIndo = [
+        'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+
+    const d = String(dateObj.getDate()).padStart(2, '0');
+    const m = bulanIndo[dateObj.getMonth()];
+    const y = dateObj.getFullYear();
+
+    return `${d} ${m} ${y}`;
+}
+
+// Helper standarisasi Nomor Invoice ke format resmi: [agen3digit][urut4digit]/[bulan]/[tahun4digit]/FP
+function formatNomorInvoiceResmi(rawId, rawDate) {
+    if (!rawId) return '-';
+    let clean = String(rawId).trim();
+
+    // Jika sudah sesuai format baru (.../FP), langsung kembalikan
+    if (clean.includes('/FP')) return clean;
+
+    // Ambil tahun dan bulan dari tanggal invoice
+    const d = rawDate ? new Date(rawDate) : new Date();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = String(d.getFullYear());
+
+    // Ambil angka urut dari ID (misal OTA09260010 -> ambil 4 digit terakhir: 0010)
+    const digits = clean.replace(/\D/g, '');
+    let urut = '0001';
+    if (digits.length >= 4) {
+        urut = digits.slice(-4);
+    }
+
+    return `001${urut}/${mm}/${yyyy}/FP`;
+}
+
 const Invoice = () => {
     const { isDarkMode } = useDarkMode();
     const now = new Date();
@@ -119,6 +186,7 @@ const Invoice = () => {
     // Penanda invoice aktif yang baru tersimpan
     const [savedInvoiceId, setSavedInvoiceId] = useState(null);
     const [savedKwitansiNo, setSavedKwitansiNo] = useState(null);
+    const [persistedSelectedBtts, setPersistedSelectedBtts] = useState([]);
 
     const [newInvoiceForm, setNewInvoiceForm] = useState({
         artih_tanggal: today,
@@ -523,10 +591,29 @@ const Invoice = () => {
     };
 
     const handleProceedToDetails = () => {
+        // 1. Validasi Customer wajib dipilih
         if (!newInvoiceForm.artih_custid) {
-            Swal.fire('Peringatan', 'Silakan pilih Customer terlebih dahulu!', 'warning');
+            Swal.fire({
+                title: 'Peringatan',
+                text: 'Silakan pilih Customer terlebih dahulu!',
+                icon: 'warning',
+                confirmButtonColor: '#eab308'
+            });
             return;
         }
+
+        // 2. Validasi Keterangan Wajib Diisi (Mandatory)
+        if (!newInvoiceForm.artih_keterangan || newInvoiceForm.artih_keterangan.trim() === '') {
+            Swal.fire({
+                title: 'Keterangan Wajib Diisi!',
+                text: 'Silakan isi Keterangan terlebih dahulu sebelum melanjutkan ke tambah rincian BTT.',
+                icon: 'warning',
+                confirmButtonColor: '#e11d48'
+            });
+            return;
+        }
+
+        // Lanjut ke Langkah 2 jika valid
         setAddStep(2);
         loadUnbilledBTTByDate(
             newInvoiceForm.artih_custid,
@@ -562,7 +649,13 @@ const Invoice = () => {
     const handleSaveNewInvoice = async (e) => {
         if (e) e.preventDefault();
 
-        if (newInvoiceForm.selected_btts.length === 0) {
+        // Ambil objek BTT yang sedang dipilih
+        const currentChosen = unbilledBTTList.filter(b => {
+            const cleanId = String(b.bttt_id || '').trim();
+            return newInvoiceForm.selected_btts.some(id => String(id).trim() === cleanId);
+        });
+
+        if (newInvoiceForm.selected_btts.length === 0 && persistedSelectedBtts.length === 0) {
             Swal.fire('Peringatan', 'Pilih minimal satu nomor resi BTT untuk difakturkan!', 'warning');
             return;
         }
@@ -610,14 +703,14 @@ const Invoice = () => {
                 showConfirmButton: false
             });
 
-            // Set state tersimpan agar tombol POSTING & CETAK langsung aktif
+            // 1. Simpan nomor faktur & kwitansi resmi yang baru terbentuk
             setSavedInvoiceId(newInvoiceId);
             if (newNoKW) setSavedKwitansiNo(newNoKW);
 
-            // Reset checklist pilihan BTT yang baru saja tersimpan
-            setNewInvoiceForm(prev => ({ ...prev, selected_btts: [] }));
+            // 2. Kunci data BTT yang dipilih agar TETAP TAMPIL di tabel atas
+            setPersistedSelectedBtts(currentChosen);
 
-            // Refresh tabel background & refresh list unbilled BTT
+            // 3. Refresh data tabel utama dan daftar unbilled bawah
             fetchInvoiceList();
             loadUnbilledBTTByDate(
                 newInvoiceForm.artih_custid,
@@ -642,17 +735,51 @@ const Invoice = () => {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            const header = res.data?.header;
-            const btts = res.data?.btt_list || [];
+            const header = res.data?.data?.header || res.data?.header || item;
+            const btts = res.data?.data?.btt_list || res.data?.btt_list || [];
 
-            setActiveInvoice({
-                ...header,
-                artih_tanggal: String(header.artih_tanggal || '').split('T')[0]
+            // 🎯 Normalisasi nomor kwitansi: ganti /OTA/ menjadi /001/
+            const rawKW = String(header.artih_nokw || '').trim();
+            const cleanKW = rawKW.replace(/\/OTA\//g, '/001/');
+
+            // 1. Simpan nomor faktur & nomor kwitansi yang sudah dinormalisasi
+            setSavedInvoiceId(header.artih_id);
+            setSavedKwitansiNo(cleanKW);
+
+            // 2. Kunci data BTT yang ada
+            const existingBttIds = btts.map(b => String(b.bttt_id).trim());
+            setPersistedSelectedBtts(btts);
+
+            // 3. Masukkan data ke form state
+            setNewInvoiceForm({
+                artih_tanggal: String(header.artih_tanggal || '').split('T')[0] || today,
+                artih_custid: header.artih_custid || '',
+                artih_custname: header.cust_name || header.artih_custname || '',
+                artih_agenid: header.artih_agenid || '001',
+                artih_agenname: header.agen_nama || 'PUSAT DAKOTA',
+                artih_jenis: header.artih_jenis || 'K',
+                artih_fktpajak: header.artih_fktpajak || '010.',
+                artih_keterangan: header.artih_keterangan || '',
+                selected_btts: existingBttIds
             });
-            setActiveBTTList(btts);
-            setIsEditModalOpen(true);
+
+            // 4. Buka modal langkah 2
+            setAddStep(2);
+            setIsAddModalOpen(true);
+
+            // 5. Muat daftar BTT unbilled lain
+            loadUnbilledBTTByDate(
+                header.artih_custid,
+                bttStartDate,
+                bttEndDate,
+                true,
+                header.artih_jenis === 'B' ? 'TUNAI' : 'KREDIT',
+                header.cust_name || header.artih_custname,
+                header.artih_jenis
+            );
+
         } catch (err) {
-            Swal.fire('Error', 'Gagal mengambil detail invoice.', 'error');
+            Swal.fire('Error', 'Gagal mengambil detail invoice: ' + (err.message || err), 'error');
         }
     };
 
@@ -720,11 +847,14 @@ const Invoice = () => {
     };
 
     // =========================================================================
-    // 🖨️ FUNGSI CETAK FAKTUR PENAGIHAN PER-BARIS INVOICE
+    // 🖨️ FUNGSI CETAK DOKUMEN (FAKTUR, KWITANSI TIPE 1, TIPE 2, SUMMARY)
     // =========================================================================
     const handlePrintDocument = async (invoiceItem, docType = 'FAKTUR') => {
         const item = invoiceItem || activeInvoice;
-        if (!item) return;
+        if (!item || !item.artih_id) {
+            Swal.fire('Peringatan', 'Data invoice tidak valid untuk dicetak.', 'warning');
+            return;
+        }
 
         try {
             const token = localStorage.getItem('token');
@@ -733,15 +863,791 @@ const Invoice = () => {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            const header = res.data?.header || {};
-            const btts = res.data?.btt_list || [];
+            const header = res.data?.data?.header || res.data?.header || item;
+            const btts = res.data?.data?.btt_list || res.data?.btt_list || persistedSelectedBtts || [];
 
-            const printWindow = window.open('', '_blank', 'width=1150,height=800,scrollbars=yes');
+            // 🎯 Nomor Kwitansi bersih global untuk semua jenis cetakan
+            const rawNoKW = header.artih_nokw || savedKwitansiNo || '';
+            const kwitansiDisplayNo = String(rawNoKW).trim().replace(/\/OTA\//g, '/001/');
+
+            const printWindow = window.open('', '_blank', 'width=1150,height=850,scrollbars=yes');
             if (!printWindow) {
                 Swal.fire('Popup Diblokir', 'Izinkan popup browser untuk mencetak dokumen ini.', 'warning');
                 return;
             }
 
+            // =====================================================================
+            // 📄 1. CETAK KHUSUS: KWITANSI TIPE 1 (SESUAI ASP LAWAS + MODERN HEADER)
+            // =====================================================================
+            if (docType === 'KWITANSI_1') {
+                let totalBiayaKirim = 0;
+                let totalDiskon = 0;
+                let totalAsuransi = 0;
+                let totalPacking = 0;
+                let totalBerat = 0;
+
+                const kwitansiRowsHtml = btts.map((b, idx) => {
+                    const biayaKirim = Number(b.bttt_harga || 0);
+                    const diskon = Number(b.bttt_disc || 0);
+                    const asuransi = Number(b.biaya_asuransi || 0);
+                    const packing = Number(b.biaya_packing || 0);
+                    const berat = Number(b.bttt_berat || 0);
+
+                    totalBiayaKirim += biayaKirim;
+                    totalDiskon += diskon;
+                    totalAsuransi += asuransi;
+                    totalPacking += packing;
+                    totalBerat += berat;
+
+                    return `
+                        <tr style="font-size: 10px; font-family: Arial, sans-serif;">
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center;">${idx + 1}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 4px; font-family: monospace; font-weight: bold; color: #0284c7;">${b.bttt_id}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center;">${formatTanggalIndonesia(b.bttt_tanggal)}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 4px;">${b.bttt_tujuankota || '-'}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 4px; font-weight: 500;">${b.bttt_tujuannama || '-'}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center;">${b.bttt_nosuratjalan || '-'}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 4px; text-align: right; font-family: monospace; font-weight: 600;">${biayaKirim.toLocaleString('id-ID')}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 4px; text-align: right; font-family: monospace;">${berat.toLocaleString('id-ID')}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 4px; color: #475569;">${b.bttt_namabarang || '-'}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                const nilaiJual = totalBiayaKirim - totalDiskon + totalAsuransi + totalPacking;
+                const dpp = nilaiJual;
+                const ppn = dpp * 0.011;
+                const totalTagihan = Number(header.artih_total || (nilaiJual + ppn));
+
+                // 🎯 1. Format Nomor Invoice Resmi (Bebas OTA)
+                const noInvoiceResmi = formatNomorInvoiceResmi(header.artih_id, header.artih_tanggal);
+
+                // 🎯 2. Format Nomor Faktur Pajak sesuai data e-Faktur
+                let noFakturPajak = String(header.artih_fktpajak || '').trim();
+                if (!noFakturPajak || noFakturPajak === '010.' || noFakturPajak === '010') {
+                    noFakturPajak = '010.026.00.340034701';
+                }
+
+                // 🎯 3. Format Tanggal Indonesia (contoh: 29 September 2026)
+                const tglKwitansiIndo = formatTanggalIndonesia(header.artih_tanggal);
+                const tglJatuhTempoIndo = formatTanggalIndonesia(header.artih_tanggal);
+
+                printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>KWITANSI - ${kwitansiDisplayNo || noInvoiceResmi}</title>
+                        <style>
+                            @page { size: A4 landscape; margin: 8mm; }
+                            body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 12px; color: #1e293b; }
+                            table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+                            th { border: 1px solid #94a3b8; padding: 6px 3px; background-color: #e2e8f0; font-size: 9.5px; text-align: center; font-weight: bold; color: #0f172a; text-transform: uppercase; }
+                            .no-print { margin-bottom: 12px; text-align: right; }
+                            .btn-print { padding: 7px 18px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; color: white; margin: 0 4px; font-size: 11px; text-transform: uppercase; }
+                            @media print { .no-print { display: none !important; } }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="no-print">
+                            <button class="btn-print" style="background:#16a34a;" onclick="window.print()">PRINT</button>
+                            <button class="btn-print" style="background:#e11d48;" onclick="window.close()">TUTUP</button>
+                        </div>
+
+                        <!-- 1. KOP RESMI DENGAN LOGO DAKOTA CARGO -->
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div style="display:flex; align-items:center; gap:12px;">
+                                <img src="${dakotaLogo}" alt="Logo Dakota Cargo" style="height:44px; object-fit:contain;" />
+                                <div>
+                                    <h2 style="margin:0; font-size:15px; font-weight:900; color:#004b84; letter-spacing:0.3px;">PT DAKOTA LOGISTIK INDONESIA</h2>
+                                    <div style="font-size:10px; color:#64748b; margin-top:2px;">Jl. Wibawa Mukti II No. 99, Jatiasih, Bekasi - Jawa Barat</div>
+                                </div>
+                            </div>
+                            <div style="text-align:right;">
+                                <h1 style="margin:0; font-size:18px; font-weight:900; letter-spacing:0.5px; color:#004b84;">KWITANSI PENAGIHAN</h1>
+                                <div style="font-size:10px; font-weight:bold; color:#0284c7; margin-top:2px;">NO. KWITANSI: ${kwitansiDisplayNo || '-'}</div>
+                            </div>
+                        </div>
+
+                        <div style="height:3px; background:#004b84; margin:8px 0 10px 0; border-radius:2px;"></div>
+
+                        <!-- 2. DATA PELANGGAN (KIRI) & METADATA INVOICE RESMI (KANAN) -->
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; font-size:11px; background:#f8fafc; padding:8px 12px; border-radius:6px; border:1px solid #e2e8f0;">
+                            <div style="width: 50%;">
+                                <div style="color:#64748b; font-size:10px; text-transform:uppercase; font-weight:bold;">Nama Pelanggan :</div>
+                                <div style="font-weight:900; font-size:13px; color:#0f172a; text-transform:uppercase; margin-top:2px;">${header.cust_name || header.artih_custname || '-'}</div>
+                                <div style="font-size:10.5px; color:#475569; margin-top:2px;">${header.cust_alamat || 'KANTOR PUSAT OPERASIONAL'}</div>
+                            </div>
+                            <div style="width: 46%;">
+                                <table style="width: 100%; border: none; margin: 0; font-size: 11px;">
+                                    <tr>
+                                        <td style="padding: 2px 0; width: 42%; color:#475569;">Tanggal Kwitansi</td>
+                                        <td style="padding: 2px 0; width: 4%;">:</td>
+                                        <td style="padding: 2px 0; font-weight: bold; color:#0f172a;">${tglKwitansiIndo}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 2px 0; color:#475569;">Nomor Invoice</td>
+                                        <td style="padding: 2px 0;">:</td>
+                                        <td style="padding: 2px 0; font-weight: 800; font-family: monospace; color:#0284c7;">${noInvoiceResmi}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 2px 0; color:#475569;">Nomor Faktur Pajak</td>
+                                        <td style="padding: 2px 0;">:</td>
+                                        <td style="padding: 2px 0; font-family: monospace; font-weight: 600; color:#0f172a;">${noFakturPajak}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 2px 0; color:#475569;">Tanggal Jatuh Tempo</td>
+                                        <td style="padding: 2px 0;">:</td>
+                                        <td style="padding: 2px 0; font-weight: bold; color:#b91c1c;">${tglJatuhTempoIndo}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- 3. TABEL DAFTAR RESI SESUAI FILE LAWAS ASP -->
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width:3%;">No Urut</th>
+                                    <th style="width:14%;">No Resi Pengiriman</th>
+                                    <th style="width:11%;">Tanggal Kirim</th>
+                                    <th style="width:10%;">Kota Tujuan</th>
+                                    <th style="width:18%;">Penerima</th>
+                                    <th style="width:13%;">No Surat Jalan / POD</th>
+                                    <th style="width:9%;">Biaya Kirim</th>
+                                    <th style="width:6%;">Berat</th>
+                                    <th style="width:16%;">Keterangan</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${kwitansiRowsHtml || '<tr><td colspan="9" style="text-align:center; padding:10px;">Tidak ada rincian resi</td></tr>'}
+                            </tbody>
+                        </table>
+
+                        <!-- 4. FOOTER INFORMASI PEMBAYARAN, TANDA TANGAN & REKAP KEUANGAN -->
+                        <div style="display:flex; border: 1px solid #94a3b8; border-top: none; font-size: 10px; background:#ffffff;">
+                            <!-- Sisi Kiri: Rekening Bank -->
+                            <div style="width: 35%; padding: 10px; border-right: 1px solid #cbd5e1; display:flex; flex-direction:column; justify-content:center;">
+                                <div style="font-weight:bold; color:#004b84; margin-bottom:2px; font-size:11px;">Transfer ke :</div>
+                                <div style="font-weight:bold; color:#0f172a;">DAKOTA LOGISTIK INDONESIA PT</div>
+                                <div style="color:#334155;">BANK CENTRAL ASIA (BCA)</div>
+                                <div style="color:#334155;">KCU KALIMALANG</div>
+                                <div style="font-weight:900; font-family:monospace; color:#0284c7; font-size:12px; margin-top:3px;">
+                                    NO REKENING : 2303937226
+                                </div>
+                            </div>
+
+                            <!-- Sisi Tengah: Tanda Tangan -->
+                            <div style="width: 35%; padding: 10px; text-align: center; display: flex; flex-direction: column; justify-content: space-between; border-right: 1px solid #cbd5e1;">
+                                <div style="font-weight:bold; color:#0f172a;">PT. DAKOTA LOGISTIK INDONESIA</div>
+                                <div>
+                                    <div style="font-weight:bold; text-decoration:underline; color:#0f172a; font-size:11px;">BAYYINATHUL RAHMATULLAH</div>
+                                    <div style="font-size:9.5px; color:#64748b;">Finance & Accounting</div>
+                                </div>
+                            </div>
+
+                            <!-- Sisi Kanan: Rekap DPP, PPN, dan Total -->
+                            <div style="width: 30%;">
+                                <table style="width: 100%; border: none; margin: 0; font-size: 10px;">
+                                    <tr>
+                                        <td style="padding: 3px 6px; font-weight: bold; border-bottom: 1px solid #e2e8f0; color:#334155;">JUMLAH</td>
+                                        <td style="padding: 3px 6px; text-align: right; font-family: monospace; font-weight: bold; border-bottom: 1px solid #e2e8f0;">${totalBiayaKirim.toLocaleString('id-ID')}.00</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 2px 6px; border-bottom: 1px solid #e2e8f0; color:#64748b;">(-) DISKON</td>
+                                        <td style="padding: 2px 6px; text-align: right; font-family: monospace; border-bottom: 1px solid #e2e8f0;">0.00</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 2px 6px; border-bottom: 1px solid #e2e8f0; color:#64748b;">(+) ASURANSI/LOLO</td>
+                                        <td style="padding: 2px 6px; text-align: right; font-family: monospace; border-bottom: 1px solid #e2e8f0;">0.00</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 2px 6px; border-bottom: 1px solid #e2e8f0; color:#64748b;">(+) PACKING/BM/LAIN</td>
+                                        <td style="padding: 2px 6px; text-align: right; font-family: monospace; border-bottom: 1px solid #e2e8f0;">${totalPacking.toLocaleString('id-ID')}.00</td>
+                                    </tr>
+                                    <tr style="background:#f8fafc;">
+                                        <td style="padding: 3px 6px; font-weight: bold; border-bottom: 1px solid #e2e8f0; color:#0f172a;">NILAI JUAL</td>
+                                        <td style="padding: 3px 6px; text-align: right; font-family: monospace; font-weight: bold; border-bottom: 1px solid #e2e8f0;">${nilaiJual.toLocaleString('id-ID')}.00</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 2px 6px; border-bottom: 1px solid #e2e8f0; color:#64748b;">DPP 1.1%</td>
+                                        <td style="padding: 2px 6px; text-align: right; font-family: monospace; border-bottom: 1px solid #e2e8f0;">${dpp.toLocaleString('id-ID')}.00</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 2px 6px; border-bottom: 1px solid #e2e8f0; color:#64748b;">PPN 1.1%</td>
+                                        <td style="padding: 2px 6px; text-align: right; font-family: monospace; border-bottom: 1px solid #e2e8f0;">${ppn.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                    </tr>
+                                    <tr style="background:#f1f5f9; font-weight: bold;">
+                                        <td style="padding: 4px 6px; color:#004b84; font-size:10.5px;">TOTAL TAGIHAN</td>
+                                        <td style="padding: 4px 6px; text-align: right; font-family: monospace; font-weight: 900; font-size: 11.5px; color:#b91c1c;">Rp ${totalTagihan.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                return;
+            }
+
+            // =====================================================================
+            // 📄 2. CETAK KHUSUS: KWITANSI TIPE 2 (PERSIS GAMBAR DENGAN KOP CENTER)
+            // =====================================================================
+            if (docType === 'KWITANSI_2') {
+                const totalBiayaKirim = btts.reduce((s, b) => s + Number(b.bttt_harga || 0), 0);
+                const totalDiskon = btts.reduce((s, b) => s + Number(b.bttt_disc || 0), 0);
+                const totalAsuransi = btts.reduce((s, b) => s + Number(b.biaya_asuransi || 0), 0);
+                const totalPacking = btts.reduce((s, b) => s + Number(b.biaya_packing || 0), 0);
+
+                const nilaiJual = totalBiayaKirim - totalDiskon + totalAsuransi + totalPacking;
+                const ppn = nilaiJual * 0.011;
+                const grandTotal = Number(header.artih_total || (nilaiJual + ppn));
+                const textTerbilang = (terbilangIndonesia(Math.round(grandTotal)).trim() + ' RUPIAH').replace(/\s+/g, ' ');
+
+                // 🎯 1. Konversi Nomor Invoice resmi (bebas OTA)
+                const noInvoiceResmi = formatNomorInvoiceResmi(header.artih_id, header.artih_tanggal);
+
+                // 🎯 2. Format Tanggal Indonesia
+                const tglCetakIndo = formatTanggalIndonesia(header.artih_tanggal);
+
+                printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>KWITANSI - ${kwitansiDisplayNo || noInvoiceResmi}</title>
+                        <style>
+                            @page { size: A4 landscape; margin: 10mm 15mm; }
+                            body { 
+                                font-family: 'Segoe UI', Arial, sans-serif; 
+                                font-size: 12px; 
+                                color: #1e293b; 
+                                margin: 0; 
+                                padding: 10px 15px; 
+                            }
+                            .no-print { margin-bottom: 15px; text-align: right; }
+                            .btn-print { 
+                                padding: 7px 18px; 
+                                font-weight: bold; 
+                                border-radius: 6px; 
+                                border: none; 
+                                cursor: pointer; 
+                                color: white; 
+                                margin: 0 4px; 
+                                font-size: 11px; 
+                                text-transform: uppercase; 
+                            }
+                            @media print { .no-print { display: none !important; } }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="no-print">
+                            <button class="btn-print" style="background:#16a34a;" onclick="window.print()">PRINT</button>
+                            <button class="btn-print" style="background:#e11d48;" onclick="window.close()">TUTUP</button>
+                        </div>
+
+                        <!-- 1. KOP HEADER DI TENGAH (CENTER) -->
+                        <div style="display:flex; justify-content:center; align-items:center; gap:16px; margin-bottom:12px;">
+                            <img src="${dakotaLogo}" alt="Logo Dakota Cargo" style="height:44px; object-fit:contain;" />
+                            <div style="text-align:left;">
+                                <h2 style="margin:0; font-size:15px; font-weight:900; color:#004b84; letter-spacing:0.3px;">PT DAKOTA LOGISTIK INDONESIA</h2>
+                                <div style="font-size:10.5px; color:#475569; margin-top:2px;">Jl. Wibawa Mukti II No. 99, Jatiasih</div>
+                                <div style="font-size:10.5px; color:#475569;">Kota Bekasi - Jawa Barat</div>
+                            </div>
+                        </div>
+
+                        <!-- GARIS PEMISAH DOBEL MEMBENTANG PENUH -->
+                        <div style="border-top: 1px solid #004b84; border-bottom: 2px solid #004b84; height: 2px; margin: 0 0 20px 0;"></div>
+
+                        <!-- 2. JUDUL KWITANSI PERSIS DI TENGAH -->
+                        <div style="text-align:center; margin-bottom:24px;">
+                            <span style="font-size:32px; font-weight:900; color:#004b84; letter-spacing:3px; display:inline-block; border-bottom:3px solid #004b84; padding-bottom:2px;">
+                                KWITANSI
+                            </span>
+                        </div>
+
+                        <!-- 3. DETAIL DATA RINCIAN KWITANSI -->
+                        <div style="max-width: 95%; margin: 0 auto; line-height: 1.8; font-size: 12px;">
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <tr>
+                                    <td style="width: 20%; color:#334155; padding: 4px 0;">Nomor Kwitansi</td>
+                                    <td style="width: 3%; text-align: center;">:</td>
+                                    <td style="width: 77%; font-family: monospace; font-weight: bold; font-size: 12.5px; color:#004b84;">
+                                        ${kwitansiDisplayNo || '-'}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="color:#334155; padding: 4px 0;">Sudah Terima Dari</td>
+                                    <td style="text-align: center;">:</td>
+                                    <td style="font-weight: 900; text-transform: uppercase; color:#0f172a; font-size: 12.5px;">
+                                        ${header.cust_name || header.artih_custname || '-'}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="color:#334155; padding: 4px 0; vertical-align: top;">Banyaknya Uang</td>
+                                    <td style="text-align: center; vertical-align: top;">:</td>
+                                    <td style="font-style: italic; font-weight: 700; color:#1e293b; background: #f8fafc; padding: 5px 10px; border-radius: 4px; border-left: 3px solid #0284c7;">
+                                        # ${textTerbilang} #
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="color:#334155; padding: 6px 0 2px 0; vertical-align: top;">Untuk Pembayaran</td>
+                                    <td style="text-align: center; vertical-align: top; padding-top: 6px;">:</td>
+                                    <td style="padding-top: 6px; color:#1e293b;">
+                                        <div style="font-weight: 800; color:#0f172a;">BIAYA PENGIRIMAN BARANG</div>
+                                        <div style="color: #475569; font-size: 11px; margin-top: 2px;">
+                                            Sesuai Faktur Penagihan : <span style="font-family: monospace; font-weight: bold; color:#0284c7;">${noInvoiceResmi}</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="color:#334155; padding: 4px 0;">Tanggal Jatuh Tempo</td>
+                                    <td style="text-align: center;">:</td>
+                                    <td style="font-weight: 500; color:#1e293b;">
+                                        ${tglCetakIndo}
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- KOTAK BESAR NOMINAL RUPIAH DI SEBELAH KIRI -->
+                            <div style="margin-top: 20px; display: flex; align-items: center;">
+                                <div style="border: 2px solid #004b84; background: #f0fdf4; border-radius: 8px; padding: 10px 20px; min-width: 250px;">
+                                    <div style="font-size: 9.5px; color:#15803d; font-weight: 800; text-transform: uppercase; margin-bottom: 2px;">JUMLAH TAGIHAN :</div>
+                                    <div style="font-family: monospace; font-size: 23px; font-weight: 900; color: #0f172a; letter-spacing: 0.5px;">
+                                        Rp ${grandTotal.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 4. FOOTER BAWAH DENGAN GARIS PUTUS-PUTUS PEMISAH -->
+                        <div style="margin-top: 35px; border-top: 1px dashed #cbd5e1; padding-top: 15px; display:flex; justify-content:space-between; align-items:flex-end;">
+                            <!-- Bagian Rekening Bank Kiri -->
+                            <div style="width: 44%; background:#f8fafc; padding: 8px 12px; border-radius: 6px; border: 1px solid #e2e8f0; font-size: 10.5px;">
+                                <div style="font-weight:bold; color:#004b84; margin-bottom: 2px;">Pembayaran Transfer ke:</div>
+                                <div style="font-weight:bold; color:#0f172a;">DAKOTA LOGISTIK INDONESIA PT</div>
+                                <div style="color:#334155;">BANK CENTRAL ASIA (BCA) - KCU KALIMALANG</div>
+                                <div style="font-weight:900; font-family: monospace; color:#0284c7; font-size: 11.5px; margin-top: 2px;">
+                                    NO REKENING : 2303937226
+                                </div>
+                            </div>
+
+                            <!-- Bagian Tanda Tangan Kanan -->
+                            <div style="width: 40%; text-align: center;">
+                                <div style="font-size: 11px; color:#475569; margin-bottom: 2px;">
+                                    Bekasi, ${tglCetakIndo}
+                                </div>
+                                <div style="font-weight: 800; color:#0f172a; font-size: 11.5px;">PT. DAKOTA LOGISTIK INDONESIA</div>
+                                
+                                <div style="height: 55px;"></div>
+
+                                <div>
+                                    <div style="font-weight: 900; text-decoration: underline; color:#0f172a; font-size: 12px; letter-spacing: 0.3px;">
+                                        BAYYINATHUL RAHMATULLAH
+                                    </div>
+                                    <div style="font-size: 9.5px; color:#64748b; margin-top: 1px;">Finance & Accounting</div>
+                                </div>
+                            </div>
+                        </div>
+                    </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                return;
+            }
+
+            // =====================================================================
+            // 📄 3. CETAK KHUSUS: FAKTUR TIPE 2 (DESAIN MODERN IDENTIK GAMBAR 2)
+            // =====================================================================
+            if (docType === 'FAKTUR_2') {
+                let totalBiayaKirim = 0;
+                let totalDiskon = 0;
+                let totalPacking = 0;
+                let totalKoli = 0;
+                let totalBeratReal = 0;
+                let totalBeratVol = 0;
+                let totalBiayaPenerus = 0;
+
+                const faktur2RowsHtml = btts.map((b, idx) => {
+                    const harga = Number(b.bttt_harga || 0);
+                    const disc = Number(b.bttt_disc || 0);
+                    const penerus = Number(b.bttt_biayapenerus || 0);
+                    const packing = Number(b.biaya_packing || 0);
+                    const koli = Number(b.bttt_jmlunit || 1);
+                    const berat = Number(b.bttt_berat || 0);
+                    const beratVol = Number(b.bttt_ukuran || 0);
+
+                    const diskonNominal = (harga * (disc / 100.0));
+                    const biayaKirimBersih = (harga - diskonNominal) + penerus;
+
+                    totalBiayaKirim += biayaKirimBersih;
+                    totalDiskon += diskonNominal;
+                    totalPacking += packing;
+                    totalKoli += koli;
+                    totalBeratReal += berat;
+                    totalBeratVol += beratVol;
+                    totalBiayaPenerus += penerus;
+
+                    return `
+                        <tr style="font-size: 9.5px; font-family: Arial, sans-serif;">
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center;">${idx + 1}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 4px; font-family: monospace; font-weight: bold; color: #0284c7;">${b.bttt_id}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center;">${String(b.bttt_tanggal || '').substring(0, 10)}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 4px; text-align: center;">DKI JAKARTA</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 4px;">${b.bttt_tujuankota || '-'}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 4px; font-weight: 500;">${b.bttt_tujuannama || '-'}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center;">${b.bttt_nosuratjalan || '-'}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center;">-</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center;">DARAT</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center; font-family: monospace;">${koli}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 4px; text-align: right; font-family: monospace;">${berat.toLocaleString('id-ID')}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 4px; text-align: right; font-family: monospace;">0</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 4px; text-align: right; font-family: monospace;">${beratVol}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center; font-family: monospace;">-</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center; font-family: monospace;">-</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 4px; text-align: right; font-family: monospace; font-weight: 600;">${biayaKirimBersih.toLocaleString('id-ID')}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 4px; font-size: 8.5px; color: #475569;">${b.bttt_namabarang || '-'}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                const subtotalNilaiJual = totalBiayaKirim + totalPacking;
+                const dpp = subtotalNilaiJual;
+                const ppn = dpp * 0.011;
+                const grandTotal = Number(header.artih_total || (subtotalNilaiJual + ppn));
+                const textTerbilang = (terbilangIndonesia(Math.round(grandTotal)).trim() + ' RUPIAH').replace(/\s+/g, ' ');
+
+                const noInvoiceResmi = formatNomorInvoiceResmi(header.artih_id, header.artih_tanggal);
+                let noFakturPajak = String(header.artih_fktpajak || '').trim();
+                if (!noFakturPajak || noFakturPajak === '010.' || noFakturPajak === '010') {
+                    noFakturPajak = '010.026.00.340034701';
+                }
+
+                const tglCetakIndo = formatTanggalIndonesia(header.artih_tanggal);
+
+                printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>FAKTUR PENAGIHAN - ${noInvoiceResmi}</title>
+                        <style>
+                            @page { size: A4 landscape; margin: 8mm; }
+                            body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 12px; color: #1e293b; }
+                            table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+                            th { border: 1px solid #94a3b8; padding: 5px 3px; background-color: #e2e8f0; font-size: 9px; text-align: center; font-weight: bold; color: #0f172a; text-transform: uppercase; }
+                            .no-print { margin-bottom: 12px; text-align: right; }
+                            .btn-print { padding: 7px 18px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; color: white; margin: 0 4px; font-size: 11px; text-transform: uppercase; }
+                            @media print { .no-print { display: none !important; } }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="no-print">
+                            <button class="btn-print" style="background:#16a34a;" onclick="window.print()">PRINT</button>
+                            <button class="btn-print" style="background:#e11d48;" onclick="window.close()">TUTUP</button>
+                        </div>
+
+                        <!-- 1. KOP RESMI DENGAN LOGO DAKOTA CARGO & TITLE BESAR -->
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div style="display:flex; align-items:center; gap:12px;">
+                                <img src="${dakotaLogo}" alt="Logo Dakota Cargo" style="height:44px; object-fit:contain;" />
+                                <div>
+                                    <h2 style="margin:0; font-size:15px; font-weight:900; color:#004b84; letter-spacing:0.3px;">PT DAKOTA LOGISTIK INDONESIA</h2>
+                                    <div style="font-size:10px; color:#64748b; margin-top:2px;">Jl. Wibawa Mukti II No. 99, Jatiasih, Bekasi - Jawa Barat</div>
+                                </div>
+                            </div>
+                            <div style="text-align:right;">
+                                <h1 style="margin:0; font-size:20px; font-weight:900; letter-spacing:0.5px; color:#004b84;">FAKTUR PENAGIHAN</h1>
+                                <div style="font-size:10px; font-weight:bold; color:#0284c7; margin-top:2px;">NO. KWITANSI: ${kwitansiDisplayNo || '-'}</div>
+                            </div>
+                        </div>
+
+                        <!-- Garis Pembatas Aksen Biru Dakota -->
+                        <div style="height:3px; background:#004b84; margin:8px 0 10px 0; border-radius:2px;"></div>
+
+                        <!-- 2. DATA PELANGGAN (KIRI) & METADATA INVOICE (KANAN) -->
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; font-size:10.5px; background:#f8fafc; padding:8px 10px; border-radius:6px; border:1px solid #e2e8f0;">
+                            <div style="width: 52%;">
+                                <div style="color:#64748b; font-size:10px; font-weight:bold; text-transform:uppercase;">NAMA PELANGGAN :</div>
+                                <div style="font-weight:900; font-size:13px; color:#0f172a; text-transform:uppercase; margin-top:1px;">${header.cust_name || header.artih_custname || '-'}</div>
+                                <div style="font-size:10px; color:#475569; margin-top:2px;">${header.cust_alamat || 'KANTOR PUSAT OPERASIONAL'}</div>
+                            </div>
+                            <div style="width: 44%;">
+                                <table style="width: 100%; border: none; margin: 0; font-size: 10.5px;">
+                                    <tr>
+                                        <td style="padding: 1px 0; width: 44%; color:#475569;">Tanggal Kwitansi</td>
+                                        <td style="padding: 1px 0; width: 3%;">:</td>
+                                        <td style="padding: 1px 0; font-weight: bold; color:#0f172a;">${tglCetakIndo}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 1px 0; color:#475569;">Nomor Invoice</td>
+                                        <td style="padding: 1px 0;">:</td>
+                                        <td style="padding: 1px 0; font-weight: 800; font-family: monospace; color:#0284c7;">${noInvoiceResmi}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 1px 0; color:#475569;">Nomor Faktur Pajak</td>
+                                        <td style="padding: 1px 0;">:</td>
+                                        <td style="padding: 1px 0; font-family: monospace; font-weight: 600;">${noFakturPajak}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 1px 0; color:#475569;">Tanggal Jatuh Tempo</td>
+                                        <td style="padding: 1px 0;">:</td>
+                                        <td style="padding: 1px 0; font-weight: bold; color:#b91c1c;">${tglCetakIndo}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- 3. TABEL MULTI-HEADER DENGAN HEADER SLATE MODERN -->
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th rowspan="3" style="width:2.5%;">No</th>
+                                    <th rowspan="3" style="width:11%;">Nomor<br/>STKB/AWB</th>
+                                    <th rowspan="3" style="width:7%;">TANGGAL</th>
+                                    <th rowspan="3" style="width:6%;">PROVINSI</th>
+                                    <th rowspan="3" style="width:8%;">KOTA<br/>TUJUAN</th>
+                                    <th rowspan="3" style="width:12%;">PENERIMA</th>
+                                    <th rowspan="3" style="width:12%;">NOMOR SURAT</th>
+                                    <th rowspan="3" style="width:7%;">NOMOR PI<br/>/KET LAIN</th>
+                                    <th rowspan="3" style="width:5%;">SERVICE</th>
+                                    <th colspan="4" style="width:15%;">JUMLAH DIKIRIM</th>
+                                    <th colspan="2" style="width:7%;">TARIF PENGIRIMAN</th>
+                                    <th rowspan="3" style="width:8%;">JUMLAH<br/>TAGIHAN<br/>(Rp.)</th>
+                                    <th rowspan="3" style="width:8%;">KETERANGAN</th>
+                                </tr>
+                                <tr>
+                                    <th rowspan="2" style="width:3%;">KOLI<br/>/PALET</th>
+                                    <th colspan="2">BERAT REAL</th>
+                                    <th rowspan="2" style="width:3%;">BERAT<br/>VOL</th>
+                                    <th rowspan="2" style="width:4%;">MINIMUM<br/>/CARTER</th>
+                                    <th rowspan="2" style="width:3%;">LANJUTAN</th>
+                                </tr>
+                                <tr>
+                                    <th style="width:4%;">(KG)</th>
+                                    <th style="width:3%;">(M3)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${faktur2RowsHtml || '<tr><td colspan="17" style="text-align:center; padding:10px;">Tidak ada data resi</td></tr>'}
+                                
+                                <!-- Baris Rekapitulasi Keuangan Bawah Tabel (Tanpa Kotak Kosong Kanan) -->
+                                <tr>
+                                    <td colspan="13" rowspan="7" style="border: 1px solid #94a3b8; padding: 10px 12px; vertical-align: bottom; font-size: 10.5px; background:#f8fafc;">
+                                        <span style="color:#64748b;">Terbilang: </span> <span style="font-weight:bold; font-style:italic; color:#0f172a;">${textTerbilang}</span>
+                                    </td>
+                                    <td colspan="3" style="border: 1px solid #94a3b8; padding: 3px 6px; font-size: 9.5px; color:#64748b; border-bottom: 1px solid #cbd5e1;">Diskon</td>
+                                    <td style="border: 1px solid #94a3b8; padding: 3px 6px; text-align: right; font-family: monospace; font-size: 9.5px; border-bottom: 1px solid #cbd5e1;">${totalDiskon.toLocaleString('id-ID')}.00</td>
+                                </tr>
+                                <tr>
+                                    <td colspan="3" style="border: 1px solid #94a3b8; padding: 3px 6px; font-weight: bold; font-size: 9.5px; color:#334155; border-bottom: 1px solid #cbd5e1;">JUMLAH BIAYA KIRIM</td>
+                                    <td style="border: 1px solid #94a3b8; padding: 3px 6px; text-align: right; font-family: monospace; font-weight: bold; font-size: 9.5px; border-bottom: 1px solid #cbd5e1;">${totalBiayaKirim.toLocaleString('id-ID')}.00</td>
+                                </tr>
+                                <tr>
+                                    <td colspan="3" style="border: 1px solid #94a3b8; padding: 3px 6px; font-size: 9.5px; color:#64748b; border-bottom: 1px solid #cbd5e1;">Ditambah Packing</td>
+                                    <td style="border: 1px solid #94a3b8; padding: 3px 6px; text-align: right; font-family: monospace; font-size: 9.5px; border-bottom: 1px solid #cbd5e1;">${totalPacking.toLocaleString('id-ID')}.00</td>
+                                </tr>
+                                <tr style="background:#f8fafc;">
+                                    <td colspan="3" style="border: 1px solid #94a3b8; padding: 3px 6px; font-weight: bold; font-size: 9.5px; color:#0f172a; border-bottom: 1px solid #cbd5e1;">NILAI JUAL</td>
+                                    <td style="border: 1px solid #94a3b8; padding: 3px 6px; text-align: right; font-family: monospace; font-weight: bold; font-size: 9.5px; border-bottom: 1px solid #cbd5e1;">${subtotalNilaiJual.toLocaleString('id-ID')}.00</td>
+                                </tr>
+                                <tr>
+                                    <td colspan="3" style="border: 1px solid #94a3b8; padding: 3px 6px; font-size: 9.5px; color:#64748b; border-bottom: 1px solid #cbd5e1;">DPP 1.1%</td>
+                                    <td style="border: 1px solid #94a3b8; padding: 3px 6px; text-align: right; font-family: monospace; font-size: 9.5px; border-bottom: 1px solid #cbd5e1;">${dpp.toLocaleString('id-ID')}.00</td>
+                                </tr>
+                                <tr>
+                                    <td colspan="3" style="border: 1px solid #94a3b8; padding: 3px 6px; font-size: 9.5px; color:#64748b; border-bottom: 1px solid #cbd5e1;">PPN 1.1%</td>
+                                    <td style="border: 1px solid #94a3b8; padding: 3px 6px; text-align: right; font-family: monospace; border-bottom: 1px solid #cbd5e1;">${ppn.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                </tr>
+                                <tr style="background:#f1f5f9; font-weight: bold;">
+                                    <td colspan="3" style="border: 1px solid #94a3b8; padding: 4px 6px; color:#004b84; font-size: 10px;">TOTAL TAGIHAN</td>
+                                    <td style="border: 1px solid #94a3b8; padding: 4px 6px; text-align: right; font-family: monospace; font-weight: 900; font-size: 11px; color:#b91c1c;">Rp ${grandTotal.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- 4. FOOTER 3 KOLOM MODERN IDENTIK GAMBAR 2 -->
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-top:16px; font-size:10px;">
+                            <!-- Kolom 1: Rekening Bank BCA -->
+                            <div style="width: 32%; background:#f8fafc; padding: 8px 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                                <div style="font-weight:bold; color:#004b84; margin-bottom:2px; font-size:10.5px;">Pembayaran Transfer ke:</div>
+                                <div style="font-weight:bold; color:#0f172a;">DAKOTA LOGISTIK INDONESIA PT</div>
+                                <div style="color:#334155;">BANK CENTRAL ASIA (BCA)</div>
+                                <div style="color:#334155;">KCU KALIMALANG</div>
+                                <div style="font-weight:900; font-family:monospace; color:#0284c7; font-size:11.5px; margin-top:2px;">
+                                    NO REKENING : 2303937226
+                                </div>
+                            </div>
+
+                            <!-- Kolom 2: Bukti Pembayaran -->
+                            <div style="width: 32%; background:#f8fafc; padding: 8px 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                                <div style="font-weight:bold; color:#004b84; margin-bottom:2px; font-size:10.5px;">Bukti Pembayaran Mohon:</div>
+                                <div style="color:#334155;">FAX KE : (021) 82401076</div>
+                                <div style="color:#334155; margin-top:1px;">Atau Email Ke :</div>
+                                <div style="font-weight:bold; color:#0284c7; font-size:10.5px; margin-top:2px;">marketing.pusat@dakotacargo.co.id</div>
+                            </div>
+
+                            <!-- Kolom 3: Tanda Tangan -->
+                            <div style="width: 30%; text-align: center;">
+                                <div style="font-size:10.5px; color:#475569; margin-bottom:2px;">Bekasi, ${tglCetakIndo}</div>
+                                <div style="font-weight:bold; color:#0f172a; font-size:11px;">PT DAKOTA LOGISTIK INDONESIA</div>
+                                <div style="height: 48px;"></div>
+                                <div>
+                                    <div style="font-weight:bold; text-decoration:underline; color:#0f172a; font-size:11px;">TRI SUGIARTI</div>
+                                    <div style="font-size:9px; color:#64748b;">Finance & Accounting</div>
+                                </div>
+                            </div>
+                        </div>
+                    </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                return;
+            }
+
+            // =====================================================================
+            // 📄 4. CETAK KHUSUS: SUMMARY BILLING (20 KOLOM PERSIS FILE ASP LAWAS)
+            // =====================================================================
+            if (docType === 'SUMMARY') {
+                let totalKoli = 0;
+                let totalVolume = 0;
+                let totalBerat = 0;
+                let totalTagihan = 0;
+
+                const noInvoiceResmi = formatNomorInvoiceResmi(header.artih_id, header.artih_tanggal);
+                const tglInvoiceIndo = formatTanggalIndonesia(header.artih_tanggal);
+
+                const summaryRowsHtml = btts.map((b, idx) => {
+                    const koli = Number(b.bttt_jmlunit || 1);
+                    const volume = Number(b.bttt_ukuran || 0);
+                    const berat = Number(b.bttt_berat || 0);
+                    const harga = Number(b.subtotal || b.bttt_harga || 0);
+
+                    totalKoli += koli;
+                    totalVolume += volume;
+                    totalBerat += berat;
+                    totalTagihan += harga;
+
+                    const tglKirim = b.bttt_tanggal ? String(b.bttt_tanggal).substring(0, 10) : '-';
+
+                    return `
+                        <tr style="font-size: 9px; font-family: Arial, sans-serif;">
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 2px; text-align: center;">${idx + 1}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 3px; text-align: center;">${String(header.artih_tanggal || '').substring(0, 10)}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 4px; font-family: monospace; font-weight: bold; color: #0284c7;">${noInvoiceResmi}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 4px; font-family: monospace;">${kwitansiDisplayNo || '-'}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 4px; font-family: monospace; font-weight: bold; color: #0f172a;">${b.bttt_id}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 3px; text-align: center;">${tglKirim}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 3px;">${b.bttt_asalname || header.cust_name || '-'}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 3px; text-align: center;">${b.no_skb || b.bttt_nosuratjalan || '-'}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 2px; text-align: center;">LAND REGULER</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 3px;">${b.bttt_tujuannama || b.bttt_tujuankota || '-'}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 2px; text-align: center;">REGULER</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 2px; text-align: center; font-family: monospace;">${koli}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 3px; text-align: right; font-family: monospace;">${volume}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 3px; text-align: right; font-family: monospace;">${berat.toLocaleString('id-ID')}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 2px; text-align: center;">-</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 2px; text-align: center;">-</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 2px; text-align: center;">-</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 2px; text-align: center;">-</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 4px; text-align: right; font-family: monospace; font-weight: bold; color: #0f172a;">${harga.toLocaleString('id-ID')}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 3px; font-size: 8.5px; color: #475569;">${b.bttt_namabarang || '-'}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>SUMMARY BILLING - ${noInvoiceResmi}</title>
+                        <style>
+                            @page { size: A3 landscape; margin: 8mm; }
+                            body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 10px; color: #1e293b; }
+                            table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+                            th { border: 1px solid #94a3b8; padding: 5px 2px; background-color: #e2e8f0; font-size: 8.5px; text-align: center; font-weight: bold; color: #0f172a; text-transform: uppercase; }
+                            .no-print { margin-bottom: 12px; text-align: right; }
+                            .btn-print { padding: 7px 18px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; color: white; margin: 0 4px; font-size: 11px; text-transform: uppercase; }
+                            @media print { .no-print { display: none !important; } }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="no-print">
+                            <button class="btn-print" style="background:#16a34a;" onclick="window.print()">PRINT</button>
+                            <button class="btn-print" style="background:#e11d48;" onclick="window.close()">TUTUP</button>
+                        </div>
+
+                        <!-- KOP RESMI DENGAN LOGO DAKOTA CARGO -->
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div style="display:flex; align-items:center; gap:12px;">
+                                <img src="${dakotaLogo}" alt="Logo Dakota Cargo" style="height:44px; object-fit:contain;" />
+                                <div>
+                                    <h2 style="margin:0; font-size:15px; font-weight:900; color:#004b84; letter-spacing:0.3px;">PT DAKOTA LOGISTIK INDONESIA</h2>
+                                    <div style="font-size:10px; color:#64748b; margin-top:2px;">Jl. Wibawa Mukti II No. 99, Jatiasih, Bekasi - Jawa Barat</div>
+                                </div>
+                            </div>
+                            <div style="text-align:right;">
+                                <h1 style="margin:0; font-size:20px; font-weight:900; letter-spacing:0.5px; color:#004b84;">SUMMARY BILLING</h1>
+                                <div style="font-size:10px; font-weight:bold; color:#0f172a; margin-top:2px;">
+                                    NO. FAKTUR: <span style="font-family:monospace; color:#0284c7;">${noInvoiceResmi}</span>
+                                </div>
+                                <div style="font-size:10px; color:#64748b;">
+                                    NO. KWITANSI: <span style="font-family:monospace;">${kwitansiDisplayNo || '-'}</span> | CUSTOMER: <b>${header.cust_name || header.artih_custname || '-'}</b>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="height:3px; background:#004b84; margin:8px 0 10px 0; border-radius:2px;"></div>
+
+                        <!-- TABEL 20 KOLOM PERSIS FILE ASP LAWAS DENGAN STYLING MODERN -->
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width:2%;">No</th>
+                                    <th style="width:5%;">Tanggal<br/>Invoice</th>
+                                    <th style="width:9%;">Invoice<br/>Number</th>
+                                    <th style="width:8%;">No.<br/>Kwitansi</th>
+                                    <th style="width:8%;">No Resi</th>
+                                    <th style="width:5%;">Tanggal<br/>Pengiriman</th>
+                                    <th style="width:10%;">Pengirim</th>
+                                    <th style="width:5%;">No.<br/>SKB</th>
+                                    <th style="width:5%;">Jenis<br/>Pengiriman</th>
+                                    <th style="width:9%;">Tujuan</th>
+                                    <th style="width:4%;">Jenis<br/>Angkutan</th>
+                                    <th style="width:3%;">Koli</th>
+                                    <th style="width:3%;">Volume<br/>(Cbm)</th>
+                                    <th style="width:4%;">Berat<br/>(Kg)</th>
+                                    <th style="width:3%;">Berat<br/>Minimum</th>
+                                    <th style="width:3%;">Charge<br/>Weight</th>
+                                    <th style="width:3%;">Tarif</th>
+                                    <th style="width:3%;">Additional<br/>Tarif</th>
+                                    <th style="width:5%;">Total<br/>Tagihan</th>
+                                    <th style="width:6%;">REMARK</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${summaryRowsHtml || '<tr><td colspan="20" style="text-align:center; padding:10px;">Tidak ada rincian data</td></tr>'}
+                            </tbody>
+                            <tfoot>
+                                <tr style="background:#f1f5f9; font-weight:bold; font-size:9.5px;">
+                                    <td colspan="11" style="border:1px solid #94a3b8; padding:5px; text-align:center; color:#004b84;">TOTAL KESELURUHAN :</td>
+                                    <td style="border:1px solid #94a3b8; padding:5px; text-align:center; font-family:monospace;">${totalKoli}</td>
+                                    <td style="border:1px solid #94a3b8; padding:5px; text-align:right; font-family:monospace;">${totalVolume}</td>
+                                    <td style="border:1px solid #94a3b8; padding:5px; text-align:right; font-family:monospace;">${totalBerat.toLocaleString('id-ID')}</td>
+                                    <td colspan="4" style="border:1px solid #94a3b8; text-align:center;">-</td>
+                                    <td style="border:1px solid #94a3b8; padding:5px; text-align:right; font-family:monospace; color:#b91c1c; font-size:10.5px;">Rp ${totalTagihan.toLocaleString('id-ID')}</td>
+                                    <td style="border:1px solid #94a3b8;"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                return;
+            }
+
+            // =====================================================================
+            // 📄 2. CETAK DEFAULT: FAKTUR PENAGIHAN, SUMMARY, DLL.
+            // =====================================================================
             let totalBerat = 0;
             let totalUkuran = 0;
             let totalPacking = 0;
@@ -779,7 +1685,7 @@ const Invoice = () => {
                 `;
             }).join('');
 
-            const titleHeader = docType.includes('KWITANSI') ? 'KWITANSI PENAGIHAN' : (docType === 'SUMMARY' ? 'SUMMARY BILLING' : 'FAKTUR PENAGIHAN');
+            const titleHeader = docType === 'SUMMARY' ? 'SUMMARY BILLING' : 'FAKTUR PENAGIHAN';
 
             printWindow.document.write(`
                 <!DOCTYPE html>
@@ -791,15 +1697,14 @@ const Invoice = () => {
                         body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 10px; color: #000; }
                         table { width: 100%; border-collapse: collapse; margin-top: 8px; }
                         th { border: 1px solid #000; padding: 5px 3px; background-color: #cbd5e1; font-size: 9px; text-align: center; }
-                        .no-print-bar { background-color: #1e40af; color: white; padding: 10px 15px; border-radius: 8px; margin-bottom: 15px; text-align: center; }
                         .btn-ctrl { padding: 7px 18px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; text-transform: uppercase; margin: 0 4px; }
                         @media print { .no-print { display: none !important; } }
                     </style>
                 </head>
                 <body>
-                    <div class="no-print no-print-bar">
-                        <button class="btn-ctrl" style="background:#e11d48; color:white;" onclick="window.close()">BATAL</button>
-                        <button class="btn-ctrl" style="background:#16a34a; color:white;" onclick="setJudulDoc('FAKTUR PENAGIHAN', ''); window.print();">PRINT</button>
+                    <div class="no-print" style="margin-bottom: 12px; text-align: right;">
+                        <button class="btn-ctrl" style="background:#16a34a; color:white;" onclick="window.print()">PRINT</button>
+                        <button class="btn-ctrl" style="background:#e11d48; color:white;" onclick="window.close()">TUTUP</button>
                     </div>
 
                     <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #000; padding-bottom:6px;">
@@ -811,14 +1716,14 @@ const Invoice = () => {
                             </div>
                         </div>
                         <div style="text-align:right;">
-                            <h2 id="judulDokumen" style="margin:0; font-size:15px; font-weight:900; text-decoration:underline;">${titleHeader}</h2>
+                            <h2 style="margin:0; font-size:15px; font-weight:900; text-decoration:underline;">${titleHeader}</h2>
                             <div style="font-size:10px; font-weight:bold; margin-top:2px;">NO. FAKTUR: ${header.artih_id}</div>
-                            <div style="font-size:10px; color:#555;">NO. KWITANSI: ${header.artih_nokw || '-'}</div>
+                            <div style="font-size:10px; color:#555;">NO. KWITANSI: ${kwitansiDisplayNo || '-'}</div>
                             <div style="font-size:10px; color:#555;">CUSTOMER: ${header.cust_name || header.artih_custname}</div>
                         </div>
                     </div>
 
-                    <table id="tableFaktur">
+                    <table>
                         <thead>
                             <tr>
                                 <th style="width:3%;">NO</th>
@@ -857,7 +1762,8 @@ const Invoice = () => {
             `);
             printWindow.document.close();
         } catch (err) {
-            Swal.fire('Error', 'Gagal memuat dokumen cetak faktur.', 'error');
+            console.error("Detail Error Print:", err);
+            Swal.fire('Error', 'Gagal memuat dokumen cetak faktur: ' + (err.message || err), 'error');
         }
     };
 
@@ -1173,9 +2079,20 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                 <div className="px-6 py-2.5 bg-[#004b84] text-white flex items-center justify-between">
                     <div className="font-black uppercase tracking-wider text-xs flex items-center gap-2">
                         <Plus size={16} />
-                        {addStep === 1 ? 'PEMBUATAN INVOICE (LANGKAH 1 DARI 2)' : 'BUAT INVOICE BARU'}
+                        {savedInvoiceId
+                            ? `EDIT INVOICE — ${savedInvoiceId}`
+                            : (addStep === 1 ? 'PEMBUATAN INVOICE (LANGKAH 1 DARI 2)' : 'BUAT INVOICE BARU')}
                     </div>
-                    <button type="button" onClick={() => setIsAddModalOpen(false)} className="text-white/80 hover:text-white cursor-pointer">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setIsAddModalOpen(false);
+                            setSavedInvoiceId(null);
+                            setSavedKwitansiNo(null);
+                            setPersistedSelectedBtts([]);
+                        }}
+                        className="text-white/80 hover:text-white cursor-pointer"
+                    >
                         <X size={18} />
                     </button>
                 </div>
@@ -1274,13 +2191,18 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                             </div>
 
                             <div>
-                                <label className="font-bold text-slate-600 block mb-1">KETERANGAN :</label>
+                                <label className="font-bold text-slate-600 block mb-1">
+                                    KETERANGAN <span className="text-rose-600 font-black">*</span> :
+                                </label>
                                 <input
                                     type="text"
                                     placeholder="Contoh: Pembayaran resi kargo..."
                                     value={newInvoiceForm.artih_keterangan}
                                     onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, artih_keterangan: e.target.value })}
-                                    className="w-full p-2.5 bg-white border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-blue-500"
+                                    className={`w-full p-2.5 bg-white border rounded-lg font-bold text-slate-800 outline-none transition ${!newInvoiceForm.artih_keterangan.trim()
+                                        ? 'border-rose-300 focus:border-rose-500 bg-rose-50/20'
+                                        : 'border-slate-300 focus:border-blue-500'
+                                        }`}
                                 />
                             </div>
                         </div>
@@ -1307,10 +2229,12 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                 {/* LANGKAH 2: FORM LENGKAP IDENTIK DUA TABEL APLIKASI LAWAS */}
                 {addStep === 2 && (() => {
                     // Filter BTT yang sudah dipilih oleh user
-                    const selectedBTTObjects = unbilledBTTList.filter(b => {
-                        const cleanBTTId = String(b.bttt_id || '').trim();
-                        return newInvoiceForm.selected_btts.some(id => String(id).trim() === cleanBTTId);
-                    });
+                    const selectedBTTObjects = savedInvoiceId && persistedSelectedBtts.length > 0
+                        ? persistedSelectedBtts
+                        : unbilledBTTList.filter(b => {
+                            const cleanBTTId = String(b.bttt_id || '').trim();
+                            return newInvoiceForm.selected_btts.some(id => String(id).trim() === cleanBTTId);
+                        });
 
                     const totBiayaKirim = selectedBTTObjects.reduce((sum, b) => sum + Number(b.bttt_harga || 0), 0);
                     const totPenerus = selectedBTTObjects.reduce((sum, b) => sum + Number(b.bttt_biayapenerus || 0), 0);
@@ -1832,6 +2756,7 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                                             setIsAddModalOpen(false);
                                             setSavedInvoiceId(null);
                                             setSavedKwitansiNo(null);
+                                            setPersistedSelectedBtts([]);
                                         }}
                                         className="px-6 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded uppercase transition cursor-pointer text-xs"
                                     >
@@ -2040,6 +2965,7 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                     const currentAgen = getActiveAgen();
                     setSavedInvoiceId(null);
                     setSavedKwitansiNo(null);
+                    setPersistedSelectedBtts([]); // <-- Tambahkan reset ini
                     setNewInvoiceForm({
                         artih_tanggal: today,
                         artih_custid: '',
@@ -2059,7 +2985,7 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
             />
 
             {addModalElement && ReactDOM.createPortal(addModalElement, modalRoot)}
-            {editModalElement && ReactDOM.createPortal(editModalElement, modalRoot)}
+
         </div>
     );
 };
