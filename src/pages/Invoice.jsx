@@ -1160,6 +1160,9 @@ const Invoice = () => {
             // =====================================================================
             // 📄 1. CETAK KHUSUS: KWITANSI TIPE 1 (SESUAI ASP LAWAS + MODERN HEADER)
             // =====================================================================
+            // =====================================================================
+            // 📄 1. CETAK KHUSUS: KWITANSI TIPE 1 (DENGAN KODEPOS & VIA SESUAI FILE LAWAS)
+            // =====================================================================
             if (docType === 'KWITANSI_1') {
                 let totalBiayaKirim = 0;
                 let totalDiskon = 0;
@@ -1174,6 +1177,10 @@ const Invoice = () => {
                     const packing = Number(b.biaya_packing || 0);
                     const berat = Number(b.bttt_berat || 0);
 
+                    // 🎯 Ambil Kodepos & Via langsung dari data BTT database
+                    const kodepos = b.bttt_tujuankodepos || b.bttt_kodepos || b.kodepos || '-';
+                    const viaTransport = (b.bttt_via || b.bttt_angkutankode || b.via || 'DARAT').toUpperCase();
+
                     totalBiayaKirim += biayaKirim;
                     totalDiskon += diskon;
                     totalAsuransi += asuransi;
@@ -1186,9 +1193,17 @@ const Invoice = () => {
                             <td style="border: 1px solid #cbd5e1; padding: 5px 4px; font-family: monospace; font-weight: bold; color: #0284c7;">${b.bttt_id}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center;">${formatTanggalIndonesia(b.bttt_tanggal)}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 5px 4px;">${b.bttt_tujuankota || '-'}</td>
+                            
+                            <!-- 🎯 KOLOM KODEPOS DARI DATABASE -->
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center; font-family: monospace; font-weight: 600;">${kodepos}</td>
+                            
                             <td style="border: 1px solid #cbd5e1; padding: 5px 4px; font-weight: 500;">${b.bttt_tujuannama || '-'}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center;">${b.bttt_nosuratjalan || '-'}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 5px 4px; text-align: right; font-family: monospace; font-weight: 600;">${biayaKirim.toLocaleString('id-ID')}</td>
+                            
+                            <!-- 🎯 KOLOM VIA PENGIRIMAN DARI DATABASE -->
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center; font-weight: bold; font-size: 9px; color: #0f172a;">${viaTransport}</td>
+                            
                             <td style="border: 1px solid #cbd5e1; padding: 5px 4px; text-align: right; font-family: monospace;">${berat.toLocaleString('id-ID')}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 5px 4px; color: #475569;">${b.bttt_namabarang || '-'}</td>
                         </tr>
@@ -1200,16 +1215,13 @@ const Invoice = () => {
                 const ppn = dpp * 0.011;
                 const totalTagihan = Number(header.artih_total || (nilaiJual + ppn));
 
-                // 🎯 1. Format Nomor Invoice Resmi (Bebas OTA)
                 const noInvoiceResmi = formatNomorInvoiceResmi(header.artih_id, header.artih_tanggal);
 
-                // 🎯 2. Format Nomor Faktur Pajak sesuai data e-Faktur
                 let noFakturPajak = String(header.artih_fktpajak || '').trim();
                 if (!noFakturPajak || noFakturPajak === '010.' || noFakturPajak === '010') {
                     noFakturPajak = '010.026.00.340034701';
                 }
 
-                // 🎯 3. Format Tanggal Indonesia (contoh: 29 September 2026)
                 const tglKwitansiIndo = formatTanggalIndonesia(header.artih_tanggal);
                 const tglJatuhTempoIndo = formatTanggalIndonesia(header.artih_tanggal);
 
@@ -1222,7 +1234,7 @@ const Invoice = () => {
                             @page { size: A4 landscape; margin: 8mm; }
                             body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 12px; color: #1e293b; }
                             table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-                            th { border: 1px solid #94a3b8; padding: 6px 3px; background-color: #e2e8f0; font-size: 9.5px; text-align: center; font-weight: bold; color: #0f172a; text-transform: uppercase; }
+                            th { border: 1px solid #94a3b8; padding: 6px 3px; background-color: #e2e8f0; font-size: 9px; text-align: center; font-weight: bold; color: #0f172a; text-transform: uppercase; }
                             .no-print { margin-bottom: 12px; text-align: right; }
                             .btn-print { padding: 7px 18px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; color: white; margin: 0 4px; font-size: 11px; text-transform: uppercase; }
                             @media print { .no-print { display: none !important; } }
@@ -1251,7 +1263,7 @@ const Invoice = () => {
 
                         <div style="height:3px; background:#004b84; margin:8px 0 10px 0; border-radius:2px;"></div>
 
-                        <!-- 2. DATA PELANGGAN (KIRI) & METADATA INVOICE RESMI (KANAN) -->
+                        <!-- 2. DATA PELANGGAN & METADATA -->
                         <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; font-size:11px; background:#f8fafc; padding:8px 12px; border-radius:6px; border:1px solid #e2e8f0;">
                             <div style="width: 50%;">
                                 <div style="color:#64748b; font-size:10px; text-transform:uppercase; font-weight:bold;">Nama Pelanggan :</div>
@@ -1284,27 +1296,29 @@ const Invoice = () => {
                             </div>
                         </div>
 
-                        <!-- 3. TABEL DAFTAR RESI SESUAI FILE LAWAS ASP -->
+                        <!-- 3. TABEL 11 KOLOM (LENGKAP DENGAN KODEPOS & VIA SESUAI GAMBAR 2) -->
                         <table>
                             <thead>
                                 <tr>
                                     <th style="width:3%;">No Urut</th>
-                                    <th style="width:14%;">No Resi Pengiriman</th>
-                                    <th style="width:11%;">Tanggal Kirim</th>
-                                    <th style="width:10%;">Kota Tujuan</th>
-                                    <th style="width:18%;">Penerima</th>
-                                    <th style="width:13%;">No Surat Jalan / POD</th>
-                                    <th style="width:9%;">Biaya Kirim</th>
-                                    <th style="width:6%;">Berat</th>
-                                    <th style="width:16%;">Keterangan</th>
+                                    <th style="width:13%;">No Resi Pengiriman</th>
+                                    <th style="width:10%;">Tanggal Kirim</th>
+                                    <th style="width:9%;">Kota Tujuan</th>
+                                    <th style="width:6%;">Kodepos</th>
+                                    <th style="width:16%;">Penerima</th>
+                                    <th style="width:11%;">No Surat Jalan / POD</th>
+                                    <th style="width:8%;">Biaya Kirim</th>
+                                    <th style="width:5%;">Via</th>
+                                    <th style="width:5%;">Berat</th>
+                                    <th style="width:14%;">Keterangan</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                ${kwitansiRowsHtml || '<tr><td colspan="9" style="text-align:center; padding:10px;">Tidak ada rincian resi</td></tr>'}
+                                ${kwitansiRowsHtml || '<tr><td colspan="11" style="text-align:center; padding:10px;">Tidak ada rincian resi</td></tr>'}
                             </tbody>
                         </table>
 
-                        <!-- 4. FOOTER INFORMASI PEMBAYARAN, TANDA TANGAN & REKAP KEUANGAN -->
+                        <!-- 4. FOOTER INFORMASI REKENING, TANDA TANGAN & REKAP KEUANGAN -->
                         <div style="display:flex; border: 1px solid #94a3b8; border-top: none; font-size: 10px; background:#ffffff;">
                             <!-- Sisi Kiri: Rekening Bank -->
                             <div style="width: 35%; padding: 10px; border-right: 1px solid #cbd5e1; display:flex; flex-direction:column; justify-content:center;">
@@ -3192,8 +3206,8 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                                         disabled={isAlreadyPosted}
                                         onClick={handleSaveNewInvoice}
                                         className={`px-7 py-2 font-black rounded uppercase transition text-xs ${isAlreadyPosted
-                                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300 select-none'
-                                                : 'bg-yellow-400 hover:bg-yellow-500 text-slate-900 cursor-pointer shadow-sm'
+                                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300 select-none'
+                                            : 'bg-yellow-400 hover:bg-yellow-500 text-slate-900 cursor-pointer shadow-sm'
                                             }`}
                                         title={isAlreadyPosted ? 'Invoice sudah diposting. Lakukan UNPOSTING untuk mengedit kembali.' : 'Simpan invoice'}
                                     >
@@ -3216,8 +3230,8 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                                             disabled={!savedInvoiceId}
                                             onClick={() => handlePostingInvoice(savedInvoiceId)}
                                             className={`px-6 py-2 font-black rounded uppercase text-xs transition ${!savedInvoiceId
-                                                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300 select-none'
-                                                    : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-sm'
+                                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300 select-none'
+                                                : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-sm'
                                                 }`}
                                             title="Posting invoice untuk membentuk jurnal memorial"
                                         >
@@ -3231,8 +3245,8 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                                         disabled={!savedInvoiceId && !activeInvoice?.artih_id}
                                         onClick={() => handlePrintDocument({ artih_id: savedInvoiceId || activeInvoice?.artih_id, artih_nokw: savedKwitansiNo || activeInvoice?.artih_nokw }, 'FAKTUR')}
                                         className={`px-6 py-2 font-black rounded uppercase text-xs transition ${savedInvoiceId || activeInvoice?.artih_id
-                                                ? 'bg-sky-600 hover:bg-sky-700 text-white cursor-pointer shadow-sm'
-                                                : 'bg-sky-600/40 text-white/70 cursor-not-allowed'
+                                            ? 'bg-sky-600 hover:bg-sky-700 text-white cursor-pointer shadow-sm'
+                                            : 'bg-sky-600/40 text-white/70 cursor-not-allowed'
                                             }`}
                                     >
                                         CETAK
