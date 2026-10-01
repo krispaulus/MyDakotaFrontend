@@ -92,6 +92,7 @@ const Invoice = () => {
 
     // Dropdown Cetak di Kolom Aksi
     const [activePrintMenuId, setActivePrintMenuId] = useState(null);
+    const [postedJournalId, setPostedJournalId] = useState('');
 
     // =========================================================================
     // HELPER: DETEKSI CABANG & STATUS HOLDING / PUSAT
@@ -271,6 +272,34 @@ const Invoice = () => {
         setSearchKwitansi('');
         setSearchBTT('');
         fetchInvoiceList();
+    };
+
+    // =========================================================================
+    // MODAL BUAT INVOICE BARU (LANGKAH 1)
+    // =========================================================================
+    const handleAdd = () => {
+        // 🎯 1. KOSONGKAN STATE JURNAL AGAR TIDAK TERBAWA DARI INVOICE SEBELUMNYA
+        setPostedJournalId('');
+
+        setActiveInvoice(null);
+        setSavedInvoiceId(null);
+        setSavedKwitansiNo(null);
+        setPersistedSelectedBtts([]);
+
+        setNewInvoiceForm({
+            artih_tanggal: today,
+            artih_custid: '',
+            artih_custname: '',
+            artih_agenid: currentActiveAgen.id,
+            artih_agenname: currentActiveAgen.nama,
+            artih_jenis: 'K',
+            artih_fktpajak: '010.',
+            artih_keterangan: '',
+            selected_btts: []
+        });
+
+        setIsAddModalOpen(true);
+        setAddStep(1);
     };
 
     // =========================================================================
@@ -729,6 +758,8 @@ const Invoice = () => {
 
     const handleOpenEditInvoice = async (item) => {
         try {
+            setActiveInvoice(item);
+
             const token = localStorage.getItem('token');
             const ptId = localStorage.getItem('pt_id') || 'C';
             const res = await api.get(`/piutang/invoice/detail?id=${encodeURIComponent(item.artih_id)}&pt_id=${ptId}`, {
@@ -746,11 +777,14 @@ const Invoice = () => {
             setSavedInvoiceId(header.artih_id);
             setSavedKwitansiNo(cleanKW);
 
-            // 2. Kunci data BTT yang ada
+            // 🎯 2. ISI NOMOR JURNAL (JIKA FAKTUR SUDAH PERNAH DIPOSTING)
+            setPostedJournalId(header.artih_journalid || item.artih_journalid || '');
+
+            // 3. Kunci data BTT yang ada
             const existingBttIds = btts.map(b => String(b.bttt_id).trim());
             setPersistedSelectedBtts(btts);
 
-            // 3. Masukkan data ke form state
+            // 4. Masukkan data ke form state
             setNewInvoiceForm({
                 artih_tanggal: String(header.artih_tanggal || '').split('T')[0] || today,
                 artih_custid: header.artih_custid || '',
@@ -763,11 +797,11 @@ const Invoice = () => {
                 selected_btts: existingBttIds
             });
 
-            // 4. Buka modal langkah 2
+            // 5. Buka modal langkah 2
             setAddStep(2);
             setIsAddModalOpen(true);
 
-            // 5. Muat daftar BTT unbilled lain
+            // 6. Muat daftar BTT unbilled lain
             loadUnbilledBTTByDate(
                 header.artih_custid,
                 bttStartDate,
@@ -785,9 +819,20 @@ const Invoice = () => {
 
     const handlePostingInvoice = (invoiceId) => {
         const id = invoiceId || activeInvoice?.artih_id || savedInvoiceId;
+        if (!id) {
+            Swal.fire('Peringatan', 'Nomor invoice tidak valid untuk diposting.', 'warning');
+            return;
+        }
+
+        // 🎯 Format nomor invoice resmi bebas OTA (contoh: 0009001/09/2026/FP)
+        const tglInvoice = activeInvoice?.artih_tanggal || newInvoiceForm.artih_tanggal || today;
+        const noInvoiceResmi = typeof formatNomorInvoiceResmi === 'function'
+            ? formatNomorInvoiceResmi(id, tglInvoice)
+            : id.replace(/^OTA/i, '001');
+
         Swal.fire({
             title: 'Posting Invoice?',
-            text: `Invoice ${id} akan diposting dan jurnal memorial otomatis terbentuk. Lanjutkan?`,
+            text: `Invoice ${noInvoiceResmi} akan diposting dan jurnal memorial otomatis terbentuk. Lanjutkan?`,
             icon: 'question',
             showCancelButton: true,
             confirmButtonColor: '#16a34a',
@@ -800,6 +845,7 @@ const Invoice = () => {
                     const ptId = localStorage.getItem('pt_id') || 'C';
                     const currentAgen = getActiveAgen();
 
+                    // Kirim ID asli ke backend agar query SQL WHERE artih_id tetap cocok
                     const response = await api.post(`/piutang/invoice/posting?pt_id=${ptId}`, {
                         invoice_id: id,
                         agen_id: currentAgen.id
@@ -807,12 +853,95 @@ const Invoice = () => {
                         headers: { Authorization: `Bearer ${token}` }
                     });
 
-                    Swal.fire('Berhasil!', response.data?.message || 'Invoice resmi diposting!', 'success');
-                    setIsEditModalOpen(false);
-                    setIsAddModalOpen(false);
+                    const newJournalId = response.data?.journal_id || response.data?.no_jurnal || response.data?.data?.artih_journalid || '';
+
+                    Swal.fire({
+                        title: 'BERHASIL DIPOSTING!',
+                        text: `Jurnal Memorial: ${newJournalId || 'Telah terbentuk'}`,
+                        icon: 'success',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+
+                    // 1. Simpan ID Jurnal di state form
+                    if (newJournalId) {
+                        setPostedJournalId(newJournalId);
+                    }
+
+                    // 2. Update state activeInvoice lokal agar flag isAlreadyPosted langsung true
+                    setActiveInvoice(prev => prev ? ({
+                        ...prev,
+                        artih_postingyn: 'Y',
+                        artih_journalid: newJournalId
+                    }) : prev);
+
+                    // 3. Refresh data tabel utama
                     fetchInvoiceList();
                 } catch (err) {
                     Swal.fire('Gagal!', err.response?.data?.message || 'Gagal memposting invoice.', 'error');
+                }
+            }
+        });
+    };
+
+    // =========================================================================
+    // 🔄 UNPOSTING INVOICE (KEMBALIKAN KE DRAFT UNTUK DIEDIT)
+    // =========================================================================
+    const handleUnpostingInvoice = (invoiceId) => {
+        const id = invoiceId || activeInvoice?.artih_id || savedInvoiceId;
+        if (!id) {
+            Swal.fire('Peringatan', 'Nomor invoice tidak valid untuk di-unposting.', 'warning');
+            return;
+        }
+
+        const tglInvoice = activeInvoice?.artih_tanggal || newInvoiceForm.artih_tanggal || today;
+        const noInvoiceResmi = typeof formatNomorInvoiceResmi === 'function'
+            ? formatNomorInvoiceResmi(id, tglInvoice)
+            : id.replace(/^OTA/i, '001');
+
+        Swal.fire({
+            title: 'Batalkan Posting (Unposting)?',
+            text: `Invoice ${noInvoiceResmi} akan dikembalikan ke status DRAFT dan Jurnal Memorial terkait akan dihapus. Lanjutkan?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ea580c',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Ya, UNPOSTING SEKARANG',
+            cancelButtonText: 'Batal'
+        }).then(async (res) => {
+            if (res.isConfirmed) {
+                try {
+                    const token = localStorage.getItem('token');
+                    const ptId = localStorage.getItem('pt_id') || 'C';
+
+                    await api.post(`/piutang/invoice/unposting?pt_id=${ptId}`, {
+                        invoice_id: id
+                    }, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+
+                    Swal.fire({
+                        title: 'BERHASIL DI-UNPOSTING!',
+                        text: 'Invoice kembali berstatus Draft dan dapat diedit kembali.',
+                        icon: 'success',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+
+                    // Kosongkan penanda nomor jurnal pada modal yang sedang terbuka
+                    setPostedJournalId('');
+                    if (activeInvoice) {
+                        setActiveInvoice({
+                            ...activeInvoice,
+                            artih_postingyn: 'N',
+                            artih_journalid: ''
+                        });
+                    }
+
+                    // Muat ulang daftar invoice utama
+                    fetchInvoiceList();
+                } catch (err) {
+                    Swal.fire('Gagal!', err.response?.data?.message || 'Gagal melakukan unposting invoice.', 'error');
                 }
             }
         });
@@ -851,6 +980,135 @@ const Invoice = () => {
     // =========================================================================
     const handlePrintDocument = async (invoiceItem, docType = 'FAKTUR') => {
         const item = invoiceItem || activeInvoice;
+
+        if (docType === 'JURNAL' || docType === 'VOUCHER') {
+            const rawNo = String(postedJournalId || item?.artih_journalid || '').trim();
+            const noJurnal = rawNo.replace(/OTA/gi, '001');
+
+            if (!noJurnal) {
+                Swal.fire('Peringatan', 'Nomor jurnal belum terbentuk atau tidak valid.', 'warning');
+                return;
+            }
+
+            // 🌟 KUNCI CHROME: Buka tab/window SEBELUM await API agar TIDAK DIBLOKIR popup blocker
+            const printWindow = window.open('', '_blank', 'width=1150,height=850,scrollbars=yes');
+            if (!printWindow) {
+                Swal.fire('Popup Diblokir', 'Silakan klik tanda pop-up diblokir di sudut kanan atas browser Anda.', 'warning');
+                return;
+            }
+            printWindow.document.write(`<html><head><title>Memuat Voucher...</title></head><body style="font-family:sans-serif;text-align:center;padding-top:50px;"><h3>Sedang memuat Voucher Memorial ${noJurnal}...</h3></body></html>`);
+
+            try {
+                const token = localStorage.getItem('token');
+                const ptId = localStorage.getItem('pt_id') || 'C';
+
+                const res = await api.get(`/gl/jurnal/detail/${encodeURIComponent(noJurnal)}?pt_id=${ptId}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                }).catch(() => null);
+
+                const jurHeader = res?.data?.header;
+                const jurDetails = res?.data?.details || [];
+
+                if (!jurHeader || jurDetails.length === 0) {
+                    printWindow.close();
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Rincian Jurnal Belum Ada',
+                        text: `Jurnal ${noJurnal} belum memiliki baris rincian di tabel gl_t_jurnald database.`
+                    });
+                    return;
+                }
+
+                let totD = 0, totK = 0;
+                const rows = jurDetails.map(d => {
+                    const db = Number(d.tjurd_debet || 0);
+                    const kr = Number(d.tjurd_kredit || 0);
+                    totD += db;
+                    totK += kr;
+                    return `
+                    <tr style="font-size:10.5px;">
+                        <td style="border:1px solid #cbd5e1;padding:6px;font-family:monospace;font-weight:bold;color:#0284c7;">${d.tjurd_acccode || '-'}</td>
+                        <td style="border:1px solid #cbd5e1;padding:6px;text-align:center;font-family:monospace;">1</td>
+                        <td style="border:1px solid #cbd5e1;padding:6px;"><b>${d.sakun_nama || d.tjurd_acccode}</b> : <span style="color:#475569;">${d.tjurd_keterangan || '-'}</span></td>
+                        <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;font-family:monospace;">${db > 0 ? db.toLocaleString('id-ID', { minimumFractionDigits: 2 }) : '0.00'}</td>
+                        <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;font-family:monospace;">${kr > 0 ? kr.toLocaleString('id-ID', { minimumFractionDigits: 2 }) : '0.00'}</td>
+                    </tr>
+                `;
+                }).join('');
+
+                const logo = typeof dakotaLogo !== 'undefined' ? dakotaLogo : '';
+
+                printWindow.document.open();
+                printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>VOUCHER MEMORIAL - ${jurHeader.tjurh_no}</title>
+                        <style>
+                            @page { size: A4 landscape; margin: 10mm; }
+                            body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 12px; color: #1e293b; }
+                            table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+                            th { border: 1px solid #94a3b8; padding: 6px 8px; background-color: #e2e8f0; font-size: 9.5px; text-align: center; font-weight: bold; color: #0f172a; text-transform: uppercase; }
+                            @media print { .no-print { display: none !important; } }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="no-print" style="text-align:right; margin-bottom:12px;">
+                            <button style="background:#16a34a;color:#fff;border:none;padding:6px 16px;border-radius:4px;font-weight:bold;cursor:pointer;" onclick="window.print()">PRINT</button>
+                            <button style="background:#e11d48;color:#fff;border:none;padding:6px 16px;border-radius:4px;font-weight:bold;cursor:pointer;margin-left:4px;" onclick="window.close()">TUTUP</button>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                ${logo ? `<img src="${logo}" style="height:42px; object-fit:contain;" />` : ''}
+                                <div>
+                                    <h2 style="margin:0; font-size:15px; font-weight:900; color:#004b84;">PT DAKOTA LOGISTIK INDONESIA</h2>
+                                    <div style="font-size:10px; color:#64748b;">Jl. Wibawa Mukti II No. 99, Jatiasih, Bekasi - Jawa Barat</div>
+                                    <div style="font-size:10px; color:#64748b;">(021) 8603278 / (021) 86608589</div>
+                                </div>
+                            </div>
+                            <div style="text-align:right;">
+                                <h1 style="margin:0; font-size:20px; font-weight:900; color:#004b84;">VOUCHER MEMORIAL</h1>
+                                <div style="font-size:11px; font-weight:bold; color:#0284c7;">NO: ${jurHeader.tjurh_no}</div>
+                            </div>
+                        </div>
+                        <div style="height:3px; background:#004b84; margin:8px 0 10px 0;"></div>
+                        <div style="background:#f8fafc; padding:8px 12px; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:8px;">
+                            <table style="width:100%; border:none;">
+                                <tr><td style="width:14%;font-weight:bold;color:#475569;">No. Transaksi</td><td style="width:2%;">:</td><td style="font-weight:bold;color:#0284c7;font-family:monospace;">${jurHeader.tjurh_no}</td></tr>
+                                <tr><td style="font-weight:bold;color:#475569;">Tanggal</td><td>:</td><td style="font-weight:bold;">${String(jurHeader.tjurh_tanggal).split('T')[0]}</td></tr>
+                                <tr><td style="font-weight:bold;color:#475569;">Keterangan</td><td>:</td><td>${jurHeader.tjurh_keterangan || '-'}</td></tr>
+                            </table>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr><th style="width:14%;">Account</th><th style="width:6%;">CC</th><th style="width:50%;text-align:left;padding-left:8px;">Keterangan</th><th style="width:15%;text-align:right;padding-right:8px;">Debet</th><th style="width:15%;text-align:right;padding-right:8px;">Kredit</th></tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                            <tfoot>
+                                <tr style="background:#f1f5f9;font-weight:bold;">
+                                    <td colspan="3" style="border:1px solid #94a3b8;padding:6px;text-align:center;color:#004b84;">TOTAL :</td>
+                                    <td style="border:1px solid #94a3b8;padding:6px;text-align:right;font-family:monospace;">Rp ${totD.toLocaleString('id-ID', { minimumFractionDigits: 2 })}</td>
+                                    <td style="border:1px solid #94a3b8;padding:6px;text-align:right;font-family:monospace;">Rp ${totK.toLocaleString('id-ID', { minimumFractionDigits: 2 })}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        <div style="display:flex; justify-content:space-between; margin-top:35px; text-align:center; padding:0 30px;">
+                            <div><div style="margin-bottom:45px;font-weight:bold;color:#475569;">Diterima</div><b>( Keuangan )</b></div>
+                            <div><div style="margin-bottom:45px;font-weight:bold;color:#475569;">Disetujui</div><b>( Direksi )</b></div>
+                            <div><div style="margin-bottom:45px;font-weight:bold;color:#475569;">Diketahui</div><b>( Akunting )</b></div>
+                        </div>
+                    </body>
+                    </html>
+                `);
+                printWindow.document.close();
+            } catch (e) {
+                printWindow.close();
+                Swal.fire('Error', 'Gagal mencetak voucher memorial: ' + e.message, 'error');
+            }
+            return;
+        }
+
+
         if (!item || !item.artih_id) {
             Swal.fire('Peringatan', 'Data invoice tidak valid untuk dicetak.', 'warning');
             return;
@@ -1664,6 +1922,181 @@ const Invoice = () => {
                 return;
             }
 
+            // =========================================================================
+            // 🖨️ CETAK VOUCHER MEMORIAL (PASTI BISA DIKLIK & ANTI-BLOCKED)
+            // =========================================================================
+            const handlePrintJurnalVoucher = async (journalNo) => {
+                console.log("🖨 TRIGGER CETAK VOUCHER MEMORIAL:", journalNo);
+
+                const rawNo = String(journalNo || postedJournalId || activeInvoice?.artih_journalid || '').trim();
+                const noJurnal = rawNo.replace(/OTA/gi, '001');
+
+                if (!noJurnal) {
+                    Swal.fire('Peringatan', 'Nomor jurnal belum terbentuk atau tidak valid.', 'warning');
+                    return;
+                }
+
+                // 2. 🌟 KUNCI: Buka tab sebelum await API agar tidak dicegat popup blocker browser
+                const printWindow = window.open('', '_blank', 'width=1150,height=850,scrollbars=yes');
+                if (!printWindow) {
+                    Swal.fire('Popup Diblokir', 'Silakan izinkan popup di browser Anda.', 'warning');
+                    return;
+                }
+                printWindow.document.write('<html><head><title>Memuat...</title></head><body style="font-family:sans-serif;text-align:center;padding-top:40px;"><h3>Sedang memuat data Voucher Memorial...</h3></body></html>');
+
+                try {
+                    const token = localStorage.getItem('token');
+                    const ptId = localStorage.getItem('pt_id') || 'C';
+
+                    // Panggil API detail jurnal
+                    const res = await api.get(`/gl/jurnal/detail/${encodeURIComponent(noJurnal)}?pt_id=${ptId}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    }).catch(() => null);
+
+                    const jurHeader = res?.data?.header;
+                    const jurDetails = res?.data?.details || [];
+
+                    // 🎯 CEK DATA DATABASE: Jika kosong, cegah crash runtime
+                    if (!jurHeader || jurDetails.length === 0) {
+                        printWindow.close();
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Data Jurnal Belum Lengkap',
+                            text: `Rincian jurnal untuk nomor ${noJurnal} belum tersimpan di tabel gl_t_jurnald.`
+                        });
+                        return;
+                    }
+
+                    let totD = 0, totK = 0;
+                    const rows = jurDetails.map(d => {
+                        const db = Number(d.tjurd_debet || 0);
+                        const kr = Number(d.tjurd_kredit || 0);
+                        totD += db;
+                        totK += kr;
+                        return `
+                    <tr style="font-size:10.5px;">
+                        <td style="border:1px solid #cbd5e1;padding:6px;font-family:monospace;font-weight:bold;color:#0284c7;">${d.tjurd_acccode || '-'}</td>
+                        <td style="border:1px solid #cbd5e1;padding:6px;text-align:center;font-family:monospace;">1</td>
+                        <td style="border:1px solid #cbd5e1;padding:6px;"><b>${d.sakun_nama || d.tjurd_acccode}</b> : <span style="color:#475569;">${d.tjurd_keterangan || '-'}</span></td>
+                        <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;font-family:monospace;">${db > 0 ? db.toLocaleString('id-ID', { minimumFractionDigits: 2 }) : '0.00'}</td>
+                        <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;font-family:monospace;">${kr > 0 ? kr.toLocaleString('id-ID', { minimumFractionDigits: 2 }) : '0.00'}</td>
+                    </tr>
+                `;
+                    }).join('');
+
+                    const logoSrc = typeof dakotaLogo !== 'undefined' && dakotaLogo ? dakotaLogo : '';
+                    const tglString = String(jurHeader.tjurh_tanggal || today).split('T')[0];
+
+                    printWindow.document.open();
+                    printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>VOUCHER MEMORIAL - ${jurHeader.tjurh_no}</title>
+                    <style>
+                        @page { size: A4 landscape; margin: 10mm; }
+                        body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 12px; color: #1e293b; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+                        th { border: 1px solid #94a3b8; padding: 6px 8px; background-color: #e2e8f0; font-size: 9.5px; text-align: center; font-weight: bold; color: #0f172a; text-transform: uppercase; }
+                        .no-print { margin-bottom: 12px; text-align: right; }
+                        .btn-print { padding: 7px 18px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; color: white; margin: 0 4px; font-size: 11px; text-transform: uppercase; }
+                        @media print { .no-print { display: none !important; } }
+                    </style>
+                </head>
+                <body>
+                    <div class="no-print">
+                        <button class="btn-print" style="background:#16a34a;" onclick="window.print()">PRINT</button>
+                        <button class="btn-print" style="background:#e11d48;" onclick="window.close()">TUTUP</button>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            ${logoSrc ? `<img src="${logoSrc}" alt="Logo Dakota Cargo" style="height:44px; object-fit:contain;" />` : ''}
+                            <div>
+                                <h2 style="margin:0; font-size:15px; font-weight:900; color:#004b84; letter-spacing:0.3px;">PT DAKOTA LOGISTIK INDONESIA</h2>
+                                <div style="font-size:10px; color:#64748b; margin-top:2px;">Jl. Wibawa Mukti II No. 99, Jatiasih, Bekasi - Jawa Barat</div>
+                                <div style="font-size:10px; color:#64748b;">(021) 8603278 / (021) 86608589</div>
+                            </div>
+                        </div>
+                        <div style="text-align:right;">
+                            <h1 style="margin:0; font-size:20px; font-weight:900; letter-spacing:0.5px; color:#004b84;">VOUCHER MEMORIAL</h1>
+                            <div style="font-size:10.5px; font-weight:bold; color:#0284c7; margin-top:2px;">NO: ${jurHeader.tjurh_no}</div>
+                        </div>
+                    </div>
+
+                    <div style="height:3px; background:#004b84; margin:8px 0 12px 0; border-radius:2px;"></div>
+
+                    <div style="background:#f8fafc; padding:8px 12px; border-radius:6px; border:1px solid #e2e8f0; margin-bottom:10px; font-size:11px;">
+                        <table style="width: 100%; border: none; margin: 0;">
+                            <tr>
+                                <td style="padding: 2px 0; width: 14%; color:#475569; font-weight:bold;">No. Transaksi</td>
+                                <td style="padding: 2px 0; width: 2%;">:</td>
+                                <td style="padding: 2px 0; font-family: monospace; font-weight: bold; color: #0284c7; font-size:12px;">${jurHeader.tjurh_no}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 2px 0; color:#475569; font-weight:bold;">Tanggal</td>
+                                <td style="padding: 2px 0;">:</td>
+                                <td style="padding: 2px 0; font-weight: bold; color:#0f172a;">${tglString}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 2px 0; color:#475569; font-weight:bold;">Keterangan</td>
+                                <td style="padding: 2px 0;">:</td>
+                                <td style="padding: 2px 0; font-weight: 600; color:#1e293b;">${jurHeader.tjurh_keterangan || '-'}</td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 14%;">Account</th>
+                                <th style="width: 6%;">CC</th>
+                                <th style="width: 50%; text-align: left; padding-left: 8px;">Keterangan</th>
+                                <th style="width: 15%; text-align: right; padding-right: 8px;">Debet (Rp)</th>
+                                <th style="width: 15%; text-align: right; padding-right: 8px;">Kredit (Rp)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows}
+                        </tbody>
+                        <tfoot>
+                            <tr style="background:#f1f5f9; font-weight:bold;">
+                                <td colspan="3" style="border:1px solid #94a3b8; padding:7px 8px; text-align:center; color:#004b84; font-size:10.5px;">TOTAL :</td>
+                                <td style="border:1px solid #94a3b8; padding:7px 8px; text-align:right; font-family:monospace; font-size:11px;">Rp ${totalDebet.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                <td style="border:1px solid #94a3b8; padding:7px 8px; text-align:right; font-family:monospace; font-size:11px;">Rp ${totalKredit.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:35px; padding:0 25px; text-align:center;">
+                        <div style="width: 25%;">
+                            <div style="font-size:11px; color:#475569; font-weight:bold; margin-bottom:50px;">Diterima</div>
+                            <div style="font-weight:bold; color:#0f172a; font-size:11px;">( Keuangan )</div>
+                        </div>
+                        <div style="width: 25%;">
+                            <div style="font-size:11px; color:#475569; font-weight:bold; margin-bottom:50px;">Disetujui</div>
+                            <div style="font-weight:bold; color:#0f172a; font-size:11px;">( Direksi )</div>
+                        </div>
+                        <div style="width: 25%;">
+                            <div style="font-size:11px; color:#475569; font-weight:bold; margin-bottom:50px;">Diketahui</div>
+                            <div style="font-weight:bold; color:#0f172a; font-size:11px;">( Akunting )</div>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `);
+                    printWindow.document.close();
+
+                } catch (err) {
+                    console.error("Gagal cetak voucher memorial:", err);
+                    printWindow.close();
+                    Swal.fire('Error', 'Gagal memuat dokumen cetak: ' + (err.message || err), 'error');
+                }
+            };
+
+            // 🎯 Daftarkan ke window agar aman dipanggil dari JSX mana pun
+            window.handlePrintJurnalVoucher = handlePrintJurnalVoucher;
+
             // =====================================================================
             // 📄 2. CETAK DEFAULT: FAKTUR PENAGIHAN, SUMMARY, DLL.
             // =====================================================================
@@ -2109,6 +2542,7 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                             setSavedInvoiceId(null);
                             setSavedKwitansiNo(null);
                             setPersistedSelectedBtts([]);
+                            setPostedJournalId('');
                         }}
                         className="text-white/80 hover:text-white cursor-pointer"
                     >
@@ -2247,7 +2681,7 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
 
                 {/* LANGKAH 2: FORM LENGKAP IDENTIK DUA TABEL APLIKASI LAWAS */}
                 {addStep === 2 && (() => {
-                    // Filter BTT yang sudah dipilih oleh user
+                    // 1. Filter BTT yang sudah dipilih oleh user
                     const selectedBTTObjects = savedInvoiceId && persistedSelectedBtts.length > 0
                         ? persistedSelectedBtts
                         : unbilledBTTList.filter(b => {
@@ -2259,6 +2693,13 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                     const totPenerus = selectedBTTObjects.reduce((sum, b) => sum + Number(b.bttt_biayapenerus || 0), 0);
                     const totPacking = selectedBTTObjects.reduce((sum, b) => sum + Number(b.biaya_packing || 0), 0);
                     const grandTotalSelected = selectedBTTObjects.reduce((sum, b) => sum + Number(b.subtotal || b.bttt_harga || 0), 0);
+
+                    // 🎯 2. CEK STATUS POSTING DI ATAS SINI (SEBELUM RETURN JSX)
+                    const isAlreadyPosted =
+                        Boolean(postedJournalId) ||
+                        activeInvoice?.artih_postingyn === 'Y' ||
+                        activeInvoice?.artih_postingyn === 'true' ||
+                        Boolean(activeInvoice?.artih_journalid);
 
                     return (
                         <div className="p-5 space-y-4 overflow-y-auto text-[11px] flex-1">
@@ -2335,12 +2776,29 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                                     </div>
                                     <div>
                                         <label className="font-bold text-slate-700 block mb-1">NO JURNAL :</label>
-                                        <input
-                                            type="text"
-                                            readOnly
-                                            placeholder="[Terbentuk Saat Posting]"
-                                            className="w-full p-1.5 bg-slate-50 border border-slate-300 rounded text-slate-400 font-mono"
-                                        />
+                                        <div className="flex items-center gap-1.5">
+                                            <input
+                                                type="text"
+                                                readOnly
+                                                value={String(postedJournalId || activeInvoice?.artih_journalid || '').replace(/OTA/gi, '001')}
+                                                placeholder="[Terbentuk Saat Posting]"
+                                                className={`w-full p-1.5 border rounded font-mono font-bold text-xs ${(postedJournalId || activeInvoice?.artih_journalid)
+                                                    ? 'bg-sky-50 border-sky-300 text-sky-700'
+                                                    : 'bg-slate-50 border-slate-300 text-slate-400'
+                                                    }`}
+                                            />
+                                            {/* 🎯 PANGGIL MELALUI handlePrintDocument YANG SUDAH TERBUKTI BISA DIKLIK */}
+                                            {(postedJournalId || activeInvoice?.artih_journalid) && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handlePrintDocument(activeInvoice, 'JURNAL')}
+                                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black rounded text-[10px] tracking-wider uppercase transition shadow-sm cursor-pointer whitespace-nowrap"
+                                                    title="Cetak Voucher Memorial"
+                                                >
+                                                    CETAK
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
 
@@ -2418,7 +2876,7 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                                 </div>
                             </div>
 
-                            {/* 2. TABEL ATAS: BTT YANG SUDAH DIPILIH (PERSIS GAMBAR 1 LAWAS) */}
+                            {/* 2. TABEL ATAS: BTT YANG SUDAH DIPILIH */}
                             <div className="border border-emerald-400 rounded-xl p-3 bg-emerald-50/20 space-y-2">
                                 <div className="text-center font-bold text-emerald-800 uppercase tracking-wider text-xs">
                                     BTT YANG SUDAH DIPILIH ({selectedBTTObjects.length} RESI)
@@ -2464,14 +2922,15 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                                                     <td className="p-2 text-center">
                                                         <button
                                                             type="button"
+                                                            disabled={isAlreadyPosted}
                                                             onClick={() => {
                                                                 setNewInvoiceForm(prev => ({
                                                                     ...prev,
                                                                     selected_btts: prev.selected_btts.filter(id => id !== btt.bttt_id)
                                                                 }));
                                                             }}
-                                                            className="text-rose-600 hover:text-rose-800 p-1 cursor-pointer"
-                                                            title="Keluarkan dari invoice"
+                                                            className={`p-1 ${isAlreadyPosted ? 'text-slate-300 cursor-not-allowed' : 'text-rose-600 hover:text-rose-800 cursor-pointer'}`}
+                                                            title={isAlreadyPosted ? 'Invoice sudah diposting' : 'Keluarkan dari invoice'}
                                                         >
                                                             <Trash2 size={13} />
                                                         </button>
@@ -2588,7 +3047,7 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                                 </div>
                             </div>
 
-                            {/* 4. TABEL BAWAH: DAFTAR NOMOR BTT (UNTUK DICARI & DICENTANG) */}
+                            {/* 4. TABEL BAWAH: DAFTAR NOMOR BTT */}
                             <div className="border border-sky-300 rounded-xl p-3 bg-slate-50/60 space-y-3">
                                 <div className="text-center font-bold text-sky-800 uppercase tracking-wider text-xs">
                                     DAFTAR NOMOR BTT
@@ -2703,6 +3162,7 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                                                         <td className="p-2 text-center">
                                                             <input
                                                                 type="checkbox"
+                                                                disabled={isAlreadyPosted}
                                                                 checked={isChecked}
                                                                 onChange={() => {
                                                                     setNewInvoiceForm(prev => ({
@@ -2712,14 +3172,13 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                                                                             : [...prev.selected_btts, cleanId]
                                                                     }));
                                                                 }}
-                                                                className="w-4 h-4 text-emerald-600 rounded cursor-pointer accent-emerald-600"
+                                                                className={`w-4 h-4 rounded ${isAlreadyPosted ? 'cursor-not-allowed opacity-40' : 'text-emerald-600 cursor-pointer accent-emerald-600'}`}
                                                             />
                                                         </td>
                                                     </tr>
                                                 );
                                             })}
                                         </tbody>
-
                                     </table>
                                 </div>
                             </div>
@@ -2727,33 +3186,53 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                             {/* 5. FOOTER TOMBOL AKSI PALING BAWAH */}
                             <div className="flex justify-between items-center pt-3 border-t border-slate-200">
                                 <div className="flex items-center gap-2">
+                                    {/* 1. TOMBOL SIMPAN (TERKUNCI JIKA SUDAH DIPOSTING, AKTIF KEMBALI JIKA DI-UNPOSTING) */}
                                     <button
                                         type="button"
+                                        disabled={isAlreadyPosted}
                                         onClick={handleSaveNewInvoice}
-                                        className="px-7 py-2 bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-black rounded uppercase transition cursor-pointer shadow-sm text-xs"
+                                        className={`px-7 py-2 font-black rounded uppercase transition text-xs ${isAlreadyPosted
+                                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300 select-none'
+                                                : 'bg-yellow-400 hover:bg-yellow-500 text-slate-900 cursor-pointer shadow-sm'
+                                            }`}
+                                        title={isAlreadyPosted ? 'Invoice sudah diposting. Lakukan UNPOSTING untuk mengedit kembali.' : 'Simpan invoice'}
                                     >
                                         SIMPAN
                                     </button>
 
-                                    <button
-                                        type="button"
-                                        disabled={!savedInvoiceId}
-                                        onClick={() => handlePostingInvoice(savedInvoiceId)}
-                                        className={`px-6 py-2 font-black rounded uppercase text-xs transition ${savedInvoiceId
-                                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-sm'
-                                            : 'bg-emerald-600/40 text-white/60 cursor-not-allowed'
-                                            }`}
-                                    >
-                                        POSTING
-                                    </button>
+                                    {/* 2. TOMBOL TOGGLE: POSTING vs UNPOSTING */}
+                                    {isAlreadyPosted ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleUnpostingInvoice(savedInvoiceId || activeInvoice?.artih_id)}
+                                            className="px-6 py-2 bg-orange-600 hover:bg-orange-700 active:scale-95 text-white font-black rounded uppercase text-xs transition shadow-sm cursor-pointer"
+                                            title="Batalkan status posting agar invoice dapat diedit kembali"
+                                        >
+                                            UNPOSTING
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            disabled={!savedInvoiceId}
+                                            onClick={() => handlePostingInvoice(savedInvoiceId)}
+                                            className={`px-6 py-2 font-black rounded uppercase text-xs transition ${!savedInvoiceId
+                                                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300 select-none'
+                                                    : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-sm'
+                                                }`}
+                                            title="Posting invoice untuk membentuk jurnal memorial"
+                                        >
+                                            POSTING
+                                        </button>
+                                    )}
 
+                                    {/* 3. TOMBOL CETAK FAKTUR */}
                                     <button
                                         type="button"
-                                        disabled={!savedInvoiceId}
-                                        onClick={() => handlePrintDocument({ artih_id: savedInvoiceId, artih_nokw: savedKwitansiNo }, 'FAKTUR')}
-                                        className={`px-6 py-2 font-black rounded uppercase text-xs transition ${savedInvoiceId
-                                            ? 'bg-sky-600 hover:bg-sky-700 text-white cursor-pointer shadow-sm'
-                                            : 'bg-sky-600/40 text-white/70 cursor-not-allowed'
+                                        disabled={!savedInvoiceId && !activeInvoice?.artih_id}
+                                        onClick={() => handlePrintDocument({ artih_id: savedInvoiceId || activeInvoice?.artih_id, artih_nokw: savedKwitansiNo || activeInvoice?.artih_nokw }, 'FAKTUR')}
+                                        className={`px-6 py-2 font-black rounded uppercase text-xs transition ${savedInvoiceId || activeInvoice?.artih_id
+                                                ? 'bg-sky-600 hover:bg-sky-700 text-white cursor-pointer shadow-sm'
+                                                : 'bg-sky-600/40 text-white/70 cursor-not-allowed'
                                             }`}
                                     >
                                         CETAK
@@ -2776,6 +3255,7 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                                             setSavedInvoiceId(null);
                                             setSavedKwitansiNo(null);
                                             setPersistedSelectedBtts([]);
+                                            setPostedJournalId('');
                                         }}
                                         className="px-6 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded uppercase transition cursor-pointer text-xs"
                                     >
