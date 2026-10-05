@@ -137,6 +137,7 @@ import CustomerKhusus from "./pages/CustomerKhusus";
 import BTTUploadV2 from "./pages/BTTUploadV2";
 import DNUpload from './pages/DNUpload';
 import UploadHasilLoperCSV from './pages/UploadHasilLoperCSV';
+import SettingOperasional from './pages/SettingOperasional';
 
 const getCompanyName = (pt) => {
   if (pt === 'A') return 'Dakota Buana Sarana';
@@ -659,11 +660,6 @@ function App() {
       <Route path="/hrd/MasterKaryawan" element={<MainLayout><MasterKaryawan /></MainLayout>} />
       <Route path="/hrd/form" element={<MainLayout><DaftarFormHRD /></MainLayout>} />
 
-      <Route path="/Settings" element={<Navigate to="/settings/users" replace />} />
-      <Route path="/settings/users" element={<MainLayout><UserManagement menuName="UserManagement" /></MainLayout>} />
-      <Route path="/settings/configurasi" element={<MainLayout><MasterConfigParam menuName="configurasi" /></MainLayout>} />
-      <Route path="/settings/security" element={<MainLayout><SecuritySettings menuName="SecuritySettings" /></MainLayout>} />
-
       <Route path="/pengambilan/barang-sendiri" element={<MainLayout><Pengambilan /></MainLayout>} />
       <Route path="/pengambilan/pengambilan-retur" element={<MainLayout><PengambilanRetur /></MainLayout>} />
 
@@ -721,6 +717,12 @@ function App() {
       <Route path="/marketing/btt-upload-v2" element={<MainLayout><BTTUploadV2 /></MainLayout>} />
       <Route path="/marketing/dn-upload" element={<MainLayout><DNUpload /></MainLayout>} />
       <Route path="/marketing/hasil-loper/upload-hasil-loper-csv" element={<MainLayout><UploadHasilLoperCSV /></MainLayout>} />
+
+      <Route path="/Settings" element={<Navigate to="/settings/users" replace />} />
+      <Route path="/settings/users" element={<MainLayout><UserManagement menuName="UserManagement" /></MainLayout>} />
+      <Route path="/settings/configurasi" element={<MainLayout><MasterConfigParam menuName="configurasi" /></MainLayout>} />
+      <Route path="/settings/security" element={<MainLayout><SecuritySettings menuName="SecuritySettings" /></MainLayout>} />
+      <Route path="/settings/operasional" element={<MainLayout><SettingOperasional menuName="SettingOperasional" /></MainLayout>} />
 
       {/* Jika nanti ada halaman lain, tinggal bungkus lagi pakai MainLayout 
       <Route
