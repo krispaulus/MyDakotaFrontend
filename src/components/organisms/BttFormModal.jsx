@@ -199,18 +199,33 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
         }
     }, [keywordCustomer]);
 
-    // Hitung otomatis Berat Volume
+    // Hitung otomatis Berat Volume (bisa dari PxLxT atau langsung dari Kubikasi M3)
     useEffect(() => {
         const p = parseFloat(formData.bttt_panjang) || 0;
         const l = parseFloat(formData.bttt_lebar) || 0;
         const t = parseFloat(formData.bttt_tinggi) || 0;
+        const m3 = parseFloat(formData.bttt_ukuran) || 0;
+
         if (p > 0 && l > 0 && t > 0) {
-            const vol = (p * l * t) / 4000;
-            setFormData(prev => ({ ...prev, bttt_beratvol: parseFloat(vol.toFixed(2)) }));
-        } else {
-            setFormData(prev => ({ ...prev, bttt_beratvol: 0 }));
+            // Hitung dari dimensi P x L x T (cm)
+            const volFromDimensi = (p * l * t) / 4000;
+            const kubikasiFromDimensi = (p * l * t) / 1000000;
+            setFormData(prev => ({
+                ...prev,
+                bttt_beratvol: parseFloat(volFromDimensi.toFixed(2)),
+                bttt_ukuran: parseFloat(kubikasiFromDimensi.toFixed(2))
+            }));
+        } else if (m3 > 0) {
+            // Hitung dari Kubikasi M3 (1 M3 = 250 Kg Darat Reguler)
+            const volFromM3 = m3 * 250;
+            setFormData(prev => ({
+                ...prev,
+                bttt_beratvol: parseFloat(volFromM3.toFixed(2))
+            }));
         }
-    }, [formData.bttt_panjang, formData.bttt_lebar, formData.bttt_tinggi]);
+    }, [formData.bttt_panjang, formData.bttt_lebar, formData.bttt_tinggi, formData.bttt_ukuran]);
+
+
 
     const validateEmailPenerima = (emailVal) => {
         if (!emailVal || emailVal.trim() === "") {
@@ -243,15 +258,33 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
         const kolomsUppercase = ['bttt_asalname', 'bttt_asalalamat', 'bttt_asalkota', 'bttt_up', 'bttt_isikiriman'];
+        const kolomsTelepon = ['bttt_asaltelp', 'bttt_asaltelp2', 'bttt_tujuantelp', 'bttt_tujuantelp2', 'bttt_tujuantelp3'];
+
         let finalValue = type === 'checkbox' ? (checked ? 'Y' : 'N') : value;
 
+        // 🔒 1. Validasi Telepon: Hapus huruf & simbol, hanya izinkan angka 0-9
+        if (kolomsTelepon.includes(name)) {
+            finalValue = finalValue.replace(/\D/g, ''); // \D = buang semua karakter non-angka
+        }
+
+        // 🔠 2. Auto Uppercase untuk kolom tertentu
         if (typeof finalValue === 'string' && kolomsUppercase.includes(name)) {
             finalValue = finalValue.toUpperCase();
         }
 
         setFormData((prev) => ({ ...prev, [name]: finalValue }));
-        if (errors[name]) { setErrors(prev => ({ ...prev, [name]: null })); }
-        if (name === 'bttt_tujuanemail') { validateEmailPenerima(finalValue); }
+
+        if (errors[name]) {
+            setErrors(prev => ({ ...prev, [name]: null }));
+        }
+
+        // ✉️ 3. Validasi Email Realtime
+        if (name === 'bttt_tujuanemail') {
+            validateEmailPenerima(finalValue);
+        }
+        if (name === 'bttt_asalemail') {
+            validateEmailPengirim(finalValue);
+        }
     };
 
     const handleHitungTarif = async () => {
@@ -591,7 +624,37 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
             return;
         }
 
+        // =========================================================================
+        // 🔒 VALIDASI TAMBAHAN: FORMAT EMAIL & TELEPON (DILETAKKAN DI SINI)
+        // =========================================================================
+
+        // 🛑 Validasi Format Email Pengirim (jika diisi)
+        if (formData.bttt_asalemail && !validateEmailPengirim(formData.bttt_asalemail)) {
+            showWarningAlert('Format Email Pengirim tidak valid! Gunakan format email yang benar (contoh: pengirim@email.com)');
+            return;
+        }
+
+        // 🛑 Validasi Format Email Penerima (jika diisi)
+        if (formData.bttt_tujuanemail && !validateEmailPenerima(formData.bttt_tujuanemail)) {
+            showWarningAlert('Format Email Penerima tidak valid! Gunakan format email yang benar (contoh: penerima@email.com)');
+            return;
+        }
+
+        // 🛑 Validasi Nomor Telepon Pengirim (minimal 8 digit angka)
+        if (formData.bttt_asaltelp.replace(/\D/g, '').length < 8) {
+            showWarningAlert('Nomor Telepon Pengirim minimal 8 digit angka dan tidak boleh mengandung huruf!');
+            return;
+        }
+
+        // 🛑 Validasi Nomor Telepon Penerima (minimal 8 digit angka)
+        if (formData.bttt_tujuantelp.replace(/\D/g, '').length < 8) {
+            showWarningAlert('Nomor Telepon Penerima minimal 8 digit angka dan tidak boleh mengandung huruf!');
+            return;
+        }
+
+        // =========================================================================
         // 🚀 Lolos seluruh validasi: proses generate ID dan simpan ke database
+        // =========================================================================
         const activeAgenId = localStorage.getItem('active_agen_id') || '839';
         const tanggalMentah = formData.bttt_tanggal;
         const komponenTanggal = tanggalMentah.split('-');
@@ -713,26 +776,32 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
         isOpen,
         formData.bttt_tujuankecamatan,
         formData.bttt_berat,
+        formData.bttt_beratvol, // 👈 Tambahkan ini
+        formData.bttt_ukuran,   // 👈 Tambahkan ini
         formData.bttt_panjang,
         formData.bttt_lebar,
         formData.bttt_tinggi
     ]);
 
     // 🔍 Validasi Field Wajib: Pengirim, Penerima, Wilayah Tujuan, Isi Barang, & Tarif
+    // 🔍 Validasi Field Wajib & Format Email/Telepon
     const isFormValid = Boolean(
         formData.bttt_tanggal &&
         formData.bttt_asalname?.trim() &&
         formData.bttt_up?.trim() &&
         formData.bttt_asalalamat?.trim() &&
-        formData.bttt_asaltelp?.trim() &&
+        formData.bttt_asaltelp?.replace(/\D/g, '').length >= 8 &&
         formData.bttt_tujuannama?.trim() &&
         formData.bttt_tujuanalamat?.trim() &&
-        formData.bttt_tujuantelp?.trim() &&
+        formData.bttt_tujuantelp?.replace(/\D/g, '').length >= 8 &&
         formData.bttt_tujuankecamatan?.trim() &&
         formData.bttt_tujuankelurahan?.trim() &&
         formData.bttt_isikiriman?.trim() &&
         (parseFloat(formData.bttt_berat) > 0) &&
-        (parseFloat(formData.bttt_harga) > 0) // Wajib sudah hitung tarif (tidak boleh Rp 0)
+        (parseFloat(formData.bttt_harga) > 0) &&
+        // Jika email diisi, format harus valid; jika kosong, tetap dianggap valid (opsional)
+        (!formData.bttt_asalemail || validateEmailPengirim(formData.bttt_asalemail)) &&
+        (!formData.bttt_tujuanemail || validateEmailPenerima(formData.bttt_tujuanemail))
     );
 
     return (
@@ -927,16 +996,17 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                                     <div>
                                         <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">EMAIL PENGIRIM :</label>
                                         <input
-                                            type="text"
+                                            type="email"
                                             name="bttt_asalemail"
-                                            value={formData.bttt_asalemail || ""}
-                                            onChange={(e) => {
-                                                handleChange(e);
-                                                validateEmailPengirim(e.target.value);
-                                            }}
-                                            className="w-full p-2 border border-slate-300 rounded-lg text-slate-800 bg-white outline-none focus:border-sky-500"
+                                            value={formData.bttt_asalemail || ''}
+                                            onChange={handleChange}
                                             placeholder="pengirim@email.com"
+                                            className={`w-full px-3 py-2 border rounded-lg text-sm transition-colors ${emailError ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                                                }`}
                                         />
+                                        {emailError && (
+                                            <p className="text-red-500 text-xs mt-1 font-semibold">{emailError}</p>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -975,16 +1045,17 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                                 <div>
                                     <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">EMAIL PENERIMA :</label>
                                     <input
-                                        type="text"
+                                        type="email"
                                         name="bttt_tujuanemail"
-                                        value={formData.bttt_tujuanemail || ""}
-                                        onChange={(e) => {
-                                            handleChange(e);
-                                            validateEmailPenerima(e.target.value);
-                                        }}
-                                        className="w-full p-2 border border-slate-300 rounded-lg text-slate-800 bg-white outline-none focus:border-sky-500"
+                                        value={formData.bttt_tujuanemail || ''}
+                                        onChange={handleChange}
                                         placeholder="penerima@email.com"
+                                        className={`w-full px-3 py-2 border rounded-lg text-sm transition-colors ${emailPenerimaError ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                                            }`}
                                     />
+                                    {emailPenerimaError && (
+                                        <p className="text-red-500 text-xs mt-1 font-semibold">{emailPenerimaError}</p>
+                                    )}
                                 </div>
 
                                 <div>
@@ -1004,11 +1075,13 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                                         <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">TELEPON 1 :</label>
                                         <input
                                             type="text"
+                                            inputMode="numeric"
                                             name="bttt_tujuantelp"
-                                            value={formData.bttt_tujuantelp || ""}
+                                            value={formData.bttt_tujuantelp || ''}
                                             onChange={handleChange}
-                                            className="w-full p-2 border border-slate-300 rounded-lg font-semibold text-slate-800 bg-white outline-none focus:border-sky-500"
                                             placeholder="08xxxxxxxxxx"
+                                            maxLength={15}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-indigo-500"
                                         />
                                     </div>
                                     <div>
@@ -1283,10 +1356,12 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                             <div>
                                 <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">BERAT VOLUME (KG) :</label>
                                 <input
-                                    type="text"
+                                    type="number"
+                                    name="bttt_beratvol"
                                     readOnly
-                                    value={formData.bttt_beratvol}
-                                    className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg font-bold text-slate-700 cursor-not-allowed outline-none"
+                                    className="bg-gray-100 dark:bg-gray-700 cursor-not-allowed border rounded-lg px-3 py-2 w-full font-bold text-indigo-600"
+                                    value={formData.bttt_beratvol || ''}
+                                    placeholder="0"
                                 />
                             </div>
                             <div>
@@ -1509,8 +1584,8 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                         disabled={!isFormValid || loadingTarif}
                         title={!isFormValid ? "Lengkapi seluruh data wajib dan hitung tarif sebelum mencetak" : ""}
                         className={`px-6 py-2 rounded-xl uppercase text-xs shadow-xs transition flex items-center gap-2 font-bold ${!isFormValid || loadingTarif
-                                ? 'bg-slate-300 text-slate-500 cursor-not-allowed select-none'
-                                : 'bg-[#004b84] hover:bg-[#003863] text-white cursor-pointer'
+                            ? 'bg-slate-300 text-slate-500 cursor-not-allowed select-none'
+                            : 'bg-[#004b84] hover:bg-[#003863] text-white cursor-pointer'
                             }`}
                     >
                         <FileText size={15} /> Cetak Bukti Terima
