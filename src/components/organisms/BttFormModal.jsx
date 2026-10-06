@@ -52,7 +52,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
     const [formData, setFormData] = useState({
         bttt_tanggal: todayStr,
         bttt_nosuratjalan: '',
-        bttt_ket: '',
+        bttt_ket: 'SURAT JALAN KEMBALI',
         bttt_nobttmanual: '',
         bttt_dliexpryn: 'N',
         bttt_promoid: '',
@@ -159,7 +159,8 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
             return;
         }
 
-        if (namaPelanggan === "" || namaPelanggan.toUpperCase() === "UMUM") {
+        // 🛑 HANYA generate ID otomatis jika form memang sedang dalam mode UMUM murni dan belum punya ID
+        if ((namaPelanggan === "" || namaPelanggan.toUpperCase() === "UMUM") && formData.bttt_asalname === 'UMUM' && !formData.bttt_asalcustid) {
             const token = localStorage.getItem('token');
             const kodeAgenAktif = localStorage.getItem('active_agen_id') || 'JKT';
 
@@ -225,7 +226,27 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
         }
     }, [formData.bttt_panjang, formData.bttt_lebar, formData.bttt_tinggi, formData.bttt_ukuran]);
 
+    const handlePilihCustomer = (cust) => {
+        const idPelanggan = cust.cust_id || cust.id || cust.kode_customer || '';
+        const namaPelanggan = cust.cust_nama || cust.nama || '';
 
+        setIsCustomerSelected(true);
+        setKeywordCustomer(namaPelanggan);
+        setRekomendasiCustomer([]);
+
+        setFormData(prev => ({
+            ...prev,
+            bttt_asalcustid: String(idPelanggan).trim(), // '001000021'
+            bttt_asalname: namaPelanggan,
+            bttt_asalalamat: cust.cust_alamat || '',
+            bttt_asalkota: cust.cust_kota || '',
+            bttt_asaltelp: cust.cust_telp || ''
+        }));
+
+        if (formData.bttt_tujuankecamatan) {
+            fetchTarifOtomatis(formData.bttt_tujuankecamatan);
+        }
+    };
 
     const validateEmailPenerima = (emailVal) => {
         if (!emailVal || emailVal.trim() === "") {
@@ -305,7 +326,9 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
             const response = await api.post('/btt/calculate-tarif', {
                 asal_kota: String(formData.bttt_asalagenid || "").trim(),
                 tujuan_kecamatan: formData.bttt_tujuankecamatan,
+                tujuan_kec: formData.bttt_tujuankecamatan,
                 agen_id: String(formData.bttt_asalagenid || "").trim(),
+                cust_id: String(formData.bttt_asalcustid || "").trim(), // 👈 WAJIB DITAMBAHKAN DI SINI
                 berat_asli: parseFloat(formData.bttt_berat) || 1,
                 panjang: parseFloat(formData.bttt_panjang) || 0,
                 lebar: parseFloat(formData.bttt_lebar) || 0,
@@ -358,17 +381,21 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
         }
     };
 
-    const fetchTarifRute = async (agenIdRaw, tujuanKecamatan) => {
+    const fetchTarifRute = async (agenIdRaw, tujuanKecamatan, overrideCustId) => {
         if (!tujuanKecamatan) return;
 
         try {
             const token = localStorage.getItem('token');
             const cleanAgenID = String(agenIdRaw || formData.bttt_asalagenid || "").trim();
+            // Ambil cust_id dari override (jika baru dipilih) atau dari state formData
+            const customerId = String(overrideCustId !== undefined ? overrideCustId : (formData.bttt_asalcustid || "")).trim();
 
             const response = await api.post('/btt/calculate-tarif', {
                 asal_kota: cleanAgenID,
                 tujuan_kecamatan: tujuanKecamatan,
+                tujuan_kec: tujuanKecamatan,
                 agen_id: cleanAgenID,
+                cust_id: customerId, // 👈 WAJIB DITAMBAHKAN AGAR MERCK TERBACA
                 berat_asli: parseFloat(formData.bttt_berat) || 1,
                 jenis_layanan: formData.bttt_paketyn === 'Y' ? 'REGULER' : 'EKONOMIS'
             }, {
@@ -733,6 +760,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
             const res = await api.post('/btt/calculate-tarif', {
                 agen_id: String(activeAgenId).trim(),
                 asal_kota: String(activeAgenId).trim(),
+                cust_id: String(formData.bttt_asalcustid || '').trim(), // 👈 Pastikan baris ini ada
                 tujuan_kec: kec.trim(),
                 tujuan_kecamatan: kec.trim(),
                 berat_asli: beratFinal,
@@ -775,12 +803,12 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
     }, [
         isOpen,
         formData.bttt_tujuankecamatan,
+        formData.bttt_asalcustid, // 👈 Cukup tambahkan ini!
         formData.bttt_berat,
-        formData.bttt_beratvol, // 👈 Tambahkan ini
-        formData.bttt_ukuran,   // 👈 Tambahkan ini
         formData.bttt_panjang,
         formData.bttt_lebar,
-        formData.bttt_tinggi
+        formData.bttt_tinggi,
+        formData.bttt_paketyn
     ]);
 
     // 🔍 Validasi Field Wajib: Pengirim, Penerima, Wilayah Tujuan, Isi Barang, & Tarif
@@ -1317,14 +1345,17 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                                 />
                             </div>
                             <div>
-                                <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">KETERANGAN :</label>
+                                <label className="text-xs font-bold text-gray-700">KETERANGAN :</label>
                                 <input
                                     type="text"
                                     name="bttt_ket"
-                                    value={formData.bttt_ket}
-                                    onChange={handleChange}
-                                    className="w-full p-2 border border-slate-300 rounded-lg font-semibold uppercase text-slate-800 bg-white outline-none focus:border-sky-500"
-                                    placeholder="SURAT JALAN KEMBALI"
+                                    value={formData.bttt_ket ?? ''}
+                                    onChange={(e) => setFormData(prev => ({
+                                        ...prev,
+                                        bttt_ket: e.target.value
+                                    }))}
+                                    placeholder="Keterangan..."
+                                    className="w-full px-3 py-1.5 bg-white text-gray-800 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 uppercase"
                                 />
                             </div>
                         </div>
@@ -1354,14 +1385,12 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                                 />
                             </div>
                             <div>
-                                <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">BERAT VOLUME (KG) :</label>
+                                <label className="text-xs font-bold text-gray-700">BERAT VOLUME (KG) :</label>
                                 <input
-                                    type="number"
-                                    name="bttt_beratvol"
+                                    type="text"
                                     readOnly
-                                    className="bg-gray-100 dark:bg-gray-700 cursor-not-allowed border rounded-lg px-3 py-2 w-full font-bold text-indigo-600"
-                                    value={formData.bttt_beratvol || ''}
-                                    placeholder="0"
+                                    value={formData.bttt_beratvol ?? 0}
+                                    className="w-full px-3 py-1.5 bg-gray-100 text-gray-800 font-semibold border border-gray-300 rounded focus:outline-none cursor-not-allowed"
                                 />
                             </div>
                             <div>
