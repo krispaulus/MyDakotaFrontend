@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Package, MapPin, Layers, Calculator, FileText, Search } from 'lucide-react';
+import { X, Save, Package, MapPin, Layers, Calculator, FileText, Search, Loader2 } from 'lucide-react';
 import api from '../../api/axios';
 import Swal from 'sweetalert2';
 
@@ -749,14 +749,15 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
 
         const activeAgenId = localStorage.getItem('active_agen_id') || formData.bttt_asalagenid || 'BDO004';
         const beratAsli = parseFloat(formData.bttt_berat) || 0;
-        const beratVolManual = parseFloat(formData.bttt_beratvol) || 0; // 👈 Ambil nilai input volume
+        const beratVolManual = parseFloat(formData.bttt_beratvol) || 0;
         const p = parseFloat(formData.bttt_panjang) || 0;
         const l = parseFloat(formData.bttt_lebar) || 0;
         const t = parseFloat(formData.bttt_tinggi) || 0;
         const beratVolumeDimensi = (p * l * t) / 4000;
-
-        // 🚀 Gunakan berat terbesar antara fisik, input volume manual, dan dimensi
         const beratFinal = Math.max(beratAsli, beratVolManual, beratVolumeDimensi, 1);
+
+        // 🚀 1. Set loading aktif saat request dimulai
+        setLoadingTarif(true);
 
         try {
             const token = localStorage.getItem('token');
@@ -791,6 +792,9 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
             }
         } catch (err) {
             console.error("❌ Gagal hitung tarif:", err);
+        } finally {
+            // 🚀 2. Matikan loading saat selesai
+            setLoadingTarif(false);
         }
     };
 
@@ -1438,11 +1442,38 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                         </div>
                     </div>
 
-                    {/* CARD 4: TABEL INFORMASI TARIF DASAR (HEADER BIRU TUA PERSIS INVOICE) */}
-                    <div className="p-5 bg-white border border-emerald-400 rounded-xl shadow-2xs space-y-4">
-                        <div className="text-center font-bold text-emerald-700 text-xs tracking-wider uppercase pb-1 border-b border-slate-200">
-                            INFORMASI TARIF DASAR (RUTE: {formData.bttt_asalkota || localStorage.getItem('active_agen_nama') || 'PUSAT'} ➡️️ {formData.bttt_tujuankecamatan || '-'})
+                    {/* CARD 4: TABEL INFORMASI TARIF DASAR */}
+                    <div className="relative p-5 bg-white border border-emerald-400 rounded-xl shadow-2xs space-y-4 overflow-hidden">
+
+                        {/* Header Judul Rute & Status Loading */}
+                        <div className="flex items-center justify-between pb-1 border-b border-slate-200">
+                            <div className="text-center flex-1 font-bold text-emerald-700 text-xs tracking-wider uppercase">
+                                INFORMASI TARIF DASAR (RUTE: {formData.bttt_asalkota || localStorage.getItem('active_agen_nama') || 'PUSAT'} ➡ {formData.bttt_tujuankecamatan || '-'})
+                            </div>
+                            {loadingTarif && (
+                                <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-300 text-amber-700 text-[10px] font-bold animate-pulse">
+                                    <Loader2 size={12} className="animate-spin text-amber-600" />
+                                    <span>MENGHITUNG TARIF...</span>
+                                </div>
+                            )}
                         </div>
+
+                        {/* 🌟 OVERLAY LOADING HALUS KETIKA PROSES HITUNG */}
+                        {loadingTarif && (
+                            <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] z-20 flex flex-col items-center justify-center gap-2">
+                                <div className="p-3 bg-white shadow-xl rounded-2xl border border-emerald-200 flex items-center gap-3">
+                                    <Loader2 size={24} className="animate-spin text-emerald-600" />
+                                    <div className="text-left">
+                                        <div className="text-xs font-black text-slate-800 uppercase tracking-wide">
+                                            Menghitung Tarif Dakota...
+                                        </div>
+                                        <div className="text-[10px] text-slate-500 font-medium">
+                                            Mengkalkulasi berat & jarak rute tujuan
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Blok Reguler */}
                         <div className="space-y-1.5">
