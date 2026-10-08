@@ -179,7 +179,6 @@ const Login = () => {
     setModalConfig(prev => ({ ...prev, isOpen: false }));
   };
 
-  // Tambahkan di dalam fungsi LoginPage:
   const [bannerUrl, setBannerUrl] = useState('');
 
   useEffect(() => {
@@ -188,9 +187,14 @@ const Login = () => {
         if (res.data?.banner_url) {
           let url = res.data.banner_url.trim();
 
-          // 🚀 JANGAN hardcode http://localhost:8080 lagi!
+          // 🚀 1. Ambil path bersihnya saja jika ada embel-embel localhost atau IP lain
+          const matchUpload = url.match(/\/uploads\/.*$/);
+          if (matchUpload) {
+            url = matchUpload[0]; // Hanya mengambil: /uploads/banners/login_banner_xxx.png
+          }
+
+          // 🚀 2. Pasang host backend dinamis sesuai baseURL Axios (atau IP server saat ini)
           if (url.startsWith('/uploads')) {
-            // Mengambil http://192.168.22.25:9090 dari baseURL axios
             const backendHost = api.defaults.baseURL
               ? api.defaults.baseURL.replace(/\/api\/?$/, '')
               : `${window.location.protocol}//${window.location.hostname}:9090`;
