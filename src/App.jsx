@@ -159,7 +159,11 @@ function LoginPage() {
 
           // Arahkan ke backend port 8080 jika path lokal
           if (url.startsWith('/uploads')) {
-            url = `http://localhost:8080${url}`;
+            const backendHost = api.defaults.baseURL
+              ? api.defaults.baseURL.replace(/\/api\/?$/, '')
+              : `${window.location.protocol}//${window.location.hostname}:9090`;
+
+            url = `${backendHost}${url}`;
           }
 
           setBannerUrl(url);
