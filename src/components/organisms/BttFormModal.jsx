@@ -328,8 +328,8 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                 tujuan_kecamatan: formData.bttt_tujuankecamatan,
                 tujuan_kec: formData.bttt_tujuankecamatan,
                 agen_id: String(formData.bttt_asalagenid || "").trim(),
-                cust_id: String(formData.bttt_asalcustid || "").trim(), // 👈 WAJIB DITAMBAHKAN DI SINI
-                berat_asli: parseFloat(formData.bttt_berat) || 1,
+                cust_id: String(formData.bttt_asalcustid || "").trim(),
+                berat_asli: Math.max(parseFloat(formData.bttt_berat) || 0, parseFloat(formData.bttt_beratvol) || 0, 1),
                 panjang: parseFloat(formData.bttt_panjang) || 0,
                 lebar: parseFloat(formData.bttt_lebar) || 0,
                 tinggi: parseFloat(formData.bttt_tinggi) || 0,
@@ -749,18 +749,21 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
 
         const activeAgenId = localStorage.getItem('active_agen_id') || formData.bttt_asalagenid || 'BDO004';
         const beratAsli = parseFloat(formData.bttt_berat) || 0;
+        const beratVolManual = parseFloat(formData.bttt_beratvol) || 0; // 👈 Ambil nilai input volume
         const p = parseFloat(formData.bttt_panjang) || 0;
         const l = parseFloat(formData.bttt_lebar) || 0;
         const t = parseFloat(formData.bttt_tinggi) || 0;
-        const beratVolume = (p * l * t) / 4000;
-        const beratFinal = Math.max(beratAsli, beratVolume, 1);
+        const beratVolumeDimensi = (p * l * t) / 4000;
+
+        // 🚀 Gunakan berat terbesar antara fisik, input volume manual, dan dimensi
+        const beratFinal = Math.max(beratAsli, beratVolManual, beratVolumeDimensi, 1);
 
         try {
             const token = localStorage.getItem('token');
             const res = await api.post('/btt/calculate-tarif', {
                 agen_id: String(activeAgenId).trim(),
                 asal_kota: String(activeAgenId).trim(),
-                cust_id: String(formData.bttt_asalcustid || '').trim(), // 👈 Pastikan baris ini ada
+                cust_id: String(formData.bttt_asalcustid || '').trim(),
                 tujuan_kec: kec.trim(),
                 tujuan_kecamatan: kec.trim(),
                 berat_asli: beratFinal,
@@ -803,8 +806,10 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
     }, [
         isOpen,
         formData.bttt_tujuankecamatan,
-        formData.bttt_asalcustid, // 👈 Cukup tambahkan ini!
+        formData.bttt_asalcustid,
         formData.bttt_berat,
+        formData.bttt_beratvol,
+        formData.bttt_pilihcarter,
         formData.bttt_panjang,
         formData.bttt_lebar,
         formData.bttt_tinggi,
@@ -831,6 +836,26 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
         (!formData.bttt_asalemail || validateEmailPengirim(formData.bttt_asalemail)) &&
         (!formData.bttt_tujuanemail || validateEmailPenerima(formData.bttt_tujuanemail))
     );
+
+    // 🚚 Auto-fill Berat Volume saat Jenis Carter dipilih
+    const MIN_BERAT_CARTER = {
+        'BUILD UP': 16000,
+        'COLT DIESEL': 4000,
+        'FUSO': 7000,
+        'FREEZER BOX': 4000,
+        'TRONTON': 11000,
+        'WING BOX': 16000
+    };
+
+    useEffect(() => {
+        if (formData.bttt_pilihcarter && MIN_BERAT_CARTER[formData.bttt_pilihcarter]) {
+            const beratDefaultCarter = MIN_BERAT_CARTER[formData.bttt_pilihcarter];
+            setFormData(prev => ({
+                ...prev,
+                bttt_beratvol: beratDefaultCarter
+            }));
+        }
+    }, [formData.bttt_pilihcarter]);
 
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-xs p-3">
@@ -1385,12 +1410,17 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                                 />
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-gray-700">BERAT VOLUME (KG) :</label>
+                                <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">
+                                    BERAT VOLUME (KG) :
+                                </label>
                                 <input
-                                    type="text"
-                                    readOnly
-                                    value={formData.bttt_beratvol ?? 0}
-                                    className="w-full px-3 py-1.5 bg-gray-100 text-gray-800 font-semibold border border-gray-300 rounded focus:outline-none cursor-not-allowed"
+                                    type="number"
+                                    step="0.01"
+                                    name="bttt_beratvol"
+                                    value={formData.bttt_beratvol ?? ''}
+                                    onChange={handleChange}
+                                    placeholder="0"
+                                    className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 bg-white outline-none focus:border-sky-500"
                                 />
                             </div>
                             <div>

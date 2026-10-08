@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate, Navigate } from 'react-router-dom'
 import { Eye, EyeOff, ChevronRight, X, User, Lock, ChevronDown, Cpu } from 'lucide-react'
 import api from './api/axios'
@@ -7,6 +7,7 @@ import bgLogin from './assets/bg1.png'
 import logo from './assets/logo.png'
 import MainLayout from './layouts/MainLayout'
 import Account from './pages/Account';
+import Login from './pages/Login';
 
 import UnderConstruction from './components/organisms/UnderConstruction';
 import UserManagement from './pages/UserManagement';
@@ -138,6 +139,7 @@ import BTTUploadV2 from "./pages/BTTUploadV2";
 import DNUpload from './pages/DNUpload';
 import UploadHasilLoperCSV from './pages/UploadHasilLoperCSV';
 import SettingOperasional from './pages/SettingOperasional';
+import ManajemenBanner from './pages/settings/ManajemenBanner';
 
 const getCompanyName = (pt) => {
   if (pt === 'A') return 'Dakota Buana Sarana';
@@ -147,6 +149,27 @@ const getCompanyName = (pt) => {
 };
 
 function LoginPage() {
+  const [bannerUrl, setBannerUrl] = useState('');
+
+  useEffect(() => {
+    api.get('/public/login-banner')
+      .then((res) => {
+        if (res.data?.banner_url) {
+          let url = res.data.banner_url.trim();
+
+          // Arahkan ke backend port 8080 jika path lokal
+          if (url.startsWith('/uploads')) {
+            url = `http://localhost:8080${url}`;
+          }
+
+          setBannerUrl(url);
+        }
+      })
+      .catch((err) => {
+        console.log('Gagal memuat banner dinamis:', err);
+      });
+  }, []);
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [selectedPT, setSelectedPT] = useState('')
@@ -335,14 +358,15 @@ function LoginPage() {
 
   return (
     <div className="flex min-h-screen w-full bg-[#bcbcbc] overflow-hidden m-0 p-0 font-['Inter']">
-      {/* SISI KIRI: Gambar Truk (Lebar proporsional mirip 657px dari 1440px) */}
+
+      {/* SISI KIRI: Gambar Truk */}
       <div className="relative hidden w-[45%] h-screen lg:block overflow-hidden">
         <img
           className="absolute inset-0 h-full w-full object-cover object-top"
-          src={bgLogin}
+          src={bannerUrl || bgLogin}
           alt="Dakota"
         />
-        {/* Overlay Logo & Text (Sesuai posisi left-[111px] top-[65px] di Figma) */}
+        {/* Overlay Logo & Text */}
         <div className="absolute left-[8%] top-[6%] flex items-center gap-2.5">
           <img className="w-32 h-24 object-contain" src={logo} alt="Logo" />
           <div className="text-white text-5xl font-bold font-['Agdasima'] tracking-[2.55px] uppercase drop-shadow-md">
@@ -723,6 +747,7 @@ function App() {
       <Route path="/settings/configurasi" element={<MainLayout><MasterConfigParam menuName="configurasi" /></MainLayout>} />
       <Route path="/settings/security" element={<MainLayout><SecuritySettings menuName="SecuritySettings" /></MainLayout>} />
       <Route path="/settings/operasional" element={<MainLayout><SettingOperasional menuName="SettingOperasional" /></MainLayout>} />
+      <Route path="/settings/manajemen-banner" element={<MainLayout><ManajemenBanner menuName="Manajemen Banner Depan" /></MainLayout>} />
 
       {/* Jika nanti ada halaman lain, tinggal bungkus lagi pakai MainLayout 
       <Route

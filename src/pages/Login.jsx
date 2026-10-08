@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Package, Lock, User, ArrowRight, Building2 } from 'lucide-react';
 import api from '../api/axios';
-import './Login.css';
 import WarningModal from '../components/WarningModal';
 
 const Login = () => {
@@ -11,7 +10,7 @@ const Login = () => {
   const [emailBaru, setEmailBaru] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [isOtpSent, setIsOtpSent] = useState(false);
-  const [selectedPT, setSelectedPT] = useState('C'); // Default DLI (C) atau ganti 'A' jika ingin DBS
+  const [selectedPT, setSelectedPT] = useState('A');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -180,9 +179,39 @@ const Login = () => {
     setModalConfig(prev => ({ ...prev, isOpen: false }));
   };
 
+  // Tambahkan di dalam fungsi LoginPage:
+  const [bannerUrl, setBannerUrl] = useState('');
+
+  useEffect(() => {
+    api.get('/public/login-banner')
+      .then(res => {
+        if (res.data?.banner_url) {
+          let url = res.data.banner_url.trim();
+
+          // Jika path mengarah ke file hasil upload, arahkan ke port 8080 lokal
+          if (url.startsWith('/uploads')) {
+            url = `http://localhost:8080${url}`;
+          }
+
+          setBannerUrl(url);
+        }
+      })
+      .catch(err => {
+        console.log('Gagal memuat banner dinamis, menggunakan default:', err);
+      });
+  }, []);
+
   return (
     <div className="login-container">
-      <div className="login-left">
+      <div
+        className="login-left"
+        style={bannerUrl ? {
+          backgroundImage: `url("${bannerUrl}")`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat'
+        } : undefined}
+      >
         <div className="login-left-content">
           <Package size={80} color="white" className="logo-cargo" />
           <h1>Dakota Cargo</h1>

@@ -12,7 +12,6 @@ const MainLayout = ({ children }) => {
     const [isIdleModalOpen, setIsIdleModalOpen] = useState(false);
     const toggleSidebar = () => setIsCollapsed(!isCollapsed);
 
-    // 🔒 1. PROTEKSI AUTH: Cek ketersediaan token saat komponen dimuat
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
 
     useEffect(() => {

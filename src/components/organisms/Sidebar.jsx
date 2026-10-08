@@ -529,6 +529,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
         { name: 'Manajemen Configurasi', path: '/settings/configurasi' },
         { name: 'Security Settings', path: '/settings/security' },
         { name: 'Aturan Operasional', path: '/settings/operasional' },
+        { name: 'Manajemen Banner Depan', path: '/settings/manajemen-banner', roles: ['S', 'A'] }
       ]
     },
   ];
