@@ -182,15 +182,15 @@ const Login = () => {
   // Tambahkan di dalam fungsi LoginPage:
   const [bannerUrl, setBannerUrl] = useState('');
 
-
   useEffect(() => {
     api.get('/public/login-banner')
       .then((res) => {
         if (res.data?.banner_url) {
           let url = res.data.banner_url.trim();
 
+          // 🚀 JANGAN hardcode http://localhost:8080 lagi!
           if (url.startsWith('/uploads')) {
-            // Ambil host backend dari baseURL Axios (menghapus akhiran /api)
+            // Mengambil http://192.168.22.25:9090 dari baseURL axios
             const backendHost = api.defaults.baseURL
               ? api.defaults.baseURL.replace(/\/api\/?$/, '')
               : `${window.location.protocol}//${window.location.hostname}:9090`;
