@@ -182,22 +182,27 @@ const Login = () => {
   // Tambahkan di dalam fungsi LoginPage:
   const [bannerUrl, setBannerUrl] = useState('');
 
+
   useEffect(() => {
     api.get('/public/login-banner')
-      .then(res => {
+      .then((res) => {
         if (res.data?.banner_url) {
           let url = res.data.banner_url.trim();
 
-          // Jika path mengarah ke file hasil upload, arahkan ke port 8080 lokal
           if (url.startsWith('/uploads')) {
-            url = `http://localhost:8080${url}`;
+            // Ambil host backend dari baseURL Axios (menghapus akhiran /api)
+            const backendHost = api.defaults.baseURL
+              ? api.defaults.baseURL.replace(/\/api\/?$/, '')
+              : `${window.location.protocol}//${window.location.hostname}:9090`;
+
+            url = `${backendHost}${url}`;
           }
 
           setBannerUrl(url);
         }
       })
-      .catch(err => {
-        console.log('Gagal memuat banner dinamis, menggunakan default:', err);
+      .catch((err) => {
+        console.log('Gagal memuat banner dinamis:', err);
       });
   }, []);
 
