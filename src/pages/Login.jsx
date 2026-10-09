@@ -1,21 +1,54 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Lock, User, ArrowRight, Building2 } from 'lucide-react';
+import {
+  Lock,
+  User,
+  ArrowRight,
+  Building2,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Truck,
+  ShieldCheck,
+  Eye,
+  EyeOff
+} from 'lucide-react';
 import api from '../api/axios';
 import WarningModal from '../components/WarningModal';
+import logoDakota from '../assets/logo.png';
+
+const defaultSlides = [
+  {
+    id: 1,
+    tag: "TRANSPORT & LOGISTICS SOLUTION",
+    title: "#1 Solusi Pengiriman",
+    highlight: "Kargo & Ekspedisi",
+    desc: "Layanan pengiriman kargo darat terpercaya ke seluruh pelosok Nusantara dengan tarif transparan dan jangkauan armada terlengkap.",
+    bgImage: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=1600&q=80"
+  },
+  {
+    id: 2,
+    tag: "ARMADA DAKOTA LENGKAP & TERPERCAYA",
+    title: "Layanan Carter &",
+    highlight: "Paket Reguler",
+    desc: "Tersedia pilihan armada Colt Diesel, Fuso, hingga Tronton untuk kebutuhan logistik korporat maupun ritel reguler.",
+    bgImage: "https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=1600&q=80"
+  }
+];
 
 const Login = () => {
-  const [showVerification, setShowVerification] = useState(false);
-  const [tempUser, setTempUser] = useState(null);
-  const [emailBaru, setEmailBaru] = useState('');
-  const [otpCode, setOtpCode] = useState('');
-  const [isOtpSent, setIsOtpSent] = useState(false);
+  const [slides, setSlides] = useState(defaultSlides);
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+
   const [selectedPT, setSelectedPT] = useState('A');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
+  // Bersihkan sisa sesi login saat masuk ke halaman ini
   useEffect(() => {
     const hardPurgeNow = () => {
       const savedIdleTime = localStorage.getItem('max_idle_time');
@@ -44,6 +77,62 @@ const Login = () => {
     };
   }, []);
 
+  // Ambil banner dinamis dari Setting Manajemen Banner Depan
+  useEffect(() => {
+    api.get('/public/login-banner')
+      .then((res) => {
+        let bannerList = [];
+
+        // Deteksi apakah backend mengirim array atau 1 URL
+        if (Array.isArray(res.data?.banners)) {
+          bannerList = res.data.banners.filter(Boolean);
+        } else if (res.data?.banner_url) {
+          try {
+            const parsed = JSON.parse(res.data.banner_url);
+            bannerList = Array.isArray(parsed) ? parsed.filter(Boolean) : [res.data.banner_url];
+          } catch {
+            bannerList = [res.data.banner_url];
+          }
+        }
+
+        if (bannerList.length > 0) {
+          const backendHost = api.defaults.baseURL
+            ? api.defaults.baseURL.replace(/\/api\/?$/, '')
+            : `${window.location.protocol}//${window.location.hostname}:9090`;
+
+          // Format URL menjadi link lengkap
+          const dynamicSlides = bannerList.map((rawUrl, idx) => {
+            const matchUpload = rawUrl.match(/\/uploads\/.*$/);
+            const cleanPath = matchUpload ? matchUpload[0] : rawUrl;
+            const fullUrl = cleanPath.startsWith('/uploads') ? `${backendHost}${cleanPath}` : cleanPath;
+
+            return {
+              id: idx + 1,
+              tag: `DAKOTA PROMO #${idx + 1}`,
+              title: idx === 0 ? "Solusi Ekspedisi &" : "Layanan Pengiriman",
+              highlight: idx === 0 ? "Kargo Terpercaya" : "Cepat & Aman",
+              desc: "Pengiriman barang ke seluruh Nusantara dengan jangkauan rute terluas dan tarif terbaik.",
+              bgImage: fullUrl
+            };
+          });
+
+          setSlides(dynamicSlides);
+        }
+      })
+      .catch((err) => {
+        console.log('Menggunakan slide default:', err);
+      });
+  }, []);
+
+  // Auto-play Slider Carousel tiap 6 detik
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % slides.length);
+    }, 6000);
+    return () => clearInterval(timer);
+  }, [slides.length]);
+
+  // Manajemen Modal Warning & Pembatasan Percobaan Login
   const [modalConfig, setModalConfig] = useState({
     isOpen: false,
     message: '',
@@ -52,9 +141,7 @@ const Login = () => {
 
   const getFailedAttempts = () => parseInt(localStorage.getItem('failedAttempts') || '0', 10);
   const setFailedAttempts = (count) => localStorage.setItem('failedAttempts', count.toString());
-  const getLockedUntil = () => parseInt(localStorage.getItem('lockedUntil') || '0', 10);
   const setLockedUntil = (timestamp) => localStorage.setItem('lockedUntil', timestamp.toString());
-  const getIsBlocked = () => localStorage.getItem('isBlocked') === 'true';
   const setIsBlocked = (status) => localStorage.setItem('isBlocked', status.toString());
 
   const handleLogin = async (e) => {
@@ -84,13 +171,12 @@ const Login = () => {
         localStorage.setItem('max_idle_time', (3 * 60 * 1000).toString());
       }
 
-      // Pemetaan Corporate: A = DBS, B = DLB, C = DLI
+      // Pemetaan Corporate
       let corpName = 'DLI';
       if (finalPT === 'A') corpName = 'DBS';
       else if (finalPT === 'B') corpName = 'DLB';
       else if (finalPT === 'C') corpName = 'DLI';
 
-      // Penyimpanan Sesi Corporate & Cabang Terpadu
       localStorage.setItem('token', token);
       localStorage.setItem('user_name', user?.realname || user?.real_name || 'User');
       localStorage.setItem('username', user?.username || 'user');
@@ -101,21 +187,17 @@ const Login = () => {
       const userRole = user?.usertype || user?.user_type || 'U';
       localStorage.setItem('role_akses', userRole);
 
-      // Ambil ID Agen yang valid (bisa angka atau kode cabang resmi)
       const validAgenId = user?.agen_id || user?.id_agen || user?.kode_agen || '1';
-      const agenNama = user?.agen_nama || user?.nama_cabang || 'PUSAT DAKOTA';
 
       if (userRole === 'S' || user?.all_cabangyn === 'Y') {
         localStorage.setItem('kode_cabang', 'PUSAT DAKOTA');
-        localStorage.setItem('active_agen_id', String(validAgenId)); // Simpan ID agen/pusat
+        localStorage.setItem('active_agen_id', String(validAgenId));
         localStorage.setItem('active_agen_nama', 'PUSAT DAKOTA');
       } else {
         const rawCabangString = user?.kode_cabang || '';
         if (rawCabangString !== '') {
           const firstCleanCabang = rawCabangString.split(',')[0].trim();
           localStorage.setItem('kode_cabang', rawCabangString);
-
-          // Utamakan agen_id jika ada di object user, jika tidak baru pakai firstCleanCabang
           localStorage.setItem('active_agen_id', String(user?.agen_id || firstCleanCabang));
           localStorage.setItem('active_agen_nama', user?.agen_nama || firstCleanCabang);
         } else {
@@ -125,18 +207,10 @@ const Login = () => {
         }
       }
 
-      if (!user?.email || user.email.trim() === '') {
-        setTempUser(user);
-        setShowVerification(true);
-        setIsLoading(false);
-        return;
-      }
-
       localStorage.removeItem('failedAttempts');
       localStorage.removeItem('lockedUntil');
       localStorage.removeItem('isBlocked');
 
-      // Masuk ke dashboard utama
       navigate('/dashboard');
     } catch (error) {
       console.error('Login Gagal:', error.response?.data?.message || error.message);
@@ -188,131 +262,224 @@ const Login = () => {
     setModalConfig(prev => ({ ...prev, isOpen: false }));
   };
 
-  const [bannerUrl, setBannerUrl] = useState('');
-
-  useEffect(() => {
-    api.get('/public/login-banner')
-      .then((res) => {
-        if (res.data?.banner_url) {
-          let url = res.data.banner_url.trim();
-
-          // 🚀 1. Ambil path bersihnya saja jika ada embel-embel localhost atau IP lain
-          const matchUpload = url.match(/\/uploads\/.*$/);
-          if (matchUpload) {
-            url = matchUpload[0]; // Hanya mengambil: /uploads/banners/login_banner_xxx.png
-          }
-
-          // 🚀 2. Pasang host backend dinamis sesuai baseURL Axios (atau IP server saat ini)
-          if (url.startsWith('/uploads')) {
-            const backendHost = api.defaults.baseURL
-              ? api.defaults.baseURL.replace(/\/api\/?$/, '')
-              : `${window.location.protocol}//${window.location.hostname}:9090`;
-
-            url = `${backendHost}${url}`;
-          }
-
-          setBannerUrl(url);
-        }
-      })
-      .catch((err) => {
-        console.log('Gagal memuat banner dinamis:', err);
-      });
-  }, []);
-
   return (
-    <div className="login-container">
-      <div
-        className="login-left"
-        style={bannerUrl ? {
-          backgroundImage: `url("${bannerUrl}")`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat'
-        } : undefined}
-      >
-        <div className="login-left-content">
-          <Package size={80} color="white" className="logo-cargo" />
-          <h1>Dakota Cargo</h1>
-          <p>Sistem Informasi Pengiriman Barang & Logistik Terpadu</p>
+    <div className="relative w-full h-screen overflow-hidden font-sans bg-slate-950 select-none">
+
+      {/* NAVBAR */}
+      <nav className="absolute top-0 left-0 w-full z-30 px-6 lg:px-16 py-5 flex items-center justify-between bg-gradient-to-b from-black/80 via-black/30 to-transparent">
+        <div className="flex items-center gap-3 cursor-pointer">
+          <img
+            src={logoDakota}
+            alt="Dakota Cargo Logo"
+            className="h-10 lg:h-12 w-auto object-contain drop-shadow-md"
+          />
+          <div className="flex flex-col">
+            <span className="text-white text-xl lg:text-2xl font-black tracking-wider uppercase leading-none font-['Inter'] drop-shadow">
+              DAKOTA CARGO
+            </span>
+            <span className="text-sky-300 text-[10px] tracking-widest font-bold uppercase mt-1">
+              LOGISTICS & TRANSPORTATION
+            </span>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setIsLoginModalOpen(true)}
+          className="px-6 py-2.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm tracking-wide shadow-lg hover:shadow-blue-500/50 transition-all duration-300 transform hover:-translate-y-0.5 active:scale-95 flex items-center gap-2 cursor-pointer"
+        >
+          <span>Masuk Sistem</span>
+          <ArrowRight size={16} />
+        </button>
+      </nav>
+
+      {/* HERO CAROUSEL */}
+      <div className="relative w-full h-full overflow-hidden">
+        {slides.map((slide, index) => {
+          const isActive = index === currentSlide;
+
+          return (
+            <div
+              key={slide.id}
+              className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${isActive ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
+                }`}
+            >
+              <img
+                src={slide.bgImage}
+                alt={slide.title}
+                className={`w-full h-full object-cover transform duration-[8000ms] ease-out ${isActive ? 'scale-105' : 'scale-100'
+                  }`}
+              />
+
+              <div className="absolute inset-0 bg-gradient-to-r from-[#060315]/95 via-[#060315]/75 to-transparent" />
+
+              <div className="absolute inset-0 flex items-center px-8 lg:px-24">
+                <div className="max-w-2xl text-white space-y-4">
+                  <div className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-sky-400 text-xs font-bold tracking-widest uppercase transition-all duration-700 delay-200 ${isActive ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+                    }`}>
+                    <ShieldCheck size={14} />
+                    {slide.tag}
+                  </div>
+
+                  <h2 className={`text-4xl lg:text-6xl font-black leading-tight tracking-tight transition-all duration-700 delay-300 ${isActive ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+                    }`}>
+                    {slide.title} <span className="text-sky-400">{slide.highlight}</span>
+                  </h2>
+
+                  <p className={`text-slate-300 text-sm lg:text-base leading-relaxed transition-all duration-700 delay-500 ${isActive ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+                    }`}>
+                    {slide.desc}
+                  </p>
+
+                  <div className={`pt-4 transition-all duration-700 delay-700 ${isActive ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+                    }`}>
+                    <button
+                      onClick={() => setIsLoginModalOpen(true)}
+                      className="px-8 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-sm tracking-wider uppercase shadow-xl transition-all duration-300 transform active:scale-95 cursor-pointer"
+                    >
+                      Buka Form Login
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Panah Carousel */}
+        <button
+          onClick={() => setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length)}
+          className="absolute left-6 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white/10 hover:bg-white/30 text-white backdrop-blur-md border border-white/20 flex items-center justify-center transition-all cursor-pointer"
+        >
+          <ChevronLeft size={24} />
+        </button>
+        <button
+          onClick={() => setCurrentSlide((prev) => (prev + 1) % slides.length)}
+          className="absolute right-6 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white/10 hover:bg-white/30 text-white backdrop-blur-md border border-white/20 flex items-center justify-center transition-all cursor-pointer"
+        >
+          <ChevronRight size={24} />
+        </button>
+
+        {/* Indikator Slider */}
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex gap-2.5">
+          {slides.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => setCurrentSlide(idx)}
+              className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${idx === currentSlide ? 'w-8 bg-sky-400' : 'w-2 bg-white/40'
+                }`}
+            />
+          ))}
         </div>
       </div>
 
-      <div className="login-right">
-        <div className="login-form-container">
-          <div className="login-form-header">
-            <h2>Selamat Datang</h2>
-            <p>Silakan masuk menggunakan akun Dakota Anda</p>
+      {/* MODAL LOGIN POP-UP HALUS */}
+      <div
+        className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-all duration-500 ${isLoginModalOpen
+          ? 'opacity-100 pointer-events-auto backdrop-blur-md bg-black/60'
+          : 'opacity-0 pointer-events-none backdrop-blur-none bg-transparent'
+          }`}
+      >
+        <div
+          className={`relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-100 transition-all duration-500 transform ${isLoginModalOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-8'
+            }`}
+        >
+          {/* Header Popup Login */}
+          <div className="px-6 py-4 bg-[#004b84] text-white flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Truck size={20} />
+              <span className="font-black text-sm uppercase tracking-wider">LOGIN PORTAL DAKOTA</span>
+            </div>
+            <button
+              onClick={() => setIsLoginModalOpen(false)}
+              className="p-1 rounded-lg text-white hover:bg-white/20 transition cursor-pointer"
+            >
+              <X size={20} />
+            </button>
           </div>
 
-          <form onSubmit={handleLogin}>
-            <div className="form-group">
-              <label htmlFor="select-pt">Perusahaan (Corporate)</label>
-              <div className="input-container">
-                <Building2 className="input-icon" size={20} />
-                <select
-                  id="select-pt"
-                  className="login-input font-bold"
-                  value={selectedPT}
-                  onChange={e => setSelectedPT(e.target.value)}
-                  disabled={isLoading}
-                >
-                  <option value="A">PT Dakota Buana Sarana (DBS)</option>
-                  <option value="B">PT Dakota Lintas Buana (DLB)</option>
-                  <option value="C">PT Dakota Logistik Indonesia (DLI)</option>
-                </select>
-              </div>
+          {/* Form Login */}
+          <div className="p-7 space-y-4">
+            <div>
+              <h3 className="text-xl font-black text-slate-800">Selamat Datang</h3>
+              <p className="text-xs text-slate-500 font-medium">Silakan masuk menggunakan akun Dakota Anda</p>
             </div>
 
-            <div className="form-group">
-              <label htmlFor="username">Username / Email</label>
-              <div className="input-container">
-                <User className="input-icon" size={20} />
-                <input
-                  id="username"
-                  type="text"
-                  className="login-input"
-                  placeholder="Masukkan username Anda"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  disabled={isLoading}
-                  required
-                />
-              </div>
-            </div>
+            <form onSubmit={handleLogin} className="space-y-4">
 
-            <div className="form-group">
-              <label htmlFor="password">Password</label>
-              <div className="input-container">
-                <Lock className="input-icon" size={20} />
-                <input
-                  id="password"
-                  type="password"
-                  className="login-input"
-                  placeholder="Masukkan password Anda"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  disabled={isLoading}
-                  required
-                />
+              {/* Pilihan Corporate */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-600 uppercase">Perusahaan (Corporate) :</label>
+                <div className="relative">
+                  <Building2 size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <select
+                    value={selectedPT}
+                    onChange={(e) => setSelectedPT(e.target.value)}
+                    disabled={isLoading}
+                    className="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-blue-500 transition appearance-none bg-white cursor-pointer"
+                  >
+                    <option value="A">PT Dakota Buana Sarana (DBS)</option>
+                    <option value="B">PT Dakota Lintas Buana (DLB)</option>
+                    <option value="C">PT Dakota Logistik Indonesia (DLI)</option>
+                  </select>
+                </div>
               </div>
-            </div>
 
-            <button
-              type="submit"
-              className="login-button"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Memproses...' : (
-                <>
-                  <span>Masuk</span>
-                  <ArrowRight size={20} />
-                </>
-              )}
-            </button>
-          </form>
+              {/* Input Username / Email */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-600 uppercase">Username / Email :</label>
+                <div className="relative">
+                  <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isLoading}
+                    placeholder="Masukkan username atau email..."
+                    className="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl text-sm font-medium text-slate-800 outline-none focus:border-blue-500 transition"
+                  />
+                </div>
+              </div>
+
+              {/* Input Password */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-600 uppercase">Password :</label>
+                <div className="relative">
+                  <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={isLoading}
+                    placeholder="Masukkan password Anda..."
+                    className="w-full pl-10 pr-10 py-2.5 border-2 border-slate-200 rounded-xl text-sm font-medium text-slate-800 outline-none focus:border-blue-500 transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Tombol Masuk */}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-3 mt-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm uppercase tracking-wider shadow-lg hover:shadow-blue-500/30 transition-all transform active:scale-95 cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                <span>{isLoading ? 'Memproses...' : 'Masuk Sekarang'}</span>
+                {!isLoading && <ArrowRight size={18} />}
+              </button>
+            </form>
+          </div>
         </div>
       </div>
 
+      {/* MODAL PERINGATAN SALAH LOGIN / COOLDOWN */}
       <WarningModal
         isOpen={modalConfig.isOpen}
         message={modalConfig.message}
