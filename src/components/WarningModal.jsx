@@ -51,11 +51,11 @@ const WarningModal = ({ isOpen, onClose, title = "WARNING", message, countdown =
   };
 
   return (
-    <div className="warning-modal-overlay">
+    <div className="warning-modal-overlay" style={{ zIndex: 999999 }}>
       <div className="warning-modal-content">
         {/* Optional close icon on top right */}
         <button className="warning-modal-close" onClick={onClose}>
-            <X size={20} />
+          <X size={20} />
         </button>
 
         <div className="warning-modal-icon-container">

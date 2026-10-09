@@ -682,7 +682,17 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
         // =========================================================================
         // 🚀 Lolos seluruh validasi: proses generate ID dan simpan ke database
         // =========================================================================
-        const activeAgenId = localStorage.getItem('active_agen_id') || '839';
+        const activeAgenId =
+            localStorage.getItem('active_agen_id') ||
+            sessionStorage.getItem('active_agen_id') ||
+            formData.bttt_asalagenid ||
+            '';
+
+        // Validasi jika agen belum ada, jangan hitung tarif sembarangan
+        if (!activeAgenId) {
+            console.warn("Kode agen aktif tidak ditemukan pada sesi pengguna.");
+            return;
+        }
         const tanggalMentah = formData.bttt_tanggal;
         const komponenTanggal = tanggalMentah.split('-');
         const tahunYY = komponenTanggal[0] ? komponenTanggal[0].substring(2, 4) : "26";

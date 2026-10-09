@@ -90,7 +90,7 @@ const Login = () => {
       else if (finalPT === 'B') corpName = 'DLB';
       else if (finalPT === 'C') corpName = 'DLI';
 
-      // Penyimpanan Sesi Corporate Terpadu
+      // Penyimpanan Sesi Corporate & Cabang Terpadu
       localStorage.setItem('token', token);
       localStorage.setItem('user_name', user?.realname || user?.real_name || 'User');
       localStorage.setItem('username', user?.username || 'user');
@@ -101,18 +101,27 @@ const Login = () => {
       const userRole = user?.usertype || user?.user_type || 'U';
       localStorage.setItem('role_akses', userRole);
 
+      // Ambil ID Agen yang valid (bisa angka atau kode cabang resmi)
+      const validAgenId = user?.agen_id || user?.id_agen || user?.kode_agen || '1';
+      const agenNama = user?.agen_nama || user?.nama_cabang || 'PUSAT DAKOTA';
+
       if (userRole === 'S' || user?.all_cabangyn === 'Y') {
         localStorage.setItem('kode_cabang', 'PUSAT DAKOTA');
-        localStorage.setItem('active_agen_id', 'PUSAT DAKOTA');
+        localStorage.setItem('active_agen_id', String(validAgenId)); // Simpan ID agen/pusat
+        localStorage.setItem('active_agen_nama', 'PUSAT DAKOTA');
       } else {
         const rawCabangString = user?.kode_cabang || '';
         if (rawCabangString !== '') {
           const firstCleanCabang = rawCabangString.split(',')[0].trim();
           localStorage.setItem('kode_cabang', rawCabangString);
-          localStorage.setItem('active_agen_id', firstCleanCabang);
+
+          // Utamakan agen_id jika ada di object user, jika tidak baru pakai firstCleanCabang
+          localStorage.setItem('active_agen_id', String(user?.agen_id || firstCleanCabang));
+          localStorage.setItem('active_agen_nama', user?.agen_nama || firstCleanCabang);
         } else {
           localStorage.setItem('kode_cabang', 'EMPTY');
           localStorage.setItem('active_agen_id', 'EMPTY');
+          localStorage.setItem('active_agen_nama', 'EMPTY');
         }
       }
 
