@@ -1425,17 +1425,16 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                             </div>
                         </div>
 
-                        {/* Field Khusus Jika Udara Dipilih: No. SMU & Badge Bandara */}
+                        {/* Field Khusus Jika Udara Dipilih: No. SMU (OPSIONAL) */}
                         {formData.bttt_layanan_nama === "Udara" && (
                             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4 flex flex-col md:flex-row gap-4 items-start md:items-center">
                                 <div className="flex-1">
                                     <label className="block text-xs font-bold text-blue-900 uppercase mb-1">
-                                        NO. SMU (Surat Muatan Udara) : <span className="text-red-500">*</span>
+                                        NO. SMU (Surat Muatan Udara) : <span className="text-gray-500 font-normal text-[11px]">(Opsional / Boleh Kosong)</span>
                                     </label>
                                     <input
                                         type="text"
-                                        required
-                                        placeholder="Masukkan Nomor SMU Maskapai..."
+                                        placeholder="Masukkan Nomor SMU Maskapai (bila sudah ada)..."
                                         value={formData.bttt_nosmu || ""}
                                         onChange={(e) => setFormData(prev => ({
                                             ...prev,
