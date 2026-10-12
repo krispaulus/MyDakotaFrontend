@@ -871,6 +871,40 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
         }
     }, [formData.bttt_pilihcarter]);
 
+    const hitungTarifOtomatis = async () => {
+        try {
+            const payload = {
+                agen_id: formData.bttt_tujuanagenid || "1",
+                asal_kota: formData.bttt_asalkota,
+                cust_id: formData.bttt_asalcustid || "0010000001",
+                asal_cust_id: formData.bttt_asalcustid || "0010000001",
+                tujuan_kota: formData.bttt_tujuankota,
+                tujuan_kec: formData.bttt_tujuankecamatan,
+                tujuan_kecamatan: formData.bttt_tujuankecamatan,
+                kabupaten: formData.bttt_tujuankota,
+                berat_asli: parseFloat(formData.bttt_berat) || 1,
+                panjang: parseFloat(formData.bttt_panjang) || 0,
+                lebar: parseFloat(formData.bttt_lebar) || 0,
+                tinggi: parseFloat(formData.bttt_tinggi) || 0,
+                jenis_layanan: formData.bttt_layanan_nama || "Darat",
+                layanan: formData.bttt_layanan_nama || "Darat",
+                jenis_pelayanan: formData.bttt_paketyn === "N" ? "CARTER" : "PAKET",
+                pilih_carter: formData.bttt_pilihcarter || ""
+            };
+
+            const res = await api.post('/api/v1/btt/calculate-tarif', payload);
+            if (res.data && res.data.status === "success") {
+                setFormData(prev => ({
+                    ...prev,
+                    bttt_harga: res.data.grand_total || 0,
+                    bttt_kodebandara: res.data.kode_bandara || prev.bttt_kodebandara
+                }));
+            }
+        } catch (err) {
+            console.error("Gagal kalkulasi tarif:", err);
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-xs p-3">
             <div className="bg-white w-full max-w-[95vw] xl:max-w-7xl max-h-[96vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
@@ -1290,163 +1324,186 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                     </div>
 
                     {/* CARD 3: INFORMASI KIRIMAN & LAYANAN */}
-                    <div className="p-5 bg-white border border-slate-200 rounded-xl shadow-2xs space-y-4">
-                        <div className="text-center font-bold text-[#004b84] text-xs tracking-wider uppercase pb-1 border-b border-slate-200">
+                    <div className="bg-white border rounded-lg p-4 shadow-sm mb-4">
+                        <h3 className="text-xs font-bold text-blue-900 uppercase tracking-wider mb-3">
                             INFORMASI KIRIMAN & LAYANAN
-                        </div>
+                        </h3>
 
-                        {/* Pilihan Pelayanan & Carter */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                            {/* Radio Jenis Pelayanan: PAKET vs CARTER */}
                             <div>
-                                <label className="text-[11px] font-bold text-slate-700 uppercase block mb-2">JENIS PELAYANAN :</label>
-                                <div className="flex items-center gap-6 h-9">
-                                    <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700">
+                                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    JENIS PELAYANAN :
+                                </label>
+                                <div className="flex items-center space-x-4 pt-1">
+                                    <label className="flex items-center text-sm cursor-pointer">
                                         <input
                                             type="radio"
-                                            name="jenis_pelayanan_radio"
-                                            checked={formData.bttt_pilihcarter === ''}
-                                            onChange={() => setFormData(prev => ({ ...prev, bttt_pilihcarter: '' }))}
-                                            className="w-4 h-4 text-sky-600 border-slate-300 focus:ring-sky-500"
+                                            name="jenis_pelayanan"
+                                            value="Y"
+                                            checked={formData.bttt_paketyn === "Y"}
+                                            onChange={() => setFormData(prev => ({
+                                                ...prev,
+                                                bttt_paketyn: 'Y',
+                                                bttt_pilihcarter: ''
+                                            }))}
+                                            className="mr-1.5 text-blue-600"
                                         />
-                                        <span>PAKET</span>
+                                        PAKET
                                     </label>
-                                    <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700">
+                                    <label className="flex items-center text-sm cursor-pointer">
                                         <input
                                             type="radio"
-                                            name="jenis_pelayanan_radio"
-                                            checked={formData.bttt_pilihcarter !== ''}
-                                            onChange={() => setFormData(prev => ({ ...prev, bttt_pilihcarter: 'BUILD UP' }))}
-                                            className="w-4 h-4 text-sky-600 border-slate-300 focus:ring-sky-500"
+                                            name="jenis_pelayanan"
+                                            value="N"
+                                            checked={formData.bttt_paketyn === "N"}
+                                            onChange={() => setFormData(prev => ({
+                                                ...prev,
+                                                bttt_paketyn: 'N',
+                                                bttt_layanan_nama: 'Darat',
+                                                bttt_kodelayanan: '1',
+                                                bttt_nosmu: ''
+                                            }))}
+                                            className="mr-1.5 text-blue-600"
                                         />
-                                        <span>CARTER</span>
+                                        CARTER
                                     </label>
                                 </div>
                             </div>
 
+                            {/* Dropdown PILIH CARTER (Hanya aktif jika CARTER dipilih) */}
                             <div>
-                                <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">PILIH CARTER :</label>
+                                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    PILIH CARTER :
+                                </label>
                                 <select
-                                    name="bttt_pilihcarter"
+                                    disabled={formData.bttt_paketyn === "Y"}
                                     value={formData.bttt_pilihcarter}
-                                    onChange={handleChange}
-                                    disabled={formData.bttt_pilihcarter === ''}
-                                    className={`w-full p-2 border rounded-lg font-bold outline-none text-xs ${formData.bttt_pilihcarter === ''
-                                        ? 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed'
-                                        : 'bg-white text-slate-800 border-slate-300 focus:border-sky-500'
-                                        }`}
+                                    onChange={(e) => setFormData(prev => ({
+                                        ...prev,
+                                        bttt_pilihcarter: e.target.value
+                                    }))}
+                                    className="w-full px-3 py-1.5 border rounded-md text-sm disabled:bg-gray-100 disabled:text-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 >
-                                    <option value="">-- BUKAN MODAL CARTER (PAKET) --</option>
-                                    <option value="BUILD UP">1. BUILD UP</option>
-                                    <option value="COLT DIESEL">2. COLT DIESEL</option>
-                                    <option value="FUSO">3. FUSO</option>
-                                    <option value="FREEZER BOX">4. FREEZER BOX</option>
-                                    <option value="TRONTON">5. TRONTON</option>
-                                    <option value="WING BOX">6. WING BOX</option>
+                                    <option value="">PILIH KENDARAAN</option>
+                                    <option value="K0002">1. GRAN MAX / BUILD UP</option>
+                                    <option value="K0005">2. COLT DIESEL ENGKEL (CDE)</option>
+                                    <option value="K0006">3. COLT DIESEL DOUBLE (CDD)</option>
+                                    <option value="K0008">4. FUSO</option>
+                                    <option value="K0017">5. TRONTON</option>
+                                    <option value="K0018">6. WING BOX</option>
                                 </select>
                             </div>
 
+                            {/* Dropdown LAYANAN (Darat, Laut, Udara) */}
                             <div>
-                                <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">JENIS KIRIMAN :</label>
+                                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    LAYANAN :
+                                </label>
                                 <select
-                                    name="bttt_jeniskiriman"
-                                    value={formData.bttt_jeniskiriman}
-                                    onChange={handleChange}
-                                    className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 bg-white outline-none focus:border-sky-500"
+                                    disabled={formData.bttt_paketyn === "N"} // Nonaktif jika Carter karena carter via Darat
+                                    value={formData.bttt_layanan_nama || "Darat"}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        let kode = '1';
+                                        if (val === 'Laut') kode = '2';
+                                        if (val === 'Udara') kode = '3';
+
+                                        setFormData(prev => ({
+                                            ...prev,
+                                            bttt_layanan_nama: val,
+                                            bttt_kodelayanan: kode,
+                                            bttt_nosmu: val !== 'Udara' ? '' : prev.bttt_nosmu
+                                        }));
+                                    }}
+                                    className="w-full px-3 py-1.5 border rounded-md text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
                                 >
-                                    <option value="BERAT">BERAT</option>
-                                    <option value="UNIT">UNIT</option>
+                                    <option value="Darat">Darat</option>
+                                    <option value="Laut">Laut</option>
+                                    <option value="Udara">Udara</option>
                                 </select>
                             </div>
                         </div>
 
-                        {/* Isi Kiriman, Surat Jalan, Keterangan */}
+                        {/* Field Khusus Jika Udara Dipilih: No. SMU & Badge Bandara */}
+                        {formData.bttt_layanan_nama === "Udara" && (
+                            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4 flex flex-col md:flex-row gap-4 items-start md:items-center">
+                                <div className="flex-1">
+                                    <label className="block text-xs font-bold text-blue-900 uppercase mb-1">
+                                        NO. SMU (Surat Muatan Udara) : <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="Masukkan Nomor SMU Maskapai..."
+                                        value={formData.bttt_nosmu || ""}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            bttt_nosmu: e.target.value
+                                        }))}
+                                        className="w-full px-3 py-2 border border-blue-300 rounded-md text-sm font-medium focus:ring-2 focus:ring-blue-500 bg-white"
+                                    />
+                                </div>
+                                {formData.bttt_kodebandara && (
+                                    <div className="bg-white px-3 py-2 rounded-md border border-blue-200 text-xs shadow-sm">
+                                        <span className="text-gray-500 block">Kode Bandara:</span>
+                                        <span className="font-bold text-blue-700 text-sm">{formData.bttt_kodebandara}</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Input Isi Kiriman, No. SJ, Keterangan */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
-                                <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">ISI KIRIMAN :</label>
+                                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    ISI KIRIMAN : <span className="text-red-500">*</span>
+                                </label>
                                 <input
                                     type="text"
-                                    name="bttt_isikiriman"
-                                    value={formData.bttt_isikiriman}
-                                    onChange={handleChange}
-                                    className="w-full p-2 border border-slate-300 rounded-lg font-semibold uppercase text-slate-800 bg-white outline-none focus:border-sky-500"
-                                    placeholder="Isi kiriman..."
+                                    required
+                                    value={formData.bttt_isikiriman || ""}
+                                    onChange={(e) => setFormData(prev => ({
+                                        ...prev,
+                                        bttt_isikiriman: e.target.value
+                                    }))}
+                                    placeholder="Isi Kiriman..."
+                                    className="w-full px-3 py-1.5 border rounded-md text-sm"
                                 />
                             </div>
+
                             <div>
-                                <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">NO. SURAT JALAN :</label>
+                                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    NO. SURAT JALAN :
+                                </label>
                                 <input
                                     type="text"
-                                    name="bttt_nosuratjalan"
-                                    value={formData.bttt_nosuratjalan}
-                                    onChange={handleChange}
-                                    className="w-full p-2 border border-slate-300 rounded-lg font-mono font-semibold text-slate-800 bg-white outline-none focus:border-sky-500"
+                                    value={formData.bttt_nosuratjalan || ""}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setFormData(prev => ({
+                                            ...prev,
+                                            bttt_nosuratjalan: val,
+                                            bttt_ket: val.trim() !== "" ? "SURAT JALAN KEMBALI" : prev.bttt_ket
+                                        }));
+                                    }}
                                     placeholder="Nomor surat jalan..."
+                                    className="w-full px-3 py-1.5 border rounded-md text-sm"
                                 />
                             </div>
+
                             <div>
-                                <label className="text-xs font-bold text-gray-700">KETERANGAN :</label>
+                                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    KETERANGAN :
+                                </label>
                                 <input
                                     type="text"
-                                    name="bttt_ket"
-                                    value={formData.bttt_ket ?? ''}
+                                    value={formData.bttt_ket || ""}
                                     onChange={(e) => setFormData(prev => ({
                                         ...prev,
                                         bttt_ket: e.target.value
                                     }))}
-                                    placeholder="Keterangan..."
-                                    className="w-full px-3 py-1.5 bg-white text-gray-800 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 uppercase"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Ukuran & Berat */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div>
-                                <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">JUMLAH KOLI :</label>
-                                <input
-                                    type="number"
-                                    name="bttt_jmlkoli"
-                                    value={formData.bttt_jmlkoli}
-                                    onChange={handleChange}
-                                    min="1"
-                                    className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 bg-white outline-none focus:border-sky-500"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">BERAT ASLI (KG) :</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    name="bttt_berat"
-                                    value={formData.bttt_berat}
-                                    onChange={handleChange}
-                                    className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 bg-white outline-none focus:border-sky-500"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">
-                                    BERAT VOLUME (KG) :
-                                </label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    name="bttt_beratvol"
-                                    value={formData.bttt_beratvol ?? ''}
-                                    onChange={handleChange}
-                                    placeholder="0"
-                                    className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 bg-white outline-none focus:border-sky-500"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">KUBIKASI (M3) :</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    name="bttt_ukuran"
-                                    value={formData.bttt_ukuran || ''}
-                                    onChange={handleChange}
-                                    className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 bg-white outline-none focus:border-sky-500"
-                                    placeholder="0"
+                                    className="w-full px-3 py-1.5 border rounded-md text-sm"
                                 />
                             </div>
                         </div>

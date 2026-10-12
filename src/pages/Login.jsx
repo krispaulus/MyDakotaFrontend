@@ -77,51 +77,38 @@ const Login = () => {
     };
   }, []);
 
-  // Ambil banner dinamis dari Setting Manajemen Banner Depan
   useEffect(() => {
     api.get('/public/login-banner')
       .then((res) => {
-        let bannerList = [];
+        let bannerList = res.data?.banners || [];
 
-        // Deteksi apakah backend mengirim array atau 1 URL
-        if (Array.isArray(res.data?.banners)) {
-          bannerList = res.data.banners.filter(Boolean);
-        } else if (res.data?.banner_url) {
-          try {
-            const parsed = JSON.parse(res.data.banner_url);
-            bannerList = Array.isArray(parsed) ? parsed.filter(Boolean) : [res.data.banner_url];
-          } catch {
-            bannerList = [res.data.banner_url];
-          }
-        }
+        const activeBanners = bannerList.filter(b => (typeof b === 'object' ? b.url : b));
 
-        if (bannerList.length > 0) {
+        if (activeBanners.length > 0) {
           const backendHost = api.defaults.baseURL
             ? api.defaults.baseURL.replace(/\/api\/?$/, '')
             : `${window.location.protocol}//${window.location.hostname}:9090`;
 
-          // Format URL menjadi link lengkap
-          const dynamicSlides = bannerList.map((rawUrl, idx) => {
+          const dynamicSlides = activeBanners.map((item, idx) => {
+            const rawUrl = typeof item === 'object' ? item.url : item;
             const matchUpload = rawUrl.match(/\/uploads\/.*$/);
             const cleanPath = matchUpload ? matchUpload[0] : rawUrl;
             const fullUrl = cleanPath.startsWith('/uploads') ? `${backendHost}${cleanPath}` : cleanPath;
 
             return {
               id: idx + 1,
-              tag: `DAKOTA PROMO #${idx + 1}`,
-              title: idx === 0 ? "Solusi Ekspedisi &" : "Layanan Pengiriman",
-              highlight: idx === 0 ? "Kargo Terpercaya" : "Cepat & Aman",
-              desc: "Pengiriman barang ke seluruh Nusantara dengan jangkauan rute terluas dan tarif terbaik.",
-              bgImage: fullUrl
+              bgImage: fullUrl,
+              tag: item.tag || `DAKOTA PROMO #${idx + 1}`,
+              title: item.title || 'Layanan Pengiriman',
+              highlight: item.highlight || 'Cepat & Aman',
+              desc: item.desc || 'Pengiriman barang ke seluruh Nusantara dengan rute terluas.'
             };
           });
 
           setSlides(dynamicSlides);
         }
       })
-      .catch((err) => {
-        console.log('Menggunakan slide default:', err);
-      });
+      .catch((err) => console.log('Menggunakan slide default:', err));
   }, []);
 
   // Auto-play Slider Carousel tiap 6 detik
