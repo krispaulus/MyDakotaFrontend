@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Package, MapPin, Layers, Calculator, FileText, Search, Loader2 } from 'lucide-react';
+import { X, Save, Package, MapPin, Layers, Calculator, FileText, Search, Loader2, Edit3, Lock, ShieldAlert } from 'lucide-react';
 import api from '../../api/axios';
 import Swal from 'sweetalert2';
 
@@ -11,8 +11,12 @@ const formatDateToYMD = (d) => {
     return `${year}-${month}-${day}`;
 };
 
-const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
+const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, initialData = null, isEditMode = false }) => {
     if (!isOpen) return null;
+
+    // 🌟 Role & Kewenangan User (Admin vs Supervisor)
+    const userRole = (localStorage.getItem('role_akses') || sessionStorage.getItem('role_akses') || 'ADMIN').toUpperCase();
+    const isSupervisor = userRole === 'SUPERVISOR' || userRole === 'MANAGER' || userRole === 'SUPERADMIN' || userRole === 'S';
 
     // 🌟 Helper tanggal hari ini dan kemarin (H-1)
     const nowObj = new Date();
@@ -23,7 +27,6 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
     const yesterdayStr = formatDateToYMD(yesterdayObj);
 
     // 🌟 State Pengontrol Alur BTT & Tarif
-    const [generatedBttNum, setGeneratedBttNum] = useState('');
     const [tarifRegulerData, setTarifRegulerData] = useState(null);
     const [tarifEkonomisData, setTarifEkonomisData] = useState(null);
 
@@ -31,25 +34,22 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
     const [emailError, setEmailError] = useState('');
     const [isPopUpPackingOpen, setIsPopUpPackingOpen] = useState(false);
 
-    // 🚀 State Live Search Multi-Field Geografi
+    // State Live Search Multi-Field Geografi
     const [geoSuggestions, setGeoSuggestions] = useState([]);
     const [kelurahanSuggestions, setKelurahanSuggestions] = useState([]);
     const [focusedField, setFocusedField] = useState(null);
 
-    // 📦 State Autocomplete Pelanggan & Agen
+    // State Autocomplete Pelanggan
     const [keywordCustomer, setKeywordCustomer] = useState('');
     const [rekomendasiCustomer, setRekomendasiCustomer] = useState([]);
     const [isCustomerSelected, setIsCustomerSelected] = useState(false);
 
-    const [keywordKecamatan, setKeywordKecamatan] = useState('');
-    const [rekomendasiArea, setRekomendasiArea] = useState([]);
-    const [isKecamatanSelected, setIsKecamatanSelected] = useState(false);
-
     const [errors, setErrors] = useState({});
     const [loadingTarif, setLoadingTarif] = useState(false);
 
-    // Inisialisasi Data Form BTT
+    // Inisialisasi Data Form BTT (Mendukung Create Baru dan Edit)
     const [formData, setFormData] = useState({
+        bttt_nobtt: '',
         bttt_tanggal: todayStr,
         bttt_nosuratjalan: '',
         bttt_ket: 'SURAT JALAN KEMBALI',
@@ -77,7 +77,6 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
         bttt_tujuantelp2: '',
         bttt_tujuantelp3: '',
         bttt_up_penerima: '',
-        bttt_up_pengirim: '',
 
         bttt_tujuanpropinsi: '',
         bttt_tujuanpulau: '',
@@ -85,7 +84,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
         bttt_kodecabangagen: '',
 
         bttt_paketyn: 'Y',
-        bttt_pilihcarter: '', // '' = PAKET, bila ada isi (misal 'BUILD UP') = CARTER
+        bttt_pilihcarter: '',
         bttt_jenisharga: '0',
         bttt_jeniskiriman: 'BERAT',
         bttt_isikiriman: '',
@@ -96,88 +95,107 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
         bttt_lebar: 0,
         bttt_tinggi: 0,
         bttt_ukuran: '',
-        bttt_harga: 0,
+        bttt_harga: 0, // Biaya Kirim
         bttt_biayapenerus: 0,
-        bttt_biayapacking: 0
+        bttt_biayapacking: 0,
+        bttt_alasan_override: '',
+        original_harga: 0 // Menyimpan harga asli untuk deteksi override
     });
 
-    // 🎯 ATURAN TANGGAL PENGIRIMAN:
-    // Jika PAKET (bttt_pilihcarter kosong): minDate = kemarin (H-1)
-    // Jika CARTER (bttt_pilihcarter terisi): minDate = hari ini (H)
+    // Populate Data Jika Masuk Mode Edit
+    useEffect(() => {
+        if (isEditMode && initialData) {
+            setFormData({
+                bttt_nobtt: initialData.no_btt || initialData.id || '',
+                bttt_tanggal: initialData.tanggal ? formatDateToYMD(new Date(initialData.tanggal)) : todayStr,
+                bttt_nosuratjalan: initialData.no_surat_jalan || '',
+                bttt_ket: initialData.keterangan || 'SURAT JALAN KEMBALI',
+                bttt_nobttmanual: initialData.no_btt_manual || '',
+                bttt_dliexpryn: initialData.dli_expr_yn || 'N',
+                bttt_promoid: initialData.promo_id || '',
+
+                bttt_asalcustid: initialData.asal_cust_id || initialData.customer_id || '',
+                bttt_asalname: initialData.pengirim_nama || initialData.customer_nama || 'UMUM',
+                bttt_asalalamat: initialData.pengirim_alamat || '',
+                bttt_asalkota: initialData.asal_kota || '',
+                bttt_asaltelp: initialData.pengirim_telp || '',
+                bttt_asaltelp2: initialData.pengirim_telp2 || '',
+                bttt_asalemail: initialData.pengirim_email || '',
+
+                bttt_tujuannama: initialData.penerima_nama || '',
+                bttt_up: initialData.up_pengirim || initialData.pengirim_nama || '',
+                bttt_tujuanalamat: initialData.penerima_alamat || '',
+                bttt_tujuankota: initialData.tujuan_kota || '',
+                bttt_tujuankelurahan: initialData.tujuan_kelurahan || '',
+                bttt_tujuankecamatan: initialData.tujuan_kecamatan || '',
+                bttt_tujuankodepos: initialData.tujuan_kodepos || '',
+                bttt_tujuanemail: initialData.penerima_email || '',
+                bttt_tujuantelp: initialData.penerima_telp || '',
+                bttt_tujuantelp2: initialData.penerima_telp2 || '',
+                bttt_tujuantelp3: initialData.penerima_telp3 || '',
+                bttt_up_penerima: initialData.up_penerima || '',
+
+                bttt_tujuanpropinsi: initialData.tujuan_propinsi || '',
+                bttt_tujuanpulau: initialData.tujuan_pulau || '',
+                bttt_tujuanagenid: initialData.tujuan_agen_id || '',
+                bttt_kodecabangagen: initialData.kode_cabang_agen || '',
+
+                bttt_paketyn: initialData.paket_yn || 'Y',
+                bttt_pilihcarter: initialData.pilih_carter || '',
+                bttt_jenisharga: String(initialData.jenis_harga ?? '0'),
+                bttt_jeniskiriman: initialData.jenis_kiriman || 'BERAT',
+                bttt_isikiriman: initialData.barang || initialData.isi_kiriman || '',
+                bttt_jmlkoli: initialData.koli || initialData.jml_koli || 1,
+                bttt_berat: initialData.berat || 1.00,
+                bttt_beratvol: initialData.berat_vol || 1.00,
+                bttt_panjang: initialData.panjang || 0,
+                bttt_lebar: initialData.lebar || 0,
+                bttt_tinggi: initialData.tinggi || 0,
+                bttt_ukuran: initialData.kubikasi || '',
+                bttt_harga: initialData.biaya_kirim || initialData.harga || 0,
+                bttt_biayapenerus: initialData.biaya_penerus || 0,
+                bttt_biayapacking: initialData.biaya_packing || 0,
+                bttt_alasan_override: initialData.alasan_override || '',
+                original_harga: initialData.biaya_kirim || initialData.harga || 0
+            });
+            setKeywordCustomer(initialData.pengirim_nama || initialData.customer_nama || '');
+            setIsCustomerSelected(true);
+        }
+    }, [isEditMode, initialData]);
+
     const isLayananPaket = formData.bttt_pilihcarter === '';
     const minDate = isLayananPaket ? yesterdayStr : todayStr;
-    const maxDate = todayStr; // Terkunci tidak bisa memilih tanggal esok / masa depan
+    const maxDate = todayStr;
 
-    // Proteksi: Jika user beralih ke CARTER saat tanggal masih terpasang kemarin, otomatis reset ke hari ini
+    // Hitung Otomatis Berat Volume
     useEffect(() => {
-        if (!isLayananPaket && formData.bttt_tanggal < todayStr) {
-            setFormData(prev => ({ ...prev, bttt_tanggal: todayStr }));
-        }
-    }, [isLayananPaket]);
+        const p = parseFloat(formData.bttt_panjang) || 0;
+        const l = parseFloat(formData.bttt_lebar) || 0;
+        const t = parseFloat(formData.bttt_tinggi) || 0;
+        const m3 = parseFloat(formData.bttt_ukuran) || 0;
 
-    // Auto generate ID Pelanggan awal
-    const pemicuGenerateID = () => {
-        const token = localStorage.getItem('token');
-        const kodeAgenAktif = localStorage.getItem('active_agen_id') || '';
-
-        api.get(`/btt/generate-custid?kode_agen=${kodeAgenAktif}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        })
-            .then(res => {
-                if (res.data && res.data.status === "success") {
-                    setFormData(prev => ({ ...prev, bttt_asalcustid: res.data.generated_id || res.data.cust_id }));
-                }
-            })
-            .catch(err => console.warn("Gagal auto-generate ID awal", err.message));
-    };
-
-    useEffect(() => {
-        pemicuGenerateID();
-    }, []);
-
-    // Sinkronisasi Sesi Agen Pengirim Aktif
-    useEffect(() => {
-        if (isOpen) {
-            const sessionAgenId = localStorage.getItem('active_agen_id') || sessionStorage.getItem('active_agen_id') || '1';
-            const sessionAgenNama = localStorage.getItem('active_agen_nama') || sessionStorage.getItem('active_agen_nama') || 'DENPASAR DLI AGEN';
-
+        if (p > 0 && l > 0 && t > 0) {
+            const volFromDimensi = (p * l * t) / 4000;
+            const kubikasiFromDimensi = (p * l * t) / 1000000;
             setFormData(prev => ({
                 ...prev,
-                bttt_asalagenid: sessionAgenId,
-                bttt_asalkota: sessionAgenNama,
-                bttt_tanggal: prev.bttt_tanggal || todayStr
+                bttt_beratvol: parseFloat(volFromDimensi.toFixed(2)),
+                bttt_ukuran: parseFloat(kubikasiFromDimensi.toFixed(2))
+            }));
+        } else if (m3 > 0) {
+            const volFromM3 = m3 * 250;
+            setFormData(prev => ({
+                ...prev,
+                bttt_beratvol: parseFloat(volFromM3.toFixed(2))
             }));
         }
-    }, [isOpen]);
+    }, [formData.bttt_panjang, formData.bttt_lebar, formData.bttt_tinggi, formData.bttt_ukuran]);
 
     // Live search Pelanggan
     useEffect(() => {
-        const namaPelanggan = keywordCustomer.trim();
-
         if (isCustomerSelected) {
             setIsCustomerSelected(false);
             return;
-        }
-
-        // 🛑 HANYA generate ID otomatis jika form memang sedang dalam mode UMUM murni dan belum punya ID
-        if ((namaPelanggan === "" || namaPelanggan.toUpperCase() === "UMUM") && formData.bttt_asalname === 'UMUM' && !formData.bttt_asalcustid) {
-            const token = localStorage.getItem('token');
-            const kodeAgenAktif = localStorage.getItem('active_agen_id') || 'JKT';
-
-            api.get(`/btt/generate-custid?kode_agen=${kodeAgenAktif}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            })
-                .then(res => {
-                    if (res.data && res.data.status === "success") {
-                        const idOtomatis = res.data.generated_id || res.data.cust_id || '';
-                        setFormData(prev => ({
-                            ...prev,
-                            bttt_asalname: 'UMUM',
-                            bttt_asalcustid: idOtomatis
-                        }));
-                    }
-                })
-                .catch(err => console.warn("Gagal inisialisasi default retail ID:", err));
         }
 
         if (keywordCustomer && keywordCustomer.length >= 1) {
@@ -186,9 +204,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
             const roleAkses = localStorage.getItem('role_akses') === 'S' ? 'SUPERADMIN' : 'USER';
             const searchUrl = `/btt/search-customer?search=${encodeURIComponent(keywordCustomer)}&agen_id=${encodeURIComponent(activeAgen)}&role_akses=${encodeURIComponent(roleAkses)}`;
 
-            api.get(searchUrl, {
-                headers: { Authorization: `Bearer ${token}` }
-            })
+            api.get(searchUrl, { headers: { Authorization: `Bearer ${token}` } })
                 .then(res => {
                     if (res.data && res.data.status === "success") {
                         setRekomendasiCustomer(res.data.data || []);
@@ -200,51 +216,28 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
         }
     }, [keywordCustomer]);
 
-    // Hitung otomatis Berat Volume (bisa dari PxLxT atau langsung dari Kubikasi M3)
-    useEffect(() => {
-        const p = parseFloat(formData.bttt_panjang) || 0;
-        const l = parseFloat(formData.bttt_lebar) || 0;
-        const t = parseFloat(formData.bttt_tinggi) || 0;
-        const m3 = parseFloat(formData.bttt_ukuran) || 0;
-
-        if (p > 0 && l > 0 && t > 0) {
-            // Hitung dari dimensi P x L x T (cm)
-            const volFromDimensi = (p * l * t) / 4000;
-            const kubikasiFromDimensi = (p * l * t) / 1000000;
-            setFormData(prev => ({
-                ...prev,
-                bttt_beratvol: parseFloat(volFromDimensi.toFixed(2)),
-                bttt_ukuran: parseFloat(kubikasiFromDimensi.toFixed(2))
-            }));
-        } else if (m3 > 0) {
-            // Hitung dari Kubikasi M3 (1 M3 = 250 Kg Darat Reguler)
-            const volFromM3 = m3 * 250;
-            setFormData(prev => ({
-                ...prev,
-                bttt_beratvol: parseFloat(volFromM3.toFixed(2))
-            }));
-        }
-    }, [formData.bttt_panjang, formData.bttt_lebar, formData.bttt_tinggi, formData.bttt_ukuran]);
-
     const handlePilihCustomer = (cust) => {
-        const idPelanggan = cust.cust_id || cust.id || cust.kode_customer || '';
-        const namaPelanggan = cust.cust_nama || cust.nama || '';
+        const idPelanggan = cust.cust_id || cust.id || '';
+        const fixName = cust.cust_name || cust.cust_nama || '';
 
         setIsCustomerSelected(true);
-        setKeywordCustomer(namaPelanggan);
+        setKeywordCustomer(fixName);
         setRekomendasiCustomer([]);
 
         setFormData(prev => ({
             ...prev,
-            bttt_asalcustid: String(idPelanggan).trim(), // '001000021'
-            bttt_asalname: namaPelanggan,
-            bttt_asalalamat: cust.cust_alamat || '',
-            bttt_asalkota: cust.cust_kota || '',
-            bttt_asaltelp: cust.cust_telp || ''
+            bttt_asalcustid: String(idPelanggan).trim(),
+            bttt_asalname: fixName.toUpperCase(),
+            bttt_asalalamat: (cust.cust_alamat1 || cust.CustAlamat1 || '').toUpperCase(),
+            bttt_asalkota: (cust.cust_kotaid || cust.CustKotaID || '').toUpperCase(),
+            bttt_asaltelp: cust.cust_telp1 || cust.CustTelp1 || '',
+            bttt_asaltelp2: cust.cust_telp2 || cust.CustTelp2 || '',
+            bttt_asalemail: cust.cust_email || cust.CustEmail || '',
+            bttt_up: fixName.toUpperCase()
         }));
 
         if (formData.bttt_tujuankecamatan) {
-            fetchTarifOtomatis(formData.bttt_tujuankecamatan);
+            fetchTarifOtomatis(formData.bttt_tujuankecamatan, String(idPelanggan).trim());
         }
     };
 
@@ -255,7 +248,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
         }
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(emailVal.trim())) {
-            setEmailPenerimaError("Format email salah! Harus mengandung '@' dan nama domain (contoh: penerima@email.com)");
+            setEmailPenerimaError("Format email tidak valid (contoh: penerima@email.com)");
             return false;
         }
         setEmailPenerimaError('');
@@ -269,7 +262,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
         }
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(emailVal.trim())) {
-            setEmailError("Format email salah! Harus mengandung '@' dan nama domain (contoh: pengirim@email.com)");
+            setEmailError("Format email tidak valid (contoh: pengirim@email.com)");
             return false;
         }
         setEmailError('');
@@ -283,138 +276,67 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
 
         let finalValue = type === 'checkbox' ? (checked ? 'Y' : 'N') : value;
 
-        // 🔒 1. Validasi Telepon: Hapus huruf & simbol, hanya izinkan angka 0-9
         if (kolomsTelepon.includes(name)) {
-            finalValue = finalValue.replace(/\D/g, ''); // \D = buang semua karakter non-angka
+            finalValue = finalValue.replace(/\D/g, '');
         }
 
-        // 🔠 2. Auto Uppercase untuk kolom tertentu
         if (typeof finalValue === 'string' && kolomsUppercase.includes(name)) {
             finalValue = finalValue.toUpperCase();
         }
 
         setFormData((prev) => ({ ...prev, [name]: finalValue }));
 
-        if (errors[name]) {
-            setErrors(prev => ({ ...prev, [name]: null }));
-        }
-
-        // ✉️ 3. Validasi Email Realtime
-        if (name === 'bttt_tujuanemail') {
-            validateEmailPenerima(finalValue);
-        }
-        if (name === 'bttt_asalemail') {
-            validateEmailPengirim(finalValue);
-        }
+        if (name === 'bttt_tujuanemail') validateEmailPenerima(finalValue);
+        if (name === 'bttt_asalemail') validateEmailPengirim(finalValue);
     };
 
-    const handleHitungTarif = async () => {
-        if (!formData.bttt_asalagenid || !formData.bttt_tujuankecamatan) {
-            Swal.fire({
-                title: 'INFO BRO',
-                text: 'Pilih Kecamatan Tujuan terlebih dahulu sebelum melakukan kalkulasi tarif kargo!',
-                icon: 'warning',
-                confirmButtonColor: '#4f46e5',
-                customClass: { container: 'z-[999999] font-sans' }
-            });
-            return;
-        }
+    // Kalkulasi Tarif Otomatis dari Master Tarif
+    const fetchTarifOtomatis = async (kecamatanTujuan, custIdOverride) => {
+        const kec = kecamatanTujuan || formData.bttt_tujuankecamatan;
+        if (!kec) return;
+
+        const activeAgenId = localStorage.getItem('active_agen_id') || formData.bttt_asalagenid || '1';
+        const targetCust = custIdOverride || formData.bttt_asalcustid;
+        const beratFinal = Math.max(parseFloat(formData.bttt_berat) || 0, parseFloat(formData.bttt_beratvol) || 0, 1);
 
         setLoadingTarif(true);
         try {
             const token = localStorage.getItem('token');
-            const response = await api.post('/btt/calculate-tarif', {
-                asal_kota: String(formData.bttt_asalagenid || "").trim(),
-                tujuan_kecamatan: formData.bttt_tujuankecamatan,
-                tujuan_kec: formData.bttt_tujuankecamatan,
-                agen_id: String(formData.bttt_asalagenid || "").trim(),
-                cust_id: String(formData.bttt_asalcustid || "").trim(),
-                berat_asli: Math.max(parseFloat(formData.bttt_berat) || 0, parseFloat(formData.bttt_beratvol) || 0, 1),
+            const res = await api.post('/btt/calculate-tarif', {
+                agen_id: String(activeAgenId).trim(),
+                asal_kota: String(activeAgenId).trim(),
+                cust_id: String(targetCust || '').trim(),
+                tujuan_kec: kec.trim(),
+                tujuan_kecamatan: kec.trim(),
+                berat_asli: beratFinal,
                 panjang: parseFloat(formData.bttt_panjang) || 0,
                 lebar: parseFloat(formData.bttt_lebar) || 0,
                 tinggi: parseFloat(formData.bttt_tinggi) || 0,
-                jenis_layanan: formData.bttt_paketyn === 'Y' ? 'REGULER' : 'EKONOMIS'
-            }, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            const data = response.data;
-            if (response.status === 200) {
-                const hargaFinal = data.grand_total || 0;
-                setTarifRegulerData(data.reguler_row || null);
-                setTarifEkonomisData(data.ekonomis_row || null);
-
-                setFormData(prev => ({
-                    ...prev,
-                    bttt_harga: hargaFinal,
-                    bttt_status_hitung: data.status_hitung || "TERHITUNG OTOMATIS",
-                    reguler_lt: data.reguler_row?.estimasihari || data.reguler_row?.estimasi_hari || 0,
-                    ekonomis_lt: data.ekonomis_row?.estimasihari || data.ekonomis_row?.estimasi_hari || 0
-                }));
-
-                Swal.fire({
-                    title: 'TARIF BERHASIL DIHITUNG!',
-                    html: `Total Biaya: <b class="text-xl text-indigo-600">Rp ${hargaFinal.toLocaleString('id-ID')}</b>`,
-                    icon: 'success',
-                    confirmButtonColor: '#4f46e5',
-                    customClass: { container: 'z-[999999] font-sans' }
-                });
-            } else {
-                Swal.fire({
-                    title: 'Gagal Hitung',
-                    text: data.error || 'Rute belum terdaftar di database kargo Dakota!',
-                    icon: 'error',
-                    confirmButtonColor: '#4f46e5',
-                    customClass: { container: 'z-[999999] font-sans' }
-                });
-            }
-        } catch (err) {
-            Swal.fire({
-                title: 'Gagal Hitung',
-                text: err.response?.data?.error || 'Terjadi kesalahan jaringan atau rute tidak terdaftar, bro...',
-                icon: 'error',
-                confirmButtonColor: '#4f46e5',
-                customClass: { container: 'z-[999999] font-sans' }
-            });
-        } finally {
-            setLoadingTarif(false);
-        }
-    };
-
-    const fetchTarifRute = async (agenIdRaw, tujuanKecamatan, overrideCustId) => {
-        if (!tujuanKecamatan) return;
-
-        try {
-            const token = localStorage.getItem('token');
-            const cleanAgenID = String(agenIdRaw || formData.bttt_asalagenid || "").trim();
-            // Ambil cust_id dari override (jika baru dipilih) atau dari state formData
-            const customerId = String(overrideCustId !== undefined ? overrideCustId : (formData.bttt_asalcustid || "")).trim();
-
-            const response = await api.post('/btt/calculate-tarif', {
-                asal_kota: cleanAgenID,
-                tujuan_kecamatan: tujuanKecamatan,
-                tujuan_kec: tujuanKecamatan,
-                agen_id: cleanAgenID,
-                cust_id: customerId, // 👈 WAJIB DITAMBAHKAN AGAR MERCK TERBACA
-                berat_asli: parseFloat(formData.bttt_berat) || 1,
-                jenis_layanan: formData.bttt_paketyn === 'Y' ? 'REGULER' : 'EKONOMIS'
+                jenis_layanan: formData.bttt_paketyn === 'N' ? 'EKONOMIS' : 'REGULER'
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            if (response.data && response.data.status === "success") {
-                const d = response.data;
-                setTarifRegulerData(d.reguler_row || null);
-                setTarifEkonomisData(d.ekonomis_row || null);
+            if (res.data && res.data.status === "success") {
+                const data = res.data;
+                const regRow = data.reguler_row || data.data_reguler || {};
+                const ekoRow = data.ekonomis_row || data.data_ekonomis || {};
 
+                setTarifRegulerData(regRow);
+                setTarifEkonomisData(ekoRow);
+
+                const finalBiayaKirim = (formData.bttt_paketyn === 'N' ? ekoRow.hargapokok : regRow.hargapokok) || data.grand_total || 0;
                 setFormData(prev => ({
                     ...prev,
-                    bttt_harga: d.grand_total || 0,
-                    bttt_biayatambahan: d.biaya_penerus || 0
+                    bttt_harga: finalBiayaKirim,
+                    original_harga: finalBiayaKirim,
+                    bttt_biayapenerus: regRow.biayatambahan || data.biaya_penerus || 0
                 }));
             }
         } catch (err) {
-            console.warn("Gagal fetch tarif otomatis:", err);
+            console.error("Gagal hitung tarif:", err);
+        } finally {
+            setLoadingTarif(false);
         }
     };
 
@@ -434,8 +356,6 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
             });
             if (res.data && res.data.status === "success") {
                 setGeoSuggestions(Array.isArray(res.data.data) ? res.data.data : []);
-            } else {
-                setGeoSuggestions([]);
             }
         } catch (err) {
             setGeoSuggestions([]);
@@ -473,112 +393,84 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
         }
     };
 
-    const handleSelectKelurahan = async (subItem) => {
+    const handleSelectKelurahan = (subItem) => {
         setFormData(prev => ({
             ...prev,
             bttt_tujuankelurahan: subItem.kelurahan,
             bttt_tujuankodepos: subItem.kodepos,
             bttt_kodecabangagen: "DK-" + subItem.kodepos
         }));
-
         setFocusedField(null);
-        const agenIdFix = localStorage.getItem('active_agen_id') || "";
-        if (formData.bttt_tujuankecamatan) {
-            await fetchTarifRute(agenIdFix, formData.bttt_tujuankecamatan);
-        }
     };
 
-    const executeFinalSaveDataToGolang = async (payloadKargo, finalResiID) => {
+    const showWarningAlert = (pesan) => {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Data Belum Lengkap',
+            text: pesan,
+            confirmButtonColor: '#004b84',
+            customClass: { container: 'z-[999999]' }
+        });
+    };
+
+    // Validasi Submit
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+
+        if (!formData.bttt_up?.trim()) return showWarningAlert('Nama Pengirim / UP wajib diisi!');
+        if (!formData.bttt_asalalamat?.trim()) return showWarningAlert('Alamat Pengirim wajib diisi!');
+        if (!formData.bttt_asaltelp?.trim()) return showWarningAlert('Nomor Telepon Pengirim wajib diisi!');
+        if (!formData.bttt_tujuannama?.trim()) return showWarningAlert('Nama Penerima wajib diisi!');
+        if (!formData.bttt_tujuanalamat?.trim()) return showWarningAlert('Alamat Lengkap Penerima wajib diisi!');
+        if (!formData.bttt_tujuantelp?.trim()) return showWarningAlert('Nomor Telepon Penerima wajib diisi!');
+        if (!formData.bttt_tujuankecamatan?.trim() || !formData.bttt_tujuankelurahan?.trim()) return showWarningAlert('Kecamatan dan Kelurahan tujuan pengiriman wajib dipilih!');
+        if (!formData.bttt_isikiriman?.trim()) return showWarningAlert('Isi kiriman barang wajib diisi!');
+        if (parseFloat(formData.bttt_harga) <= 0) return showWarningAlert('Biaya kirim tidak boleh 0! Lakukan hitung tarif terlebih dahulu.');
+
+        // 🛑 Wajib isi alasan jika Supervisor melakukan bypass harga manual
+        const isBypassed = isSupervisor && parseFloat(formData.bttt_harga) !== parseFloat(formData.original_harga);
+        if (isBypassed && !formData.bttt_alasan_override?.trim()) {
+            return showWarningAlert('Anda melakukan bypass tarif manual. Silakan isi alasan perubahan tarif!');
+        }
+
+        const totalBiayaFinal = parseFloat(formData.bttt_harga) + parseFloat(formData.bttt_biayapenerus || 0) + parseFloat(formData.bttt_biayapacking || 0);
+
         setLoadingTarif(true);
         try {
             const token = localStorage.getItem('token');
-            const sessionAgenId = localStorage.getItem('active_agen_id') || sessionStorage.getItem('active_agen_id');
+            const endpoint = isEditMode ? '/btt/update' : '/btt/add';
+            const payload = {
+                no_btt: formData.bttt_nobtt,
+                id: formData.bttt_nobtt,
+                ...formData,
+                total_biaya: totalBiayaFinal,
+                bttt_harga: parseFloat(formData.bttt_harga),
+                bttt_biayapenerus: parseFloat(formData.bttt_biayapenerus || 0),
+                bttt_biayapacking: parseFloat(formData.bttt_biayapacking || 0)
+            };
 
-            if (!sessionAgenId) {
-                Swal.fire({
-                    title: 'Sesi Loket Hilang!',
-                    text: 'Identitas kode agen aktif tidak terdeteksi di browser Anda. Mohon login ulang akun loket Anda demi keamanan audit!',
-                    icon: 'error',
-                    confirmButtonColor: '#ef4444',
-                    customClass: { container: 'z-[999999]' }
-                });
-                return;
-            }
-
-            const parsedAgenId = parseInt(sessionAgenId);
-            const validAgenId = !isNaN(parsedAgenId) && parsedAgenId > 0 ? parsedAgenId : sessionAgenId;
-
-            const response = await api.post('/btt/add', {
-                id: finalResiID,
-                bttt_tanggal: payloadKargo.bttt_tanggal,
-                bttt_asalagenid: validAgenId,
-                bttt_nosuratjalan: payloadKargo.bttt_nosuratjalan,
-                bttt_ket: payloadKargo.bttt_ket,
-                bttt_nobttmanual: payloadKargo.bttt_nobttmanual,
-                bttt_dliexpryn: payloadKargo.bttt_dliexpryn,
-                bttt_promoid: payloadKargo.bttt_promoid,
-                bttt_asalcustid: payloadKargo.bttt_asalcustid,
-                bttt_asalname: payloadKargo.bttt_asalname,
-                bttt_asalalamat: payloadKargo.bttt_asalalamat,
-                bttt_asalkota: payloadKargo.bttt_asalkota,
-                bttt_asaltelp: payloadKargo.bttt_asaltelp,
-                bttt_tujuannama: payloadKargo.bttt_tujuannama,
-                bttt_up: payloadKargo.bttt_up,
-                bttt_tujuanalamat: payloadKargo.bttt_tujuanalamat,
-                bttt_tujuankota: payloadKargo.bttt_tujuankota,
-                bttt_tujuankelurahan: payloadKargo.bttt_tujuankelurahan,
-                bttt_tujuankecamatan: payloadKargo.bttt_tujuankecamatan,
-                bttt_tujuankodepos: payloadKargo.bttt_tujuankodepos,
-                bttt_tujuanemail: payloadKargo.bttt_tujuanemail,
-                bttt_tujuantelp: payloadKargo.bttt_tujuantelp,
-                bttt_tujuanpropinsi: payloadKargo.bttt_tujuanpropinsi,
-                bttt_tujuanagenid: payloadKargo.bttt_tujuanagenid,
-                bttt_kodecabangagen: payloadKargo.bttt_kodecabangagen,
-                bttt_paketyn: payloadKargo.bttt_paketyn,
-                bttt_pilihcarter: payloadKargo.bttt_pilihcarter,
-                bttt_jenisharga: payloadKargo.bttt_jenisharga,
-                bttt_isikiriman: payloadKargo.bttt_isikiriman,
-                bttt_jmlkoli: parseInt(payloadKargo.bttt_jmlkoli) || 1,
-                bttt_berat: parseFloat(payloadKargo.bttt_berat) || 1,
-                bttt_beratvol: parseFloat(payloadKargo.bttt_beratvol) || 0,
-                bttt_ukuran: parseFloat(payloadKargo.bttt_ukuran) || 0,
-                bttt_harga: parseFloat(payloadKargo.bttt_harga) || 0,
-                bttt_biayatambahan: parseFloat(payloadKargo.bttt_biayapenerus) || 0,
-                bttt_biayapacking: parseFloat(payloadKargo.bttt_biayapacking) || 0
-            }, {
-                headers: { 'Authorization': `Bearer ${token}` }
+            const res = await api.post(endpoint, payload, {
+                headers: { Authorization: `Bearer ${token}` }
             });
 
-            if (response.data && response.data.status === "success") {
-                const nomorBttResmiDariGo = response.data.btt_no || finalResiID;
-
-                localStorage.setItem('print_btt_payload', JSON.stringify(payloadKargo));
-                localStorage.setItem('print_btt_number', nomorBttResmiDariGo);
-
+            if (res.data && res.data.status === "success") {
+                const noBttResmi = res.data.btt_no || formData.bttt_nobtt;
                 onClose();
 
                 Swal.fire({
-                    title: 'SUKSES SIMPAN DATABASE!',
-                    html: `
-                    <div style="font-family: sans-serif; padding: 5px;">
-                        <p style="color: #4b5563; margin-bottom: 8px;">Data transaksi BTT logistik berhasil disimpan dengan nomor resi sah:</p>
-                        <h2 style="font-size: 24px; font-weight: 900; color: #059669; background-color: #ecfdf5; padding: 10px; border-radius: 8px; border: 1px solid #a7f3d0; letter-spacing: 1px;">${nomorBttResmiDariGo}</h2>
-                        <p style="font-size: 13px; color: #6b7280; margin-top: 5px;">Membuka dokumen layout cetak resi kargo 3 rangkap...</p>
-                    </div>
-                `,
+                    title: isEditMode ? 'BTT BERHASIL DIPERBARUI!' : 'SUKSES SIMPAN BTT!',
+                    html: `<div class="p-2"><p>Nomor Resi BTT:</p><h2 class="text-2xl font-black text-emerald-600 font-mono mt-1">${noBttResmi}</h2></div>`,
                     icon: 'success',
-                    confirmButtonColor: '#4f46e5',
-                    confirmButtonText: 'OK, CETAK RESI!',
+                    confirmButtonColor: '#004b84',
                     customClass: { container: 'z-[999999]' }
                 }).then(() => {
-                    window.open(`/marketing/btt/print?id=${nomorBttResmiDariGo}`, '_blank');
-                    if (onSave) onSave(payloadKargo);
+                    if (onSave) onSave(payload);
                 });
             }
-        } catch (error) {
+        } catch (err) {
             Swal.fire({
-                title: 'PROSES SIMPAN GAGAL!',
-                text: error.response?.data?.error || 'Terjadi kesalahan sistem saat menyimpan BTT.',
+                title: 'Gagal Menyimpan',
+                text: err.response?.data?.message || err.message,
                 icon: 'error',
                 confirmButtonColor: '#ef4444',
                 customClass: { container: 'z-[999999]' }
@@ -588,352 +480,36 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
         }
     };
 
-    // 🛡️ Helper SweetAlert agar PASTI berada di atas modal (z-index 999999)
-    const showWarningAlert = (pesan) => {
-        Swal.fire({
-            icon: 'warning',
-            title: 'Data Belum Lengkap',
-            text: pesan,
-            confirmButtonColor: '#004b84',
-            confirmButtonText: 'OKE, SAYA LENGKAPI',
-            customClass: {
-                container: 'z-[999999]' // 👈 Kunci agar popup tampil di paling depan modal!
-            }
-        });
-    };
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-
-        // 🛑 Guard Validasi Lengkap dengan z-index di depan modal
-        if (!formData.bttt_up?.trim()) {
-            showWarningAlert('Nama Pengirim / UP wajib diisi!');
-            return;
-        }
-
-        if (!formData.bttt_asalalamat?.trim()) {
-            showWarningAlert('Alamat Pengirim wajib diisi!');
-            return;
-        }
-
-        if (!formData.bttt_asaltelp?.trim()) {
-            showWarningAlert('Nomor Telepon Pengirim wajib diisi!');
-            return;
-        }
-
-        if (!formData.bttt_tujuannama?.trim()) {
-            showWarningAlert('Nama Penerima wajib diisi!');
-            return;
-        }
-
-        if (!formData.bttt_tujuanalamat?.trim()) {
-            showWarningAlert('Alamat Lengkap Penerima wajib diisi!');
-            return;
-        }
-
-        if (!formData.bttt_tujuantelp?.trim()) {
-            showWarningAlert('Nomor Telepon Penerima wajib diisi!');
-            return;
-        }
-
-        if (!formData.bttt_tujuankecamatan?.trim() || !formData.bttt_tujuankelurahan?.trim()) {
-            showWarningAlert('Kecamatan dan Kelurahan tujuan pengiriman wajib dipilih dari daftar!');
-            return;
-        }
-
-        if (!formData.bttt_isikiriman?.trim()) {
-            showWarningAlert('Isi kiriman barang wajib diisi!');
-            return;
-        }
-
-        if (!formData.bttt_harga || parseFloat(formData.bttt_harga) <= 0) {
-            showWarningAlert('Klik tombol "HITUNG TARIF OTOMATIS" terlebih dahulu sebelum mencetak bukti terima!');
-            return;
-        }
-
-        // =========================================================================
-        // 🔒 VALIDASI TAMBAHAN: FORMAT EMAIL & TELEPON (DILETAKKAN DI SINI)
-        // =========================================================================
-
-        // 🛑 Validasi Format Email Pengirim (jika diisi)
-        if (formData.bttt_asalemail && !validateEmailPengirim(formData.bttt_asalemail)) {
-            showWarningAlert('Format Email Pengirim tidak valid! Gunakan format email yang benar (contoh: pengirim@email.com)');
-            return;
-        }
-
-        // 🛑 Validasi Format Email Penerima (jika diisi)
-        if (formData.bttt_tujuanemail && !validateEmailPenerima(formData.bttt_tujuanemail)) {
-            showWarningAlert('Format Email Penerima tidak valid! Gunakan format email yang benar (contoh: penerima@email.com)');
-            return;
-        }
-
-        // 🛑 Validasi Nomor Telepon Pengirim (minimal 8 digit angka)
-        if (formData.bttt_asaltelp.replace(/\D/g, '').length < 8) {
-            showWarningAlert('Nomor Telepon Pengirim minimal 8 digit angka dan tidak boleh mengandung huruf!');
-            return;
-        }
-
-        // 🛑 Validasi Nomor Telepon Penerima (minimal 8 digit angka)
-        if (formData.bttt_tujuantelp.replace(/\D/g, '').length < 8) {
-            showWarningAlert('Nomor Telepon Penerima minimal 8 digit angka dan tidak boleh mengandung huruf!');
-            return;
-        }
-
-        // =========================================================================
-        // 🚀 Lolos seluruh validasi: proses generate ID dan simpan ke database
-        // =========================================================================
-        const activeAgenId =
-            localStorage.getItem('active_agen_id') ||
-            sessionStorage.getItem('active_agen_id') ||
-            formData.bttt_asalagenid ||
-            '';
-
-        // Validasi jika agen belum ada, jangan hitung tarif sembarangan
-        if (!activeAgenId) {
-            console.warn("Kode agen aktif tidak ditemukan pada sesi pengguna.");
-            return;
-        }
-        const tanggalMentah = formData.bttt_tanggal;
-        const komponenTanggal = tanggalMentah.split('-');
-        const tahunYY = komponenTanggal[0] ? komponenTanggal[0].substring(2, 4) : "26";
-        const bulanMM = komponenTanggal[1] ? komponenTanggal[1] : "06";
-        const prefixID = "A" + activeAgenId + bulanMM + tahunYY;
-
-        executeFinalSaveDataToGolang(formData, prefixID + "00001");
-    };
-
-    const angkaKeTerbilang = (nominal) => {
-        const angka = Math.floor(parseFloat(nominal) || 0);
-        if (angka === 0) return "Nol Rupiah";
-
-        const konversiPecahan = (n) => {
-            const kata = ["", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Delapan", "Sembilan", "Sepuluh", "Sebelas"];
-            let hasil = "";
-            if (n < 12) {
-                hasil = " " + kata[n];
-            } else if (n < 20) {
-                hasil = konversiPecahan(n - 10) + " Belas";
-            } else if (n < 100) {
-                hasil = konversiPecahan(Math.floor(n / 10)) + " Puluh" + konversiPecahan(n % 10);
-            } else if (n < 200) {
-                hasil = " Seratus" + konversiPecahan(n - 100);
-            } else if (n < 1000) {
-                hasil = konversiPecahan(Math.floor(n / 100)) + " Ratus" + konversiPecahan(n % 100);
-            } else if (n < 2000) {
-                hasil = " Seribu" + konversiPecahan(n - 1000);
-            } else if (n < 1000000) {
-                hasil = konversiPecahan(Math.floor(n / 1000)) + " Ribu" + konversiPecahan(n % 1000);
-            } else if (n < 1000000000) {
-                hasil = konversiPecahan(Math.floor(n / 1000000)) + " Juta" + konversiPecahan(n % 1000000);
-            } else if (n < 1000000000000) {
-                hasil = konversiPecahan(Math.floor(n / 1000000000)) + " Milyar" + konversiPecahan(n % 1000000000);
-            }
-            return hasil;
-        };
-
-        const hasilTeksMentah = konversiPecahan(angka) + " Rupiah";
-        return hasilTeksMentah.trim().replace(/\s+/g, ' ');
-    };
-
-    const RenderDropdownMelayang = () => {
-        if (!Array.isArray(geoSuggestions) || geoSuggestions.length === 0) return null;
-
-        return (
-            <div className="absolute left-0 right-0 top-[60px] bg-white border-2 border-teal-400 text-slate-900 rounded-xl shadow-2xl z-[99999] max-h-48 overflow-y-auto text-sm text-left block">
-                {geoSuggestions.map((item, idx) => (
-                    <div
-                        key={idx}
-                        onClick={() => handleSelectGeo(item)}
-                        className="p-3 hover:bg-teal-100 cursor-pointer border-b last:border-b-0 font-bold text-slate-800 transition-colors py-3.5"
-                    >
-                        📍 <span className="text-teal-600">{item?.kecamatan || '-'}</span> - <span className="text-gray-500 text-xs font-normal">{item?.kelurahan || ''}, {item?.kabupaten || ''}, {item?.propinsi || ''} [{item?.kodepos || ''}]</span>
-                    </div>
-                ))}
-            </div>
-        );
-    };
-
-    const fetchTarifOtomatis = async (kecamatanTujuan) => {
-        const kec = kecamatanTujuan || formData.bttt_tujuankecamatan;
-        if (!kec) return;
-
-        const activeAgenId = localStorage.getItem('active_agen_id') || formData.bttt_asalagenid || 'BDO004';
-        const beratAsli = parseFloat(formData.bttt_berat) || 0;
-        const beratVolManual = parseFloat(formData.bttt_beratvol) || 0;
-        const p = parseFloat(formData.bttt_panjang) || 0;
-        const l = parseFloat(formData.bttt_lebar) || 0;
-        const t = parseFloat(formData.bttt_tinggi) || 0;
-        const beratVolumeDimensi = (p * l * t) / 4000;
-        const beratFinal = Math.max(beratAsli, beratVolManual, beratVolumeDimensi, 1);
-
-        // 🚀 1. Set loading aktif saat request dimulai
-        setLoadingTarif(true);
-
-        try {
-            const token = localStorage.getItem('token');
-            const res = await api.post('/btt/calculate-tarif', {
-                agen_id: String(activeAgenId).trim(),
-                asal_kota: String(activeAgenId).trim(),
-                cust_id: String(formData.bttt_asalcustid || '').trim(),
-                tujuan_kec: kec.trim(),
-                tujuan_kecamatan: kec.trim(),
-                berat_asli: beratFinal,
-                panjang: p,
-                lebar: l,
-                tinggi: t,
-                jenis_layanan: formData.bttt_paketyn === 'N' ? 'EKONOMIS' : 'REGULER'
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            if (res.data && res.data.status === "success") {
-                const data = res.data;
-                const regRow = data.reguler_row || data.data_reguler || {};
-                const ekoRow = data.ekonomis_row || data.data_ekonomis || {};
-
-                setTarifRegulerData(regRow);
-                setTarifEkonomisData(ekoRow);
-
-                setFormData(prev => ({
-                    ...prev,
-                    bttt_harga: (prev.bttt_paketyn === 'N' ? ekoRow.hargapokok : regRow.hargapokok) || data.grand_total || 0,
-                    bttt_biayapenerus: regRow.biayatambahan || data.biaya_penerus || 0
-                }));
-            }
-        } catch (err) {
-            console.error("❌ Gagal hitung tarif:", err);
-        } finally {
-            // 🚀 2. Matikan loading saat selesai
-            setLoadingTarif(false);
-        }
-    };
-
-    // 🎯 HANYA 1 EFFECT DEBOUNCE UNTUK TARIF OTOMATIS (DUPLIKAT SUDAH DIHAPUS)
-    useEffect(() => {
-        if (isOpen && formData.bttt_tujuankecamatan) {
-            const delayDebounceFn = setTimeout(() => {
-                fetchTarifOtomatis(formData.bttt_tujuankecamatan);
-            }, 350);
-
-            return () => clearTimeout(delayDebounceFn);
-        }
-    }, [
-        isOpen,
-        formData.bttt_tujuankecamatan,
-        formData.bttt_asalcustid,
-        formData.bttt_berat,
-        formData.bttt_beratvol,
-        formData.bttt_pilihcarter,
-        formData.bttt_panjang,
-        formData.bttt_lebar,
-        formData.bttt_tinggi,
-        formData.bttt_paketyn
-    ]);
-
-    // 🔍 Validasi Field Wajib: Pengirim, Penerima, Wilayah Tujuan, Isi Barang, & Tarif
-    // 🔍 Validasi Field Wajib & Format Email/Telepon
-    const isFormValid = Boolean(
-        formData.bttt_tanggal &&
-        formData.bttt_asalname?.trim() &&
-        formData.bttt_up?.trim() &&
-        formData.bttt_asalalamat?.trim() &&
-        formData.bttt_asaltelp?.replace(/\D/g, '').length >= 8 &&
-        formData.bttt_tujuannama?.trim() &&
-        formData.bttt_tujuanalamat?.trim() &&
-        formData.bttt_tujuantelp?.replace(/\D/g, '').length >= 8 &&
-        formData.bttt_tujuankecamatan?.trim() &&
-        formData.bttt_tujuankelurahan?.trim() &&
-        formData.bttt_isikiriman?.trim() &&
-        (parseFloat(formData.bttt_berat) > 0) &&
-        (parseFloat(formData.bttt_harga) > 0) &&
-        // Jika email diisi, format harus valid; jika kosong, tetap dianggap valid (opsional)
-        (!formData.bttt_asalemail || validateEmailPengirim(formData.bttt_asalemail)) &&
-        (!formData.bttt_tujuanemail || validateEmailPenerima(formData.bttt_tujuanemail))
-    );
-
-    // 🚚 Auto-fill Berat Volume saat Jenis Carter dipilih
-    const MIN_BERAT_CARTER = {
-        'BUILD UP': 16000,
-        'COLT DIESEL': 4000,
-        'FUSO': 7000,
-        'FREEZER BOX': 4000,
-        'TRONTON': 11000,
-        'WING BOX': 16000
-    };
-
-    useEffect(() => {
-        if (formData.bttt_pilihcarter && MIN_BERAT_CARTER[formData.bttt_pilihcarter]) {
-            const beratDefaultCarter = MIN_BERAT_CARTER[formData.bttt_pilihcarter];
-            setFormData(prev => ({
-                ...prev,
-                bttt_beratvol: beratDefaultCarter
-            }));
-        }
-    }, [formData.bttt_pilihcarter]);
-
-    const hitungTarifOtomatis = async () => {
-        try {
-            const payload = {
-                agen_id: formData.bttt_tujuanagenid || "1",
-                asal_kota: formData.bttt_asalkota,
-                cust_id: formData.bttt_asalcustid || "0010000001",
-                asal_cust_id: formData.bttt_asalcustid || "0010000001",
-                tujuan_kota: formData.bttt_tujuankota,
-                tujuan_kec: formData.bttt_tujuankecamatan,
-                tujuan_kecamatan: formData.bttt_tujuankecamatan,
-                kabupaten: formData.bttt_tujuankota,
-                berat_asli: parseFloat(formData.bttt_berat) || 1,
-                panjang: parseFloat(formData.bttt_panjang) || 0,
-                lebar: parseFloat(formData.bttt_lebar) || 0,
-                tinggi: parseFloat(formData.bttt_tinggi) || 0,
-                jenis_layanan: formData.bttt_layanan_nama || "Darat",
-                layanan: formData.bttt_layanan_nama || "Darat",
-                jenis_pelayanan: formData.bttt_paketyn === "N" ? "CARTER" : "PAKET",
-                pilih_carter: formData.bttt_pilihcarter || ""
-            };
-
-            const res = await api.post('/api/v1/btt/calculate-tarif', payload);
-            if (res.data && res.data.status === "success") {
-                setFormData(prev => ({
-                    ...prev,
-                    bttt_harga: res.data.grand_total || 0,
-                    bttt_kodebandara: res.data.kode_bandara || prev.bttt_kodebandara
-                }));
-            }
-        } catch (err) {
-            console.error("Gagal kalkulasi tarif:", err);
-        }
-    };
+    const isPriceOverridden = isSupervisor && parseFloat(formData.bttt_harga) !== parseFloat(formData.original_harga);
+    const totalBiayaKeseluruhan = (parseFloat(formData.bttt_harga) || 0) + (parseFloat(formData.bttt_biayapenerus) || 0) + (parseFloat(formData.bttt_biayapacking) || 0);
 
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-xs p-3">
             <div className="bg-white w-full max-w-[95vw] xl:max-w-7xl max-h-[96vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
 
-                {/* 🎯 1. HEADER BIRU ELEGAN KHAS INVOICE */}
-                <div className="px-6 py-3.5 bg-[#004b84] text-white flex items-center justify-between shadow-xs">
+                {/* 🎯 HEADER */}
+                <div className={`px-6 py-3.5 text-white flex items-center justify-between shadow-xs ${isEditMode ? 'bg-amber-600' : 'bg-[#004b84]'}`}>
                     <div className="flex items-center gap-2">
-                        <span className="text-lg font-bold">+</span>
-                        <h2 className="text-sm font-black uppercase tracking-wider">ENTRY BUKTI TANDA TERIMA (BTT)</h2>
+                        <span className="text-lg font-bold">{isEditMode ? '✏️' : '+'}</span>
+                        <h2 className="text-sm font-black uppercase tracking-wider">
+                            {isEditMode ? `EDIT BUKTI TANDA TERIMA (BTT) - ${formData.bttt_nobtt}` : 'ENTRY BUKTI TANDA TERIMA (BTT)'}
+                        </h2>
+                        <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-black uppercase tracking-widest ${isSupervisor ? 'bg-amber-400 text-slate-900' : 'bg-sky-200 text-sky-900'}`}>
+                            LEVEL: {userRole}
+                        </span>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="text-white hover:text-red-200 p-1 rounded-lg transition-colors text-lg font-bold cursor-pointer"
-                    >
+                    <button onClick={onClose} className="text-white hover:text-red-200 p-1 rounded-lg text-lg font-bold cursor-pointer">
                         ✕
                     </button>
                 </div>
 
-                {/* 🎯 2. BODY KONTEN FORM */}
+                {/* 🎯 BODY */}
                 <div className="p-6 overflow-y-auto space-y-5 text-xs text-slate-800">
 
-                    {/* CARD 1: PENGIRIM, PENERIMA & TANGGAL PENGIRIMAN */}
+                    {/* CARD 1: PENGIRIM & PENERIMA */}
                     <div className="p-5 bg-white border border-slate-200 rounded-xl shadow-2xs space-y-4">
-
-                        {/* Baris Tanggal Pengiriman */}
                         <div className="flex flex-wrap items-center gap-3 pb-3 border-b border-slate-100">
-                            <label className="text-[11px] font-bold text-red-600 tracking-tight uppercase">
-                                * TANGGAL PENGIRIMAN :
-                            </label>
+                            <label className="text-[11px] font-bold text-red-600 uppercase">* TANGGAL PENGIRIMAN :</label>
                             <input
                                 type="date"
                                 name="bttt_tanggal"
@@ -941,40 +517,26 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                                 onChange={handleChange}
                                 min={minDate}
                                 max={maxDate}
-                                className="p-1.5 border border-slate-300 rounded-lg font-bold text-sky-800 bg-white outline-none focus:border-sky-500 text-xs shadow-2xs"
+                                className="p-1.5 border border-slate-300 rounded-lg font-bold text-sky-800 bg-white outline-none text-xs"
                             />
-                            {isLayananPaket ? (
-                                <span className="text-[11px] text-emerald-700 font-semibold italic">
-                                    (Layanan Paket: bisa pilih H-1 kemarin atau hari ini)
-                                </span>
-                            ) : (
-                                <span className="text-[11px] text-amber-700 font-semibold italic">
-                                    (Layanan Carter: hanya bisa memilih tanggal hari ini)
-                                </span>
-                            )}
                         </div>
 
-                        {/* Grid Informasi Pengirim vs Penerima */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-                            {/* KOLOM KIRI: INFORMASI PENGIRIM */}
+                            {/* PENGIRIM */}
                             <div className="space-y-3">
-                                <div className="text-center font-bold text-slate-700 text-xs tracking-wider uppercase pb-1 border-b border-slate-200">
+                                <div className="text-center font-bold text-slate-700 text-xs tracking-wider uppercase pb-1 border-b">
                                     INFORMASI PENGIRIM BARANG
                                 </div>
-
                                 <div className="grid grid-cols-2 gap-3">
-                                    {/* Pelanggan Autocomplete */}
                                     <div className="relative">
                                         <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">CUSTOMER :</label>
                                         <input
                                             type="text"
-                                            className="w-full p-2 border border-slate-300 rounded-lg font-bold uppercase text-slate-800 bg-white outline-none focus:border-sky-500"
+                                            className="w-full p-2 border border-slate-300 rounded-lg font-bold uppercase text-slate-800 bg-white outline-none"
                                             value={keywordCustomer || formData.bttt_asalname}
                                             onChange={(e) => {
-                                                const val = e.target.value;
-                                                setKeywordCustomer(val);
-                                                setFormData(prev => ({ ...prev, bttt_asalname: val }));
+                                                setKeywordCustomer(e.target.value);
+                                                setFormData(prev => ({ ...prev, bttt_asalname: e.target.value }));
                                             }}
                                             placeholder="Cari Pelanggan..."
                                         />
@@ -983,37 +545,8 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                                                 {rekomendasiCustomer.map((cust, idx) => (
                                                     <div
                                                         key={idx}
-                                                        className="p-2 hover:bg-sky-50 cursor-pointer border-b last:border-b-0 font-bold text-slate-800"
-                                                        onClick={() => {
-                                                            const namaTerpilih = cust.cust_name ? cust.cust_name.toUpperCase() : '';
-                                                            setIsCustomerSelected(true);
-                                                            if (namaTerpilih === 'UMUM' || namaTerpilih === '') {
-                                                                setKeywordCustomer('UMUM');
-                                                                setFormData(prev => ({ ...prev, bttt_asalname: 'UMUM' }));
-                                                                pemicuGenerateID();
-                                                            } else {
-                                                                const fixName = cust.cust_name || cust.cust_nama || "";
-                                                                const fixAlamat = cust.cust_alamat1 || cust.CustAlamat1 || "";
-                                                                const fixKota = cust.cust_kotaid || cust.CustKotaID || "";
-                                                                const fixTelp = cust.cust_telp1 || cust.CustTelp1 || "";
-                                                                const fixTelp2 = cust.cust_telp2 || cust.CustTelp2 || "";
-                                                                const fixEmail = cust.cust_email || cust.CustEmail || "";
-
-                                                                setKeywordCustomer(fixName);
-                                                                setFormData(prev => ({
-                                                                    ...prev,
-                                                                    bttt_asalname: fixName.toUpperCase(),
-                                                                    bttt_asalcustid: cust.cust_id,
-                                                                    bttt_asalalamat: fixAlamat.toUpperCase(),
-                                                                    bttt_asalkota: fixKota.toUpperCase(),
-                                                                    bttt_asaltelp: fixTelp,
-                                                                    bttt_asaltelp2: fixTelp2,
-                                                                    bttt_asalemail: fixEmail,
-                                                                    bttt_up: fixName.toUpperCase()
-                                                                }));
-                                                            }
-                                                            setRekomendasiCustomer([]);
-                                                        }}
+                                                        className="p-2 hover:bg-sky-50 cursor-pointer border-b font-bold text-slate-800"
+                                                        onClick={() => handlePilihCustomer(cust)}
                                                     >
                                                         🏢 {cust.cust_name} <span className="text-red-600 font-mono">[{cust.cust_id}]</span>
                                                     </div>
@@ -1021,8 +554,6 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                                             </div>
                                         )}
                                     </div>
-
-                                    {/* Cust ID */}
                                     <div>
                                         <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">CUST ID :</label>
                                         <input
@@ -1030,7 +561,6 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                                             readOnly
                                             className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg font-mono font-bold text-red-600 cursor-not-allowed outline-none"
                                             value={formData.bttt_asalcustid}
-                                            placeholder="Generate ID..."
                                         />
                                     </div>
                                 </div>
@@ -1039,611 +569,205 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                                     <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">NAMA PENGIRIM / UP :</label>
                                     <input
                                         type="text"
-                                        className="w-full p-2 border border-slate-300 rounded-lg font-bold uppercase text-slate-800 bg-white outline-none focus:border-sky-500"
+                                        className="w-full p-2 border border-slate-300 rounded-lg font-bold uppercase text-slate-800"
                                         value={formData.bttt_up || ""}
                                         onChange={(e) => setFormData(prev => ({ ...prev, bttt_up: e.target.value }))}
-                                        placeholder="Nama PIC Pengirim..."
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">ALAMAT LENGKAP PENGIRIM :</label>
+                                    <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">ALAMAT PENGIRIM :</label>
                                     <textarea
                                         name="bttt_asalalamat"
                                         value={formData.bttt_asalalamat || ""}
                                         onChange={handleChange}
-                                        className="w-full p-2 border border-slate-300 rounded-lg uppercase text-slate-800 bg-white outline-none focus:border-sky-500 text-xs"
+                                        className="w-full p-2 border border-slate-300 rounded-lg uppercase text-xs"
                                         rows="2"
-                                        placeholder="Alamat gudang/kantor pengirim..."
                                     />
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">KOTA ASAL :</label>
-                                        <input
-                                            type="text"
-                                            name="bttt_asalkota"
-                                            value={formData.bttt_asalkota || ""}
-                                            onChange={handleChange}
-                                            className="w-full p-2 border border-slate-300 rounded-lg font-bold uppercase text-slate-800 bg-white outline-none focus:border-sky-500"
-                                        />
+                                        <input type="text" name="bttt_asalkota" value={formData.bttt_asalkota || ""} onChange={handleChange} className="w-full p-2 border rounded-lg font-bold uppercase" />
                                     </div>
                                     <div>
                                         <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">TELEPON PENGIRIM :</label>
-                                        <input
-                                            type="text"
-                                            name="bttt_asaltelp"
-                                            value={formData.bttt_asaltelp || ""}
-                                            onChange={handleChange}
-                                            className="w-full p-2 border border-slate-300 rounded-lg font-semibold text-slate-800 bg-white outline-none focus:border-sky-500"
-                                            placeholder="08xxxxxxxxxx"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">TELEPON 2 :</label>
-                                        <input
-                                            type="text"
-                                            name="bttt_asaltelp2"
-                                            value={formData.bttt_asaltelp2 || ""}
-                                            onChange={handleChange}
-                                            className="w-full p-2 border border-slate-300 rounded-lg text-slate-800 bg-white outline-none focus:border-sky-500"
-                                            placeholder="Opsional"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">EMAIL PENGIRIM :</label>
-                                        <input
-                                            type="email"
-                                            name="bttt_asalemail"
-                                            value={formData.bttt_asalemail || ''}
-                                            onChange={handleChange}
-                                            placeholder="pengirim@email.com"
-                                            className={`w-full px-3 py-2 border rounded-lg text-sm transition-colors ${emailError ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500'
-                                                }`}
-                                        />
-                                        {emailError && (
-                                            <p className="text-red-500 text-xs mt-1 font-semibold">{emailError}</p>
-                                        )}
+                                        <input type="text" name="bttt_asaltelp" value={formData.bttt_asaltelp || ""} onChange={handleChange} className="w-full p-2 border rounded-lg font-semibold" placeholder="08xxxxxxxxxx" />
                                     </div>
                                 </div>
                             </div>
 
-                            {/* KOLOM KANAN: INFORMASI PENERIMA */}
+                            {/* PENERIMA */}
                             <div className="space-y-3">
-                                <div className="text-center font-bold text-slate-700 text-xs tracking-wider uppercase pb-1 border-b border-slate-200">
+                                <div className="text-center font-bold text-slate-700 text-xs tracking-wider uppercase pb-1 border-b">
                                     INFORMASI PENERIMA BARANG
                                 </div>
-
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">PENERIMA :</label>
-                                        <input
-                                            type="text"
-                                            name="bttt_tujuannama"
-                                            value={formData.bttt_tujuannama}
-                                            onChange={handleChange}
-                                            className="w-full p-2 border border-slate-300 rounded-lg font-bold uppercase text-slate-800 bg-white outline-none focus:border-sky-500"
-                                            placeholder="Nama Perusahaan/Toko..."
-                                        />
+                                        <input type="text" name="bttt_tujuannama" value={formData.bttt_tujuannama} onChange={handleChange} className="w-full p-2 border rounded-lg font-bold uppercase" />
                                     </div>
                                     <div>
                                         <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">UP / NAMA :</label>
-                                        <input
-                                            type="text"
-                                            name="bttt_up_penerima"
-                                            value={formData.bttt_up_penerima}
-                                            onChange={handleChange}
-                                            className="w-full p-2 border border-slate-300 rounded-lg font-bold uppercase text-slate-800 bg-white outline-none focus:border-sky-500"
-                                            placeholder="Nama Penerima..."
-                                        />
+                                        <input type="text" name="bttt_up_penerima" value={formData.bttt_up_penerima} onChange={handleChange} className="w-full p-2 border rounded-lg font-bold uppercase" />
                                     </div>
-                                </div>
-
-                                <div>
-                                    <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">EMAIL PENERIMA :</label>
-                                    <input
-                                        type="email"
-                                        name="bttt_tujuanemail"
-                                        value={formData.bttt_tujuanemail || ''}
-                                        onChange={handleChange}
-                                        placeholder="penerima@email.com"
-                                        className={`w-full px-3 py-2 border rounded-lg text-sm transition-colors ${emailPenerimaError ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500'
-                                            }`}
-                                    />
-                                    {emailPenerimaError && (
-                                        <p className="text-red-500 text-xs mt-1 font-semibold">{emailPenerimaError}</p>
-                                    )}
                                 </div>
 
                                 <div>
                                     <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">* ALAMAT LENGKAP PENERIMA :</label>
-                                    <textarea
-                                        name="bttt_tujuanalamat"
-                                        value={formData.bttt_tujuanalamat || ""}
-                                        onChange={handleChange}
-                                        className="w-full p-2 border border-slate-300 rounded-lg uppercase text-slate-800 bg-white outline-none focus:border-sky-500 text-xs"
-                                        rows="2"
-                                        placeholder="Nama Jalan, Blok, No Rumah, RT/RW..."
-                                    />
+                                    <textarea name="bttt_tujuanalamat" value={formData.bttt_tujuanalamat || ""} onChange={handleChange} className="w-full p-2 border rounded-lg uppercase text-xs" rows="2" />
                                 </div>
 
-                                <div className="grid grid-cols-3 gap-3">
+                                <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">TELEPON 1 :</label>
-                                        <input
-                                            type="text"
-                                            inputMode="numeric"
-                                            name="bttt_tujuantelp"
-                                            value={formData.bttt_tujuantelp || ''}
-                                            onChange={handleChange}
-                                            placeholder="08xxxxxxxxxx"
-                                            maxLength={15}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-indigo-500"
-                                        />
+                                        <input type="text" name="bttt_tujuantelp" value={formData.bttt_tujuantelp || ''} onChange={handleChange} className="w-full p-2 border rounded-lg" placeholder="08xxxxxxxxxx" />
                                     </div>
                                     <div>
-                                        <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">TELEPON 2 :</label>
-                                        <input
-                                            type="text"
-                                            name="bttt_tujuantelp2"
-                                            value={formData.bttt_tujuantelp2 || ""}
-                                            onChange={handleChange}
-                                            className="w-full p-2 border border-slate-300 rounded-lg text-slate-800 bg-white outline-none focus:border-sky-500"
-                                            placeholder="Opsional"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">TELEPON 3 :</label>
-                                        <input
-                                            type="text"
-                                            name="bttt_tujuantelp3"
-                                            value={formData.bttt_tujuantelp3 || ""}
-                                            onChange={handleChange}
-                                            className="w-full p-2 border border-slate-300 rounded-lg text-slate-800 bg-white outline-none focus:border-sky-500"
-                                            placeholder="Opsional"
-                                        />
+                                        <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">EMAIL PENERIMA :</label>
+                                        <input type="email" name="bttt_tujuanemail" value={formData.bttt_tujuanemail || ''} onChange={handleChange} className="w-full p-2 border rounded-lg" placeholder="penerima@email.com" />
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* CARD 2: TUJUAN AREA KIRIM */}
+                    {/* CARD 2: TUJUAN AREA */}
                     <div className="p-5 bg-white border border-slate-200 rounded-xl shadow-2xs space-y-4">
-                        <div className="text-center font-bold text-[#004b84] text-xs tracking-wider uppercase pb-1 border-b border-slate-200">
+                        <div className="text-center font-bold text-[#004b84] text-xs uppercase pb-1 border-b">
                             INFORMASI TUJUAN AREA KIRIM
                         </div>
-
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 relative">
-                            {/* Kecamatan Utama */}
                             <div className="relative">
                                 <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">KECAMATAN :</label>
                                 <input
                                     type="text"
-                                    className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 bg-white outline-none focus:border-sky-500 uppercase"
+                                    className="w-full p-2 border border-slate-300 rounded-lg font-bold uppercase"
                                     placeholder="Ketik kecamatan..."
                                     value={formData.bttt_tujuankecamatan || ''}
                                     onChange={(e) => handleLiveSearchGeo('bttt_tujuankecamatan', e.target.value)}
                                     onFocus={() => setFocusedField('bttt_tujuankecamatan')}
                                 />
-                                {focusedField === 'bttt_tujuankecamatan' && Array.isArray(geoSuggestions) && geoSuggestions.length > 0 && <RenderDropdownMelayang />}
+                                {focusedField === 'bttt_tujuankecamatan' && Array.isArray(geoSuggestions) && geoSuggestions.length > 0 && (
+                                    <div className="absolute left-0 right-0 top-[60px] bg-white border border-teal-400 rounded-xl shadow-2xl z-[99999] max-h-48 overflow-y-auto text-xs">
+                                        {geoSuggestions.map((item, idx) => (
+                                            <div key={idx} onClick={() => handleSelectGeo(item)} className="p-2.5 hover:bg-teal-50 cursor-pointer border-b font-bold">
+                                                📍 {item.kecamatan} - <span className="text-gray-500 font-normal">{item.kabupaten}, {item.propinsi}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
 
-                            {/* Provinsi */}
                             <div>
                                 <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">PROVINSI :</label>
-                                <input
-                                    type="text"
-                                    readOnly
-                                    className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg font-bold text-slate-700 cursor-not-allowed outline-none"
-                                    placeholder="Otomatis..."
-                                    value={formData.bttt_tujuanpropinsi || ''}
-                                />
+                                <input type="text" readOnly className="w-full p-2 bg-slate-50 border rounded-lg font-bold text-slate-700" value={formData.bttt_tujuanpropinsi || ''} />
                             </div>
 
-                            {/* Kota / Kabupaten */}
                             <div>
                                 <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">KOTA / KABUPATEN :</label>
-                                <input
-                                    type="text"
-                                    readOnly
-                                    className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg font-bold text-slate-700 cursor-not-allowed outline-none"
-                                    placeholder="Otomatis..."
-                                    value={formData.bttt_tujuankota || ''}
-                                />
+                                <input type="text" readOnly className="w-full p-2 bg-slate-50 border rounded-lg font-bold text-slate-700" value={formData.bttt_tujuankota || ''} />
                             </div>
 
-                            {/* Kelurahan */}
                             <div className="relative">
                                 <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">KELURAHAN :</label>
                                 <input
                                     type="text"
-                                    className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 bg-white outline-none focus:border-sky-500 uppercase"
-                                    placeholder="Pilih kelurahan..."
+                                    className="w-full p-2 border border-slate-300 rounded-lg font-bold uppercase"
                                     value={formData.bttt_tujuankelurahan || ''}
-                                    onChange={(e) => {
-                                        const val = e.target.value.toUpperCase();
-                                        setFormData(prev => ({ ...prev, bttt_tujuankelurahan: val }));
-                                        setFocusedField('bttt_tujuankelurahan');
-                                    }}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, bttt_tujuankelurahan: e.target.value.toUpperCase() }))}
                                     onFocus={() => setFocusedField('bttt_tujuankelurahan')}
                                 />
                                 {focusedField === 'bttt_tujuankelurahan' && Array.isArray(kelurahanSuggestions) && kelurahanSuggestions.length > 0 && (
-                                    <div className="absolute left-0 right-0 top-[58px] bg-white border border-sky-400 text-slate-900 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto text-xs">
-                                        {kelurahanSuggestions
-                                            .filter(item => (item?.kelurahan || '').toUpperCase().includes((formData.bttt_tujuankelurahan || '').toUpperCase()))
-                                            .map((subItem, idx) => (
-                                                <div
-                                                    key={idx}
-                                                    onClick={() => handleSelectKelurahan(subItem)}
-                                                    className="p-2 hover:bg-sky-50 cursor-pointer border-b last:border-b-0 font-bold text-slate-800"
-                                                >
-                                                    🏘️ {subItem?.kelurahan} - <span className="text-slate-500">[{subItem?.kodepos}]</span>
-                                                </div>
-                                            ))}
+                                    <div className="absolute left-0 right-0 top-[58px] bg-white border border-sky-400 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto text-xs">
+                                        {kelurahanSuggestions.map((sub, idx) => (
+                                            <div key={idx} onClick={() => handleSelectKelurahan(sub)} className="p-2 hover:bg-sky-50 cursor-pointer border-b font-bold">
+                                                🏘️ {sub.kelurahan} - [{sub.kodepos}]
+                                            </div>
+                                        ))}
                                     </div>
                                 )}
-                            </div>
-                        </div>
-
-                        {/* Rincian Pos dan Cabang */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-100">
-                            <div>
-                                <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">KODE POS :</label>
-                                <input
-                                    type="text"
-                                    readOnly
-                                    className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg font-mono font-bold text-slate-700 cursor-not-allowed outline-none"
-                                    value={formData.bttt_tujuankodepos || ''}
-                                    placeholder="Otomatis..."
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">CABANG / AGEN TUJUAN :</label>
-                                <input
-                                    type="text"
-                                    readOnly
-                                    className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg font-bold text-slate-700 cursor-not-allowed outline-none"
-                                    value={formData.bttt_tujuanagenid || ''}
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">KODE CABANG :</label>
-                                <input
-                                    type="text"
-                                    readOnly
-                                    className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg font-mono font-bold text-slate-700 cursor-not-allowed outline-none"
-                                    value={formData.bttt_kodecabangagen || ''}
-                                />
                             </div>
                         </div>
                     </div>
 
-                    {/* CARD 3: INFORMASI KIRIMAN & LAYANAN */}
+                    {/* CARD 3: INFORMASI KIRIMAN */}
                     <div className="bg-white border rounded-lg p-4 shadow-sm mb-4">
-                        <h3 className="text-xs font-bold text-blue-900 uppercase tracking-wider mb-3">
-                            INFORMASI KIRIMAN & LAYANAN
-                        </h3>
-
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                            {/* Radio Jenis Pelayanan: PAKET vs CARTER */}
                             <div>
-                                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                                    JENIS PELAYANAN :
-                                </label>
-                                <div className="flex items-center space-x-4 pt-1">
-                                    <label className="flex items-center text-sm cursor-pointer">
-                                        <input
-                                            type="radio"
-                                            name="jenis_pelayanan"
-                                            value="Y"
-                                            checked={formData.bttt_paketyn === "Y"}
-                                            onChange={() => setFormData(prev => ({
-                                                ...prev,
-                                                bttt_paketyn: 'Y',
-                                                bttt_pilihcarter: ''
-                                            }))}
-                                            className="mr-1.5 text-blue-600"
-                                        />
-                                        PAKET
-                                    </label>
-                                    <label className="flex items-center text-sm cursor-pointer">
-                                        <input
-                                            type="radio"
-                                            name="jenis_pelayanan"
-                                            value="N"
-                                            checked={formData.bttt_paketyn === "N"}
-                                            onChange={() => setFormData(prev => ({
-                                                ...prev,
-                                                bttt_paketyn: 'N',
-                                                bttt_layanan_nama: 'Darat',
-                                                bttt_kodelayanan: '1',
-                                                bttt_nosmu: ''
-                                            }))}
-                                            className="mr-1.5 text-blue-600"
-                                        />
-                                        CARTER
-                                    </label>
-                                </div>
+                                <label className="block text-xs font-semibold text-gray-700 mb-1">ISI KIRIMAN : <span className="text-red-500">*</span></label>
+                                <input type="text" required value={formData.bttt_isikiriman || ""} onChange={(e) => setFormData(prev => ({ ...prev, bttt_isikiriman: e.target.value }))} className="w-full px-3 py-1.5 border rounded-md" />
                             </div>
-
-                            {/* Dropdown PILIH CARTER (Hanya aktif jika CARTER dipilih) */}
                             <div>
-                                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                                    PILIH CARTER :
-                                </label>
-                                <select
-                                    disabled={formData.bttt_paketyn === "Y"}
-                                    value={formData.bttt_pilihcarter}
-                                    onChange={(e) => setFormData(prev => ({
-                                        ...prev,
-                                        bttt_pilihcarter: e.target.value
-                                    }))}
-                                    className="w-full px-3 py-1.5 border rounded-md text-sm disabled:bg-gray-100 disabled:text-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                >
-                                    <option value="">PILIH KENDARAAN</option>
-                                    <option value="K0002">1. GRAN MAX / BUILD UP</option>
-                                    <option value="K0005">2. COLT DIESEL ENGKEL (CDE)</option>
-                                    <option value="K0006">3. COLT DIESEL DOUBLE (CDD)</option>
-                                    <option value="K0008">4. FUSO</option>
-                                    <option value="K0017">5. TRONTON</option>
-                                    <option value="K0018">6. WING BOX</option>
-                                </select>
+                                <label className="block text-xs font-semibold text-gray-700 mb-1">NO. SURAT JALAN :</label>
+                                <input type="text" value={formData.bttt_nosuratjalan || ""} onChange={(e) => setFormData(prev => ({ ...prev, bttt_nosuratjalan: e.target.value }))} className="w-full px-3 py-1.5 border rounded-md" />
                             </div>
-
-                            {/* Dropdown LAYANAN (Darat, Laut, Udara) */}
                             <div>
-                                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                                    LAYANAN :
-                                </label>
-                                <select
-                                    disabled={formData.bttt_paketyn === "N"} // Nonaktif jika Carter karena carter via Darat
-                                    value={formData.bttt_layanan_nama || "Darat"}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        let kode = '1';
-                                        if (val === 'Laut') kode = '2';
-                                        if (val === 'Udara') kode = '3';
-
-                                        setFormData(prev => ({
-                                            ...prev,
-                                            bttt_layanan_nama: val,
-                                            bttt_kodelayanan: kode,
-                                            bttt_nosmu: val !== 'Udara' ? '' : prev.bttt_nosmu
-                                        }));
-                                    }}
-                                    className="w-full px-3 py-1.5 border rounded-md text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
-                                >
-                                    <option value="Darat">Darat</option>
-                                    <option value="Laut">Laut</option>
-                                    <option value="Udara">Udara</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        {/* Field Khusus Jika Udara Dipilih: No. SMU (OPSIONAL) */}
-                        {formData.bttt_layanan_nama === "Udara" && (
-                            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4 flex flex-col md:flex-row gap-4 items-start md:items-center">
-                                <div className="flex-1">
-                                    <label className="block text-xs font-bold text-blue-900 uppercase mb-1">
-                                        NO. SMU (Surat Muatan Udara) : <span className="text-gray-500 font-normal text-[11px]">(Opsional / Boleh Kosong)</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        placeholder="Masukkan Nomor SMU Maskapai (bila sudah ada)..."
-                                        value={formData.bttt_nosmu || ""}
-                                        onChange={(e) => setFormData(prev => ({
-                                            ...prev,
-                                            bttt_nosmu: e.target.value
-                                        }))}
-                                        className="w-full px-3 py-2 border border-blue-300 rounded-md text-sm font-medium focus:ring-2 focus:ring-blue-500 bg-white"
-                                    />
-                                </div>
-                                {formData.bttt_kodebandara && (
-                                    <div className="bg-white px-3 py-2 rounded-md border border-blue-200 text-xs shadow-sm">
-                                        <span className="text-gray-500 block">Kode Bandara:</span>
-                                        <span className="font-bold text-blue-700 text-sm">{formData.bttt_kodebandara}</span>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Input Isi Kiriman, No. SJ, Keterangan */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                                    ISI KIRIMAN : <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={formData.bttt_isikiriman || ""}
-                                    onChange={(e) => setFormData(prev => ({
-                                        ...prev,
-                                        bttt_isikiriman: e.target.value
-                                    }))}
-                                    placeholder="Isi Kiriman..."
-                                    className="w-full px-3 py-1.5 border rounded-md text-sm"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                                    NO. SURAT JALAN :
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formData.bttt_nosuratjalan || ""}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        setFormData(prev => ({
-                                            ...prev,
-                                            bttt_nosuratjalan: val,
-                                            bttt_ket: val.trim() !== "" ? "SURAT JALAN KEMBALI" : prev.bttt_ket
-                                        }));
-                                    }}
-                                    placeholder="Nomor surat jalan..."
-                                    className="w-full px-3 py-1.5 border rounded-md text-sm"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                                    KETERANGAN :
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formData.bttt_ket || ""}
-                                    onChange={(e) => setFormData(prev => ({
-                                        ...prev,
-                                        bttt_ket: e.target.value
-                                    }))}
-                                    className="w-full px-3 py-1.5 border rounded-md text-sm"
-                                />
+                                <label className="block text-xs font-semibold text-gray-700 mb-1">KETERANGAN :</label>
+                                <input type="text" value={formData.bttt_ket || ""} onChange={(e) => setFormData(prev => ({ ...prev, bttt_ket: e.target.value }))} className="w-full px-3 py-1.5 border rounded-md" />
                             </div>
                         </div>
                     </div>
 
                     {/* CARD 4: TABEL INFORMASI TARIF DASAR */}
-                    <div className="relative p-5 bg-white border border-emerald-400 rounded-xl shadow-2xs space-y-4 overflow-hidden">
-
-                        {/* Header Judul Rute & Status Loading */}
-                        <div className="flex items-center justify-between pb-1 border-b border-slate-200">
-                            <div className="text-center flex-1 font-bold text-emerald-700 text-xs tracking-wider uppercase">
-                                INFORMASI TARIF DASAR (RUTE: {formData.bttt_asalkota || localStorage.getItem('active_agen_nama') || 'PUSAT'} ➡ {formData.bttt_tujuankecamatan || '-'})
+                    <div className="relative p-5 bg-white border border-emerald-400 rounded-xl shadow-2xs space-y-4">
+                        <div className="flex items-center justify-between pb-1 border-b">
+                            <div className="font-bold text-emerald-700 text-xs uppercase">
+                                INFORMASI TARIF DASAR (RUTE: {formData.bttt_asalkota || 'PUSAT'} ➡ {formData.bttt_tujuankecamatan || '-'})
                             </div>
                             {loadingTarif && (
-                                <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-300 text-amber-700 text-[10px] font-bold animate-pulse">
+                                <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-300 text-amber-700 text-[10px] font-bold">
                                     <Loader2 size={12} className="animate-spin text-amber-600" />
                                     <span>MENGHITUNG TARIF...</span>
                                 </div>
                             )}
                         </div>
 
-                        {/* 🌟 OVERLAY LOADING HALUS KETIKA PROSES HITUNG */}
-                        {loadingTarif && (
-                            <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] z-20 flex flex-col items-center justify-center gap-2">
-                                <div className="p-3 bg-white shadow-xl rounded-2xl border border-emerald-200 flex items-center gap-3">
-                                    <Loader2 size={24} className="animate-spin text-emerald-600" />
-                                    <div className="text-left">
-                                        <div className="text-xs font-black text-slate-800 uppercase tracking-wide">
-                                            Menghitung Tarif Dakota...
-                                        </div>
-                                        <div className="text-[10px] text-slate-500 font-medium">
-                                            Mengkalkulasi berat & jarak rute tujuan
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Blok Reguler */}
-                        <div className="space-y-1.5">
-                            <div className="text-[11px] font-black uppercase text-purple-700 tracking-wider">
-                                [1] DARAT REGULER
-                            </div>
-                            <div className="overflow-x-auto rounded-lg border border-slate-200">
-                                <table className="w-full text-left border-collapse min-w-[1100px]">
-                                    <thead className="bg-[#004b84] text-white text-[11px] font-bold uppercase">
-                                        <tr>
-                                            <th className="p-2 text-center w-12">PILIH</th>
-                                            <th className="p-2 text-center w-14">LT</th>
-                                            <th className="p-2 text-right">DASAR</th>
-                                            <th className="p-2 text-center">KG MIN</th>
-                                            <th className="p-2 text-center">KG NEXT</th>
-                                            <th className="p-2 text-center">AMBIL SDR</th>
-                                            <th className="p-2 text-right">DISKON-1 RP</th>
-                                            <th className="p-2 text-right">DISKON-2 RP</th>
-                                            <th className="p-2 text-right">HARGA PENERUS</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="text-xs font-semibold text-slate-800">
-                                        <tr className="hover:bg-slate-50 transition-colors">
-                                            <td className="p-2 text-center">
-                                                <input
-                                                    type="radio"
-                                                    name="pilih_tarif_layanan"
-                                                    checked={formData.bttt_paketyn === 'Y' || formData.bttt_paketyn === 'REGULER'}
-                                                    onChange={() => setFormData(prev => ({
-                                                        ...prev,
-                                                        bttt_paketyn: 'Y',
-                                                        bttt_harga: tarifRegulerData?.hargapokok || 0
-                                                    }))}
-                                                    className="w-4 h-4 text-purple-600 cursor-pointer"
-                                                />
-                                            </td>
-                                            <td className="p-2 text-center">{tarifRegulerData?.estimasihari || '-'}</td>
-                                            <td className="p-2 text-right">Rp {(Number(tarifRegulerData?.hargapokok) || 0).toLocaleString('id-ID')}</td>
-                                            <td className="p-2 text-center">{tarifRegulerData?.minimalkg || 0}</td>
-                                            <td className="p-2 text-center">Rp {(Number(tarifRegulerData?.hargakgselanjutnya) || 0).toLocaleString('id-ID')}</td>
-                                            <td className="p-2 text-center font-mono">{tarifRegulerData?.flag_ds || 'N'}</td>
-                                            <td className="p-2 text-right">Rp {(Number(tarifRegulerData?.harga1kg) || 0).toLocaleString('id-ID')}</td>
-                                            <td className="p-2 text-right">Rp {(Number(tarifRegulerData?.harga2kg) || 0).toLocaleString('id-ID')}</td>
-                                            <td className="p-2 text-right text-orange-600 font-bold">Rp {(Number(tarifRegulerData?.biayatambahan) || 0).toLocaleString('id-ID')}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        {/* Blok Ekonomis */}
-                        <div className="space-y-1.5 pt-2">
-                            <div className="text-[11px] font-black uppercase text-emerald-700 tracking-wider">
-                                [2] DARAT EKONOMIS
-                            </div>
-                            <div className="overflow-x-auto rounded-lg border border-slate-200">
-                                <table className="w-full text-left border-collapse min-w-[1100px]">
-                                    <thead className="bg-[#004b84] text-white text-[11px] font-bold uppercase">
-                                        <tr>
-                                            <th className="p-2 text-center w-12">PILIH</th>
-                                            <th className="p-2 text-center w-14">LT</th>
-                                            <th className="p-2 text-right">DASAR</th>
-                                            <th className="p-2 text-center">KG MIN</th>
-                                            <th className="p-2 text-center">KG NEXT</th>
-                                            <th className="p-2 text-center">AMBIL SDR</th>
-                                            <th className="p-2 text-right">DISKON-1 RP</th>
-                                            <th className="p-2 text-right">DISKON-2 RP</th>
-                                            <th className="p-2 text-right">HARGA PENERUS</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="text-xs font-semibold text-slate-800">
-                                        <tr className="hover:bg-slate-50 transition-colors">
-                                            <td className="p-2 text-center">
-                                                <input
-                                                    type="radio"
-                                                    name="pilih_tarif_layanan"
-                                                    checked={formData.bttt_paketyn === 'N' || formData.bttt_paketyn === 'EKONOMIS'}
-                                                    onChange={() => setFormData(prev => ({
-                                                        ...prev,
-                                                        bttt_paketyn: 'N',
-                                                        bttt_harga: tarifEkonomisData?.hargapokok || 0
-                                                    }))}
-                                                    className="w-4 h-4 text-emerald-600 cursor-pointer"
-                                                />
-                                            </td>
-                                            <td className="p-2 text-center">{tarifEkonomisData?.estimasihari || '-'}</td>
-                                            <td className="p-2 text-right">Rp {(Number(tarifEkonomisData?.hargapokok) || 0).toLocaleString('id-ID')}</td>
-                                            <td className="p-2 text-center">{tarifEkonomisData?.minimalkg || 0}</td>
-                                            <td className="p-2 text-center">Rp {(Number(tarifEkonomisData?.hargakgselanjutnya) || 0).toLocaleString('id-ID')}</td>
-                                            <td className="p-2 text-center font-mono">{tarifEkonomisData?.flag_ds || 'N'}</td>
-                                            <td className="p-2 text-right">Rp {(Number(tarifEkonomisData?.harga1kg) || 0).toLocaleString('id-ID')}</td>
-                                            <td className="p-2 text-right">Rp {(Number(tarifEkonomisData?.harga2kg) || 0).toLocaleString('id-ID')}</td>
-                                            <td className="p-2 text-right text-orange-600 font-bold">Rp {(Number(tarifEkonomisData?.biayatambahan) || 0).toLocaleString('id-ID')}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
+                        {/* Rincian Reguler */}
+                        <div className="overflow-x-auto rounded-lg border border-slate-200">
+                            <table className="w-full text-left border-collapse min-w-[900px]">
+                                <thead className="bg-[#004b84] text-white text-[11px] font-bold uppercase">
+                                    <tr>
+                                        <th className="p-2 text-center w-12">PILIH</th>
+                                        <th className="p-2 text-center w-14">LT</th>
+                                        <th className="p-2 text-right">DASAR</th>
+                                        <th className="p-2 text-center">KG MIN</th>
+                                        <th className="p-2 text-center">KG NEXT</th>
+                                        <th className="p-2 text-right">HARGA PENERUS</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="text-xs font-semibold text-slate-800">
+                                    <tr>
+                                        <td className="p-2 text-center">
+                                            <input type="radio" checked={formData.bttt_paketyn === 'Y'} onChange={() => setFormData(prev => ({ ...prev, bttt_paketyn: 'Y', bttt_harga: tarifRegulerData?.hargapokok || prev.bttt_harga }))} />
+                                        </td>
+                                        <td className="p-2 text-center">{tarifRegulerData?.estimasihari || '-'}</td>
+                                        <td className="p-2 text-right">Rp {(Number(tarifRegulerData?.hargapokok) || 0).toLocaleString('id-ID')}</td>
+                                        <td className="p-2 text-center">{tarifRegulerData?.minimalkg || 0}</td>
+                                        <td className="p-2 text-center">Rp {(Number(tarifRegulerData?.hargakgselanjutnya) || 0).toLocaleString('id-ID')}</td>
+                                        <td className="p-2 text-right text-orange-600 font-bold">Rp {(Number(tarifRegulerData?.biayatambahan) || 0).toLocaleString('id-ID')}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
-                    {/* CARD 5: INFORMASI PEMBAYARAN & PACKING */}
+                    {/* CARD 5: INFORMASI PEMBAYARAN & PACKING (DENGAN PROTEKSI LEVEL SUPERVISOR) */}
                     <div className="p-5 bg-white border border-slate-200 rounded-xl shadow-2xs space-y-4">
-                        <div className="text-center font-bold text-[#004b84] text-xs tracking-wider uppercase pb-1 border-b border-slate-200">
-                            INFORMASI PEMBAYARAN & PACKING
+                        <div className="flex items-center justify-between pb-1 border-b border-slate-200">
+                            <div className="font-bold text-[#004b84] text-xs uppercase">
+                                INFORMASI PEMBAYARAN & PACKING
+                            </div>
+                            {!isSupervisor ? (
+                                <span className="flex items-center gap-1 text-[11px] text-slate-500 font-bold bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
+                                    <Lock size={13} className="text-slate-400" /> Biaya Terkunci (Level Admin)
+                                </span>
+                            ) : (
+                                <span className="flex items-center gap-1 text-[11px] text-amber-800 font-bold bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-300">
+                                    <ShieldAlert size={13} className="text-amber-600" /> Mode Supervisor (Bypass Tarif Aktif)
+                                </span>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1652,7 +776,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                                 <select
                                     value={formData.bttt_jenisharga}
                                     onChange={(e) => setFormData(prev => ({ ...prev, bttt_jenisharga: e.target.value }))}
-                                    className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 bg-white outline-none focus:border-sky-500"
+                                    className="w-full p-2 border border-slate-300 rounded-lg font-bold bg-white"
                                 >
                                     <option value="0">TUNAI (CASH)</option>
                                     <option value="2">KREDIT (TEMPO)</option>
@@ -1660,14 +784,24 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                                 </select>
                             </div>
 
+                            {/* FIELD BIAYA KIRIM (ADMIN = READONLY, SUPERVISOR = EDITABLE) */}
                             <div>
-                                <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">BIAYA KIRIM :</label>
-                                <input
-                                    type="text"
-                                    readOnly
-                                    className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg font-bold text-slate-700 cursor-not-allowed outline-none"
-                                    value={`Rp ${(formData.bttt_harga || 0).toLocaleString('id-ID')}`}
-                                />
+                                <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">
+                                    BIAYA KIRIM : {isSupervisor && <span className="text-amber-600 font-bold">*Bypass</span>}
+                                </label>
+                                <div className="relative">
+                                    <input
+                                        type="number"
+                                        readOnly={!isSupervisor}
+                                        value={formData.bttt_harga || 0}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, bttt_harga: parseFloat(e.target.value) || 0 }))}
+                                        className={`w-full p-2 border rounded-lg font-mono font-bold text-right outline-none ${isSupervisor
+                                            ? 'bg-amber-50 border-amber-400 text-slate-900 focus:ring-2 focus:ring-amber-200'
+                                            : 'bg-slate-100 border-slate-300 text-slate-600 cursor-not-allowed'
+                                            }`}
+                                    />
+                                    {!isSupervisor && <Lock size={12} className="absolute left-2.5 top-3 text-slate-400" />}
+                                </div>
                             </div>
 
                             <div>
@@ -1675,9 +809,10 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                                 <input
                                     type="number"
                                     name="bttt_biayapenerus"
+                                    readOnly={!isSupervisor}
                                     value={formData.bttt_biayapenerus || 0}
                                     onChange={handleChange}
-                                    className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 bg-white outline-none focus:border-sky-500"
+                                    className={`w-full p-2 border rounded-lg font-bold text-right ${isSupervisor ? 'bg-white' : 'bg-slate-100 cursor-not-allowed'}`}
                                 />
                             </div>
 
@@ -1687,14 +822,15 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                                     <input
                                         type="number"
                                         name="bttt_biayapacking"
+                                        readOnly={!isSupervisor}
                                         value={formData.bttt_biayapacking || 0}
                                         onChange={handleChange}
-                                        className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 bg-white outline-none focus:border-sky-500"
+                                        className={`w-full p-2 border rounded-lg font-bold text-right ${isSupervisor ? 'bg-white' : 'bg-slate-100 cursor-not-allowed'}`}
                                     />
                                     <button
                                         type="button"
                                         onClick={() => setIsPopUpPackingOpen(true)}
-                                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg font-bold text-[10px] uppercase text-slate-700 transition cursor-pointer"
+                                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 border rounded-lg font-bold text-[10px] uppercase"
                                     >
                                         PILIH
                                     </button>
@@ -1702,20 +838,36 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                             </div>
                         </div>
 
-                        {/* Perhitungan Total & Tombol Kalkulasi */}
-                        <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-slate-100">
+                        {/* INPUT ALASAN OVERRIDE JIKA SUPERVISOR MENGUBAH HARGA MANUAL */}
+                        {isPriceOverridden && (
+                            <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl space-y-1 animate-in fade-in">
+                                <label className="block text-[11px] font-bold text-amber-900 uppercase">
+                                    ALASAN PERUBAHAN / BYPASS TARIF * :
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="Contoh: Diskon muatan volume atas persetujuan Kacab / Kontrak Ad-Hoc"
+                                    value={formData.bttt_alasan_override || ''}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, bttt_alasan_override: e.target.value }))}
+                                    className="w-full p-2 border border-amber-400 rounded-lg bg-white font-medium text-xs text-slate-800 outline-none"
+                                />
+                            </div>
+                        )}
+
+                        <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t">
                             <div>
                                 <span className="text-[11px] font-bold text-slate-500 uppercase block">TOTAL BIAYA KESELURUHAN :</span>
-                                <span className="text-xl font-black text-emerald-600">
-                                    Rp {(formData.bttt_harga + (parseFloat(formData.bttt_biayapenerus) || 0) + (parseFloat(formData.bttt_biayapacking) || 0)).toLocaleString('id-ID')}
+                                <span className="text-xl font-black text-emerald-600 font-mono">
+                                    Rp {totalBiayaKeseluruhan.toLocaleString('id-ID')}
                                 </span>
                             </div>
 
                             <button
                                 type="button"
-                                onClick={handleHitungTarif}
+                                onClick={() => fetchTarifOtomatis()}
                                 disabled={loadingTarif}
-                                className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                                className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase text-xs flex items-center gap-1.5 shadow-sm transition"
                             >
                                 <Calculator size={14} />
                                 {loadingTarif ? 'MENGHITUNG...' : 'HITUNG TARIF OTOMATIS'}
@@ -1730,21 +882,21 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
                     <button
                         type="button"
                         onClick={onClose}
-                        className="px-5 py-2 border border-slate-300 text-slate-700 hover:bg-slate-200 font-bold rounded-xl uppercase text-xs transition cursor-pointer"
+                        className="px-5 py-2 border border-slate-300 text-slate-700 hover:bg-slate-200 font-bold rounded-xl uppercase text-xs transition"
                     >
                         Batal
                     </button>
                     <button
                         type="button"
                         onClick={handleSubmit}
-                        disabled={!isFormValid || loadingTarif}
-                        title={!isFormValid ? "Lengkapi seluruh data wajib dan hitung tarif sebelum mencetak" : ""}
-                        className={`px-6 py-2 rounded-xl uppercase text-xs shadow-xs transition flex items-center gap-2 font-bold ${!isFormValid || loadingTarif
-                            ? 'bg-slate-300 text-slate-500 cursor-not-allowed select-none'
-                            : 'bg-[#004b84] hover:bg-[#003863] text-white cursor-pointer'
+                        disabled={loadingTarif}
+                        className={`px-6 py-2 rounded-xl uppercase text-xs shadow-xs transition flex items-center gap-2 font-bold ${isEditMode
+                            ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                            : 'bg-[#004b84] hover:bg-[#003863] text-white'
                             }`}
                     >
-                        <FileText size={15} /> Cetak Bukti Terima
+                        {isEditMode ? <Save size={15} /> : <FileText size={15} />}
+                        {isEditMode ? 'Simpan Perubahan BTT' : 'Cetak Bukti Terima'}
                     </button>
                 </div>
             </div>
@@ -1767,6 +919,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode }) => {
 };
 
 export default BttFormModal;
+
 
 // =========================================================================
 // 📦 SUB-MODAL COMPONENT: ORDER PACKING
