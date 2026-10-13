@@ -262,7 +262,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
           children: [
             { name: 'Tarif Carter', path: '/master/tarif-carter' },
             // { name: 'Tarif Handling', path: '/settings/general-ledger' },
-            { name: 'Tarif Paket Customer', path: '/master/tarif-customer' },
+            { name: 'Tarif Customer', path: '/master/tarif-customer' },
             { name: 'Tarif Paket', path: '/master/tarif-paket' },
             // { name: 'Tarif Paket Kurir', path: '/settings/marketing' },
             { name: 'Tarif Paket Ekonomis', path: '/master/tarif-ekonomis' },
