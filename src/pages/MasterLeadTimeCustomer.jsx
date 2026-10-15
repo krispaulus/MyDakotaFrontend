@@ -9,6 +9,7 @@ const MasterLeadTimeCustomer = () => {
     const { isDarkMode } = useDarkMode();
     const [dataList, setDataList] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [customerOptions, setCustomerOptions] = useState([]);
 
     // Filter Query Server (Grid Atas)
     const [filterCustomer, setFilterCustomer] = useState('');
@@ -71,6 +72,18 @@ const MasterLeadTimeCustomer = () => {
     };
 
     useEffect(() => {
+        const fetchCustomers = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await api.get('/master/customer/active-list', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                setCustomerOptions(res.data?.data || res.data || []);
+            } catch (e) {
+                console.error("Gagal load master customer", e);
+            }
+        };
+        fetchCustomers();
         fetchLeadTime();
     }, []);
 
@@ -91,7 +104,7 @@ const MasterLeadTimeCustomer = () => {
     const handleAddSubmit = async (e) => {
         e.preventDefault();
         if (!formData.customer_id || !formData.kota_asal || !formData.kota_tujuan) {
-            return Swal.fire('Peringatan', 'ID Customer, Kota Asal, dan Kota Tujuan wajib diisi!', 'warning');
+            return Swal.fire('Peringatan', 'Customer, Kota Asal, dan Kota Tujuan wajib diisi!', 'warning');
         }
         try {
             const token = localStorage.getItem('token');
@@ -220,16 +233,21 @@ const MasterLeadTimeCustomer = () => {
 
             {/* GRID FILTER PENCARIAN SERVER */}
             <div className="p-4 bg-white rounded-xl shadow-xs border border-slate-200 grid grid-cols-4 gap-4 items-end text-xs font-bold text-slate-600">
+                {/* 🟢 CUSTOMER SELECT FILTER */}
                 <div>
-                    <label className="block mb-1 text-slate-500 uppercase">ID CUSTOMER</label>
-                    <input
-                        type="text"
+                    <label className="block mb-1 text-slate-500 uppercase">CUSTOMER</label>
+                    <select
                         className="w-full p-2.5 border border-slate-200 rounded-lg text-sm font-medium focus:border-indigo-500 bg-white outline-none"
-                        placeholder="Contoh: BEKASI..."
                         value={filterCustomer}
                         onChange={e => setFilterCustomer(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && fetchLeadTime()}
-                    />
+                    >
+                        <option value="">-- SEMUA CUSTOMER --</option>
+                        {customerOptions.map(c => (
+                            <option key={c.Cust_ID || c.cust_id} value={c.Cust_ID || c.cust_id}>
+                                {c.Cust_Name || c.cust_name} ({c.Cust_ID || c.cust_id})
+                            </option>
+                        ))}
+                    </select>
                 </div>
                 <div>
                     <label className="block mb-1 text-slate-500 uppercase">KOTA ASAL</label>
@@ -260,15 +278,15 @@ const MasterLeadTimeCustomer = () => {
                 </div>
             </div>
 
-            {/* 🟢 RENDERING TEMPLATE DENGAN FILTERED DATA */}
+            {/* RENDERING TEMPLATE */}
             <DataTableTemplate
                 title="MASTER LEAD TIME CUSTOMER"
                 columns={columns}
-                data={filteredData} // 👈 PASS DATA HASIL FILTER SEARCH
+                data={filteredData}
                 loading={loading}
                 isDarkMode={isDarkMode}
                 searchValue={globalSearch}
-                onSearchChange={(e) => setGlobalSearch(e.target.value)} // 👈 BIND KE SEARCH INPUT TABEL
+                onSearchChange={(e) => setGlobalSearch(e.target.value)}
                 onAdd={() => setIsAddModalOpen(true)}
                 onEdit={handleEditTrigger}
                 onDelete={(item) => handleDeleteTrigger(item)}
@@ -283,9 +301,22 @@ const MasterLeadTimeCustomer = () => {
                         </div>
                         <form onSubmit={handleAddSubmit} className="space-y-4 text-xs font-bold text-slate-700">
                             <div className="grid grid-cols-2 gap-3">
+                                {/* 🟢 CUSTOMER SELECT DI MODAL TAMBAH */}
                                 <div>
-                                    <label className="block mb-1">CUSTOMER ID</label>
-                                    <input type="text" required className="w-full p-2 border rounded bg-amber-50 font-black text-sm uppercase" placeholder="Contoh: BEKASI" value={formData.customer_id} onChange={e => setFormData({ ...formData, customer_id: e.target.value.toUpperCase() })} />
+                                    <label className="block mb-1">CUSTOMER</label>
+                                    <select
+                                        required
+                                        className="w-full p-2 border rounded bg-white font-bold text-sm uppercase outline-none focus:border-indigo-500"
+                                        value={formData.customer_id}
+                                        onChange={e => setFormData({ ...formData, customer_id: e.target.value })}
+                                    >
+                                        <option value="">-- PILIH CUSTOMER --</option>
+                                        {customerOptions.map(c => (
+                                            <option key={c.Cust_ID || c.cust_id} value={c.Cust_ID || c.cust_id}>
+                                                {c.Cust_Name || c.cust_name} ({c.Cust_ID || c.cust_id})
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div>
                                     <label className="block mb-1">KABUPATEN</label>
@@ -330,7 +361,7 @@ const MasterLeadTimeCustomer = () => {
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto">
                     <div className="w-full max-w-3xl p-6 bg-white rounded-2xl shadow-2xl border flex flex-col my-8">
                         <div className="text-center border-b pb-3 mb-4">
-                            <span className="px-4 py-1.5 border border-dashed border-amber-500 text-amber-700 font-bold text-sm tracking-wide rounded-sm uppercase">EDIT LEAD TIME: {selectedItem.customer_id} ({selectedItem.kota_asal} ➔ {selectedItem.kota_tujuan})</span>
+                            <span className="px-4 py-1.5 border border-dashed border-amber-500 text-amber-700 font-bold text-sm tracking-wide rounded-sm uppercase">EDIT LEAD TIME: {selectedItem.cust_name || selectedItem.customer_id} ({selectedItem.kota_asal} ➔ {selectedItem.kota_tujuan})</span>
                         </div>
                         <form onSubmit={handleEditSubmit} className="space-y-4 text-xs font-bold text-slate-700">
                             <div className="grid grid-cols-3 gap-3 bg-slate-50 p-3 rounded-lg border">
