@@ -288,8 +288,18 @@ const SuratTugas = () => {
         const fullTglBerangkat = `${formData.tgl_berangkat} ${formData.jam_berangkat}`;
         const fullTglKembali = `${formData.tgl_kembali} ${formData.jam_kembali}`;
 
+        // 🌟 AUTO GENERATE SJH_ID JIKA MODE TAMBAH BARU (AGAR LOLOS VALIDASI BACKEND)
+        let finalSjhId = formData.sjh_id;
+        if (!isEditMode && (!finalSjhId || finalSjhId.trim() === '')) {
+            const cbg = (formData.sjh_startagenid || '001').substring(0, 3);
+            const tglClean = (formData.tgl_berangkat || today).replace(/-/g, '');
+            const randomSuffix = Math.floor(1000 + Math.random() * 9000); // 4 digit angka acak/urut
+            finalSjhId = `${cbg}JC${tglClean}${randomSuffix}`;
+        }
+
         const payload = {
             ...formData,
+            sjh_id: finalSjhId, // Pastikan tidak dikirim string kosong ""
             sjh_tanggal: fullTglBerangkat,
             sjh_tanggalkembali: fullTglKembali,
             nominal_um: parseFloat(formData.nominal_um) || 0
@@ -689,7 +699,7 @@ const SuratTugas = () => {
 
             {/* 🌟 2. DATA TABLE TEMPLATE (Action sudah ditangani langsung di array columns) */}
             <DataTableTemplate
-                title="SURAT TUGAS / SURAT JALAN SUPIR (OPR_T_eSuratJalan)"
+                title="SURAT TUGAS / SURAT JALAN SUPIR"
                 columns={columns}
                 data={filteredList}
                 loading={loading}
