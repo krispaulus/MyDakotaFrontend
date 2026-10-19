@@ -38,6 +38,7 @@ const SuratTugas = () => {
     const [filterNamaSopir, setFilterNamaSopir] = useState('');
     const [filterTugas, setFilterTugas] = useState('');
     const [filterTrayek, setFilterTrayek] = useState('');
+    const activeAgenId = localStorage.getItem('active_agen_id') || localStorage.getItem('cabang_id') || '';
 
     const [isUmListVisible, setIsUmListVisible] = useState(false);
     const [globalSearch, setGlobalSearch] = useState('');
@@ -47,8 +48,6 @@ const SuratTugas = () => {
     const [isEditMode, setIsEditMode] = useState(false);
 
     // 🌟 Modal View GPS Tracking State
-
-
     const defaultForm = {
         sjh_id: '',
         tgl_berangkat: today,
@@ -61,12 +60,16 @@ const SuratTugas = () => {
         sjh_kendid: '',
         sjh_sopir1_nip: '',
         sjh_sopir2_nip: '',
-        sjh_startagenid: '',
-        sjh_endagenid: '',
+        // 🌟 Dinamis mengikuti akun cabang yang sedang login
+        sjh_startagenid: activeAgenId,
+        sjh_endagenid: activeAgenId,
         sjh_assid: '',
+        sjh_trayekid: '',
+        nama_um: '',
         nominal_um: 0,
         sjh_keterangan: ''
     };
+
     const [formData, setFormData] = useState(defaultForm);
 
     useEffect(() => {
@@ -204,9 +207,13 @@ const SuratTugas = () => {
 
     const handleAdd = () => {
         setIsEditMode(false);
-        setFormData(defaultForm);
-        setIsModalOpen(true);
+        setFormData({
+            ...defaultForm,
+            sjh_startagenid: activeAgenId,
+            sjh_endagenid: activeAgenId
+        });
         setIsUmListVisible(false);
+        setIsModalOpen(true);
     };
 
     const handleEdit = (item) => {
@@ -512,6 +519,59 @@ const SuratTugas = () => {
         } finally {
             setLoadingPrint(false);
         }
+    };
+
+    // 🖨️ Handler Print Bersih Bebas Background Hitam
+    const handlePrintDocument = () => {
+        const printContent = document.getElementById('printable-area');
+        if (!printContent) return;
+
+        // Buat iframe tersembunyi
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+        const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+            .map(style => style.outerHTML)
+            .join('\n');
+
+        const doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Cetak Surat Tugas - ${printData?.sjh_id || ''}</title>
+            ${styles}
+            <style>
+                @page {
+                    size: A4 portrait;
+                    margin: 12mm 15mm;
+                }
+                body {
+                    background-color: #ffffff !important;
+                    color: #000000 !important;
+                    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }
+            </style>
+        </head>
+        <body onload="window.print()">
+            ${printContent.innerHTML}
+        </body>
+        </html>
+    `);
+        doc.close();
+
+        // Hapus iframe setelah dialog print selesai / ditutup
+        iframe.contentWindow.onafterprint = () => {
+            document.body.removeChild(iframe);
+        };
     };
 
     return (
@@ -1071,30 +1131,50 @@ const SuratTugas = () => {
 
                             {/* Baris 4: Berangkat Dari, Pulang Ke, Tugas */}
                             <div className="grid grid-cols-12 gap-4">
+                                {/* BERANGKAT DARI */}
                                 <div className="col-span-12 md:col-span-4">
                                     <label className="block mb-1 text-slate-600 uppercase">BERANGKAT DARI :</label>
                                     <select
-                                        className="w-full p-2.5 border border-slate-300 rounded-xl outline-none focus:border-emerald-600 bg-white cursor-pointer uppercase"
+                                        className="w-full p-2.5 border border-slate-300 rounded-xl outline-none focus:border-emerald-600 bg-white cursor-pointer uppercase font-bold text-slate-800"
                                         value={formData.sjh_startagenid}
                                         onChange={e => setFormData({ ...formData, sjh_startagenid: e.target.value })}
+                                        required
                                     >
                                         <option value="">-- PILIH AGEN ASAL --</option>
-                                        {agenList.map((a, i) => (
-                                            <option key={i} value={a.agen_id}>{a.agen_nama}</option>
-                                        ))}
+                                        {agenList.map((a, i) => {
+                                            // Jika agen adalah PUSAT DAKOTA, tampilkan sebagai DLI PUSAT
+                                            const labelNama = (a.agen_nama === 'PUSAT DAKOTA' || a.agen_id === 'PST001' || a.agen_id === '001')
+                                                ? 'DLI PUSAT'
+                                                : a.agen_nama;
+                                            return (
+                                                <option key={i} value={a.agen_id}>
+                                                    {labelNama}
+                                                </option>
+                                            );
+                                        })}
                                     </select>
                                 </div>
+
+                                {/* PULANG KE */}
                                 <div className="col-span-12 md:col-span-4">
                                     <label className="block mb-1 text-slate-600 uppercase">PULANG KE :</label>
                                     <select
-                                        className="w-full p-2.5 border border-slate-300 rounded-xl outline-none focus:border-emerald-600 bg-white cursor-pointer uppercase"
+                                        className="w-full p-2.5 border border-slate-300 rounded-xl outline-none focus:border-emerald-600 bg-white cursor-pointer uppercase font-bold text-slate-800"
                                         value={formData.sjh_endagenid}
                                         onChange={e => setFormData({ ...formData, sjh_endagenid: e.target.value })}
+                                        required
                                     >
                                         <option value="">-- PILIH AGEN TUJUAN --</option>
-                                        {agenList.map((a, i) => (
-                                            <option key={i} value={a.agen_id}>{a.agen_nama}</option>
-                                        ))}
+                                        {agenList.map((a, i) => {
+                                            const labelNama = (a.agen_nama === 'PUSAT DAKOTA' || a.agen_id === 'PST001' || a.agen_id === '001')
+                                                ? 'DLI PUSAT'
+                                                : a.agen_nama;
+                                            return (
+                                                <option key={i} value={a.agen_id}>
+                                                    {labelNama}
+                                                </option>
+                                            );
+                                        })}
                                     </select>
                                 </div>
                                 <div className="col-span-12 md:col-span-4">
@@ -1367,6 +1447,7 @@ const SuratTugas = () => {
                     </div>
                 </div>
             )}
+
             {/* 🖨️ MODAL CETAK SURAT TUGAS RESMI DAKOTA BESERTA QR CODE */}
             {isPrintModalOpen && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
@@ -1374,9 +1455,10 @@ const SuratTugas = () => {
                         {/* Toolbar Cetak */}
                         <div className="p-4 bg-slate-100 border-b flex justify-between items-center print:hidden">
                             <span className="font-bold text-xs uppercase text-slate-700">Preview Cetak Dokumen Surat Tugas</span>
-                            <div className="flex gap-2">
+                            <div className="flex items-center gap-2">
                                 <button
-                                    onClick={() => window.print()}
+                                    type="button"
+                                    onClick={handlePrintDocument}
                                     className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
                                 >
                                     <Printer size={14} /> Cetak Dokumen
@@ -1387,105 +1469,163 @@ const SuratTugas = () => {
                                 >
                                     Tutup
                                 </button>
+                                <button
+                                    onClick={() => setIsPrintModalOpen(false)}
+                                    className="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center transition cursor-pointer font-bold ml-1"
+                                >
+                                    <XIcon size={16} />
+                                </button>
                             </div>
                         </div>
 
-                        {/* Layout Cetak Sesuai Format Gambar 3 & Gambar 4 */}
-                        <div className="p-8 overflow-y-auto bg-white font-serif text-slate-900 leading-normal" id="printable-area">
+                        {/* Layout Cetak Modern Ready Print & Zebra Table */}
+                        <div className="p-8 overflow-y-auto bg-white font-sans text-slate-800 leading-normal" id="printable-area">
                             {loadingPrint || !printData ? (
                                 <div className="text-center py-12 text-slate-400 text-xs font-mono">Menyiapkan halaman cetak...</div>
                             ) : (
                                 <div className="space-y-4 text-xs">
-                                    {/* Header Atas: Logo DAKOTA & QR Code */}
-                                    <div className="flex justify-between items-start pb-2 border-b border-slate-300">
-                                        <div>
+                                    {/* 🌟 1. HEADER ATAS: LOGO DAKOTA & QR CODE MODERN */}
+                                    <div className="flex justify-between items-start pb-3 border-b-2 border-slate-800">
+                                        <div className="space-y-1">
                                             <img
                                                 src={dakotaLogo}
                                                 alt="Dakota Cargo"
                                                 className="h-10 w-auto object-contain mb-1"
                                             />
-                                            <h2 className="text-sm font-bold uppercase mt-1">SURAT TUGAS SUPIR LK</h2>
-                                            <p className="text-[10px] text-slate-600">https://www.dakotacargo.co.id</p>
-                                            <p className="text-[10px] text-slate-600 italic">Mohon scan QRCode/Barcode untuk validasi surat tugas ini</p>
+                                            <h2 className="text-sm font-black uppercase tracking-wider text-slate-900">
+                                                SURAT TUGAS SUPIR LK
+                                            </h2>
+                                            <p className="text-[11px] font-medium text-slate-500">https://www.dakotacargo.co.id</p>
+                                            <p className="text-[10px] text-slate-400 italic">
+                                                Mohon scan QRCode/Barcode untuk validasi surat tugas ini
+                                            </p>
                                         </div>
 
-                                        {/* QR Code Container */}
-                                        <div className="flex flex-col items-center">
+                                        <div className="flex flex-col items-center bg-slate-50 p-2 rounded-xl border border-slate-200">
                                             <QRCodeSVG
                                                 value={printData.sjh_id || '-'}
-                                                size={88}
+                                                size={84}
                                                 level="M"
                                                 includeMargin={false}
                                             />
-                                            <span className="font-mono font-bold text-[11px] mt-1 text-slate-800">
+                                            <span className="font-mono font-black text-[11px] mt-1.5 text-slate-900 tracking-wider">
                                                 {printData.sjh_id}
                                             </span>
                                         </div>
                                     </div>
 
-                                    {/* Rincian Tugas & Waktu */}
-                                    <div className="grid grid-cols-12 gap-1 py-1">
-                                        <div className="col-span-3 font-bold uppercase">TUGAS</div>
-                                        <div className="col-span-9 font-bold uppercase">: {printData.ass_nama}</div>
+                                    {/* 🌟 2. RINCIAN TUGAS & JADWAL */}
+                                    <div className="grid grid-cols-12 gap-y-1.5 py-1 text-slate-700 font-medium">
+                                        <div className="col-span-3 font-bold uppercase text-slate-900">TUGAS</div>
+                                        <div className="col-span-9 font-bold uppercase text-slate-900">: {printData.ass_nama}</div>
 
-                                        <div className="col-span-3">TGL BERANGKAT</div>
-                                        <div className="col-span-9 font-mono">: {printData.sjh_tanggal}</div>
+                                        <div className="col-span-3 text-slate-600">TGL BERANGKAT</div>
+                                        <div className="col-span-9 font-mono font-semibold">: {printData.sjh_tanggal}</div>
 
-                                        <div className="col-span-3">TGL KEDATANGAN</div>
-                                        <div className="col-span-9 font-mono">: {printData.sjh_tanggalkembali}</div>
+                                        <div className="col-span-3 text-slate-600">TGL KEDATANGAN</div>
+                                        <div className="col-span-9 font-mono font-semibold">: {printData.sjh_tanggalkembali}</div>
                                     </div>
 
-                                    <div className="border-t border-slate-300 my-2"></div>
+                                    <div className="border-t border-slate-200 my-2"></div>
 
-                                    {/* Rincian Kendaraan & Pengemudi */}
-                                    <div className="grid grid-cols-12 gap-1 py-1">
-                                        <div className="col-span-3 font-bold uppercase">NO KENDARAAN</div>
-                                        <div className="col-span-9 font-mono font-bold">: {printData.sjh_kendid}</div>
+                                    {/* 🌟 3. RINCIAN KENDARAAN & PENGEMUDI */}
+                                    <div className="grid grid-cols-12 gap-y-1.5 py-1 text-slate-700">
+                                        <div className="col-span-3 font-bold uppercase text-slate-900">NO KENDARAAN</div>
+                                        <div className="col-span-9 font-mono font-black text-slate-900">: {printData.sjh_kendid}</div>
 
-                                        <div className="col-span-3">PENGEMUDI</div>
-                                        <div className="col-span-4">: 1. {printData.nmsopir1}</div>
-                                        <div className="col-span-5">2. {printData.nmsopir2 !== '-' ? printData.nmsopir2 : ''}</div>
+                                        <div className="col-span-3 text-slate-600">PENGEMUDI</div>
+                                        <div className="col-span-4 font-semibold">: 1. {printData.nmsopir1}</div>
+                                        <div className="col-span-5 font-semibold">2. {printData.nmsopir2 !== '-' ? printData.nmsopir2 : ''}</div>
 
-                                        <div className="col-span-3">NIP PENGEMUDI</div>
-                                        <div className="col-span-4 font-mono">: 1. {printData.sjh_sopir1_nip}</div>
-                                        <div className="col-span-5 font-mono">2. {printData.sjh_sopir2_nip !== '-' ? printData.sjh_sopir2_nip : ''}</div>
+                                        <div className="col-span-3 text-slate-600">NIP PENGEMUDI</div>
+                                        <div className="col-span-4 font-mono text-slate-600">: 1. {printData.sjh_sopir1_nip}</div>
+                                        <div className="col-span-5 font-mono text-slate-600">2. {printData.sjh_sopir2_nip !== '-' ? printData.sjh_sopir2_nip : ''}</div>
                                     </div>
 
-                                    <div className="border-t border-slate-300 my-2"></div>
+                                    <div className="border-t border-slate-200 my-2"></div>
 
-                                    {/* Isian Manual KM & Jam */}
-                                    <div className="grid grid-cols-12 gap-2 py-1">
-                                        <div className="col-span-2">KM AWAL</div>
-                                        <div className="col-span-4">:</div>
-                                        <div className="col-span-3">JAM BERANGKAT</div>
-                                        <div className="col-span-3">:</div>
+                                    {/* 🌟 4. BLOK ISIAN MANUAL KM & JAM OPERASIONAL */}
+                                    <div className="grid grid-cols-12 gap-y-2 py-1.5 text-slate-700">
+                                        <div className="col-span-2 text-slate-600">KM AWAL</div>
+                                        <div className="col-span-4 font-mono">: ....................................</div>
+                                        <div className="col-span-3 text-slate-600">JAM BERANGKAT</div>
+                                        <div className="col-span-3 font-mono">: ....................</div>
 
-                                        <div className="col-span-2">KM AKHIR</div>
-                                        <div className="col-span-4">:</div>
-                                        <div className="col-span-3">JAM KEDATANGAN</div>
-                                        <div className="col-span-3">:</div>
+                                        <div className="col-span-2 text-slate-600">KM AKHIR</div>
+                                        <div className="col-span-4 font-mono">: ....................................</div>
+                                        <div className="col-span-3 text-slate-600">JAM KEDATANGAN</div>
+                                        <div className="col-span-3 font-mono">: ....................</div>
                                     </div>
 
-                                    <div className="border-t border-slate-300 my-2"></div>
+                                    <div className="border-t border-slate-200 my-2"></div>
 
-                                    {/* Tanda Tangan */}
-                                    <div className="pt-4">
-                                        <p className="text-[11px] mb-6">
+                                    {/* 🌟 5. TABEL RINCIAN UANG MUKA / BPLK DENGAN EFEK ZEBRA */}
+                                    {printData.rincian_biaya && printData.rincian_biaya.length > 0 && (
+                                        <div className="space-y-2 pt-1 pb-1">
+                                            {/* Header Trayek Card */}
+                                            <div className="text-center font-bold text-xs uppercase tracking-wide bg-slate-100 py-1.5 px-3 rounded-lg border border-slate-200 text-slate-800">
+                                                {printData.nama_trayek} <span className="font-mono text-slate-600">({printData.sjh_trayekid})</span>
+                                            </div>
+
+                                            <div className="overflow-hidden rounded-xl border border-slate-300">
+                                                <table className="w-full border-collapse text-xs">
+                                                    <thead>
+                                                        <tr className="bg-[#004b84] text-white text-left font-bold uppercase text-[11px] tracking-wider">
+                                                            <th className="py-2.5 px-3 w-40">KODE</th>
+                                                            <th className="py-2.5 px-3">NAMA BIAYA</th>
+                                                            <th className="py-2.5 px-3 text-right w-36">NOMINAL</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-200">
+                                                        {printData.rincian_biaya.map((b, bIdx) => (
+                                                            <tr
+                                                                key={bIdx}
+                                                                /* 🌟 Efek Zebra Kolom/Baris: Genap Putih, Ganjil Slate Halus */
+                                                                className={bIdx % 2 === 1 ? 'bg-slate-50/80' : 'bg-white'}
+                                                            >
+                                                                <td className="py-2 px-3 font-mono text-slate-700 font-semibold">{b.kode}</td>
+                                                                <td className="py-2 px-3 uppercase text-slate-800 font-medium">{b.nama_biaya}</td>
+                                                                <td className="py-2 px-3 text-right font-mono text-slate-900 font-bold">
+                                                                    {Number(b.nominal).toLocaleString('id-ID')}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                    <tfoot>
+                                                        <tr className="border-t-2 border-slate-800 bg-slate-100 font-black text-slate-900">
+                                                            <td colSpan="2" className="py-2 px-3 uppercase tracking-wider text-xs">
+                                                                TOTAL BPLK
+                                                            </td>
+                                                            <td className="py-2 px-3 text-right font-mono text-sm text-[#004b84]">
+                                                                Rp {Number(printData.total_bplk || 0).toLocaleString('id-ID')}
+                                                            </td>
+                                                        </tr>
+                                                    </tfoot>
+                                                </table>
+                                            </div>
+
+                                            <div className="border-t border-slate-200 my-2"></div>
+                                        </div>
+                                    )}
+
+                                    {/* 🌟 6. BLOK TANDA TANGAN */}
+                                    <div className="pt-2">
+                                        <p className="text-[11px] mb-8 text-slate-600 font-medium">
                                             {printData.cbgmulai}, {printData.tgl_cetak || new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
                                         </p>
 
                                         <div className="grid grid-cols-3 text-center text-xs">
                                             <div>
-                                                <p className="font-semibold mb-16">Pemberi Tugas</p>
-                                                <p className="font-medium">(Operasional)</p>
+                                                <p className="font-bold text-slate-800 mb-16">Pemberi Tugas</p>
+                                                <p className="font-medium text-slate-600">( Operasional )</p>
                                             </div>
                                             <div>
-                                                <p className="font-semibold mb-16">Pengemudi</p>
-                                                <p className="font-medium">{printData.nmsopir1}</p>
+                                                <p className="font-bold text-slate-800 mb-16">Pengemudi</p>
+                                                <p className="font-semibold text-slate-900 underline underline-offset-4">{printData.nmsopir1}</p>
                                             </div>
                                             <div>
-                                                <p className="font-semibold mb-16">Menyetujui</p>
-                                                <p className="font-medium">( .................................... )</p>
+                                                <p className="font-bold text-slate-800 mb-16">Menyetujui</p>
+                                                <p className="font-medium text-slate-600">( .................................... )</p>
                                             </div>
                                         </div>
                                     </div>
@@ -1495,6 +1635,7 @@ const SuratTugas = () => {
                     </div>
                 </div>
             )}
+
         </div>
     );
 };
