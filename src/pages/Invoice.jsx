@@ -950,23 +950,52 @@ const Invoice = () => {
     const handleDeleteInvoice = (item) => {
         if (!item) return;
 
+        // 🔒 Proteksi: Jika invoice sudah berstatus POSTED, minta user untuk unposting dulu
+        if (item.artih_postingyn === 'Y') {
+            Swal.fire({
+                title: 'Invoice Sudah Diposting!',
+                text: `Invoice ${item.artih_id} sudah membentuk Jurnal Memorial. Silakan lakukan UNPOSTING terlebih dahulu sebelum menghapus invoice.`,
+                icon: 'warning',
+                confirmButtonColor: '#ea580c',
+                confirmButtonText: 'Mengerti'
+            });
+            return;
+        }
+
         Swal.fire({
             title: 'Hapus Invoice?',
-            text: `Apakah Anda yakin ingin menghapus Invoice ${item.artih_id}?`,
+            html: `
+            <div class="text-left text-xs space-y-2 p-1 text-slate-700">
+                <p>Apakah Anda yakin ingin menghapus Invoice <b class="font-mono text-rose-600">${item.artih_id}</b>?</p>
+                <p class="text-[11px] text-slate-500 italic">
+                    * Nomor resi BTT yang terhubung akan otomatis dikembalikan ke daftar BTT belum difakturkan (Unbilled).
+                </p>
+            </div>
+        `,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#e11d48',
-            confirmButtonText: 'Ya, Hapus',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Ya, Hapus Invoice',
             cancelButtonText: 'Batal'
         }).then(async (res) => {
             if (res.isConfirmed) {
                 try {
                     const token = localStorage.getItem('token');
                     const ptId = localStorage.getItem('pt_id') || 'C';
+
                     await api.delete(`/piutang/invoice?id=${encodeURIComponent(item.artih_id)}&pt_id=${ptId}`, {
                         headers: { Authorization: `Bearer ${token}` }
                     });
-                    Swal.fire('Berhasil!', `Invoice ${item.artih_id} berhasil dihapus.`, 'success');
+
+                    Swal.fire({
+                        title: 'Berhasil!',
+                        text: `Invoice ${item.artih_id} berhasil dihapus.`,
+                        icon: 'success',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+
                     fetchInvoiceList();
                 } catch (err) {
                     Swal.fire('Gagal!', err.response?.data?.message || 'Gagal menghapus invoice.', 'error');
@@ -2325,11 +2354,13 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                 </span>
             )
         },
+
         {
-            header: 'AKSI',
+            header: 'ACTION',
             accessor: 'artih_id',
             render: (item) => (
                 <div className="flex items-center gap-1 justify-center relative" onClick={(e) => e.stopPropagation()}>
+                    {/* 1. CETAK DOKUMEN */}
                     <div className="relative">
                         <button
                             type="button"
@@ -2384,6 +2415,7 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                         )}
                     </div>
 
+                    {/* 2. UNDUH RTF */}
                     <button
                         type="button"
                         onClick={() => handleDownloadRTF(item)}
@@ -2393,6 +2425,7 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                         <Download size={13} />
                     </button>
 
+                    {/* 3. EDIT RINCIAN INVOICE */}
                     <button
                         type="button"
                         onClick={() => handleOpenEditInvoice(item)}
@@ -2402,7 +2435,17 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                         <Edit3 size={13} />
                     </button>
 
-                    {item.artih_postingyn !== 'Y' && (
+                    {/* 4. POSTING / UNPOSTING BUTTON */}
+                    {item.artih_postingyn === 'Y' ? (
+                        <button
+                            type="button"
+                            onClick={() => handleUnpostingInvoice(item.artih_id)}
+                            className="p-1.5 text-amber-600 hover:bg-amber-50 border border-amber-200 rounded-lg transition cursor-pointer shadow-2xs"
+                            title="Unposting Invoice (Kembalikan ke Draft)"
+                        >
+                            <Unlock size={13} />
+                        </button>
+                    ) : (
                         <button
                             type="button"
                             onClick={() => handlePostingInvoice(item.artih_id)}
@@ -2413,16 +2456,15 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                         </button>
                     )}
 
-                    {item.artih_postingyn !== 'Y' && (
-                        <button
-                            type="button"
-                            onClick={() => handleDeleteInvoice(item)}
-                            className="p-1.5 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg transition cursor-pointer shadow-2xs"
-                            title="Hapus Invoice"
-                        >
-                            <Trash2 size={13} />
-                        </button>
-                    )}
+                    {/* 🌟 5. TOMBOL DELETE INVOICE (SELALU MUNCUL) */}
+                    <button
+                        type="button"
+                        onClick={() => handleDeleteInvoice(item)}
+                        className="p-1.5 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg transition cursor-pointer shadow-2xs"
+                        title="Hapus Invoice"
+                    >
+                        <Trash2 size={13} />
+                    </button>
                 </div>
             )
         }

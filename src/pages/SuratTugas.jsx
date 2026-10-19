@@ -10,7 +10,7 @@ import {
 import Swal from 'sweetalert2';
 import { QRCodeSVG } from 'qrcode.react';
 import { Search as SearchIcon, CheckCircle } from 'lucide-react';
-import dakotaLogo from '../assets/new_logo 2.png';
+import dliLogo from '../assets/logoDLI.png';
 
 const SuratTugas = () => {
     const { isDarkMode } = useDarkMode();
@@ -1488,8 +1488,8 @@ const SuratTugas = () => {
                                     <div className="flex justify-between items-start pb-3 border-b-2 border-slate-800">
                                         <div className="space-y-1">
                                             <img
-                                                src={dakotaLogo}
-                                                alt="Dakota Cargo"
+                                                src={dliLogo}
+                                                alt="Dakota Logistik Indonesia"
                                                 className="h-10 w-auto object-contain mb-1"
                                             />
                                             <h2 className="text-sm font-black uppercase tracking-wider text-slate-900">

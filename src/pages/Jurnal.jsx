@@ -608,6 +608,7 @@ const Jurnal = () => {
         <div
             className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs transition-opacity"
             style={{ zIndex: 99999 }}
+            tabIndex={-1}
         >
             <div className={`w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden transition-all transform ${isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-slate-800'}`}>
                 {/* Header Modal */}
@@ -701,192 +702,85 @@ const Jurnal = () => {
                         </div>
                     </div>
 
-                    {/* Tabel Rincian Jurnal */}
-                    <div className="space-y-3">
+                    {/* Tombol Otomatis Hitung PPN 1.1% jika Jurnal Penjualan */}
+                    <div className="flex items-center justify-between">
                         <div className="font-bold uppercase tracking-wider text-slate-700">RINCIAN JURNAL</div>
+                        {formData.tjurh_type === 'J' && (
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    // 🌟 1. Lepaskan fokus dari tombol agar tidak bentrok dengan aria-hidden SweetAlert
+                                    if (e && e.currentTarget) {
+                                        e.currentTarget.blur();
+                                    }
 
-                        <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-                            <table className="w-full text-left">
-                                <thead className="bg-slate-800 text-white font-bold">
-                                    <tr>
-                                        <th className="p-2.5">KODE PERKIRAAN</th>
-                                        <th className="p-2.5">CABANG / AGEN</th>
-                                        <th className="p-2.5">KETERANGAN</th>
-                                        <th className="p-2.5 text-right">DEBET (RP)</th>
-                                        <th className="p-2.5 text-right">KREDIT (RP)</th>
-                                        <th className="p-2.5 text-center">AKSI</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {details.map((item, idx) => (
-                                        <tr key={idx} className="hover:bg-slate-50">
-                                            <td className="p-2.5">
-                                                <span className="font-mono font-bold text-sky-700">{item.tjurd_acccode}</span>
-                                                <span className="block text-slate-500 font-medium text-[11px]">{item.ca_name}</span>
-                                            </td>
-                                            <td className="p-2.5 font-bold text-slate-700 uppercase">{item.agen_nama || 'DLI PUSAT'}</td>
-                                            <td className="p-2.5 text-slate-800">{item.tjurd_keterangan}</td>
-                                            <td className="p-2.5 text-right font-mono font-bold text-slate-800">
-                                                {parseFloat(item.tjurd_debet || 0).toLocaleString('id-ID')}
-                                            </td>
-                                            <td className="p-2.5 text-right font-mono font-bold text-slate-800">
-                                                {parseFloat(item.tjurd_kredit || 0).toLocaleString('id-ID')}
-                                            </td>
-                                            <td className="p-2.5 text-center">
-                                                <div className="flex items-center justify-center gap-1.5">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleEditRow(idx)}
-                                                        className="p-1 text-sky-600 hover:text-sky-800 hover:bg-sky-50 rounded transition cursor-pointer"
-                                                        title="Edit Baris Rincian"
-                                                    >
-                                                        <Edit size={14} />
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleDeleteRow(idx)}
-                                                        className="p-1 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded transition cursor-pointer"
-                                                        title="Hapus Baris Rincian"
-                                                    >
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {details.length === 0 && (
-                                        <tr>
-                                            <td colSpan={6} className="p-4 text-center text-slate-400 font-medium">
-                                                Belum ada rincian baris jurnal. Tambahkan di bawah.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                                <tfoot className="bg-slate-100 font-black border-t border-slate-200">
-                                    <tr>
-                                        <td colSpan={3} className="p-2.5 text-right uppercase">TOTAL :</td>
-                                        <td className="p-2.5 text-right font-mono text-emerald-700 text-sm">
-                                            Rp {totalDebet.toLocaleString('id-ID')}
-                                        </td>
-                                        <td className="p-2.5 text-right font-mono text-emerald-700 text-sm">
-                                            Rp {totalKredit.toLocaleString('id-ID')}
-                                        </td>
-                                        <td></td>
-                                    </tr>
-                                    <tr>
-                                        <td colSpan={3} className="p-2 text-right uppercase text-slate-500">SELISIH :</td>
-                                        <td colSpan={2} className={`p-2 text-center font-mono font-black ${selisih === 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                            Rp {selisih.toLocaleString('id-ID')} {selisih === 0 ? '(BALANCE)' : '(UNBALANCED)'}
-                                        </td>
-                                        <td></td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
+                                    // Cari baris piutang (A102010100)
+                                    const piutangRow = details.find(d => d.tjurd_acccode?.trim() === 'A102010100');
+                                    if (!piutangRow || !piutangRow.tjurd_debet) {
+                                        Swal.fire({
+                                            title: 'Info',
+                                            text: 'Pastikan baris Piutang (A102010100) memiliki nilai Debet.',
+                                            icon: 'info',
+                                            didOpen: () => {
+                                                const container = document.querySelector('.swal2-container');
+                                                if (container) container.style.zIndex = '9999999';
+                                            }
+                                        });
+                                        return;
+                                    }
 
-                        {/* Form Input Baris Rincian Baru */}
-                        <div className="p-4 bg-sky-50/50 border border-sky-200 rounded-xl space-y-3">
-                            <div className="font-bold text-sky-900 text-xs">TAMBAH BARIS RINCIAN:</div>
-                            <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
-                                <div className="md:col-span-2 relative">
-                                    <label className="font-bold text-slate-700 block mb-1">KODE PERKIRAAN (COA):</label>
-                                    <div className="relative">
-                                        <input
-                                            type="text"
-                                            placeholder="Ketik nama / kode akun..."
-                                            value={coaKeyword}
-                                            onChange={(e) => handleSearchCOA(e.target.value)}
-                                            onFocus={() => {
-                                                if (coaKeyword) handleSearchCOA(coaKeyword);
-                                            }}
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-medium text-slate-800 outline-none focus:border-sky-500"
-                                        />
-                                        <Search size={14} className="absolute right-3 top-2.5 text-slate-400" />
-                                    </div>
+                                    const totalPiutang = parseFloat(piutangRow.tjurd_debet);
+                                    // Rumus PPN 1.1% include
+                                    const dpp = Math.round(totalPiutang / 1.011);
+                                    const nominalPPN = totalPiutang - dpp;
 
-                                    {showCoaDropdown && coaList.length > 0 && (
-                                        <div
-                                            className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-y-auto divide-y divide-slate-100 max-h-48"
-                                            style={{ zIndex: 9999999 }}
-                                        >
-                                            {coaList.map((coa, idx) => (
-                                                <div
-                                                    key={idx}
-                                                    onClick={() => handleSelectCOA(coa)}
-                                                    className="p-2.5 hover:bg-sky-50 cursor-pointer flex items-center justify-between text-xs transition"
-                                                >
-                                                    <span className="font-bold text-slate-800">{coa.ca_name}</span>
-                                                    <span className="font-mono text-sky-600 font-semibold bg-sky-50 px-2 py-0.5 rounded border border-sky-100">{coa.ca_id}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
+                                    const updatedDetails = details.map(item => {
+                                        const code = item.tjurd_acccode?.trim();
+                                        // Update Utang PPN
+                                        if (code === 'B102010600') {
+                                            return { ...item, tjurd_debet: 0, tjurd_kredit: nominalPPN };
+                                        }
+                                        // Update Pendapatan Penjualan
+                                        if (code === 'D101010200') {
+                                            return { ...item, tjurd_debet: 0, tjurd_kredit: dpp };
+                                        }
+                                        return item;
+                                    });
 
-                                <div>
-                                    <label className="font-bold text-slate-700 block mb-1">CABANG / AGEN :</label>
-                                    <select
-                                        value={entryRow.tjurd_agenid}
-                                        onChange={(e) => setEntryRow({ ...entryRow, tjurd_agenid: e.target.value })}
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-medium text-slate-800 outline-none focus:border-sky-500"
-                                    >
-                                        <option value="1">DLI PUSAT</option>
-                                        {cabangList.map((cabang, idx) => (
-                                            <option key={idx} value={cabang.agen_id || cabang.AgenID}>
-                                                {cabang.agen_nama || cabang.AgenNama}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
+                                    // Jika akun B102010600 belum ada di tabel, tambahkan otomatis
+                                    const hasPPN = updatedDetails.some(d => d.tjurd_acccode?.trim() === 'B102010600');
+                                    if (!hasPPN) {
+                                        updatedDetails.push({
+                                            tjurd_acccode: 'B102010600',
+                                            ca_name: 'UTANG PPN KELUARAN',
+                                            tjurd_agenid: formData.tjurh_cbid || '1',
+                                            agen_nama: 'DLI PUSAT',
+                                            tjurd_keterangan: 'UTANG PPN ' + (formData.tjurh_keterangan || ''),
+                                            tjurd_debet: 0,
+                                            tjurd_kredit: nominalPPN
+                                        });
+                                    }
 
-                                <div>
-                                    <label className="font-bold text-slate-700 block mb-1">KETERANGAN :</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Keterangan baris..."
-                                        value={entryRow.tjurd_keterangan}
-                                        onChange={(e) => setEntryRow({ ...entryRow, tjurd_keterangan: e.target.value })}
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-medium text-slate-800 outline-none focus:border-sky-500"
-                                    />
-                                </div>
+                                    setDetails(updatedDetails);
 
-                                <div>
-                                    <label className="font-bold text-slate-700 block mb-1">DEBET (RP):</label>
-                                    <input
-                                        type="number"
-                                        value={entryRow.tjurd_debet}
-                                        onChange={(e) => {
-                                            const val = parseFloat(e.target.value) || 0;
-                                            setEntryRow((prev) => ({ ...prev, tjurd_debet: val, tjurd_kredit: 0 }));
-                                        }}
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-mono font-bold text-slate-800 outline-none focus:border-sky-500 text-right"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="font-bold text-slate-700 block mb-1">KREDIT (RP):</label>
-                                    <input
-                                        type="number"
-                                        value={entryRow.tjurd_kredit}
-                                        onChange={(e) => {
-                                            const val = parseFloat(e.target.value) || 0;
-                                            setEntryRow((prev) => ({ ...prev, tjurd_kredit: val, tjurd_debet: 0 }));
-                                        }}
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-mono font-bold text-slate-800 outline-none focus:border-sky-500 text-right"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="flex justify-end pt-1">
-                                <button
-                                    type="button"
-                                    onClick={handleAddRow}
-                                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition shadow-xs flex items-center gap-1.5 cursor-pointer"
-                                >
-                                    <Plus size={14} /> Tambah Baris
-                                </button>
-                            </div>
-                        </div>
+                                    // 🌟 2. Tampilkan notifikasi tanpa mengunci aria-hidden ke elemen aktif
+                                    Swal.fire({
+                                        title: 'Berhasil',
+                                        text: `PPN 1.1% berhasil dihitung: Rp ${nominalPPN.toLocaleString('id-ID')}`,
+                                        icon: 'success',
+                                        timer: 1500,
+                                        showConfirmButton: false,
+                                        didOpen: () => {
+                                            const container = document.querySelector('.swal2-container');
+                                            if (container) container.style.zIndex = '9999999';
+                                        }
+                                    });
+                                }}
+                                className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-lg font-bold text-xs hover:bg-emerald-100 transition cursor-pointer flex items-center gap-1"
+                            >
+                                ⚡ Hitung Otomatis PPN 1.1%
+                            </button>
+                        )}
                     </div>
 
                     {/* Tombol Simpan / Keluar */}
