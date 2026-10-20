@@ -287,26 +287,95 @@ const SuratTugas = () => {
 
     const handleSubmitForm = async (e) => {
         e.preventDefault();
+
+        // 🌟 1. VALIDASI TANGGAL & JAM KEMBALI (HANYA CEK JIKA TANGGAL KEMBALI DIISI)
+        if (formData.tgl_berangkat && formData.tgl_kembali) {
+            const jamBerangkat = formData.jam_berangkat || '00:00:00';
+            const jamKembali = formData.jam_kembali || '23:59:59';
+
+            const dtBerangkat = new Date(`${formData.tgl_berangkat}T${jamBerangkat}`);
+            const dtKembali = new Date(`${formData.tgl_kembali}T${jamKembali}`);
+
+            // Jika tanggal kembali lebih kecil dari tanggal berangkat
+            if (formData.tgl_kembali < formData.tgl_berangkat) {
+                Swal.fire({
+                    title: 'Tanggal Tidak Valid!',
+                    text: 'Tanggal kembali tidak boleh lebih awal dari tanggal berangkat!',
+                    icon: 'warning',
+                    confirmButtonColor: '#e11d48',
+                    confirmButtonText: 'Periksa Kembali'
+                });
+                return;
+            }
+
+            // Jika pada tanggal yang sama, jam kembali lebih kecil atau sama dengan jam berangkat
+            if (dtKembali <= dtBerangkat) {
+                Swal.fire({
+                    title: 'Waktu Tidak Valid!',
+                    text: 'Waktu kedatangan/kembali harus lebih besar dari waktu keberangkatan!',
+                    icon: 'warning',
+                    confirmButtonColor: '#e11d48',
+                    confirmButtonText: 'Periksa Kembali'
+                });
+                return;
+            }
+        }
+
+        // 🌟 2. VALIDASI NOMOR KENDARAAN (CUKUP SATU KALI)
         if (!formData.sjh_kendid) {
             Swal.fire('Peringatan', 'Nomor Kendaraan wajib dipilih!', 'warning');
             return;
         }
 
-        const fullTglBerangkat = `${formData.tgl_berangkat} ${formData.jam_berangkat}`;
-        const fullTglKembali = `${formData.tgl_kembali} ${formData.jam_kembali}`;
+        // 🌟 3. VALIDASI DATA MUTASI JIKA ADA
+        if (formData.hasMutasi === 'YA') {
+            const validNoPol = /^[A-Z]{1,2}\s\d{1,4}\s[A-Z]{1,3}$/i.test(formData.no_pol_mutasi);
 
-        // 🌟 AUTO GENERATE SJH_ID JIKA MODE TAMBAH BARU (AGAR LOLOS VALIDASI BACKEND)
+            if (!formData.tgl_mulai_mutasi || !formData.tgl_selesai_mutasi) {
+                Swal.fire('Peringatan', 'Tanggal mulai dan selesai mutasi harus diisi jika status mutasi adalah YA.', 'warning');
+                return;
+            }
+
+            if (!formData.mutasi_dari) {
+                Swal.fire('Peringatan', 'Cabang asal mutasi wajib diisi.', 'warning');
+                return;
+            }
+
+            if (!validNoPol) {
+                Swal.fire('Peringatan', 'Format Nomor Polisi Kendaraan Mutasi tidak valid.', 'warning');
+                return;
+            }
+
+            if (formData.tgl_selesai_mutasi && formData.tgl_selesai_mutasi < formData.tgl_mulai_mutasi) {
+                Swal.fire({
+                    title: 'Tanggal Mutasi Tidak Valid!',
+                    text: 'Tanggal selesai mutasi tidak boleh lebih awal dari tanggal mulai mutasi!',
+                    icon: 'warning',
+                    confirmButtonColor: '#e11d48',
+                    confirmButtonText: 'Periksa Kembali'
+                });
+                return;
+            }
+        }
+
+        // 🌟 4. SUSUN TANGGAL & JAM LENGKAP
+        const fullTglBerangkat = `${formData.tgl_berangkat} ${formData.jam_berangkat || '00:00:00'}`;
+        const fullTglKembali = formData.tgl_kembali
+            ? `${formData.tgl_kembali} ${formData.jam_kembali || '00:00:00'}`
+            : '';
+
+        // 🌟 5. AUTO GENERATE SJH_ID JIKA MODE TAMBAH BARU
         let finalSjhId = formData.sjh_id;
         if (!isEditMode && (!finalSjhId || finalSjhId.trim() === '')) {
             const cbg = (formData.sjh_startagenid || '001').substring(0, 3);
             const tglClean = (formData.tgl_berangkat || today).replace(/-/g, '');
-            const randomSuffix = Math.floor(1000 + Math.random() * 9000); // 4 digit angka acak/urut
+            const randomSuffix = Math.floor(1000 + Math.random() * 9000);
             finalSjhId = `${cbg}JC${tglClean}${randomSuffix}`;
         }
 
         const payload = {
             ...formData,
-            sjh_id: finalSjhId, // Pastikan tidak dikirim string kosong ""
+            sjh_id: finalSjhId,
             sjh_tanggal: fullTglBerangkat,
             sjh_tanggalkembali: fullTglKembali,
             nominal_um: parseFloat(formData.nominal_um) || 0
@@ -940,13 +1009,22 @@ const SuratTugas = () => {
 
                             {/* 🌟 BARIS 1: WAKTU BERANGKAT, BY LOADING, STATUS LOADING, STATUS CHECKIN */}
                             <div className="grid grid-cols-12 gap-4">
+                                {/* TANGGAL BERANGKAT */}
                                 <div className="col-span-12 md:col-span-3">
                                     <label className="block mb-1 text-slate-600 uppercase">TANGGAL BERANGKAT :</label>
                                     <input
                                         type="date"
                                         className="w-full p-2.5 border border-slate-300 rounded-xl outline-none focus:border-emerald-600 bg-emerald-50/50 font-medium"
                                         value={formData.tgl_berangkat}
-                                        onChange={e => setFormData({ ...formData, tgl_berangkat: e.target.value })}
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                tgl_berangkat: val,
+                                                // 🌟 Jika tgl kembali sebelumnya lebih kecil dari tgl berangkat baru, otomatis samakan
+                                                tgl_kembali: prev.tgl_kembali && prev.tgl_kembali < val ? val : prev.tgl_kembali
+                                            }));
+                                        }}
                                         required
                                     />
                                 </div>
@@ -1052,13 +1130,21 @@ const SuratTugas = () => {
 
                             {/* Baris 2: Tanggal Kembali, Jam Kembali */}
                             <div className="grid grid-cols-12 gap-4">
+                                {/* TANGGAL KEMBALI */}
                                 <div className="col-span-12 md:col-span-6">
                                     <label className="block mb-1 text-slate-600 uppercase">TANGGAL KEMBALI :</label>
                                     <input
                                         type="date"
                                         className="w-full p-2.5 border border-slate-300 rounded-xl outline-none focus:border-emerald-600 bg-white font-medium"
                                         value={formData.tgl_kembali}
-                                        onChange={e => setFormData({ ...formData, tgl_kembali: e.target.value })}
+                                        min={formData.tgl_berangkat} // 🌟 Otomatis mengunci kalender agar tidak bisa pilih sebelum tgl berangkat
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                tgl_kembali: val
+                                            }));
+                                        }}
                                     />
                                 </div>
                                 <div className="col-span-12 md:col-span-6">
@@ -1492,8 +1578,24 @@ const SuratTugas = () => {
                                                 alt="Dakota Logistik Indonesia"
                                                 className="h-10 w-auto object-contain mb-1"
                                             />
+                                            {/* 🌟 JUDUL DINAMIS MENGIKUTI TUGAS / ASSIGNMENT */}
                                             <h2 className="text-sm font-black uppercase tracking-wider text-slate-900">
-                                                SURAT TUGAS SUPIR LK
+                                                {(() => {
+                                                    const tugas = String(printData.ass_nama || '').toUpperCase();
+
+                                                    if (tugas.includes('LUAR KOTA') || tugas === 'LK') {
+                                                        return 'SURAT TUGAS SUPIR LK';
+                                                    } else if (tugas.includes('DALAM KOTA') || tugas === 'DK') {
+                                                        return 'SURAT TUGAS SUPIR DK';
+                                                    } else if (tugas.includes('LOPER')) {
+                                                        return 'SURAT TUGAS SUPIR LOPER (DK)';
+                                                    } else if (tugas.includes('CHARTER') || tugas.includes('CARTER')) {
+                                                        return 'SURAT TUGAS SUPIR CARTER';
+                                                    } else if (tugas) {
+                                                        return `SURAT TUGAS SUPIR ${tugas}`;
+                                                    }
+                                                    return 'SURAT TUGAS SUPIR';
+                                                })()}
                                             </h2>
                                             <p className="text-[11px] font-medium text-slate-500">https://www.dakotacargo.co.id</p>
                                             <p className="text-[10px] text-slate-400 italic">

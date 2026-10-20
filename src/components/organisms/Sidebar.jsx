@@ -256,6 +256,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
         { name: 'Sopir', path: '/master/master-sopir' },
         { name: 'Trayek', path: '/master/master-trayek', roles: ['S', 'A'] },
         { name: 'Tarif Handling Propinsi', path: '/master/tarif-handling-propinsi' },
+        { name: 'Uang Muka BPLK / BPDK', path: '/master/uang-muka', icon: DollarSign },
         {
           name: 'Tarif',
           icon: <Truck size={18} />,
