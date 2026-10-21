@@ -643,6 +643,228 @@ const SuratTugas = () => {
         };
     };
 
+    const handleCetakRekapSuratTugas = () => {
+        // Menggunakan data hasil filter atau data master yang ada
+        const printData = (filteredList && filteredList.length > 0) ? filteredList : stList;
+
+        if (!printData || printData.length === 0) {
+            Swal.fire('Info', 'Tidak ada data surat tugas pada periode filter ini untuk dicetak.', 'info');
+            return;
+        }
+
+        const printWindow = window.open('', '_blank', 'width=1200,height=800');
+        if (!printWindow) {
+            Swal.fire('Peringatan', 'Pop-up browser terblokir. Izinkan pop-up untuk mencetak!', 'warning');
+            return;
+        }
+
+        const grandTotalUM = printData.reduce((acc, curr) => acc + (parseFloat(curr.nominal_um || curr.sjh_uangmuka || 0) || 0), 0);
+
+        const htmlContent = `
+            <!DOCTYPE html>
+            <html lang="id">
+            <head>
+                <meta charset="UTF-8">
+                <title>Laporan Rekapitulasi Surat Tugas / Surat Jalan</title>
+                <style>
+                    @page {
+                        size: A4 landscape;
+                        margin: 7mm 9mm;
+                    }
+                    * {
+                        box-sizing: border-box;
+                        font-family: Arial, Helvetica, sans-serif;
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }
+                    body {
+                        margin: 0;
+                        padding: 10px 14px;
+                        color: #000;
+                        background: #fff;
+                        font-size: 10px;
+                    }
+                    .header-container {
+                        display: flex;
+                        flex-direction: column;
+                        align-items: flex-start;
+                        margin-bottom: 4px;
+                    }
+                    .header-container img {
+                        height: 38px;
+                        width: auto;
+                        object-fit: contain;
+                        margin-bottom: 0;
+                    }
+                    .address-box {
+                        margin-left: 44px;
+                        margin-top: -6px;
+                        font-size: 9px;
+                        color: #222;
+                        line-height: 1.3;
+                    }
+                    .title-section {
+                        text-align: center;
+                        margin-top: 4px;
+                        margin-bottom: 12px;
+                    }
+                    .title-section h2 {
+                        margin: 0;
+                        font-size: 13.5px;
+                        font-weight: 900;
+                        letter-spacing: 1.2px;
+                        text-transform: uppercase;
+                    }
+                    .title-section p {
+                        margin: 3px 0 0 0;
+                        font-size: 10px;
+                        font-weight: bold;
+                        color: #333;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        font-size: 9.5px;
+                    }
+                    table th {
+                        background-color: #666666 !important;
+                        color: #ffffff !important;
+                        font-weight: bold;
+                        text-align: center;
+                        padding: 5px 4px;
+                        border: 1px solid #444;
+                        font-size: 9.5px;
+                        letter-spacing: 0.3px;
+                        white-space: nowrap;
+                    }
+                    table td {
+                        border: 1px solid #777;
+                        padding: 4px 5px;
+                        vertical-align: middle;
+                    }
+                    .text-center { text-align: center; }
+                    .text-right { text-align: right; }
+                    .font-mono { font-family: 'Courier New', Courier, monospace; }
+                    .font-bold { font-weight: bold; }
+                    .nowrap { white-space: nowrap; }
+                    .row-even { background-color: #fafafa; }
+                    .row-odd { background-color: #ffffff; }
+
+                    .signature-section {
+                        margin-top: 32px;
+                        display: flex;
+                        justify-content: space-around;
+                        text-align: center;
+                        font-size: 10px;
+                        page-break-inside: avoid;
+                    }
+                    .sig-box {
+                        width: 28%;
+                    }
+                    .sig-space {
+                        height: 50px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header-container">
+                    <img src="${window.location.origin}/src/assets/logoDLI.png" alt="DAKOTA LOGISTIK INDONESIA" onerror="this.style.display='none'" />
+                    <div class="address-box">
+                        <div>Jl. Wibawa Mukti II No. 8 Jatiasih, Bekasi Kota</div>
+                        <div>Telp: (021) 8602278 / (021) 86008589</div>
+                    </div>
+                </div>
+
+                <div class="title-section">
+                    <h2>LAPORAN SURAT TUGAS / SURAT JALAN</h2>
+                    <p>Periode : ${filterTgla || '-'} s/d ${filterTgle || '-'} &nbsp;|&nbsp; Cabang : ${filterCabang === 'ALL' || !filterCabang ? 'SEMUA CABANG' : filterCabang}</p>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 30px;">NO</th>
+                            <th style="width: 145px;">NO. SURAT TUGAS</th>
+                            <th style="width: 85px;">TANGGAL</th>
+                            <th style="width: 50px;">JAM</th>
+                            <th style="width: 90px;">NO. MOBIL</th>
+                            <th>SOPIR 1</th>
+                            <th>SOPIR 2</th>
+                            <th style="width: 100px;">ASSIGNMENT</th>
+                            <th style="width: 110px;">UANG MUKA</th>
+                            <th style="width: 80px;">STATUS</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${printData.map((item, idx) => {
+            const tglRaw = item.sjh_tanggal || item.tanggal || '';
+            const datePart = tglRaw.split(' ')[0] || '-';
+            const timePart = tglRaw.includes(' ') ? tglRaw.split(' ')[1]?.substring(0, 5) : '-';
+            const umVal = parseFloat(item.nominal_um || item.sjh_uangmuka || 0);
+
+            return `
+                                <tr class="${idx % 2 === 0 ? 'row-even' : 'row-odd'}">
+                                    <td class="text-center font-mono">${idx + 1}</td>
+                                    <td class="font-mono font-bold nowrap">${item.sjh_id || '-'}</td>
+                                    <td class="text-center font-mono nowrap">${datePart}</td>
+                                    <td class="text-center font-mono">${timePart}</td>
+                                    <td class="text-center font-bold font-mono nowrap">${item.sjh_kendid || '-'}</td>
+                                    <td style="text-transform: uppercase;">${item.nmsopir1 || item.sjh_sopir1_nip || '-'}</td>
+                                    <td style="text-transform: uppercase;">${item.nmsopir2 || item.sjh_sopir2_nip || '-'}</td>
+                                    <td class="text-center font-bold uppercase">${item.ass_nama || '-'}</td>
+                                    <td class="text-right font-mono font-bold">${umVal > 0 ? 'Rp ' + Number(umVal).toLocaleString('id-ID') : '-'}</td>
+                                    <td class="text-center font-bold">${item.sjh_completeyn === 'Y' ? 'SELESAI' : 'BERJALAN'}</td>
+                                </tr>
+                            `;
+        }).join('')}
+                    </tbody>
+                    <tfoot>
+                        <tr style="background-color:#e2e8f0; font-weight:bold;">
+                            <td colspan="8" class="text-right font-bold" style="padding-right: 12px;">
+                                TOTAL SURAT TUGAS (${printData.length} DOKUMEN) :
+                            </td>
+                            <td class="text-right font-mono font-bold">
+                                Rp ${grandTotalUM.toLocaleString('id-ID')}
+                            </td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <div class="signature-section">
+                    <div class="sig-box">
+                        <div>Dibuat Oleh</div>
+                        <div class="sig-space"></div>
+                        <div><u>( Staff Operasional )</u></div>
+                    </div>
+                    <div class="sig-box">
+                        <div>Diperiksa Oleh</div>
+                        <div class="sig-space"></div>
+                        <div><u>( Spv. Operasional )</u></div>
+                    </div>
+                    <div class="sig-box">
+                        <div>Mengetahui</div>
+                        <div class="sig-space"></div>
+                        <div><u>( Kepala Cabang )</u></div>
+                    </div>
+                </div>
+
+                <script>
+                    window.onload = function() {
+                        setTimeout(function() {
+                            window.print();
+                        }, 300);
+                    };
+                </script>
+            </body>
+            </html>
+                    `;
+
+        printWindow.document.open();
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+    };
+
     return (
         <div className="space-y-4 font-sans">
             {/* 🌟 1. PANEL FILTER TOGGLE (Bersih, Rapi, Tanpa Checkbox Kaku) */}
@@ -792,10 +1014,10 @@ const SuratTugas = () => {
 
                             <button
                                 type="button"
-                                onClick={handleCetakRekap}
-                                className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl flex items-center gap-1.5 transition text-xs uppercase shadow-sm cursor-pointer"
+                                onClick={handleCetakRekapSuratTugas}
+                                className="h-10 px-5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold rounded-xl text-xs flex items-center gap-2 transition shadow-sm cursor-pointer uppercase tracking-wider"
                             >
-                                <Printer size={14} /> CETAK
+                                <Printer size={15} /> CETAK
                             </button>
 
                             <button
