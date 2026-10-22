@@ -1458,6 +1458,259 @@ const PenerimaanPembayaran = () => {
         });
     };
 
+    const handleExecutePrintJurnal = () => {
+        const jData = editForm || {};
+        const accounts = [];
+
+        const totalBayar = (jData.pembayaran_customer || []).reduce(
+            (acc, curr) => acc + (parseFloat(curr.trectd_nilai || curr.nilai || 0) || 0),
+            0
+        );
+        if (totalBayar > 0) {
+            accounts.push({
+                kode: '11110',
+                nama: 'KAS / BANK PENERIMAAN',
+                debet: totalBayar,
+                kredit: 0
+            });
+        }
+
+        // Akun Kurang / Lebih Bayar
+        (jData.kurang_lebih || []).forEach(hub => {
+            const jml = parseFloat(hub.thrd_jumlah || hub.jumlah || 0);
+            const isLebih = (hub.thrd_kodelk || hub.kodelk) === 'L';
+            accounts.push({
+                kode: hub.thrd_caid || hub.caid || '-',
+                nama: hub.ca_name || hub.thrd_keterangan || hub.keterangan || (isLebih ? 'LEBIH BAYAR' : 'BIAYA KURANG BAYAR / PEMBULATAN'),
+                debet: isLebih ? 0 : jml,
+                kredit: isLebih ? jml : 0
+            });
+        });
+
+        // Akun Piutang Dagang Customer (Kredit dari total faktur terbayar)
+        const totalFaktur = (jData.pelunasan_faktur || []).reduce(
+            (acc, curr) => acc + (parseFloat(curr.trectdd_jumlah || curr.jumlah || 0) || 0),
+            0
+        );
+        if (totalFaktur > 0) {
+            accounts.push({
+                kode: '11210',
+                nama: 'PIUTANG DAGANG CUSTOMER',
+                debet: 0,
+                kredit: totalFaktur
+            });
+        }
+
+        // Kalkulasi Total Balance
+        const totalDebet = accounts.reduce((acc, curr) => acc + (curr.debet || 0), 0);
+        const totalKredit = accounts.reduce((acc, curr) => acc + (curr.kredit || 0), 0);
+
+        const printWindow = window.open('', '_blank', 'width=1100,height=800');
+        if (!printWindow) {
+            Swal.fire('Peringatan', 'Pop-up browser terblokir. Izinkan pop-up untuk mencetak!', 'warning');
+            return;
+        }
+
+        const htmlContent = `
+            <!DOCTYPE html>
+            <html lang="id">
+            <head>
+                <meta charset="UTF-8">
+                <title>Bukti Jurnal - ${jData.nojurnal || '-'}</title>
+                <style>
+                    @page {
+                        size: A4 portrait;
+                        margin: 12mm 15mm;
+                    }
+                    * {
+                        box-sizing: border-box;
+                        font-family: Arial, Helvetica, sans-serif;
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }
+                    body {
+                        margin: 0;
+                        padding: 10px;
+                        color: #000;
+                        background: #fff;
+                        font-size: 11px;
+                        line-height: 1.4;
+                    }
+                    .company-name {
+                        font-size: 12px;
+                        font-weight: 900;
+                        letter-spacing: 0.5px;
+                        text-transform: uppercase;
+                        margin-bottom: 8px;
+                    }
+                    .title-box {
+                        text-align: center;
+                        margin-bottom: 16px;
+                    }
+                    .title-box h2 {
+                        margin: 0;
+                        font-size: 14px;
+                        font-weight: 900;
+                        letter-spacing: 1px;
+                        font-family: 'Courier New', Courier, monospace;
+                        text-transform: uppercase;
+                    }
+                    .meta-grid {
+                        display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        gap: 4px 24px;
+                        font-family: 'Courier New', Courier, monospace;
+                        font-size: 11px;
+                        margin-bottom: 12px;
+                        padding-bottom: 8px;
+                        border-bottom: 1.5px solid #000;
+                    }
+                    .meta-row {
+                        display: flex;
+                    }
+                    .meta-lbl {
+                        width: 120px;
+                        font-weight: bold;
+                    }
+                    .meta-val {
+                        flex: 1;
+                    }
+                    .section-hdr {
+                        font-weight: bold;
+                        font-size: 11px;
+                        margin: 10px 0 6px 0;
+                        text-transform: uppercase;
+                        letter-spacing: 0.3px;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        font-size: 11px;
+                        margin-bottom: 12px;
+                    }
+                    table th, table td {
+                        border: 1px solid #333;
+                        padding: 5px 8px;
+                    }
+                    table th {
+                        background-color: #f1f5f9 !important;
+                        font-weight: bold;
+                        text-align: center;
+                        font-size: 10.5px;
+                        letter-spacing: 0.3px;
+                    }
+                    .text-center { text-align: center; }
+                    .text-right { text-align: right; }
+                    .font-mono { font-family: 'Courier New', Courier, monospace; }
+                    .font-bold { font-weight: bold; }
+                    .row-total {
+                        background-color: #f8fafc !important;
+                        font-weight: bold;
+                    }
+                    /* 🌟 Blok Tanda Tangan 3 Kolom Sesuai Aplikasi Lawas */
+                    .sig-section {
+                        margin-top: 40px;
+                        display: flex;
+                        justify-content: space-around;
+                        text-align: center;
+                        font-size: 11px;
+                        page-break-inside: avoid;
+                    }
+                    .sig-col {
+                        width: 28%;
+                    }
+                    .sig-space {
+                        height: 55px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="company-name">PT DAKOTA LOGISTIK INDONESIA</div>
+
+                <div class="title-box">
+                    <h2>BUKTI MEMORIAL / JURNAL PENERIMAAN</h2>
+                </div>
+
+                <div class="meta-grid">
+                    <div class="meta-row"><span class="meta-lbl">NO. JURNAL</span><span class="meta-val">: <b>${jData.nojurnal || '-'}</b></span></div>
+                    <div class="meta-row"><span class="meta-lbl">TANGGAL</span><span class="meta-val">: ${jData.tanggal || '-'}</span></div>
+                    <div class="meta-row"><span class="meta-lbl">NO. RECEIPT</span><span class="meta-val">: ${jData.noreceipt || '-'}</span></div>
+                    <div class="meta-row"><span class="meta-lbl">CABANG / AGEN</span><span class="meta-val">: ${jData.cabang || 'DLI PUSAT'}</span></div>
+                    <div class="meta-row" style="grid-column: span 2;"><span class="meta-lbl">CUSTOMER</span><span class="meta-val">: ${jData.customer || '-'} [${jData.custid || '-'}]</span></div>
+                    <div class="meta-row" style="grid-column: span 2;"><span class="meta-lbl">KETERANGAN</span><span class="meta-val">: ${jData.keterangan || '-'}</span></div>
+                </div>
+
+                <div class="section-hdr">RINCIAN AKUN (DEBET / KREDIT) :</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 140px;">KODE AKUN</th>
+                            <th>KETERANGAN AKUN</th>
+                            <th style="width: 150px;">DEBET (RP)</th>
+                            <th style="width: 150px;">KREDIT (RP)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${accounts.length > 0 ? accounts.map(a => `
+                            <tr>
+                                <td class="font-mono font-bold">${a.kode}</td>
+                                <td>${a.nama}</td>
+                                <td class="text-right font-mono font-bold">${a.debet > 0 ? Number(a.debet).toLocaleString('id-ID') : '0'}</td>
+                                <td class="text-right font-mono font-bold">${a.kredit > 0 ? Number(a.kredit).toLocaleString('id-ID') : '0'}</td>
+                            </tr>
+                        `).join('') : `
+                            <tr>
+                                <td class="font-mono font-bold">11110</td>
+                                <td>KAS / BANK PENERIMAAN</td>
+                                <td class="text-right font-mono font-bold">0</td>
+                                <td class="text-right font-mono">0</td>
+                            </tr>
+                        `}
+                    </tbody>
+                    <tfoot>
+                        <tr class="row-total">
+                            <td colspan="2" class="text-right font-bold" style="letter-spacing: 0.5px;">TOTAL BALANCE :</td>
+                            <td class="text-right font-mono font-bold">Rp ${Number(totalDebet).toLocaleString('id-ID')}</td>
+                            <td class="text-right font-mono font-bold">Rp ${Number(totalKredit).toLocaleString('id-ID')}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <!-- 🌟 Tanda Tangan 3 Kolom Sesuai Format Aplikasi Lawas -->
+                <div class="sig-section">
+                    <div class="sig-col">
+                        <div class="font-bold">Diterima</div>
+                        <div class="sig-space"></div>
+                        <div><b>( Keuangan )</b></div>
+                    </div>
+                    <div class="sig-col">
+                        <div class="font-bold">Disetujui</div>
+                        <div class="sig-space"></div>
+                        <div><b>( Direksi )</b></div>
+                    </div>
+                    <div class="sig-col">
+                        <div class="font-bold">Diketahui</div>
+                        <div class="sig-space"></div>
+                        <div><b>( Akunting )</b></div>
+                    </div>
+                </div>
+
+                <script>
+                    window.onload = function() {
+                        setTimeout(function() {
+                            window.print();
+                        }, 300);
+                    };
+                </script>
+            </body>
+            </html>
+                    `;
+
+        printWindow.document.open();
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+    };
+
     return (
         <div className="space-y-4 font-sans">
             {/* Filter Panel */}
@@ -2751,10 +3004,10 @@ const PenerimaanPembayaran = () => {
                             <div className="flex items-center gap-2">
                                 <button
                                     type="button"
-                                    onClick={() => window.print()}
-                                    className="px-4 py-1.5 bg-[#004b84] hover:bg-sky-900 active:scale-95 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer uppercase"
+                                    onClick={handleExecutePrintJurnal}
+                                    className="px-4 py-1.5 bg-[#004b84] hover:bg-[#003863] active:scale-95 text-white font-bold rounded-xl text-xs uppercase flex items-center gap-1.5 transition shadow-sm cursor-pointer"
                                 >
-                                    <Printer size={15} /> Cetak Sekarang
+                                    <Printer size={14} /> Cetak Sekarang
                                 </button>
                                 <button
                                     onClick={() => setIsJurnalPrintModalOpen(false)}
@@ -2877,23 +3130,19 @@ const PenerimaanPembayaran = () => {
                                 </div>
                             </div>
 
-                            {/* Kolom Tanda Tangan Dokumen Akuntansi */}
-                            <div className="pt-8 grid grid-cols-4 text-center text-xs text-black">
+                            {/* 🌟 BLOK TANDA TANGAN 3 KOLOM SESUAI FORMAT APLIKASI LAWAS */}
+                            <div className="pt-8 pb-4 grid grid-cols-3 text-center text-xs text-slate-800 font-medium">
                                 <div>
-                                    <p className="font-bold mb-16">Dibuat Oleh</p>
-                                    <p className="font-medium underline">( Kasir / Keuangan )</p>
+                                    <p className="font-bold text-slate-900 mb-14">Diterima</p>
+                                    <p className="font-bold text-slate-900">( Keuangan )</p>
                                 </div>
                                 <div>
-                                    <p className="font-bold mb-16">Diperiksa Oleh</p>
-                                    <p className="font-medium underline">( Supervisor )</p>
+                                    <p className="font-bold text-slate-900 mb-14">Disetujui</p>
+                                    <p className="font-bold text-slate-900">( Direksi )</p>
                                 </div>
                                 <div>
-                                    <p className="font-bold mb-16">Disetujui Oleh</p>
-                                    <p className="font-medium underline">( Ka. Cabang )</p>
-                                </div>
-                                <div>
-                                    <p className="font-bold mb-16">Pembukuan</p>
-                                    <p className="font-medium underline">( Accounting )</p>
+                                    <p className="font-bold text-slate-900 mb-14">Diketahui</p>
+                                    <p className="font-bold text-slate-900">( Akunting )</p>
                                 </div>
                             </div>
                         </div>
