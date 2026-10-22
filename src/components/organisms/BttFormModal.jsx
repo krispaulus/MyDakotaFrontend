@@ -293,13 +293,18 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
             finalValue = finalValue.toUpperCase();
         }
 
+        // 📐 3. Konversi koma ke titik untuk input angka desimal (Kubikasi & Berat)
+        if (name === 'bttt_ukuran' || name === 'bttt_berat') {
+            finalValue = typeof finalValue === 'string' ? finalValue.replace(',', '.') : finalValue;
+        }
+
         setFormData((prev) => ({ ...prev, [name]: finalValue }));
 
         if (errors[name]) {
             setErrors(prev => ({ ...prev, [name]: null }));
         }
 
-        // ✉️ 3. Validasi Email Realtime
+        // ✉️ 4. Validasi Email Realtime
         if (name === 'bttt_tujuanemail') {
             validateEmailPenerima(finalValue);
         }
@@ -323,58 +328,46 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
         setLoadingTarif(true);
         try {
             const token = localStorage.getItem('token');
-            const response = await api.post('/btt/calculate-tarif', {
-                asal_kota: String(formData.bttt_asalagenid || "").trim(),
-                tujuan_kecamatan: formData.bttt_tujuankecamatan,
-                tujuan_kec: formData.bttt_tujuankecamatan,
-                agen_id: String(formData.bttt_asalagenid || "").trim(),
-                cust_id: String(formData.bttt_asalcustid || "").trim(),
-                berat_asli: Math.max(parseFloat(formData.bttt_berat) || 0, parseFloat(formData.bttt_beratvol) || 0, 1),
-                panjang: parseFloat(formData.bttt_panjang) || 0,
-                lebar: parseFloat(formData.bttt_lebar) || 0,
-                tinggi: parseFloat(formData.bttt_tinggi) || 0,
-                jenis_layanan: formData.bttt_paketyn === 'Y' ? 'REGULER' : 'EKONOMIS'
-            }, {
-                headers: { 'Authorization': `Bearer ${token}` }
+            const endpoint = isEditMode ? '/btt/update' : '/btt/add';
+            const totalBiayaFinal = parseFloat(formData.bttt_harga || 0) + parseFloat(formData.bttt_biayapenerus || 0) + parseFloat(formData.bttt_biayapacking || 0);
+
+            const payload = {
+                no_btt: formData.bttt_nobtt,
+                id: formData.bttt_nobtt,
+                ...formData,
+                // 🌟 Pastikan kubikasi dikirim dalam bentuk desimal float64
+                bttt_ukuran: parseFloat(formData.bttt_ukuran) || 0,
+                total_biaya: totalBiayaFinal,
+                bttt_harga: parseFloat(formData.bttt_harga || 0),
+                bttt_biayapenerus: parseFloat(formData.bttt_biayapenerus || 0),
+                bttt_biayapacking: parseFloat(formData.bttt_biayapacking || 0)
+            };
+
+            const res = await api.post(endpoint, payload, {
+                headers: { Authorization: `Bearer ${token}` }
             });
 
-            const data = response.data;
-            if (response.status === 200) {
-                const hargaFinal = data.grand_total || 0;
-                setTarifRegulerData(data.reguler_row || null);
-                setTarifEkonomisData(data.ekonomis_row || null);
-
-                setFormData(prev => ({
-                    ...prev,
-                    bttt_harga: hargaFinal,
-                    bttt_status_hitung: data.status_hitung || "TERHITUNG OTOMATIS",
-                    reguler_lt: data.reguler_row?.estimasihari || data.reguler_row?.estimasi_hari || 0,
-                    ekonomis_lt: data.ekonomis_row?.estimasihari || data.ekonomis_row?.estimasi_hari || 0
-                }));
+            if (res.data && res.data.status === "success") {
+                const noBttResmi = res.data.btt_no || formData.bttt_nobtt;
+                onClose();
 
                 Swal.fire({
-                    title: 'TARIF BERHASIL DIHITUNG!',
-                    html: `Total Biaya: <b class="text-xl text-indigo-600">Rp ${hargaFinal.toLocaleString('id-ID')}</b>`,
+                    title: isEditMode ? 'BTT BERHASIL DIPERBARUI!' : 'SUKSES SIMPAN BTT!',
+                    html: `<div class="p-2"><p>Nomor Resi BTT:</p><h2 class="text-2xl font-black text-emerald-600 font-mono mt-1">${noBttResmi}</h2></div>`,
                     icon: 'success',
-                    confirmButtonColor: '#4f46e5',
-                    customClass: { container: 'z-[999999] font-sans' }
-                });
-            } else {
-                Swal.fire({
-                    title: 'Gagal Hitung',
-                    text: data.error || 'Rute belum terdaftar di database kargo Dakota!',
-                    icon: 'error',
-                    confirmButtonColor: '#4f46e5',
-                    customClass: { container: 'z-[999999] font-sans' }
+                    confirmButtonColor: '#004b84',
+                    customClass: { container: 'z-[999999]' }
+                }).then(() => {
+                    if (onSave) onSave(payload);
                 });
             }
         } catch (err) {
             Swal.fire({
-                title: 'Gagal Hitung',
-                text: err.response?.data?.error || 'Terjadi kesalahan jaringan atau rute tidak terdaftar, bro...',
+                title: 'Gagal Menyimpan',
+                text: err.response?.data?.message || err.message,
                 icon: 'error',
-                confirmButtonColor: '#4f46e5',
-                customClass: { container: 'z-[999999] font-sans' }
+                confirmButtonColor: '#ef4444',
+                customClass: { container: 'z-[999999]' }
             });
         } finally {
             setLoadingTarif(false);
@@ -968,6 +961,9 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                 panjang: parseFloat(formData.bttt_panjang) || 0,
                 lebar: parseFloat(formData.bttt_lebar) || 0,
                 tinggi: parseFloat(formData.bttt_tinggi) || 0,
+                // 🌟 Kirim nilai kubikasi m3 dalam bentuk float
+                kubikasi: parseFloat(formData.bttt_ukuran) || 0,
+                volume_cbm: parseFloat(formData.bttt_ukuran) || 0,
                 jenis_layanan: formData.bttt_layanan_nama || "Darat",
                 layanan: formData.bttt_layanan_nama || "Darat",
                 jenis_pelayanan: formData.bttt_paketyn === "N" ? "CARTER" : "PAKET",
@@ -1686,12 +1682,12 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                                     <label className="block font-bold text-slate-600 text-[11px] uppercase mb-1">Kubikasi (m³) :</label>
                                     <input
                                         type="number"
-                                        step="0.01"
+                                        step="any"
                                         name="bttt_ukuran"
-                                        value={formData.bttt_ukuran || ''}
+                                        value={formData.bttt_ukuran !== undefined && formData.bttt_ukuran !== null ? formData.bttt_ukuran : ''}
                                         onChange={handleChange}
                                         className="w-full p-2 bg-white border border-slate-300 rounded-lg font-bold text-center text-slate-800 outline-none focus:border-sky-500"
-                                        placeholder="0"
+                                        placeholder="0.000"
                                     />
                                 </div>
                             </div>
@@ -1972,8 +1968,8 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                         onClick={handleSubmit}
                         disabled={loadingTarif}
                         className={`px-6 py-2 rounded-xl uppercase text-xs shadow-xs transition flex items-center gap-2 font-bold cursor-pointer ${isEditMode
-                                ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                                : 'bg-[#004b84] hover:bg-[#003863] text-white'
+                            ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                            : 'bg-[#004b84] hover:bg-[#003863] text-white'
                             }`}
                     >
                         {isEditMode ? <Save size={15} /> : <FileText size={15} />}
@@ -2116,8 +2112,18 @@ const OrderPackingModal = ({ isOpen, onClose, parentData, onSavePacking }) => {
                                 <input type="text" readOnly className="w-full mt-1.5 p-3 bg-gray-50 border border-gray-200 rounded-xl text-slate-600 font-black text-center cursor-not-allowed outline-none" value={parentData.bttt_beratvol} />
                             </div>
                             <div>
-                                <label className="font-bold text-slate-500 uppercase">KUBIKASI :</label>
-                                <input type="text" readOnly className="w-full mt-1.5 p-3 bg-gray-50 border border-gray-200 rounded-xl text-slate-600 font-black text-center cursor-not-allowed outline-none" value={parentData.bttt_ukuran || 0} />
+                                <label className="block font-bold text-slate-600 text-[11px] uppercase mb-1">
+                                    Kubikasi (m³) :
+                                </label>
+                                <input
+                                    type="number"
+                                    step="any"
+                                    name="bttt_ukuran"
+                                    value={formData.bttt_ukuran !== undefined && formData.bttt_ukuran !== null ? formData.bttt_ukuran : ''}
+                                    onChange={handleChange}
+                                    className="w-full p-2 bg-white border border-slate-300 rounded-lg font-bold text-center text-slate-800 outline-none focus:border-sky-500"
+                                    placeholder="0.000"
+                                />
                             </div>
                         </div>
                     </div>
