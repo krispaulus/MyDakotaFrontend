@@ -541,26 +541,34 @@ const PenerimaanPembayaran = () => {
         }
     };
 
-    // Pilih Invoice Belum Lunas
     const handlePilihInvoice = (inv) => {
-        const isExist = editForm.pelunasan_faktur.some(f => (f.trectdd_nofpum || f.no_kwitansi) === inv.no_kwitansi);
-        if (isExist) {
-            Swal.fire('Info', 'Faktur ini sudah dipilih ke dalam rincian pelunasan!', 'info');
+        // Cek apakah faktur sudah ada di list
+        const exists = editForm.pelunasan_faktur.some(
+            (item) => (item.trectdd_nofpum || item.no_fpum) === inv.no_kwitansi
+        );
+        if (exists) {
+            Swal.fire('Info', 'Faktur ini sudah dimasukkan ke dalam daftar pelunasan.', 'info');
             return;
         }
 
-        const newFakturItem = {
-            trectdd_nofpum: inv.no_kwitansi,
-            trectdd_tgljt: inv.tanggalStr || inv.tanggal,
-            trectdd_jumlah: inv.jumlahTagihan || inv.jumlah_tagihan
-        };
+        const tagihan = parseFloat(inv.jumlahTagihan || inv.jumlah_tagihan || 0);
+        const ppnVal = parseFloat(inv.artih_ppn || inv.ppn || 0);
+        const dppVal = parseFloat(inv.artih_dpp || inv.dpp || (ppnVal > 0 ? (tagihan / 1.011) : tagihan));
 
-        setEditForm(prev => ({
+        setEditForm((prev) => ({
             ...prev,
-            pelunasan_faktur: [...prev.pelunasan_faktur, newFakturItem]
+            pelunasan_faktur: [
+                ...prev.pelunasan_faktur,
+                {
+                    trectdd_nofpum: inv.no_kwitansi,
+                    trectdd_tgljt: inv.tanggalStr || inv.tanggal,
+                    artih_dpp: Math.round(dppVal),
+                    artih_ppn: Math.round(ppnVal),
+                    artih_total: tagihan,
+                    trectdd_jumlah: tagihan
+                }
+            ]
         }));
-
-        setUnpaidInvoices(prev => prev.filter(f => f.no_kwitansi !== inv.no_kwitansi));
     };
 
     // Tambah Kurang/Lebih Bayar
@@ -1605,11 +1613,13 @@ const PenerimaanPembayaran = () => {
                 renderExtraActions={renderCustomActions}
             />
 
-            {/* Modal Form Transaksi Terpadu */}
+            {/* ========================================================================= */}
+            {/* 🌟 MODAL TRANSAKSI PENERIMAAN PEMBAYARAN KREDIT SESUAI SISTEM LAWAS     */}
+            {/* ========================================================================= */}
             {isTransactionModalOpen && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-[70] p-4 animate-in fade-in duration-200">
                     <div className="w-full max-w-6xl bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 max-h-[94vh]">
-                        {/* Header Modal */}
+                        {/* Header Modal Bar */}
                         <div className="px-8 py-4 bg-[#004b84] text-white flex justify-between items-center shrink-0">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-white/10 rounded-xl">
@@ -1620,7 +1630,7 @@ const PenerimaanPembayaran = () => {
                                         Data Penerimaan Pembayaran Kredit
                                     </h2>
                                     <p className="text-[11px] text-sky-100 font-mono">
-                                        No. Receipt: <b className="text-white">{editForm.noreceipt}</b> • Cabang: {editForm.cabang}
+                                        No. Receipt: <b className="text-white">{editForm.noreceipt || '-'}</b> &nbsp;|&nbsp; Cabang: {editForm.cabang || 'DLI PUSAT'}
                                     </p>
                                 </div>
                             </div>
@@ -1633,25 +1643,29 @@ const PenerimaanPembayaran = () => {
                             </button>
                         </div>
 
-                        {/* Modal Body */}
-                        <div className="p-6 overflow-y-auto space-y-4 text-xs font-semibold text-slate-700 flex-1">
-                            {/* 1. Header Penerimaan */}
+                        {/* Modal Body: Scrollable */}
+                        <div className="p-6 overflow-y-auto space-y-5 text-xs font-semibold text-slate-700 flex-1">
+
+                            {/* ============================================================== */}
+                            {/* BAGIAN 1: INPUT INFORMASI DOKUMEN PENERIMAAN KREDIT            */}
+                            {/* ============================================================== */}
                             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3.5">
                                 <div className="flex items-center justify-between pb-2 border-b border-slate-200">
                                     <span className="font-black text-slate-800 uppercase tracking-wide flex items-center gap-2 text-xs">
-                                        <FileText size={15} className="text-[#004b84]" /> Informasi Dokumen Penerimaan
+                                        <FileText size={15} className="text-[#004b84]" /> INPUT PENERIMAAN PEMBAYARAN KREDIT
                                     </span>
                                     <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${editForm.posting_yn === 'Y' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
-                                        {editForm.posting_yn === 'Y' ? 'Status: POSTED' : 'Status: DRAFT'}
+                                        {editForm.posting_yn === 'Y' ? 'STATUS: POSTED' : 'STATUS: DRAFT'}
                                     </span>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                                    {/* Baris 1: No Receipt, Cabang, Posting, No Jurnal */}
                                     <div className="md:col-span-3">
                                         <label className="block text-[10px] text-slate-500 font-bold uppercase mb-1">NO. RECEIPT :</label>
                                         <input
                                             type="text"
-                                            value={editForm.noreceipt}
+                                            value={editForm.noreceipt || ''}
                                             readOnly
                                             className="w-full h-9 px-3 bg-slate-200/70 border border-slate-300 rounded-xl font-mono font-bold text-slate-800 outline-none"
                                         />
@@ -1659,7 +1673,7 @@ const PenerimaanPembayaran = () => {
                                     <div className="md:col-span-3">
                                         <label className="block text-[10px] text-slate-500 font-bold uppercase mb-1">CABANG / AGEN :</label>
                                         <select
-                                            value={editForm.cabang}
+                                            value={editForm.cabang || 'DLI PUSAT'}
                                             onChange={(e) => setEditForm({ ...editForm, cabang: e.target.value })}
                                             className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl font-bold text-xs uppercase outline-none focus:border-blue-500 cursor-pointer"
                                         >
@@ -1669,8 +1683,6 @@ const PenerimaanPembayaran = () => {
                                             ))}
                                         </select>
                                     </div>
-
-                                    {/* POSTING RADIO (INTERAKTIF YA / TIDAK) */}
                                     <div className="md:col-span-2">
                                         <label className="block text-[10px] text-slate-500 font-bold uppercase mb-1">POSTING :</label>
                                         <div className="h-9 px-3 bg-white border border-slate-300 rounded-xl flex items-center justify-around font-bold text-xs">
@@ -1698,7 +1710,6 @@ const PenerimaanPembayaran = () => {
                                             </label>
                                         </div>
                                     </div>
-
                                     <div className="md:col-span-4">
                                         <label className="block text-[10px] text-slate-500 font-bold uppercase mb-1">NO. JURNAL :</label>
                                         <div className="flex items-center gap-1.5">
@@ -1706,10 +1717,7 @@ const PenerimaanPembayaran = () => {
                                                 type="text"
                                                 value={editForm.nojurnal || '-'}
                                                 readOnly
-                                                className={`w-full h-9 px-3 border rounded-xl font-mono font-bold outline-none ${editForm.nojurnal
-                                                    ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
-                                                    : 'bg-slate-100 border-slate-300 text-slate-500'
-                                                    }`}
+                                                className={`w-full h-9 px-3 border rounded-xl font-mono font-bold outline-none ${editForm.nojurnal ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : 'bg-slate-100 border-slate-300 text-slate-500'}`}
                                             />
                                             {editForm.nojurnal && (
                                                 <button
@@ -1724,10 +1732,11 @@ const PenerimaanPembayaran = () => {
                                         </div>
                                     </div>
 
+                                    {/* Baris 2: Customer, Cust ID, Tanggal, Keterangan */}
                                     <div className="md:col-span-4">
                                         <label className="block text-[10px] text-slate-500 font-bold uppercase mb-1">CUSTOMER :</label>
                                         <select
-                                            value={editForm.custid}
+                                            value={editForm.custid || ''}
                                             onChange={(e) => {
                                                 const cId = e.target.value;
                                                 const cObj = customers.find(c => String(c.cust_id) === String(cId));
@@ -1748,7 +1757,6 @@ const PenerimaanPembayaran = () => {
                                             ))}
                                         </select>
                                     </div>
-
                                     <div className="md:col-span-2">
                                         <label className="block text-[10px] text-slate-500 font-bold uppercase mb-1">CUST ID :</label>
                                         <input
@@ -1762,7 +1770,7 @@ const PenerimaanPembayaran = () => {
                                         <label className="block text-[10px] text-slate-500 font-bold uppercase mb-1">TANGGAL :</label>
                                         <input
                                             type="date"
-                                            value={editForm.tanggal}
+                                            value={editForm.tanggal || ''}
                                             onChange={(e) => setEditForm({ ...editForm, tanggal: e.target.value })}
                                             className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl font-mono font-bold text-slate-800 outline-none focus:border-blue-500"
                                         />
@@ -1771,7 +1779,7 @@ const PenerimaanPembayaran = () => {
                                         <label className="block text-[10px] text-slate-500 font-bold uppercase mb-1">KETERANGAN :</label>
                                         <input
                                             type="text"
-                                            value={editForm.keterangan}
+                                            value={editForm.keterangan || ''}
                                             onChange={(e) => setEditForm({ ...editForm, keterangan: e.target.value })}
                                             placeholder="Catatan pelunasan..."
                                             className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl font-medium text-slate-800 outline-none focus:border-blue-500"
@@ -1780,8 +1788,224 @@ const PenerimaanPembayaran = () => {
                                 </div>
                             </div>
 
-                            {/* 2. Kalkulasi Pembayaran & Selisih */}
-                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4.5 space-y-2">
+                            {/* ============================================================== */}
+                            {/* BAGIAN 2: TABEL 1. PEMBAYARAN DARI CUSTOMER (SESUAI GAMBAR 2)  */}
+                            {/* ============================================================== */}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="font-black text-slate-800 uppercase text-xs flex items-center gap-1.5">
+                                        <CreditCard size={15} className="text-blue-700" /> 1. PEMBAYARAN DARI CUSTOMER
+                                    </span>
+                                    <span className="font-mono font-bold text-emerald-700 text-xs">
+                                        Total Bayar: Rp {totalPembayaranCustomer.toLocaleString('id-ID')}
+                                    </span>
+                                </div>
+                                <div className="rounded-xl border border-slate-300 overflow-hidden shadow-2xs">
+                                    <table className="w-full text-left text-xs border-collapse">
+                                        <thead className="bg-[#004b84] text-white font-bold uppercase text-[10px]">
+                                            <tr>
+                                                <th className="p-2 w-10 text-center">NO</th>
+                                                <th className="p-2 w-28">TYPE</th>
+                                                <th className="p-2">NO. BG</th>
+                                                <th className="p-2">BANK</th>
+                                                <th className="p-2 text-center w-28">JATUH TEMPO</th>
+                                                <th className="p-2 text-right w-36">NILAI (RP)</th>
+                                                <th className="p-2 text-center w-16">HAPUS</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-200 font-medium">
+                                            {editForm.pembayaran_customer.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={7} className="p-4 text-center text-slate-400 italic bg-slate-50/50">
+                                                        Belum ada rincian pembayaran dari customer.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                editForm.pembayaran_customer.map((p, idx) => (
+                                                    <tr key={idx} className="hover:bg-slate-50">
+                                                        <td className="p-2 text-center font-mono">{idx + 1}</td>
+                                                        <td className="p-2 font-bold uppercase">
+                                                            {p.trectd_type === '0' || p.trectd_type === 0 ? 'Cash' : p.trectd_type === '1' || p.trectd_type === 1 ? 'Giro / Cek' : 'Transfer'}
+                                                        </td>
+                                                        <td className="p-2 font-mono">{p.trectd_nobg || '-'}</td>
+                                                        <td className="p-2 uppercase">{p.trectd_nmbank || '-'}</td>
+                                                        <td className="p-2 text-center font-mono">
+                                                            {p.trectd_tanggaljt ? p.trectd_tanggaljt.split('T')[0] : '-'}
+                                                        </td>
+                                                        <td className="p-2 text-right font-mono font-bold text-emerald-700">
+                                                            {Number(p.trectd_nilai || p.nilai || 0).toLocaleString('id-ID')}
+                                                        </td>
+                                                        <td className="p-2 text-center">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setEditForm(prev => ({
+                                                                    ...prev,
+                                                                    pembayaran_customer: prev.pembayaran_customer.filter((_, i) => i !== idx)
+                                                                }))}
+                                                                className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer transition"
+                                                                title="Hapus baris pembayaran ini"
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {/* ============================================================== */}
+                            {/* BAGIAN 3: TABEL 2. PELUNASAN FAKTUR (SESUAI GAMBAR 2)           */}
+                            {/* ============================================================== */}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="font-black text-slate-800 uppercase text-xs flex items-center gap-1.5">
+                                        <Receipt size={15} className="text-blue-700" /> 2. PELUNASAN FAKTUR
+                                    </span>
+                                    <span className="font-mono font-bold text-blue-700 text-xs">
+                                        Total Tagihan: Rp {totalPelunasanFaktur.toLocaleString('id-ID')}
+                                    </span>
+                                </div>
+                                <div className="rounded-xl border border-slate-300 overflow-hidden shadow-2xs">
+                                    <table className="w-full text-left text-xs border-collapse">
+                                        <thead className="bg-[#004b84] text-white font-bold uppercase text-[10px]">
+                                            <tr>
+                                                <th className="p-2 w-10 text-center">NO</th>
+                                                <th className="p-2">NO. FAKTUR</th>
+                                                <th className="p-2 text-center w-28">TANGGAL</th>
+                                                <th className="p-2 text-right w-24">DPP</th>
+                                                <th className="p-2 text-right w-20">PPN</th>
+                                                <th className="p-2 text-right w-36">JML. TAGIHAN</th>
+                                                <th className="p-2 text-right w-36">TAGIHAN TERBAYAR</th>
+                                                <th className="p-2 text-center w-16">HAPUS</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-200 font-medium">
+                                            {editForm.pelunasan_faktur.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={8} className="p-4 text-center text-slate-400 italic bg-slate-50/50">
+                                                        Belum ada faktur yang dipilih untuk dilunasi.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                editForm.pelunasan_faktur.map((inv, idx) => (
+                                                    <tr key={idx} className="hover:bg-slate-50">
+                                                        <td className="p-2 text-center font-mono">{idx + 1}</td>
+                                                        <td className="p-2 font-mono font-bold text-blue-700">
+                                                            {inv.trectdd_nofpum || inv.no_fpum}
+                                                        </td>
+                                                        <td className="p-2 text-center font-mono">
+                                                            {inv.trectdd_tgljt || inv.tanggal || '-'}
+                                                        </td>
+                                                        <td className="p-2 text-right font-mono">
+                                                            {Number(inv.artih_dpp || inv.dpp || 0).toLocaleString('id-ID')}
+                                                        </td>
+                                                        <td className="p-2 text-right font-mono">
+                                                            {Number(inv.artih_ppn || inv.ppn || 0).toLocaleString('id-ID')}
+                                                        </td>
+                                                        <td className="p-2 text-right font-mono font-semibold">
+                                                            {Number(inv.artih_total || inv.jumlah_tagihan || inv.trectdd_jumlah || 0).toLocaleString('id-ID')}
+                                                        </td>
+                                                        <td className="p-2 text-right font-mono font-bold text-emerald-700">
+                                                            {Number(inv.trectdd_jumlah || 0).toLocaleString('id-ID')}
+                                                        </td>
+                                                        <td className="p-2 text-center">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setEditForm(prev => ({
+                                                                    ...prev,
+                                                                    pelunasan_faktur: prev.pelunasan_faktur.filter((_, i) => i !== idx)
+                                                                }))}
+                                                                className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer transition"
+                                                                title="Hapus faktur ini"
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {/* ============================================================== */}
+                            {/* BAGIAN 4: TABEL 3. KURANG / LEBIH BAYAR (SESUAI GAMBAR 2)       */}
+                            {/* ============================================================== */}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="font-black text-slate-800 uppercase text-xs flex items-center gap-1.5">
+                                        <ArrowRightLeft size={15} className="text-amber-600" /> 3. KURANG / LEBIH BAYAR
+                                    </span>
+                                    <span className="font-mono font-bold text-amber-700 text-xs">
+                                        Lebih: Rp {totalLebihBayar.toLocaleString('id-ID')} &nbsp;|&nbsp; Kurang: Rp {totalKurangBayar.toLocaleString('id-ID')}
+                                    </span>
+                                </div>
+                                <div className="rounded-xl border border-slate-300 overflow-hidden shadow-2xs">
+                                    <table className="w-full text-left text-xs border-collapse">
+                                        <thead className="bg-[#004b84] text-white font-bold uppercase text-[10px]">
+                                            <tr>
+                                                <th className="p-2 w-10 text-center">NO</th>
+                                                <th className="p-2 w-32">JENIS</th>
+                                                <th className="p-2 w-36">KODE AKUN</th>
+                                                <th className="p-2">NAMA AKUN</th>
+                                                <th className="p-2">KETERANGAN</th>
+                                                <th className="p-2 text-right w-36">JUMLAH (RP)</th>
+                                                <th className="p-2 text-center w-16">HAPUS</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-200 font-medium">
+                                            {editForm.kurang_lebih.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={7} className="p-4 text-center text-slate-400 italic bg-slate-50/50">
+                                                        Belum ada penyesuaian kurang / lebih bayar.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                editForm.kurang_lebih.map((hub, idx) => (
+                                                    <tr key={idx} className="hover:bg-slate-50">
+                                                        <td className="p-2 text-center font-mono">{idx + 1}</td>
+                                                        <td className="p-2 font-bold uppercase">
+                                                            {(hub.thrd_kodelk || hub.kodelk) === 'L' ? (
+                                                                <span className="text-sky-700">LEBIH BAYAR</span>
+                                                            ) : (
+                                                                <span className="text-amber-600">KURANG BAYAR</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="p-2 font-mono font-bold">{hub.thrd_caid || hub.caid}</td>
+                                                        <td className="p-2">{hub.ca_name || '-'}</td>
+                                                        <td className="p-2">{hub.thrd_keterangan || hub.keterangan || '-'}</td>
+                                                        <td className="p-2 text-right font-mono font-bold">
+                                                            {Number(hub.thrd_jumlah || hub.jumlah || 0).toLocaleString('id-ID', { minimumFractionDigits: 2 })}
+                                                        </td>
+                                                        <td className="p-2 text-center">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setEditForm(prev => ({
+                                                                    ...prev,
+                                                                    kurang_lebih: prev.kurang_lebih.filter((_, i) => i !== idx)
+                                                                }))}
+                                                                className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer transition"
+                                                                title="Hapus baris ini"
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {/* ============================================================== */}
+                            {/* BAGIAN 5: KALKULASI PEMBAYARAN SUMMARY CARD                     */}
+                            {/* ============================================================== */}
+                            <div className="bg-slate-50 border border-slate-300 rounded-2xl p-4.5 space-y-2">
                                 <span className="font-black text-slate-800 uppercase tracking-wide flex items-center gap-2 text-xs">
                                     <Calculator size={15} className="text-[#004b84]" /> KALKULASI PEMBAYARAN
                                 </span>
@@ -1811,10 +2035,7 @@ const PenerimaanPembayaran = () => {
                                             {totalPembayaranCustomer.toLocaleString('id-ID')}
                                         </span>
                                     </div>
-                                    <div className={`p-3 rounded-xl border ${Math.abs(selisihPembayaran) <= 0.01
-                                        ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
-                                        : 'bg-rose-50 border-rose-300 text-rose-900'
-                                        }`}>
+                                    <div className={`p-3 rounded-xl border ${Math.abs(selisihPembayaran) <= 0.01 ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-rose-50 border-rose-300 text-rose-900'}`}>
                                         <span className="text-[10px] uppercase font-black block">SELISIH :</span>
                                         <span className="font-mono font-black text-base">
                                             {selisihPembayaran.toLocaleString('id-ID')}
@@ -1823,7 +2044,9 @@ const PenerimaanPembayaran = () => {
                                 </div>
                             </div>
 
-                            {/* 3. Tambah Rincian Pembayaran */}
+                            {/* ============================================================== */}
+                            {/* BAGIAN 6: FORM TAMBAH RINCIAN PEMBAYARAN (INPUT ENTRY BARU)    */}
+                            {/* ============================================================== */}
                             <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
                                 <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
                                     <span className="font-black text-slate-800 uppercase tracking-wide flex items-center gap-2 text-xs">
@@ -1834,36 +2057,28 @@ const PenerimaanPembayaran = () => {
                                         <button
                                             type="button"
                                             onClick={() => setActiveTabRincian('terima')}
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${activeTabRincian === 'terima'
-                                                ? 'bg-white text-blue-600 shadow-xs font-black'
-                                                : 'text-slate-600 hover:text-slate-900'
-                                                }`}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${activeTabRincian === 'terima' ? 'bg-white text-blue-600 shadow-xs font-black' : 'text-slate-600 hover:text-slate-900'}`}
                                         >
-                                            <CreditCard size={13} /> Pembayaran Customer
+                                            <CreditCard size={13} /> 1. Pembayaran Customer
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => setActiveTabRincian('pelunasan')}
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${activeTabRincian === 'pelunasan'
-                                                ? 'bg-white text-blue-600 shadow-xs font-black'
-                                                : 'text-slate-600 hover:text-slate-900'
-                                                }`}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${activeTabRincian === 'pelunasan' ? 'bg-white text-blue-600 shadow-xs font-black' : 'text-slate-600 hover:text-slate-900'}`}
                                         >
-                                            <Receipt size={13} /> Pelunasan Faktur
+                                            <Receipt size={13} /> 2. Pelunasan Faktur
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => setActiveTabRincian('hub')}
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${activeTabRincian === 'hub'
-                                                ? 'bg-white text-blue-600 shadow-xs font-black'
-                                                : 'text-slate-600 hover:text-slate-900'
-                                                }`}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${activeTabRincian === 'hub' ? 'bg-white text-blue-600 shadow-xs font-black' : 'text-slate-600 hover:text-slate-900'}`}
                                         >
-                                            <ArrowRightLeft size={13} /> Kurang / Lebih Bayar
+                                            <ArrowRightLeft size={13} /> 3. Kurang / Lebih Bayar
                                         </button>
                                     </div>
                                 </div>
 
+                                {/* Form 1. Entry Pembayaran Customer */}
                                 {activeTabRincian === 'terima' && (
                                     <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                                         <div className="md:col-span-2">
@@ -1942,7 +2157,7 @@ const PenerimaanPembayaran = () => {
                                                     }));
                                                     setInputBayarNilai('');
                                                 }}
-                                                className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs uppercase cursor-pointer"
+                                                className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-xl text-xs uppercase cursor-pointer"
                                             >
                                                 TAMBAH
                                             </button>
@@ -1950,6 +2165,7 @@ const PenerimaanPembayaran = () => {
                                     </div>
                                 )}
 
+                                {/* Form 2. Entry Pelunasan Faktur */}
                                 {activeTabRincian === 'pelunasan' && (
                                     <div className="space-y-3">
                                         <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
@@ -2038,6 +2254,7 @@ const PenerimaanPembayaran = () => {
                                     </div>
                                 )}
 
+                                {/* Form 3. Entry Kurang / Lebih Bayar (Searchable Akun) */}
                                 {activeTabRincian === 'hub' && (
                                     <form onSubmit={handleAddKurangLebih} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                                         <div className="md:col-span-2">
@@ -2052,12 +2269,11 @@ const PenerimaanPembayaran = () => {
                                             </select>
                                         </div>
 
-                                        {/* ✅ KODE BARU: INPUT SEARCHABLE DENGAN DATALIST NATIVE */}
+                                        {/* Searchable Akun Datalist */}
                                         <div className="md:col-span-4 relative">
                                             <label className="block text-[10px] text-slate-500 font-bold uppercase mb-1">
-                                                NAMA AKUN / KODE BIAYA (BISA DIKETIK) :
+                                                NAMA AKUN / KODE BIAYA :
                                             </label>
-
                                             <div className="relative">
                                                 <input
                                                     type="text"
@@ -2066,7 +2282,6 @@ const PenerimaanPembayaran = () => {
                                                     value={inputHubCAID}
                                                     onChange={(e) => {
                                                         const val = e.target.value;
-                                                        // Jika user memilih item dari dropdown dengan format "KODE - NAMA"
                                                         if (val.includes(' - ')) {
                                                             const code = val.split(' - ')[0].trim();
                                                             setInputHubCAID(code);
@@ -2074,10 +2289,8 @@ const PenerimaanPembayaran = () => {
                                                             setInputHubCAID(val);
                                                         }
                                                     }}
-                                                    className="w-full h-9 px-3 pr-8 bg-white border border-slate-300 rounded-xl font-bold font-mono text-xs outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-400 placeholder:font-sans placeholder:font-normal uppercase transition"
+                                                    className="w-full h-9 px-3 pr-8 bg-white border border-slate-300 rounded-xl font-bold font-mono text-xs outline-none focus:border-blue-500 uppercase transition"
                                                 />
-
-                                                {/* Tombol Clear (X) saat input terisi */}
                                                 {inputHubCAID && (
                                                     <button
                                                         type="button"
@@ -2089,8 +2302,6 @@ const PenerimaanPembayaran = () => {
                                                     </button>
                                                 )}
                                             </div>
-
-                                            {/* Daftar opsi yang mendukung autocomplete pencarian kode & nama */}
                                             <datalist id="accounts-datalist">
                                                 {accounts.map((a) => (
                                                     <option key={a.ca_id} value={`${a.ca_id} - ${a.ca_nama}`}>
@@ -2098,19 +2309,6 @@ const PenerimaanPembayaran = () => {
                                                     </option>
                                                 ))}
                                             </datalist>
-
-                                            {/* Label konfirmasi otomatis nama akun yang sedang aktif */}
-                                            {(() => {
-                                                const selectedAcc = accounts.find(a => String(a.ca_id).trim() === String(inputHubCAID).trim());
-                                                if (selectedAcc) {
-                                                    return (
-                                                        <span className="text-[10px] text-blue-700 font-bold mt-1 block truncate">
-                                                            ✓ {selectedAcc.ca_nama}
-                                                        </span>
-                                                    );
-                                                }
-                                                return null;
-                                            })()}
                                         </div>
 
                                         <div className="md:col-span-3">
@@ -2146,113 +2344,9 @@ const PenerimaanPembayaran = () => {
                                 )}
                             </div>
 
-                            {/* 4. Tabel Pelunasan Faktur Terpilih */}
-                            {editForm.pelunasan_faktur.length > 0 && (
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <span className="font-black text-slate-800 uppercase text-[11px] flex items-center gap-1.5">
-                                            <Receipt size={14} className="text-blue-600" /> Pelunasan Faktur Terpilih
-                                        </span>
-                                        <span className="font-mono font-bold text-blue-700 text-xs">
-                                            Total: Rp {totalPelunasanFaktur.toLocaleString('id-ID')}
-                                        </span>
-                                    </div>
-                                    <div className="rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
-                                        <table className="w-full text-left text-xs border-collapse">
-                                            <thead className="bg-[#004b84] text-white font-bold uppercase text-[10px]">
-                                                <tr>
-                                                    <th className="p-2 w-10 text-center">NO</th>
-                                                    <th className="p-2">NO. FAKTUR / KWITANSI</th>
-                                                    <th className="p-2">TANGGAL JT</th>
-                                                    <th className="p-2 text-right">TAGIHAN TERBAYAR</th>
-                                                    <th className="p-2 text-center w-16">HAPUS</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-200 font-medium">
-                                                {editForm.pelunasan_faktur.map((inv, idx) => (
-                                                    <tr key={idx} className="hover:bg-slate-50">
-                                                        <td className="p-2 text-center font-mono">{idx + 1}</td>
-                                                        <td className="p-2 font-mono font-bold text-blue-700">{inv.trectdd_nofpum}</td>
-                                                        <td className="p-2 font-mono">{inv.trectdd_tgljt || '-'}</td>
-                                                        <td className="p-2 text-right font-mono font-bold">
-                                                            Rp {Number(inv.trectdd_jumlah || 0).toLocaleString('id-ID')}
-                                                        </td>
-                                                        <td className="p-2 text-center">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setEditForm(prev => ({
-                                                                    ...prev,
-                                                                    pelunasan_faktur: prev.pelunasan_faktur.filter((_, i) => i !== idx)
-                                                                }))}
-                                                                className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer"
-                                                            >
-                                                                <Trash2 size={14} />
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* 5. Tabel Kurang / Lebih Bayar Terpilih */}
-                            {editForm.kurang_lebih.length > 0 && (
-                                <div className="space-y-2">
-                                    <span className="font-black text-slate-800 uppercase text-[11px] flex items-center gap-1.5">
-                                        <ArrowRightLeft size={14} className="text-amber-600" /> Kurang / Lebih Bayar
-                                    </span>
-                                    <div className="rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
-                                        <table className="w-full text-left text-xs border-collapse">
-                                            <thead className="bg-[#004b84] text-white font-bold uppercase text-[10px]">
-                                                <tr>
-                                                    <th className="p-2 w-10 text-center">NO</th>
-                                                    <th className="p-2">JENIS</th>
-                                                    <th className="p-2">KODE AKUN</th>
-                                                    <th className="p-2">KETERANGAN</th>
-                                                    <th className="p-2 text-right">JUMLAH</th>
-                                                    <th className="p-2 text-center w-16">HAPUS</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-200 font-medium">
-                                                {editForm.kurang_lebih.map((hub, idx) => (
-                                                    <tr key={idx} className="hover:bg-slate-50">
-                                                        <td className="p-2 text-center font-mono">{idx + 1}</td>
-                                                        <td className="p-2 font-bold uppercase">
-                                                            {(hub.thrd_kodelk || hub.kodelk) === 'L' ? (
-                                                                <span className="text-sky-700">LEBIH BAYAR</span>
-                                                            ) : (
-                                                                <span className="text-amber-600">KURANG BAYAR</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="p-2 font-mono">{hub.thrd_caid || hub.caid} {hub.ca_name ? `(${hub.ca_name})` : ''}</td>
-                                                        <td className="p-2">{hub.thrd_keterangan || hub.keterangan || '-'}</td>
-                                                        <td className="p-2 text-right font-mono font-bold">
-                                                            Rp {Number(hub.thrd_jumlah || hub.jumlah || 0).toLocaleString('id-ID', { minimumFractionDigits: 2 })}
-                                                        </td>
-                                                        <td className="p-2 text-center">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setEditForm(prev => ({
-                                                                    ...prev,
-                                                                    kurang_lebih: prev.kurang_lebih.filter((_, i) => i !== idx)
-                                                                }))}
-                                                                className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer"
-                                                            >
-                                                                <Trash2 size={14} />
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            )}
                         </div>
 
-                        {/* Footer Aksi */}
+                        {/* Modal Footer Actions */}
                         <div className="px-8 py-4 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
                             <div className="flex items-center gap-2">
                                 {editForm.posting_yn !== 'Y' && (
@@ -2285,20 +2379,7 @@ const PenerimaanPembayaran = () => {
 
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        setSelectedDetail({
-                                            header: {
-                                                trecth_no: editForm.noreceipt,
-                                                trecth_tanggal: editForm.tanggal,
-                                                trecth_custname: editForm.customer,
-                                                trecth_postingyn: editForm.posting_yn,
-                                                trecth_total: totalPembayaranCustomer
-                                            },
-                                            payments: editForm.pembayaran_customer,
-                                            invoices: editForm.pelunasan_faktur
-                                        });
-                                        setIsPrintModalOpen(true);
-                                    }}
+                                    onClick={() => handleOpenDetailPrint(editForm.noreceipt)}
                                     className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-xl text-xs uppercase flex items-center gap-1.5 transition shadow-sm cursor-pointer"
                                 >
                                     <Printer size={15} /> CETAK
