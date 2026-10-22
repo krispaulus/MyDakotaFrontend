@@ -200,31 +200,31 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
         }
     }, [keywordCustomer]);
 
-    // Hitung otomatis Berat Volume (bisa dari PxLxT atau langsung dari Kubikasi M3)
+    // ✅ PERBAIKAN: Berat Volume MURNI hanya dari Dimensi (P x L x T) / 4.000
     useEffect(() => {
         const p = parseFloat(formData.bttt_panjang) || 0;
         const l = parseFloat(formData.bttt_lebar) || 0;
         const t = parseFloat(formData.bttt_tinggi) || 0;
-        const m3 = parseFloat(formData.bttt_ukuran) || 0;
+        const divisor = formData.bttt_layanan_nama === 'Udara' ? 6000 : 4000;
 
+        // Hanya hitung jika P, L, dan T semuanya lebih besar dari 0
         if (p > 0 && l > 0 && t > 0) {
-            // Hitung dari dimensi P x L x T (cm)
-            const volFromDimensi = (p * l * t) / 4000;
-            const kubikasiFromDimensi = (p * l * t) / 1000000;
+            const hitungVol = (p * l * t) / divisor;
+            // Pembulatan atau format desimal
+            const finalVol = Math.round(hitungVol * 100) / 100;
+
             setFormData(prev => ({
                 ...prev,
-                bttt_beratvol: parseFloat(volFromDimensi.toFixed(2)),
-                bttt_ukuran: parseFloat(kubikasiFromDimensi.toFixed(2))
+                bttt_beratvol: finalVol
             }));
-        } else if (m3 > 0) {
-            // Hitung dari Kubikasi M3 (1 M3 = 250 Kg Darat Reguler)
-            const volFromM3 = m3 * 250;
+        } else {
+            // Jika salah satu dari P, L, T adalah 0, Berat Vol WAJIB 0
             setFormData(prev => ({
                 ...prev,
-                bttt_beratvol: parseFloat(volFromM3.toFixed(2))
+                bttt_beratvol: 0
             }));
         }
-    }, [formData.bttt_panjang, formData.bttt_lebar, formData.bttt_tinggi, formData.bttt_ukuran]);
+    }, [formData.bttt_panjang, formData.bttt_lebar, formData.bttt_tinggi, formData.bttt_layanan_nama]);
 
     const handlePilihCustomer = (cust) => {
         const idPelanggan = cust.cust_id || cust.id || cust.kode_customer || '';
