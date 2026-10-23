@@ -566,25 +566,37 @@ const MasterCustomerNew = () => {
                                             list="kota-list-dropdown"
                                             required
                                             placeholder="Ketik atau pilih nama kota..."
-                                            value={formData.kota_name}
+                                            value={formData.kota_name || ''}
                                             onChange={(e) => {
-                                                const val = e.target.value;
-                                                const match = kotaList.find(k => (k.kota_name || k.nama) === val);
+                                                const val = e.target.value.toUpperCase();
+
+                                                // 🌟 Cari kota dengan mencakup kota_nama, kota_name, maupun ID
+                                                const match = kotaList.find(k => {
+                                                    const nama = String(k.kota_nama || k.kota_name || k.nama || '').trim().toUpperCase();
+                                                    const id = String(k.kota_id || k.id || '').trim().toUpperCase();
+                                                    return nama === val || id === val;
+                                                });
+
                                                 setFormData(prev => ({
                                                     ...prev,
                                                     kota_name: val,
-                                                    cust_kotaid: match ? (match.kota_id || match.id) : prev.cust_kotaid
+                                                    cust_kotaid: match ? (match.kota_id || match.id) : (prev.cust_kotaid || val)
                                                 }));
                                             }}
                                             className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl font-bold uppercase outline-none focus:border-blue-500"
                                         />
                                         <datalist id="kota-list-dropdown">
-                                            {kotaList.map((k, idx) => (
-                                                <option key={idx} value={k.kota_name || k.nama} />
-                                            ))}
+                                            {kotaList.map((k, idx) => {
+                                                const nama = k.kota_nama || k.kota_name || k.nama || '';
+                                                const id = k.kota_id || k.id || '';
+                                                return (
+                                                    <option key={idx} value={nama}>
+                                                        {id ? `${id} - ${nama}` : nama}
+                                                    </option>
+                                                );
+                                            })}
                                         </datalist>
                                     </div>
-
                                     <div className="md:col-span-2">
                                         <label className="block text-[10px] text-slate-500 font-bold uppercase mb-1">
                                             TELP 1 : <span className="text-rose-500">*</span>
