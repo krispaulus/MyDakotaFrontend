@@ -1019,7 +1019,6 @@ const Invoice = () => {
                 return;
             }
 
-            // 🌟 KUNCI CHROME: Buka tab/window SEBELUM await API agar TIDAK DIBLOKIR popup blocker
             const printWindow = window.open('', '_blank', 'width=1150,height=850,scrollbars=yes');
             if (!printWindow) {
                 Swal.fire('Popup Diblokir', 'Silakan klik tanda pop-up diblokir di sudut kanan atas browser Anda.', 'warning');
@@ -1137,7 +1136,6 @@ const Invoice = () => {
             return;
         }
 
-
         if (!item || !item.artih_id) {
             Swal.fire('Peringatan', 'Data invoice tidak valid untuk dicetak.', 'warning');
             return;
@@ -1147,7 +1145,6 @@ const Invoice = () => {
             const token = localStorage.getItem('token');
             const ptId = localStorage.getItem('pt_id') || 'C';
 
-            // 🎯 Ambil detail invoice sekaligus parameter Acc_Head dari rute resmi /config/params
             const [res, resParam] = await Promise.all([
                 api.get(`/piutang/invoice/detail?id=${encodeURIComponent(item.artih_id)}&pt_id=${ptId}`, {
                     headers: { Authorization: `Bearer ${token}` }
@@ -1160,10 +1157,7 @@ const Invoice = () => {
             const header = res.data?.data?.header || res.data?.header || item;
             const btts = res.data?.data?.btt_list || res.data?.btt_list || persistedSelectedBtts || [];
 
-            // 🎯 Prioritaskan pembacaan nama kepala akunting murni dari database
             let dbAccHead = res.data?.acc_head || res.data?.data?.acc_head || '';
-
-            // Jika backend detail belum terupdate, ambil dari hasil /config/params
             if (!dbAccHead && resParam?.data) {
                 const list = resParam.data.data || resParam.data;
                 if (Array.isArray(list)) {
@@ -1176,9 +1170,28 @@ const Invoice = () => {
                 ? dbAccHead.trim()
                 : '( .................................... )';
 
-            // Bersihkan format nomor kwitansi
             const rawNoKW = header.artih_nokw || savedKwitansiNo || '';
             const kwitansiDisplayNo = String(rawNoKW).trim().replace(/\/OTA\//g, '/001/');
+
+            // Scope variabel umum dokumen
+            const nomorPOCustomer = String(
+                header.nopo ||
+                header.no_po ||
+                header.Cust_NoPo ||
+                header.NoPo ||
+                header.cust_nopo ||
+                ''
+            ).trim();
+
+            const tglKwitansiIndo = formatTanggalIndonesia(header.artih_tanggal);
+            const tglJatuhTempoIndo = formatTanggalIndonesia(header.artih_tanggal);
+            const tglCetakIndo = formatTanggalIndonesia(header.artih_tanggal);
+            const noInvoiceResmi = formatNomorInvoiceResmi(header.artih_id, header.artih_tanggal);
+
+            let noFakturPajak = String(header.artih_fktpajak || '').trim();
+            if (!noFakturPajak || noFakturPajak === '010.' || noFakturPajak === '010') {
+                noFakturPajak = '010.026.00.340034701';
+            }
 
             const printWindow = window.open('', '_blank', 'width=1150,height=850,scrollbars=yes');
             if (!printWindow) {
@@ -1186,12 +1199,7 @@ const Invoice = () => {
                 return;
             }
 
-            // =====================================================================
-            // 📄 1. CETAK KHUSUS: KWITANSI TIPE 1 (SESUAI ASP LAWAS + MODERN HEADER)
-            // =====================================================================
-            // =====================================================================
-            // 📄 1. CETAK KHUSUS: KWITANSI TIPE 1 (DENGAN KODEPOS & VIA SESUAI FILE LAWAS)
-            // =====================================================================
+            // 1. KWITANSI TIPE 1
             if (docType === 'KWITANSI_1') {
                 let totalBiayaKirim = 0;
                 let totalDiskon = 0;
@@ -1205,8 +1213,6 @@ const Invoice = () => {
                     const asuransi = Number(b.biaya_asuransi || 0);
                     const packing = Number(b.biaya_packing || 0);
                     const berat = Number(b.bttt_berat || 0);
-
-                    // 🎯 Ambil Kodepos & Via langsung dari data BTT database
                     const kodepos = b.bttt_tujuankodepos || b.bttt_kodepos || b.kodepos || '-';
                     const viaTransport = (b.bttt_via || b.bttt_angkutankode || b.via || 'DARAT').toUpperCase();
 
@@ -1222,17 +1228,11 @@ const Invoice = () => {
                             <td style="border: 1px solid #cbd5e1; padding: 5px 4px; font-family: monospace; font-weight: bold; color: #0284c7;">${b.bttt_id}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center;">${formatTanggalIndonesia(b.bttt_tanggal)}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 5px 4px;">${b.bttt_tujuankota || '-'}</td>
-                            
-                            <!-- 🎯 KOLOM KODEPOS DARI DATABASE -->
                             <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center; font-family: monospace; font-weight: 600;">${kodepos}</td>
-                            
                             <td style="border: 1px solid #cbd5e1; padding: 5px 4px; font-weight: 500;">${b.bttt_tujuannama || '-'}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center;">${b.bttt_nosuratjalan || '-'}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 5px 4px; text-align: right; font-family: monospace; font-weight: 600;">${biayaKirim.toLocaleString('id-ID')}</td>
-                            
-                            <!-- 🎯 KOLOM VIA PENGIRIMAN DARI DATABASE -->
                             <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center; font-weight: bold; font-size: 9px; color: #0f172a;">${viaTransport}</td>
-                            
                             <td style="border: 1px solid #cbd5e1; padding: 5px 4px; text-align: right; font-family: monospace;">${berat.toLocaleString('id-ID')}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 5px 4px; color: #475569;">${b.bttt_namabarang || '-'}</td>
                         </tr>
@@ -1243,16 +1243,6 @@ const Invoice = () => {
                 const dpp = nilaiJual;
                 const ppn = dpp * 0.011;
                 const totalTagihan = Number(header.artih_total || (nilaiJual + ppn));
-
-                const noInvoiceResmi = formatNomorInvoiceResmi(header.artih_id, header.artih_tanggal);
-
-                let noFakturPajak = String(header.artih_fktpajak || '').trim();
-                if (!noFakturPajak || noFakturPajak === '010.' || noFakturPajak === '010') {
-                    noFakturPajak = '010.026.00.340034701';
-                }
-
-                const tglKwitansiIndo = formatTanggalIndonesia(header.artih_tanggal);
-                const tglJatuhTempoIndo = formatTanggalIndonesia(header.artih_tanggal);
 
                 printWindow.document.write(`
                     <!DOCTYPE html>
@@ -1274,8 +1264,6 @@ const Invoice = () => {
                             <button class="btn-print" style="background:#16a34a;" onclick="window.print()">PRINT</button>
                             <button class="btn-print" style="background:#e11d48;" onclick="window.close()">TUTUP</button>
                         </div>
-
-                        <!-- 1. KOP RESMI DENGAN LOGO DAKOTA CARGO -->
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <div style="display:flex; align-items:center; gap:12px;">
                                 <img src="${dakotaLogo}" alt="Logo Dakota Cargo" style="height:44px; object-fit:contain;" />
@@ -1289,15 +1277,12 @@ const Invoice = () => {
                                 <div style="font-size:10px; font-weight:bold; color:#0284c7; margin-top:2px;">NO. KWITANSI: ${kwitansiDisplayNo || '-'}</div>
                             </div>
                         </div>
-
                         <div style="height:3px; background:#004b84; margin:8px 0 10px 0; border-radius:2px;"></div>
-
-                        <!-- 2. DATA PELANGGAN & METADATA -->
                         <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; font-size:11px; background:#f8fafc; padding:8px 12px; border-radius:6px; border:1px solid #e2e8f0;">
                             <div style="width: 50%;">
                                 <div style="color:#64748b; font-size:10px; text-transform:uppercase; font-weight:bold;">Nama Pelanggan :</div>
                                 <div style="font-weight:900; font-size:13px; color:#0f172a; text-transform:uppercase; margin-top:2px;">${header.cust_name || header.artih_custname || '-'}</div>
-                                <div style="font-size:10.5px; color:#475569; margin-top:2px;">${header.cust_alamat || 'KANTOR PUSAT OPERASIONAL'}</div>
+                                <div style="font-size:10.5px; color:#475569; margin-top:2px;">${header.cust_alamat || header.cust_alamat1 || 'KANTOR PUSAT OPERASIONAL'}</div>
                             </div>
                             <div style="width: 46%;">
                                 <table style="width: 100%; border: none; margin: 0; font-size: 11px;">
@@ -1321,11 +1306,16 @@ const Invoice = () => {
                                         <td style="padding: 2px 0;">:</td>
                                         <td style="padding: 2px 0; font-weight: bold; color:#b91c1c;">${tglJatuhTempoIndo}</td>
                                     </tr>
+                                    <tr>
+                                        <td style="padding: 2px 0; color:#475569; font-weight: 600;">Nomor PO</td>
+                                        <td style="padding: 2px 0;">:</td>
+                                        <td style="padding: 2px 0; font-family: monospace; font-weight: bold; color:#0f172a;">
+                                            ${nomorPOCustomer !== '' ? nomorPOCustomer : '-'}
+                                        </td>
+                                    </tr>
                                 </table>
                             </div>
                         </div>
-
-                        <!-- 3. TABEL 11 KOLOM (LENGKAP DENGAN KODEPOS & VIA SESUAI GAMBAR 2) -->
                         <table>
                             <thead>
                                 <tr>
@@ -1346,10 +1336,7 @@ const Invoice = () => {
                                 ${kwitansiRowsHtml || '<tr><td colspan="11" style="text-align:center; padding:10px;">Tidak ada rincian resi</td></tr>'}
                             </tbody>
                         </table>
-
-                        <!-- 4. FOOTER INFORMASI REKENING, TANDA TANGAN & REKAP KEUANGAN -->
                         <div style="display:flex; border: 1px solid #94a3b8; border-top: none; font-size: 10px; background:#ffffff;">
-                            <!-- Sisi Kiri: Rekening Bank -->
                             <div style="width: 35%; padding: 10px; border-right: 1px solid #cbd5e1; display:flex; flex-direction:column; justify-content:center;">
                                 <div style="font-weight:bold; color:#004b84; margin-bottom:2px; font-size:11px;">Transfer ke :</div>
                                 <div style="font-weight:bold; color:#0f172a;">DAKOTA LOGISTIK INDONESIA PT</div>
@@ -1359,8 +1346,6 @@ const Invoice = () => {
                                     NO REKENING : 2303937226
                                 </div>
                             </div>
-
-                            <!-- Sisi Tengah: Tanda Tangan -->
                             <div style="width: 35%; padding: 10px; text-align: center; display: flex; flex-direction: column; justify-content: space-between; border-right: 1px solid #cbd5e1;">
                                 <div style="font-weight:bold; color:#0f172a;">PT. DAKOTA LOGISTIK INDONESIA</div>
                                 <div style="height: 55px;"></div>
@@ -1368,8 +1353,6 @@ const Invoice = () => {
                                     <div style="font-weight:bold; text-decoration:underline; color:#0f172a; font-size:11px; text-transform:uppercase;">${pejabatAccounting}</div>
                                 </div>
                             </div>
-
-                            <!-- Sisi Kanan: Rekap DPP, PPN, dan Total -->
                             <div style="width: 30%;">
                                 <table style="width: 100%; border: none; margin: 0; font-size: 10px;">
                                     <tr>
@@ -1414,9 +1397,7 @@ const Invoice = () => {
                 return;
             }
 
-            // =====================================================================
-            // 📄 2. CETAK KHUSUS: KWITANSI TIPE 2 (PERSIS GAMBAR DENGAN KOP CENTER)
-            // =====================================================================
+            // 2. KWITANSI TIPE 2
             if (docType === 'KWITANSI_2') {
                 const totalBiayaKirim = btts.reduce((s, b) => s + Number(b.bttt_harga || 0), 0);
                 const totalDiskon = btts.reduce((s, b) => s + Number(b.bttt_disc || 0), 0);
@@ -1428,12 +1409,6 @@ const Invoice = () => {
                 const grandTotal = Number(header.artih_total || (nilaiJual + ppn));
                 const textTerbilang = (terbilangIndonesia(Math.round(grandTotal)).trim() + ' RUPIAH').replace(/\s+/g, ' ');
 
-                // 🎯 1. Konversi Nomor Invoice resmi (bebas OTA)
-                const noInvoiceResmi = formatNomorInvoiceResmi(header.artih_id, header.artih_tanggal);
-
-                // 🎯 2. Format Tanggal Indonesia
-                const tglCetakIndo = formatTanggalIndonesia(header.artih_tanggal);
-
                 printWindow.document.write(`
                     <!DOCTYPE html>
                     <html>
@@ -1441,25 +1416,9 @@ const Invoice = () => {
                         <title>KWITANSI - ${kwitansiDisplayNo || noInvoiceResmi}</title>
                         <style>
                             @page { size: A4 landscape; margin: 10mm 15mm; }
-                            body { 
-                                font-family: 'Segoe UI', Arial, sans-serif; 
-                                font-size: 12px; 
-                                color: #1e293b; 
-                                margin: 0; 
-                                padding: 10px 15px; 
-                            }
+                            body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; color: #1e293b; margin: 0; padding: 10px 15px; }
                             .no-print { margin-bottom: 15px; text-align: right; }
-                            .btn-print { 
-                                padding: 7px 18px; 
-                                font-weight: bold; 
-                                border-radius: 6px; 
-                                border: none; 
-                                cursor: pointer; 
-                                color: white; 
-                                margin: 0 4px; 
-                                font-size: 11px; 
-                                text-transform: uppercase; 
-                            }
+                            .btn-print { padding: 7px 18px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; color: white; margin: 0 4px; font-size: 11px; text-transform: uppercase; }
                             @media print { .no-print { display: none !important; } }
                         </style>
                     </head>
@@ -1468,8 +1427,6 @@ const Invoice = () => {
                             <button class="btn-print" style="background:#16a34a;" onclick="window.print()">PRINT</button>
                             <button class="btn-print" style="background:#e11d48;" onclick="window.close()">TUTUP</button>
                         </div>
-
-                        <!-- 1. KOP HEADER DI TENGAH (CENTER) -->
                         <div style="display:flex; justify-content:center; align-items:center; gap:16px; margin-bottom:12px;">
                             <img src="${dakotaLogo}" alt="Logo Dakota Cargo" style="height:44px; object-fit:contain;" />
                             <div style="text-align:left;">
@@ -1478,18 +1435,12 @@ const Invoice = () => {
                                 <div style="font-size:10.5px; color:#475569;">Kota Bekasi - Jawa Barat</div>
                             </div>
                         </div>
-
-                        <!-- GARIS PEMISAH DOBEL MEMBENTANG PENUH -->
                         <div style="border-top: 1px solid #004b84; border-bottom: 2px solid #004b84; height: 2px; margin: 0 0 20px 0;"></div>
-
-                        <!-- 2. JUDUL KWITANSI PERSIS DI TENGAH -->
                         <div style="text-align:center; margin-bottom:24px;">
                             <span style="font-size:32px; font-weight:900; color:#004b84; letter-spacing:3px; display:inline-block; border-bottom:3px solid #004b84; padding-bottom:2px;">
                                 KWITANSI
                             </span>
                         </div>
-
-                        <!-- 3. DETAIL DATA RINCIAN KWITANSI -->
                         <div style="max-width: 95%; margin: 0 auto; line-height: 1.8; font-size: 12px;">
                             <table style="width: 100%; border-collapse: collapse;">
                                 <tr>
@@ -1530,9 +1481,14 @@ const Invoice = () => {
                                         ${tglCetakIndo}
                                     </td>
                                 </tr>
+                                <tr>
+                                    <td style="font-weight: 600; padding: 2px 0;">Nomor PO</td>
+                                    <td style="padding: 2px 4px;">:</td>
+                                    <td style="font-weight: bold; color: #0f172a; padding: 2px 0;">
+                                        ${nomorPOCustomer !== '' ? nomorPOCustomer : '-'}
+                                    </td>
+                                </tr>
                             </table>
-
-                            <!-- KOTAK BESAR NOMINAL RUPIAH DI SEBELAH KIRI -->
                             <div style="margin-top: 20px; display: flex; align-items: center;">
                                 <div style="border: 2px solid #004b84; background: #f0fdf4; border-radius: 8px; padding: 10px 20px; min-width: 250px;">
                                     <div style="font-size: 9.5px; color:#15803d; font-weight: 800; text-transform: uppercase; margin-bottom: 2px;">JUMLAH TAGIHAN :</div>
@@ -1542,10 +1498,7 @@ const Invoice = () => {
                                 </div>
                             </div>
                         </div>
-
-                        <!-- 4. FOOTER BAWAH DENGAN GARIS PUTUS-PUTUS PEMISAH -->
                         <div style="margin-top: 35px; border-top: 1px dashed #cbd5e1; padding-top: 15px; display:flex; justify-content:space-between; align-items:flex-end;">
-                            <!-- Bagian Rekening Bank Kiri -->
                             <div style="width: 44%; background:#f8fafc; padding: 8px 12px; border-radius: 6px; border: 1px solid #e2e8f0; font-size: 10.5px;">
                                 <div style="font-weight:bold; color:#004b84; margin-bottom: 2px;">Pembayaran Transfer ke:</div>
                                 <div style="font-weight:bold; color:#0f172a;">DAKOTA LOGISTIK INDONESIA PT</div>
@@ -1554,8 +1507,6 @@ const Invoice = () => {
                                     NO REKENING : 2303937226
                                 </div>
                             </div>
-
-                            <!-- Bagian Tanda Tangan Kanan -->
                             <div style="width: 40%; text-align: center;">
                                 <div style="font-size: 11px; color:#475569; margin-bottom: 2px;">
                                     Bekasi, ${tglCetakIndo}
@@ -1576,9 +1527,7 @@ const Invoice = () => {
                 return;
             }
 
-            // =====================================================================
-            // 📄 3. CETAK KHUSUS: FAKTUR TIPE 2 (DESAIN MODERN IDENTIK GAMBAR 2)
-            // =====================================================================
+            // 3. FAKTUR TIPE 2
             if (docType === 'FAKTUR_2') {
                 let totalBiayaKirim = 0;
                 let totalDiskon = 0;
@@ -1637,14 +1586,6 @@ const Invoice = () => {
                 const grandTotal = Number(header.artih_total || (subtotalNilaiJual + ppn));
                 const textTerbilang = (terbilangIndonesia(Math.round(grandTotal)).trim() + ' RUPIAH').replace(/\s+/g, ' ');
 
-                const noInvoiceResmi = formatNomorInvoiceResmi(header.artih_id, header.artih_tanggal);
-                let noFakturPajak = String(header.artih_fktpajak || '').trim();
-                if (!noFakturPajak || noFakturPajak === '010.' || noFakturPajak === '010') {
-                    noFakturPajak = '010.026.00.340034701';
-                }
-
-                const tglCetakIndo = formatTanggalIndonesia(header.artih_tanggal);
-
                 printWindow.document.write(`
                     <!DOCTYPE html>
                     <html>
@@ -1665,8 +1606,6 @@ const Invoice = () => {
                             <button class="btn-print" style="background:#16a34a;" onclick="window.print()">PRINT</button>
                             <button class="btn-print" style="background:#e11d48;" onclick="window.close()">TUTUP</button>
                         </div>
-
-                        <!-- 1. KOP RESMI DENGAN LOGO DAKOTA CARGO & TITLE BESAR -->
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <div style="display:flex; align-items:center; gap:12px;">
                                 <img src="${dakotaLogo}" alt="Logo Dakota Cargo" style="height:44px; object-fit:contain;" />
@@ -1680,11 +1619,7 @@ const Invoice = () => {
                                 <div style="font-size:10px; font-weight:bold; color:#0284c7; margin-top:2px;">NO. KWITANSI: ${kwitansiDisplayNo || '-'}</div>
                             </div>
                         </div>
-
-                        <!-- Garis Pembatas Aksen Biru Dakota -->
                         <div style="height:3px; background:#004b84; margin:8px 0 10px 0; border-radius:2px;"></div>
-
-                        <!-- 2. DATA PELANGGAN (KIRI) & METADATA INVOICE (KANAN) -->
                         <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; font-size:10.5px; background:#f8fafc; padding:8px 10px; border-radius:6px; border:1px solid #e2e8f0;">
                             <div style="width: 52%;">
                                 <div style="color:#64748b; font-size:10px; font-weight:bold; text-transform:uppercase;">NAMA PELANGGAN :</div>
@@ -1713,11 +1648,16 @@ const Invoice = () => {
                                         <td style="padding: 1px 0;">:</td>
                                         <td style="padding: 1px 0; font-weight: bold; color:#b91c1c;">${tglCetakIndo}</td>
                                     </tr>
+                                    <tr>
+                                        <td style="padding: 1px 0; font-weight: 600;">Nomor PO</td>
+                                        <td style="padding: 1px 0; font-weight: 600;">:</td>
+                                        <td style="padding: 1px 0; font-weight: bold; color: #0f172a;">
+                                            ${nomorPOCustomer !== '' ? nomorPOCustomer : '-'}
+                                        </td>
+                                    </tr>
                                 </table>
                             </div>
                         </div>
-
-                        <!-- 3. TABEL MULTI-HEADER DENGAN HEADER SLATE MODERN -->
                         <table>
                             <thead>
                                 <tr>
@@ -1749,8 +1689,6 @@ const Invoice = () => {
                             </thead>
                             <tbody>
                                 ${faktur2RowsHtml || '<tr><td colspan="17" style="text-align:center; padding:10px;">Tidak ada data resi</td></tr>'}
-                                
-                                <!-- Baris Rekapitulasi Keuangan Bawah Tabel (Tanpa Kotak Kosong Kanan) -->
                                 <tr>
                                     <td colspan="13" rowspan="7" style="border: 1px solid #94a3b8; padding: 10px 12px; vertical-align: bottom; font-size: 10.5px; background:#f8fafc;">
                                         <span style="color:#64748b;">Terbilang: </span> <span style="font-weight:bold; font-style:italic; color:#0f172a;">${textTerbilang}</span>
@@ -1768,11 +1706,11 @@ const Invoice = () => {
                                 </tr>
                                 <tr style="background:#f8fafc;">
                                     <td colspan="3" style="border: 1px solid #94a3b8; padding: 3px 6px; font-weight: bold; font-size: 9.5px; color:#0f172a; border-bottom: 1px solid #cbd5e1;">NILAI JUAL</td>
-                                    <td style="border: 1px solid #94a3b8; padding: 3px 6px; text-align: right; font-family: monospace; font-weight: bold; font-size: 9.5px; border-bottom: 1px solid #cbd5e1;">${subtotalNilaiJual.toLocaleString('id-ID')}.00</td>
+                                    <td style="border: 1px solid #94a3b8; padding: 3px 6px; text-align: right; font-family: monospace; font-weight: bold; border-bottom: 1px solid #cbd5e1;">${subtotalNilaiJual.toLocaleString('id-ID')}.00</td>
                                 </tr>
                                 <tr>
                                     <td colspan="3" style="border: 1px solid #94a3b8; padding: 3px 6px; font-size: 9.5px; color:#64748b; border-bottom: 1px solid #cbd5e1;">DPP</td>
-                                    <td style="border: 1px solid #94a3b8; padding: 3px 6px; text-align: right; font-family: monospace; font-size: 9.5px; border-bottom: 1px solid #cbd5e1;">${dpp.toLocaleString('id-ID')}.00</td>
+                                    <td style="border: 1px solid #94a3b8; padding: 3px 6px; text-align: right; font-family: monospace; border-bottom: 1px solid #cbd5e1;">${dpp.toLocaleString('id-ID')}.00</td>
                                 </tr>
                                 <tr>
                                     <td colspan="3" style="border: 1px solid #94a3b8; padding: 3px 6px; font-size: 9.5px; color:#64748b; border-bottom: 1px solid #cbd5e1;">PPN 1.1%</td>
@@ -1784,10 +1722,7 @@ const Invoice = () => {
                                 </tr>
                             </tbody>
                         </table>
-
-                        <!-- 4. FOOTER 3 KOLOM MODERN IDENTIK GAMBAR 2 -->
                         <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-top:16px; font-size:10px;">
-                            <!-- Kolom 1: Rekening Bank BCA -->
                             <div style="width: 32%; background:#f8fafc; padding: 8px 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
                                 <div style="font-weight:bold; color:#004b84; margin-bottom:2px; font-size:10.5px;">Pembayaran Transfer ke:</div>
                                 <div style="font-weight:bold; color:#0f172a;">DAKOTA LOGISTIK INDONESIA PT</div>
@@ -1797,16 +1732,12 @@ const Invoice = () => {
                                     NO REKENING : 2303937226
                                 </div>
                             </div>
-
-                            <!-- Kolom 2: Bukti Pembayaran -->
                             <div style="width: 32%; background:#f8fafc; padding: 8px 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
                                 <div style="font-weight:bold; color:#004b84; margin-bottom:2px; font-size:10.5px;">Bukti Pembayaran Mohon:</div>
                                 <div style="color:#334155;">FAX KE : (021) 82401076</div>
                                 <div style="color:#334155; margin-top:1px;">Atau Email Ke :</div>
                                 <div style="font-weight:bold; color:#0284c7; font-size:10.5px; margin-top:2px;">marketing.pusat@dakotacargo.co.id</div>
                             </div>
-
-                            <!-- Kolom 3: Tanda Tangan -->
                             <div style="width: 30%; text-align: center;">
                                 <div style="font-size: 10.5px; color:#475569; margin-bottom: 2px;">Bekasi, ${tglCetakIndo}</div>
                                 <div style="font-weight:bold; color:#0f172a; font-size:11px;">PT DAKOTA LOGISTIK INDONESIA</div>
@@ -1823,17 +1754,12 @@ const Invoice = () => {
                 return;
             }
 
-            // =====================================================================
-            // 📄 4. CETAK KHUSUS: SUMMARY BILLING (20 KOLOM PERSIS FILE ASP LAWAS)
-            // =====================================================================
+            // 4. SUMMARY BILLING
             if (docType === 'SUMMARY') {
                 let totalKoli = 0;
                 let totalVolume = 0;
                 let totalBerat = 0;
                 let totalTagihan = 0;
-
-                const noInvoiceResmi = formatNomorInvoiceResmi(header.artih_id, header.artih_tanggal);
-                const tglInvoiceIndo = formatTanggalIndonesia(header.artih_tanggal);
 
                 const summaryRowsHtml = btts.map((b, idx) => {
                     const koli = Number(b.bttt_jmlunit || 1);
@@ -1864,10 +1790,7 @@ const Invoice = () => {
                             <td style="border: 1px solid #cbd5e1; padding: 4px 2px; text-align: center; font-family: monospace;">${koli}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 4px 3px; text-align: right; font-family: monospace;">${volume}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 4px 3px; text-align: right; font-family: monospace;">${berat.toLocaleString('id-ID')}</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 4px 2px; text-align: center;">-</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 4px 2px; text-align: center;">-</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 4px 2px; text-align: center;">-</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 4px 2px; text-align: center;">-</td>
+                            <td colspan="4" style="border: 1px solid #cbd5e1; text-align: center;">-</td>
                             <td style="border: 1px solid #cbd5e1; padding: 4px 4px; text-align: right; font-family: monospace; font-weight: bold; color: #0f172a;">${harga.toLocaleString('id-ID')}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 4px 3px; font-size: 8.5px; color: #475569;">${b.bttt_namabarang || '-'}</td>
                         </tr>
@@ -1894,8 +1817,6 @@ const Invoice = () => {
                             <button class="btn-print" style="background:#16a34a;" onclick="window.print()">PRINT</button>
                             <button class="btn-print" style="background:#e11d48;" onclick="window.close()">TUTUP</button>
                         </div>
-
-                        <!-- KOP RESMI DENGAN LOGO DAKOTA CARGO -->
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <div style="display:flex; align-items:center; gap:12px;">
                                 <img src="${dakotaLogo}" alt="Logo Dakota Cargo" style="height:44px; object-fit:contain;" />
@@ -1914,10 +1835,7 @@ const Invoice = () => {
                                 </div>
                             </div>
                         </div>
-
                         <div style="height:3px; background:#004b84; margin:8px 0 10px 0; border-radius:2px;"></div>
-
-                        <!-- TABEL 20 KOLOM PERSIS FILE ASP LAWAS DENGAN STYLING MODERN -->
                         <table>
                             <thead>
                                 <tr>
@@ -1935,10 +1853,7 @@ const Invoice = () => {
                                     <th style="width:3%;">Koli</th>
                                     <th style="width:3%;">Volume<br/>(Cbm)</th>
                                     <th style="width:4%;">Berat<br/>(Kg)</th>
-                                    <th style="width:3%;">Berat<br/>Minimum</th>
-                                    <th style="width:3%;">Charge<br/>Weight</th>
-                                    <th style="width:3%;">Tarif</th>
-                                    <th style="width:3%;">Additional<br/>Tarif</th>
+                                    <th colspan="4" style="width:12%;">Rincian Biaya</th>
                                     <th style="width:5%;">Total<br/>Tagihan</th>
                                     <th style="width:6%;">REMARK</th>
                                 </tr>
@@ -1965,184 +1880,7 @@ const Invoice = () => {
                 return;
             }
 
-            // =========================================================================
-            // 🖨️ CETAK VOUCHER MEMORIAL (PASTI BISA DIKLIK & ANTI-BLOCKED)
-            // =========================================================================
-            const handlePrintJurnalVoucher = async (journalNo) => {
-                console.log("🖨 TRIGGER CETAK VOUCHER MEMORIAL:", journalNo);
-
-                const rawNo = String(journalNo || postedJournalId || activeInvoice?.artih_journalid || '').trim();
-                const noJurnal = rawNo.replace(/OTA/gi, '001');
-
-                if (!noJurnal) {
-                    Swal.fire('Peringatan', 'Nomor jurnal belum terbentuk atau tidak valid.', 'warning');
-                    return;
-                }
-
-                // 2. 🌟 KUNCI: Buka tab sebelum await API agar tidak dicegat popup blocker browser
-                const printWindow = window.open('', '_blank', 'width=1150,height=850,scrollbars=yes');
-                if (!printWindow) {
-                    Swal.fire('Popup Diblokir', 'Silakan izinkan popup di browser Anda.', 'warning');
-                    return;
-                }
-                printWindow.document.write('<html><head><title>Memuat...</title></head><body style="font-family:sans-serif;text-align:center;padding-top:40px;"><h3>Sedang memuat data Voucher Memorial...</h3></body></html>');
-
-                try {
-                    const token = localStorage.getItem('token');
-                    const ptId = localStorage.getItem('pt_id') || 'C';
-
-                    // Panggil API detail jurnal
-                    const res = await api.get(`/gl/jurnal/detail/${encodeURIComponent(noJurnal)}?pt_id=${ptId}`, {
-                        headers: { Authorization: `Bearer ${token}` }
-                    }).catch(() => null);
-
-                    const jurHeader = res?.data?.header;
-                    const jurDetails = res?.data?.details || [];
-
-                    // 🎯 CEK DATA DATABASE: Jika kosong, cegah crash runtime
-                    if (!jurHeader || jurDetails.length === 0) {
-                        printWindow.close();
-                        Swal.fire({
-                            icon: 'warning',
-                            title: 'Data Jurnal Belum Lengkap',
-                            text: `Rincian jurnal untuk nomor ${noJurnal} belum tersimpan di tabel gl_t_jurnald.`
-                        });
-                        return;
-                    }
-
-                    let totD = 0, totK = 0;
-                    const rows = jurDetails.map(d => {
-                        const db = Number(d.tjurd_debet || 0);
-                        const kr = Number(d.tjurd_kredit || 0);
-                        totD += db;
-                        totK += kr;
-                        return `
-                    <tr style="font-size:10.5px;">
-                        <td style="border:1px solid #cbd5e1;padding:6px;font-family:monospace;font-weight:bold;color:#0284c7;">${d.tjurd_acccode || '-'}</td>
-                        <td style="border:1px solid #cbd5e1;padding:6px;text-align:center;font-family:monospace;">1</td>
-                        <td style="border:1px solid #cbd5e1;padding:6px;"><b>${d.sakun_nama || d.tjurd_acccode}</b> : <span style="color:#475569;">${d.tjurd_keterangan || '-'}</span></td>
-                        <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;font-family:monospace;">${db > 0 ? db.toLocaleString('id-ID', { minimumFractionDigits: 2 }) : '0.00'}</td>
-                        <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;font-family:monospace;">${kr > 0 ? kr.toLocaleString('id-ID', { minimumFractionDigits: 2 }) : '0.00'}</td>
-                    </tr>
-                `;
-                    }).join('');
-
-                    const logoSrc = typeof dakotaLogo !== 'undefined' && dakotaLogo ? dakotaLogo : '';
-                    const tglString = String(jurHeader.tjurh_tanggal || today).split('T')[0];
-
-                    printWindow.document.open();
-                    printWindow.document.write(`
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>VOUCHER MEMORIAL - ${jurHeader.tjurh_no}</title>
-                    <style>
-                        @page { size: A4 landscape; margin: 10mm; }
-                        body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 12px; color: #1e293b; }
-                        table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-                        th { border: 1px solid #94a3b8; padding: 6px 8px; background-color: #e2e8f0; font-size: 9.5px; text-align: center; font-weight: bold; color: #0f172a; text-transform: uppercase; }
-                        .no-print { margin-bottom: 12px; text-align: right; }
-                        .btn-print { padding: 7px 18px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; color: white; margin: 0 4px; font-size: 11px; text-transform: uppercase; }
-                        @media print { .no-print { display: none !important; } }
-                    </style>
-                </head>
-                <body>
-                    <div class="no-print">
-                        <button class="btn-print" style="background:#16a34a;" onclick="window.print()">PRINT</button>
-                        <button class="btn-print" style="background:#e11d48;" onclick="window.close()">TUTUP</button>
-                    </div>
-
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <div style="display:flex; align-items:center; gap:12px;">
-                            ${logoSrc ? `<img src="${logoSrc}" alt="Logo Dakota Cargo" style="height:44px; object-fit:contain;" />` : ''}
-                            <div>
-                                <h2 style="margin:0; font-size:15px; font-weight:900; color:#004b84; letter-spacing:0.3px;">PT DAKOTA LOGISTIK INDONESIA</h2>
-                                <div style="font-size:10px; color:#64748b; margin-top:2px;">Jl. Wibawa Mukti II No. 99, Jatiasih, Bekasi - Jawa Barat</div>
-                                <div style="font-size:10px; color:#64748b;">(021) 8603278 / (021) 86608589</div>
-                            </div>
-                        </div>
-                        <div style="text-align:right;">
-                            <h1 style="margin:0; font-size:20px; font-weight:900; letter-spacing:0.5px; color:#004b84;">VOUCHER MEMORIAL</h1>
-                            <div style="font-size:10.5px; font-weight:bold; color:#0284c7; margin-top:2px;">NO: ${jurHeader.tjurh_no}</div>
-                        </div>
-                    </div>
-
-                    <div style="height:3px; background:#004b84; margin:8px 0 12px 0; border-radius:2px;"></div>
-
-                    <div style="background:#f8fafc; padding:8px 12px; border-radius:6px; border:1px solid #e2e8f0; margin-bottom:10px; font-size:11px;">
-                        <table style="width: 100%; border: none; margin: 0;">
-                            <tr>
-                                <td style="padding: 2px 0; width: 14%; color:#475569; font-weight:bold;">No. Transaksi</td>
-                                <td style="padding: 2px 0; width: 2%;">:</td>
-                                <td style="padding: 2px 0; font-family: monospace; font-weight: bold; color: #0284c7; font-size:12px;">${jurHeader.tjurh_no}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 2px 0; color:#475569; font-weight:bold;">Tanggal</td>
-                                <td style="padding: 2px 0;">:</td>
-                                <td style="padding: 2px 0; font-weight: bold; color:#0f172a;">${tglString}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 2px 0; color:#475569; font-weight:bold;">Keterangan</td>
-                                <td style="padding: 2px 0;">:</td>
-                                <td style="padding: 2px 0; font-weight: 600; color:#1e293b;">${jurHeader.tjurh_keterangan || '-'}</td>
-                            </tr>
-                        </table>
-                    </div>
-
-                    <table>
-                        <thead>
-                            <tr>
-                                <th style="width: 14%;">Account</th>
-                                <th style="width: 6%;">CC</th>
-                                <th style="width: 50%; text-align: left; padding-left: 8px;">Keterangan</th>
-                                <th style="width: 15%; text-align: right; padding-right: 8px;">Debet (Rp)</th>
-                                <th style="width: 15%; text-align: right; padding-right: 8px;">Kredit (Rp)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${rows}
-                        </tbody>
-                        <tfoot>
-                            <tr style="background:#f1f5f9; font-weight:bold;">
-                                <td colspan="3" style="border:1px solid #94a3b8; padding:7px 8px; text-align:center; color:#004b84; font-size:10.5px;">TOTAL :</td>
-                                <td style="border:1px solid #94a3b8; padding:7px 8px; text-align:right; font-family:monospace; font-size:11px;">Rp ${totalDebet.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                                <td style="border:1px solid #94a3b8; padding:7px 8px; text-align:right; font-family:monospace; font-size:11px;">Rp ${totalKredit.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                            </tr>
-                        </tfoot>
-                    </table>
-
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:35px; padding:0 25px; text-align:center;">
-                        <div style="width: 25%;">
-                            <div style="font-size:11px; color:#475569; font-weight:bold; margin-bottom:50px;">Diterima</div>
-                            <div style="font-weight:bold; color:#0f172a; font-size:11px;">( Keuangan )</div>
-                        </div>
-                        <div style="width: 25%;">
-                            <div style="font-size:11px; color:#475569; font-weight:bold; margin-bottom:50px;">Disetujui</div>
-                            <div style="font-weight:bold; color:#0f172a; font-size:11px;">( Direksi )</div>
-                        </div>
-                        <div style="width: 25%;">
-                            <div style="font-size:11px; color:#475569; font-weight:bold; margin-bottom:50px;">Diketahui</div>
-                            <div style="font-weight:bold; color:#0f172a; font-size:11px;">( Akunting )</div>
-                        </div>
-                    </div>
-                </body>
-                </html>
-            `);
-                    printWindow.document.close();
-
-                } catch (err) {
-                    console.error("Gagal cetak voucher memorial:", err);
-                    printWindow.close();
-                    Swal.fire('Error', 'Gagal memuat dokumen cetak: ' + (err.message || err), 'error');
-                }
-            };
-
-            // 🎯 Daftarkan ke window agar aman dipanggil dari JSX mana pun
-            window.handlePrintJurnalVoucher = handlePrintJurnalVoucher;
-
-            // =====================================================================
-            // 📄 2. CETAK DEFAULT: FAKTUR PENAGIHAN, SUMMARY, DLL.
-            // =====================================================================
+            // 5. DEFAULT FAKTUR PENAGIHAN
             let totalBerat = 0;
             let totalUkuran = 0;
             let totalPacking = 0;
@@ -2180,7 +1918,7 @@ const Invoice = () => {
                 `;
             }).join('');
 
-            const titleHeader = docType === 'SUMMARY' ? 'SUMMARY BILLING' : 'FAKTUR PENAGIHAN';
+            const titleHeader = 'FAKTUR PENAGIHAN';
 
             printWindow.document.write(`
                 <!DOCTYPE html>
@@ -2201,7 +1939,6 @@ const Invoice = () => {
                         <button class="btn-ctrl" style="background:#16a34a; color:white;" onclick="window.print()">PRINT</button>
                         <button class="btn-ctrl" style="background:#e11d48; color:white;" onclick="window.close()">TUTUP</button>
                     </div>
-
                     <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #000; padding-bottom:6px;">
                         <div style="display:flex; align-items:center; gap:10px;">
                             <img src="${dakotaLogo}" alt="Logo" style="height:38px;" />
@@ -2217,7 +1954,6 @@ const Invoice = () => {
                             <div style="font-size:10px; color:#555;">CUSTOMER: ${header.cust_name || header.artih_custname}</div>
                         </div>
                     </div>
-
                     <table>
                         <thead>
                             <tr>
