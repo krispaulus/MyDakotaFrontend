@@ -1,9 +1,54 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import api from '../api/axios';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
-import { Filter, RotateCcw, Search, RefreshCw, Printer } from 'lucide-react';
+import { Filter, RefreshCw, X, Search, FileText } from 'lucide-react';
 import Swal from 'sweetalert2';
+
+// Helper standarisasi Nomor Invoice ke format resmi: [agen3digit][urut4digit]/[bulan]/[tahun4digit]/FP
+function formatNomorInvoiceResmi(rawId, rawDate, fallbackAgenId = '') {
+    if (!rawId) return '-';
+    let clean = String(rawId).trim();
+
+    if (clean.includes('/FP')) return clean;
+
+    const digits = clean.replace(/\D/g, '');
+    const d = rawDate ? new Date(rawDate) : new Date();
+    let mm = String(d.getMonth() + 1).padStart(2, '0');
+    let yyyy = String(d.getFullYear());
+
+    let agen = '';
+    if (clean.length >= 3 && isNaN(Number(clean.slice(0, 3))) === false) {
+        agen = clean.slice(0, 3);
+    } else if (fallbackAgenId) {
+        agen = String(fallbackAgenId).padStart(3, '0').slice(-3);
+    } else {
+        const sessionAgen = localStorage.getItem('active_cabang_id') || localStorage.getItem('active_agen_id') || '';
+        agen = sessionAgen ? String(sessionAgen).padStart(3, '0').slice(-3) : clean.slice(0, 3);
+    }
+
+    let urut = '0001';
+
+    if (digits.length >= 11) {
+        agen = digits.slice(0, 3);
+        const bulanId = digits.slice(3, 5);
+        const tahunId = digits.slice(5, 7);
+        urut = digits.slice(7);
+
+        if (Number(bulanId) >= 1 && Number(bulanId) <= 12) {
+            mm = bulanId;
+        }
+        yyyy = `20${tahunId}`;
+    } else if (digits.length >= 7) {
+        agen = digits.slice(0, 3);
+        urut = digits.slice(-4);
+    } else if (digits.length > 0) {
+        urut = digits.padStart(4, '0').slice(-4);
+    }
+
+    return `${agen}${urut}/${mm}/${yyyy}/FP`;
+}
 
 const TukarFaktur = () => {
     const { isDarkMode } = useDarkMode();
@@ -13,6 +58,23 @@ const TukarFaktur = () => {
     const [showFilter, setShowFilter] = useState(false);
 
     const todayStr = new Date().toISOString().split('T')[0];
+
+    // =========================================================================
+    // STATE MODAL TUKAR FAKTUR (IDENTIK APLIKASI LAWAS)
+    // =========================================================================
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [searchInvoiceInput, setSearchInvoiceInput] = useState('');
+    const [availableInvoices, setAvailableInvoices] = useState([]);
+    const [invoiceDetail, setInvoiceDetail] = useState(null);
+    const [loadingInvoiceDetail, setLoadingInvoiceDetail] = useState(false);
+
+    const [formInput, setFormInput] = useState({
+        invoice_no: '',
+        tgl_tukar: todayStr,
+        penerima: '',
+        tgl_jt: ''
+    });
 
     // =========================================================================
     // HELPER: DETEKSI CABANG & STATUS HOLDING / PUSAT SECARA DINAMIS
@@ -92,7 +154,6 @@ const TukarFaktur = () => {
         }
     };
 
-    // Sinkronisasi cabang otomatis untuk user cabang
     useEffect(() => {
         if (!isHoldingUser && currentActiveAgen.id) {
             setFilterState(prev => ({ ...prev, selectedCabang: currentActiveAgen.id }));
@@ -152,109 +213,128 @@ const TukarFaktur = () => {
         fetchTukarFaktur();
     };
 
-    const handleFormSubmit = async (item = null) => {
-        const isEdit = Boolean(item);
-        const token = localStorage.getItem('token');
-        const ptId = localStorage.getItem('pt_id') || 'C';
+    // =========================================================================
+    // FETCH DETAIL INVOICE (AUTO-FILL DETAIL INVOICE SEPERTI APLIKASI LAWAS)
+    // =========================================================================
+    const loadInvoiceDetail = async (invIdentifier) => {
+        if (!invIdentifier) return;
+        setLoadingInvoiceDetail(true);
+        try {
+            const token = localStorage.getItem('token');
+            const ptId = localStorage.getItem('pt_id') || 'C';
 
-        let invoiceOptionsHtml = '';
-        if (!isEdit) {
-            try {
-                const activeFilterCabang = !isHoldingUser ? currentActiveAgen.id : filterState.selectedCabang;
-                const resInv = await api.get('/piutang/tukar-faktur/available-invoices', {
-                    params: {
-                        pt_id: ptId,
-                        cabang_id: activeFilterCabang || undefined
-                    },
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                const invoices = resInv.data?.data || [];
-                invoiceOptionsHtml = invoices.map(inv =>
-                    `<option value="${inv.invoice_no}">${inv.invoice_no} - ${inv.cust_name} (Rp ${Number(inv.total_tagihan || 0).toLocaleString('id-ID')})</option>`
-                ).join('');
-            } catch (err) {
-                console.error("Gagal ambil invoice:", err);
+            const res = await api.get(`/piutang/invoice/detail?id=${encodeURIComponent(invIdentifier)}&pt_id=${ptId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            const header = res.data?.data?.header || res.data?.header;
+            if (!header) {
+                Swal.fire('Tidak Ditemukan', 'Detail Invoice tidak ditemukan.', 'warning');
+                setInvoiceDetail(null);
+                return;
             }
+
+            setInvoiceDetail(header);
+            setFormInput(prev => ({
+                ...prev,
+                invoice_no: header.artih_id,
+                tgl_jt: String(header.artih_tanggal || '').split('T')[0] || todayStr
+            }));
+
+        } catch (err) {
+            console.error("Gagal load detail invoice:", err);
+            Swal.fire('Error', err.response?.data?.message || 'Gagal memuat detail invoice.', 'error');
+            setInvoiceDetail(null);
+        } finally {
+            setLoadingInvoiceDetail(false);
         }
+    };
 
-        const { value: formValues } = await Swal.fire({
-            title: isEdit ? 'Edit Tukar Faktur' : 'Tambah Tukar Faktur',
-            html: `
-                <div style="text-align: left; font-size: 13px; font-weight: bold; display: flex; flex-direction: column; gap: 12px;">
-                    <div>
-                        <label style="display:block; margin-bottom: 4px;">Nomor Invoice :</label>
-                        ${isEdit ?
-                    `<input id="swal-inv" class="swal2-input" style="margin: 0; width: 100%; height: 38px; font-size: 13px; font-family: monospace; font-weight: bold;" value="${item.invoice_no}" disabled />` :
-                    `<select id="swal-inv" class="swal2-input" style="margin: 0; width: 100%; height: 38px; font-size: 13px; font-family: monospace; font-weight: bold;">
-                                <option value="">-- PILIH NO. INVOICE --</option>
-                                ${invoiceOptionsHtml}
-                             </select>`
-                }
-                    </div>
-                    <div>
-                        <label style="display:block; margin-bottom: 4px;">Tanggal Tukar Faktur :</label>
-                        <input id="swal-tgltukar" type="date" class="swal2-input" style="margin: 0; width: 100%; height: 38px; font-size: 13px;" value="${isEdit ? (item.tgl_tukar || todayStr) : todayStr}" />
-                    </div>
-                    <div>
-                        <label style="display:block; margin-bottom: 4px;">Nama Penerima (PIC Pelanggan) :</label>
-                        <input id="swal-penerima" type="text" class="swal2-input" style="margin: 0; width: 100%; height: 38px; font-size: 13px;" value="${isEdit ? item.penerima : ''}" placeholder="Nama PIC Stempel / Penerima" />
-                    </div>
-                    <div>
-                        <label style="display:block; margin-bottom: 4px;">Tanggal Jatuh Tempo :</label>
-                        <input id="swal-tgljt" type="date" class="swal2-input" style="margin: 0; width: 100%; height: 38px; font-size: 13px;" value="${isEdit ? (item.tgl_jt || '') : ''}" />
-                    </div>
-                </div>
-            `,
-            focusConfirm: false,
-            showCancelButton: true,
-            confirmButtonColor: '#0284c7',
-            cancelButtonColor: '#64748b',
-            confirmButtonText: 'Simpan Data',
-            cancelButtonText: 'Batal',
-            preConfirm: () => {
-                const invoice_no = isEdit ? item.invoice_no : document.getElementById('swal-inv').value;
-                const tgl_tukar = document.getElementById('swal-tgltukar').value;
-                const penerima = document.getElementById('swal-penerima').value;
-                const tgl_jt = document.getElementById('swal-tgljt').value;
-
-                if (!invoice_no) {
-                    Swal.showValidationMessage('Nomor Invoice wajib dipilih');
-                    return false;
-                }
-                if (!penerima) {
-                    Swal.showValidationMessage('Nama penerima wajib diisi');
-                    return false;
-                }
-
-                return {
-                    invoice_no,
-                    tgl_tukar,
-                    penerima: penerima.toUpperCase(),
-                    tgl_jt: tgl_jt || ''
-                };
-            }
+    const handleOpenAddModal = async () => {
+        setIsEditMode(false);
+        setSearchInvoiceInput('');
+        setInvoiceDetail(null);
+        setFormInput({
+            invoice_no: '',
+            tgl_tukar: todayStr,
+            penerima: '',
+            tgl_jt: ''
         });
 
-        if (formValues) {
-            try {
-                await api.post('/piutang/tukar-faktur/save', {
-                    pt_id: ptId,
-                    ...formValues
-                }, { headers: { Authorization: `Bearer ${token}` } });
+        try {
+            const token = localStorage.getItem('token');
+            const ptId = localStorage.getItem('pt_id') || 'C';
+            const activeCabang = !isHoldingUser ? currentActiveAgen.id : filterState.selectedCabang;
 
-                Swal.fire('Sukses', 'Data Tukar Faktur berhasil disimpan', 'success');
-                fetchTukarFaktur();
-            } catch (err) {
-                console.error("Gagal simpan tukar faktur:", err);
-                Swal.fire('Error', 'Gagal menyimpan transaksi tukar faktur', 'error');
-            }
+            const res = await api.get('/piutang/tukar-faktur/available-invoices', {
+                params: { pt_id: ptId, cabang_id: activeCabang || undefined },
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setAvailableInvoices(res.data?.data || []);
+        } catch (e) {
+            setAvailableInvoices([]);
+        }
+
+        setIsModalOpen(true);
+    };
+
+    const handleOpenEditModal = (item) => {
+        setIsEditMode(true);
+        setSearchInvoiceInput(item.invoice_no);
+        setFormInput({
+            invoice_no: item.invoice_no,
+            tgl_tukar: item.tgl_tukar || todayStr,
+            penerima: item.penerima || '',
+            tgl_jt: item.tgl_jt || ''
+        });
+        loadInvoiceDetail(item.invoice_no);
+        setIsModalOpen(true);
+    };
+
+    const handleSaveTukarFaktur = async () => {
+        const invNo = formInput.invoice_no || searchInvoiceInput;
+        if (!invNo) {
+            Swal.fire('Peringatan', 'Nomor Invoice wajib dimasukkan / dipilih!', 'warning');
+            return;
+        }
+        if (!formInput.penerima.trim()) {
+            Swal.fire('Peringatan', 'Nama Penerima (PIC Pelanggan) wajib diisi!', 'warning');
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            const ptId = localStorage.getItem('pt_id') || 'C';
+
+            await api.post('/piutang/tukar-faktur/save', {
+                pt_id: ptId,
+                invoice_no: invNo,
+                tgl_tukar: formInput.tgl_tukar,
+                penerima: formInput.penerima.trim().toUpperCase(),
+                tgl_jt: formInput.tgl_jt || formInput.tgl_tukar
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            Swal.fire({
+                icon: 'success',
+                title: 'BERHASIL DISIMPAN',
+                text: 'Data Tukar Faktur berhasil disimpan.',
+                timer: 1500,
+                showConfirmButton: false
+            });
+
+            setIsModalOpen(false);
+            fetchTukarFaktur();
+        } catch (err) {
+            Swal.fire('Gagal!', err.response?.data?.message || 'Gagal menyimpan transaksi tukar faktur.', 'error');
         }
     };
 
     const handleDelete = async (item) => {
         const confirm = await Swal.fire({
             title: 'Hapus Tukar Faktur?',
-            html: `Apakah Anda yakin ingin membatalkan status Tukar Faktur untuk invoice <b>${item.invoice_no}</b>?`,
+            html: `Apakah Anda yakin ingin membatalkan status Tukar Faktur untuk invoice <b>${formatNomorInvoiceResmi(item.invoice_no, item.tgl_invoice)}</b>?`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#e11d48',
@@ -278,13 +358,16 @@ const TukarFaktur = () => {
         }
     };
 
+    // =========================================================================
+    // KOLOM TABEL DATA GRID
+    // =========================================================================
     const columns = [
         {
             header: 'NO. INVOICE',
             accessor: 'invoice_no',
             render: (item) => (
-                <span className="font-mono font-bold text-sky-600">
-                    {item.invoice_no}
+                <span className="font-mono font-bold text-sky-600 select-all">
+                    {formatNomorInvoiceResmi(item.invoice_no, item.tgl_invoice)}
                 </span>
             )
         },
@@ -345,6 +428,221 @@ const TukarFaktur = () => {
         }
     ];
 
+    // =========================================================================
+    // ELEMEN MODAL TUKAR FAKTUR (PORTAL KE MODAL-ROOT)
+    // =========================================================================
+    const modalElement = isModalOpen ? (
+        <div className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs z-[1000] animate-in fade-in">
+            <div className={`w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white text-slate-800'}`}>
+
+                {/* Header Modal */}
+                <div className="px-6 py-3 bg-[#004b84] text-white flex items-center justify-between font-bold uppercase tracking-wider text-xs">
+                    <div className="flex items-center gap-2">
+                        <FileText size={16} className="text-sky-300" />
+                        <span>{isEditMode ? 'EDIT DATA TUKAR FAKTUR' : 'INPUT DATA TUKAR FAKTUR'}</span>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setIsModalOpen(false)}
+                        className="text-white/80 hover:text-white cursor-pointer"
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <div className="p-6 space-y-4 overflow-y-auto text-xs flex-1">
+                    {/* 1. KOTAK INPUT MASUKKAN NO. INVOICE */}
+                    <div className="border border-sky-300 rounded-xl p-4 bg-slate-50/50 space-y-2">
+                        <label className="font-bold text-rose-600 block text-xs tracking-wide">
+                            * MASUKKAN NO. INVOICE
+                        </label>
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                placeholder="Contoh: 0010001/10/2026/FP atau 00110260001"
+                                disabled={isEditMode}
+                                list="inv-options"
+                                value={searchInvoiceInput}
+                                onChange={(e) => setSearchInvoiceInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        loadInvoiceDetail(searchInvoiceInput);
+                                    }
+                                }}
+                                className={`w-full p-2.5 border rounded-lg font-mono font-bold text-slate-800 outline-none text-xs transition ${isEditMode
+                                    ? 'bg-slate-100 border-slate-300 cursor-not-allowed text-slate-500'
+                                    : 'bg-rose-50/30 border-rose-300 focus:border-rose-500'
+                                    }`}
+                            />
+                            <datalist id="inv-options">
+                                {availableInvoices.map((inv, idx) => (
+                                    <option key={idx} value={inv.invoice_no}>
+                                        {formatNomorInvoiceResmi(inv.invoice_no, inv.tgl_invoice)} — {inv.cust_name}
+                                    </option>
+                                ))}
+                            </datalist>
+
+                            {!isEditMode && (
+                                <button
+                                    type="button"
+                                    onClick={() => loadInvoiceDetail(searchInvoiceInput)}
+                                    disabled={loadingInvoiceDetail || !searchInvoiceInput.trim()}
+                                    className="px-5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-lg uppercase cursor-pointer flex items-center gap-1.5 whitespace-nowrap shadow-sm text-xs"
+                                >
+                                    <Search size={14} className={loadingInvoiceDetail ? 'animate-spin' : ''} />
+                                    {loadingInvoiceDetail ? 'MEMUAT...' : 'CARI'}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* 2. KOTAK DETAIL INVOICE (OTOMATIS MUNCUL) */}
+                    {invoiceDetail && (
+                        <div className="border border-slate-300 rounded-xl p-4 bg-white space-y-3 shadow-xs">
+                            <div className="text-center font-bold text-sky-800 tracking-wider text-xs uppercase border-b pb-2 border-slate-200">
+                                DETAIL INVOICE
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 font-semibold">
+                                <div className="md:col-span-3">
+                                    <label className="font-bold text-slate-700 block mb-1">CUSTOMER :</label>
+                                    <input
+                                        type="text"
+                                        readOnly
+                                        value={invoiceDetail.cust_name || invoiceDetail.artih_custname || '-'}
+                                        className="w-full p-1.5 bg-slate-50 border border-slate-300 rounded font-bold text-slate-800"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="font-bold text-slate-700 block mb-1">CUST ID :</label>
+                                    <input
+                                        type="text"
+                                        readOnly
+                                        value={invoiceDetail.artih_custid || '-'}
+                                        className="w-full p-1.5 bg-slate-50 border border-slate-300 rounded font-mono font-bold text-slate-700"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="font-bold text-slate-700 block mb-1">TANGGAL INVOICE :</label>
+                                    <input
+                                        type="text"
+                                        readOnly
+                                        value={String(invoiceDetail.artih_tanggal || '').split('T')[0]}
+                                        className="w-full p-1.5 bg-slate-50 border border-slate-300 rounded font-mono text-slate-700"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="font-bold text-slate-700 block mb-1">NO KWITANSI :</label>
+                                    <input
+                                        type="text"
+                                        readOnly
+                                        value={invoiceDetail.artih_nokw || '-'}
+                                        className="w-full p-1.5 bg-slate-50 border border-slate-300 rounded font-mono font-bold text-emerald-700"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="font-bold text-slate-700 block mb-1">TAGIHAN :</label>
+                                    <input
+                                        type="text"
+                                        readOnly
+                                        value={Number(invoiceDetail.artih_total || 0).toLocaleString('id-ID')}
+                                        className="w-full p-1.5 bg-slate-50 border border-slate-300 rounded font-mono font-black text-rose-600 text-right"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="font-bold text-slate-700 block mb-1">PPN (%) :</label>
+                                    <input
+                                        type="text"
+                                        readOnly
+                                        value="1.1"
+                                        className="w-full p-1.5 bg-slate-50 border border-slate-300 rounded font-bold text-slate-700 text-center"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="font-bold text-slate-700 block mb-1">DPP (%) :</label>
+                                    <input
+                                        type="text"
+                                        readOnly
+                                        value="100"
+                                        className="w-full p-1.5 bg-slate-50 border border-slate-300 rounded font-bold text-slate-700 text-center"
+                                    />
+                                </div>
+                                <div className="md:col-span-3">
+                                    <label className="font-bold text-slate-700 block mb-1">NO FAKTUR PAJAK :</label>
+                                    <input
+                                        type="text"
+                                        readOnly
+                                        value={(() => {
+                                            const rawFP = String(invoiceDetail.artih_fktpajak || '').trim();
+                                            if (!rawFP || rawFP === '010.' || rawFP === '010') {
+                                                return '010.026.00.340034701'; // Fallback nomor faktur pajak aktif
+                                            }
+                                            return rawFP;
+                                        })()}
+                                        className="w-full p-1.5 bg-slate-50 border border-slate-300 rounded font-mono font-bold text-slate-800"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 3. INPUT DATA TUKAR FAKTUR */}
+                    <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 space-y-3 font-semibold">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="font-bold text-slate-700 block mb-1 text-xs">
+                                    TANGGAL TUKAR :
+                                </label>
+                                <input
+                                    type="date"
+                                    value={formInput.tgl_tukar}
+                                    onChange={(e) => setFormInput({ ...formInput, tgl_tukar: e.target.value })}
+                                    className="w-full p-2 bg-white border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500 cursor-pointer"
+                                />
+                            </div>
+                            <div>
+                                <label className="font-bold text-slate-700 block mb-1 text-xs">
+                                    NAMA PENERIMA :
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="Contoh: FIKRI / PAK SAIFUL"
+                                    value={formInput.penerima}
+                                    onChange={(e) => setFormInput({ ...formInput, penerima: e.target.value })}
+                                    className="w-full p-2 bg-white border border-slate-300 rounded-lg font-bold text-slate-800 uppercase outline-none focus:border-sky-500"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer Tombol Modal */}
+                <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
+                    <button
+                        type="button"
+                        onClick={handleSaveTukarFaktur}
+                        className="px-8 py-2.5 bg-amber-400 hover:bg-amber-500 text-slate-900 font-black uppercase rounded-xl transition shadow-sm cursor-pointer text-xs tracking-wider"
+                    >
+                        SIMPAN
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setIsModalOpen(false)}
+                        className="px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold uppercase rounded-xl transition cursor-pointer text-xs"
+                    >
+                        KELUAR
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    ) : null;
+
+    const modalRoot = document.getElementById('modal-root') || document.body;
+
     return (
         <div className="space-y-5">
             {/* PANEL FILTER EXPANDABLE */}
@@ -362,7 +660,6 @@ const TukarFaktur = () => {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 font-bold">
-                        {/* 1. Filter Rentang Tanggal */}
                         <div className="space-y-1.5 md:col-span-2">
                             <label className="flex items-center gap-2 cursor-pointer select-none text-slate-600">
                                 <input
@@ -380,8 +677,8 @@ const TukarFaktur = () => {
                                     value={filterState.startDate}
                                     onChange={(e) => setFilterState(p => ({ ...p, startDate: e.target.value }))}
                                     className={`w-full p-2 border rounded-lg font-mono outline-none ${!filterState.useTanggal
-                                            ? 'opacity-50 cursor-not-allowed bg-slate-100 border-slate-200 text-slate-400'
-                                            : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500'
+                                        ? 'opacity-50 cursor-not-allowed bg-slate-100 border-slate-200 text-slate-400'
+                                        : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500'
                                         }`}
                                 />
                                 <input
@@ -390,14 +687,13 @@ const TukarFaktur = () => {
                                     value={filterState.endDate}
                                     onChange={(e) => setFilterState(p => ({ ...p, endDate: e.target.value }))}
                                     className={`w-full p-2 border rounded-lg font-mono outline-none ${!filterState.useTanggal
-                                            ? 'opacity-50 cursor-not-allowed bg-slate-100 border-slate-200 text-slate-400'
-                                            : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500'
+                                        ? 'opacity-50 cursor-not-allowed bg-slate-100 border-slate-200 text-slate-400'
+                                        : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500'
                                         }`}
                                 />
                             </div>
                         </div>
 
-                        {/* Dropdown Cabang dengan Logika Penguncian */}
                         <div>
                             <label className="block mb-1 text-slate-500">AGEN / CABANG</label>
                             <select
@@ -405,8 +701,8 @@ const TukarFaktur = () => {
                                 disabled={!isHoldingUser}
                                 onChange={(e) => setFilterState(p => ({ ...p, selectedCabang: e.target.value }))}
                                 className={`w-full p-2 border rounded-lg font-bold outline-none ${!isHoldingUser
-                                        ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed select-none'
-                                        : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500 cursor-pointer'
+                                    ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed select-none'
+                                    : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500 cursor-pointer'
                                     }`}
                                 title={!isHoldingUser ? 'Filter cabang terkunci sesuai lokasi login Anda' : 'Pilih cabang'}
                             >
@@ -426,7 +722,6 @@ const TukarFaktur = () => {
                             </select>
                         </div>
 
-                        {/* 2. Filter No Invoice */}
                         <div className="space-y-1.5">
                             <label className="flex items-center gap-2 cursor-pointer select-none text-slate-600">
                                 <input
@@ -444,13 +739,12 @@ const TukarFaktur = () => {
                                 value={filterState.noInvoice}
                                 onChange={(e) => setFilterState(p => ({ ...p, noInvoice: e.target.value }))}
                                 className={`w-full p-2 border rounded-lg font-mono outline-none ${!filterState.useNoInvoice
-                                        ? 'opacity-50 cursor-not-allowed bg-slate-100 border-slate-200 text-slate-400'
-                                        : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500'
+                                    ? 'opacity-50 cursor-not-allowed bg-slate-100 border-slate-200 text-slate-400'
+                                    : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500'
                                     }`}
                             />
                         </div>
 
-                        {/* 3. Filter No Kwitansi */}
                         <div className="space-y-1.5">
                             <label className="flex items-center gap-2 cursor-pointer select-none text-slate-600">
                                 <input
@@ -468,8 +762,8 @@ const TukarFaktur = () => {
                                 value={filterState.noKW}
                                 onChange={(e) => setFilterState(p => ({ ...p, noKW: e.target.value }))}
                                 className={`w-full p-2 border rounded-lg font-mono outline-none ${!filterState.useNoKW
-                                        ? 'opacity-50 cursor-not-allowed bg-slate-100 border-slate-200 text-slate-400'
-                                        : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500'
+                                    ? 'opacity-50 cursor-not-allowed bg-slate-100 border-slate-200 text-slate-400'
+                                    : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500'
                                     }`}
                             />
                         </div>
@@ -500,11 +794,14 @@ const TukarFaktur = () => {
                 data={data}
                 loading={loading}
                 isDarkMode={isDarkMode}
-                onAdd={() => handleFormSubmit(null)}
-                onEdit={(item) => handleFormSubmit(item)}
+                onAdd={handleOpenAddModal}
+                onEdit={(item) => handleOpenEditModal(item)}
                 onDelete={handleDelete}
                 onFilter={() => setShowFilter((prev) => !prev)}
             />
+
+            {/* PORTAL MODAL INPUT TUKAR FAKTUR */}
+            {modalElement && ReactDOM.createPortal(modalElement, modalRoot)}
         </div>
     );
 };

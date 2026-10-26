@@ -56,26 +56,50 @@ function formatTanggalIndonesia(dateStr) {
 }
 
 // Helper standarisasi Nomor Invoice ke format resmi: [agen3digit][urut4digit]/[bulan]/[tahun4digit]/FP
-function formatNomorInvoiceResmi(rawId, rawDate) {
+function formatNomorInvoiceResmi(rawId, rawDate, fallbackAgenId = '') {
     if (!rawId) return '-';
     let clean = String(rawId).trim();
 
     // Jika sudah sesuai format baru (.../FP), langsung kembalikan
     if (clean.includes('/FP')) return clean;
 
-    // Ambil tahun dan bulan dari tanggal invoice
-    const d = rawDate ? new Date(rawDate) : new Date();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const yyyy = String(d.getFullYear());
-
-    // Ambil angka urut dari ID (misal OTA09260010 -> ambil 4 digit terakhir: 0010)
     const digits = clean.replace(/\D/g, '');
-    let urut = '0001';
-    if (digits.length >= 4) {
-        urut = digits.slice(-4);
+    const d = rawDate ? new Date(rawDate) : new Date();
+    let mm = String(d.getMonth() + 1).padStart(2, '0');
+    let yyyy = String(d.getFullYear());
+
+    // 1. Ekstraksi kode agen 3 digit pertama dari ID jika ada
+    let agen = '';
+    if (clean.length >= 3 && isNaN(Number(clean.slice(0, 3))) === false) {
+        agen = clean.slice(0, 3);
+    } else if (fallbackAgenId) {
+        agen = String(fallbackAgenId).padStart(3, '0').slice(-3);
+    } else {
+        const sessionAgen = localStorage.getItem('active_cabang_id') || localStorage.getItem('active_agen_id') || '';
+        agen = sessionAgen ? String(sessionAgen).padStart(3, '0').slice(-3) : clean.slice(0, 3);
     }
 
-    return `001${urut}/${mm}/${yyyy}/FP`;
+    let urut = '0001';
+
+    // 2. Jika ID standar 11 digit: [AGEN 3][BULAN 2][TAHUN 2][URUT 4] (contoh: 00210260001)
+    if (digits.length >= 11) {
+        agen = digits.slice(0, 3);
+        const bulanId = digits.slice(3, 5);
+        const tahunId = digits.slice(5, 7);
+        urut = digits.slice(7);
+
+        if (Number(bulanId) >= 1 && Number(bulanId) <= 12) {
+            mm = bulanId;
+        }
+        yyyy = `20${tahunId}`;
+    } else if (digits.length >= 7) {
+        agen = digits.slice(0, 3);
+        urut = digits.slice(-4);
+    } else if (digits.length > 0) {
+        urut = digits.padStart(4, '0').slice(-4);
+    }
+
+    return `${agen}${urut}/${mm}/${yyyy}/FP`;
 }
 
 const Invoice = () => {
@@ -2034,7 +2058,7 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
             accessor: 'artih_id',
             render: (item) => (
                 <span className="font-mono font-bold text-sky-600 select-all">
-                    {item.artih_id}
+                    {formatNomorInvoiceResmi(item.artih_id, item.artih_tanggal, item.artih_agenid)}
                 </span>
             )
         },
@@ -2323,8 +2347,8 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                 <div className="px-6 py-2.5 bg-[#004b84] text-white flex items-center justify-between">
                     <div className="font-black uppercase tracking-wider text-xs flex items-center gap-2">
                         <Plus size={16} />
-                        {savedInvoiceId
-                            ? `EDIT INVOICE — ${savedInvoiceId}`
+                        {savedInvoiceId || activeInvoice?.artih_id
+                            ? `EDIT INVOICE — ${formatNomorInvoiceResmi(savedInvoiceId || activeInvoice?.artih_id, activeInvoice?.artih_tanggal || newInvoiceForm.artih_tanggal, newInvoiceForm.artih_agenid)}`
                             : (addStep === 1 ? 'PEMBUATAN INVOICE (LANGKAH 1 DARI 2)' : 'BUAT INVOICE BARU')}
                     </div>
                     <button
@@ -2513,8 +2537,8 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                                         <input
                                             type="text"
                                             readOnly
-                                            value={savedInvoiceId || "0010006/09/2026/FP"}
-                                            className="w-full p-1.5 bg-slate-50 border border-slate-300 rounded font-mono font-bold text-sky-700"
+                                            value={formatNomorInvoiceResmi(activeInvoice.artih_id, activeInvoice.artih_tanggal, activeInvoice.artih_agenid)}
+                                            className="w-full p-2 bg-slate-100 border border-slate-200 rounded font-mono font-bold text-sky-700"
                                         />
                                     </div>
                                     <div>
