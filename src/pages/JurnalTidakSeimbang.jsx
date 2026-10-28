@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
-import { Search, Scale, RefreshCw, FileSpreadsheet, Download } from 'lucide-react';
+import { Search, Scale, RefreshCw, FileSpreadsheet, Download, RotateCcw } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 const JurnalTidakSeimbang = () => {
@@ -11,18 +11,83 @@ const JurnalTidakSeimbang = () => {
     // 📊 State Data
     const [loading, setLoading] = useState(false);
     const [jurnalList, setJurnalList] = useState([]);
+    const [cabangList, setCabangList] = useState([]);
     const [globalSearch, setGlobalSearch] = useState('');
 
-    // 🔍 State Filter & Toggle Panel
+    // 🏢 Helper Identifikasi Cabang / Holding Aktif
+    function getActiveAgen() {
+        const activeAgenId = localStorage.getItem('active_agen_id') || localStorage.getItem('agen_id') || '';
+        const activeCabangId = localStorage.getItem('active_cabang_id') || localStorage.getItem('cabang_id') || '';
+        const sessionCabangNama = localStorage.getItem('active_cabang_nama')
+            || localStorage.getItem('cabang_nama')
+            || localStorage.getItem('active_agen_nama')
+            || '';
+
+        if (sessionCabangNama) {
+            return {
+                id: activeCabangId || activeAgenId || '001',
+                nama: sessionCabangNama.toUpperCase()
+            };
+        }
+
+        const found = cabangList.find(c => {
+            const cId = String(c.agen_id || c.AgenID || '').trim().toLowerCase();
+            const cKode = String(c.agen_kode || c.AgenKode || '').trim().toLowerCase();
+            const cNama = String(c.agen_nama || c.AgenNama || '').trim().toLowerCase();
+            return (
+                (activeAgenId && (cId === activeAgenId.toLowerCase() || cKode === activeAgenId.toLowerCase() || cNama.includes(activeAgenId.toLowerCase()))) ||
+                (activeCabangId && (cId === activeCabangId.toLowerCase() || cKode === activeCabangId.toLowerCase() || cNama.includes(activeCabangId.toLowerCase())))
+            );
+        });
+
+        if (found) {
+            return {
+                id: String(found.agen_id || found.AgenID),
+                nama: String(found.agen_nama || found.AgenNama).toUpperCase()
+            };
+        }
+
+        return { id: '001', nama: 'DLI PUSAT' };
+    }
+
+    const currentActiveAgen = getActiveAgen();
+    const isHoldingUser =
+        String(currentActiveAgen.nama || '').toUpperCase().includes('PUSAT') ||
+        String(currentActiveAgen.nama || '').toUpperCase().includes('HOLDING') ||
+        String(currentActiveAgen.id || '') === '001' ||
+        (!currentActiveAgen.id && !currentActiveAgen.nama);
+
+    // 🔍 State Filter Modern (Tanpa Checkbox)
     const [showFilter, setShowFilter] = useState(true);
     const todayStr = new Date().toISOString().split('T')[0];
     const [filterParams, setFilterParams] = useState({
-        useTanggal: true,
+        cabangId: isHoldingUser ? '' : currentActiveAgen.id,
         tanggalStart: todayStr,
         tanggalEnd: todayStr,
-        useNoJurnal: false,
         noJurnal: ''
     });
+
+    // 🏢 Fetch Daftar Cabang
+    const fetchCabangOptions = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const resCabang = await api.get('/gl/agen-ca?stt=', { headers: { Authorization: `Bearer ${token}` } });
+            setCabangList(resCabang.data?.data || []);
+        } catch (err) {
+            console.error("Gagal memuat opsi cabang:", err);
+        }
+    };
+
+    useEffect(() => {
+        fetchCabangOptions();
+    }, []);
+
+    // Sinkronisasi filter cabang awal
+    useEffect(() => {
+        if (!isHoldingUser && currentActiveAgen.id) {
+            setFilterParams(prev => ({ ...prev, cabangId: currentActiveAgen.id }));
+        }
+    }, [isHoldingUser, currentActiveAgen.id, cabangList]);
 
     useEffect(() => {
         fetchJurnalTidakSeimbang();
@@ -34,13 +99,21 @@ const JurnalTidakSeimbang = () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const params = {};
+            const ptId = localStorage.getItem('pt_id') || 'C';
+            const params = { pt_id: ptId };
 
-            if (filterParams.useTanggal) {
+            const activeFilterCabang = !isHoldingUser ? currentActiveAgen.id : filterParams.cabangId;
+            if (activeFilterCabang) {
+                params.cabang_id = activeFilterCabang;
+                params.agen_id = activeFilterCabang;
+            }
+            if (filterParams.tanggalStart) {
                 params.tanggalStart = filterParams.tanggalStart;
+            }
+            if (filterParams.tanggalEnd) {
                 params.tanggalEnd = filterParams.tanggalEnd;
             }
-            if (filterParams.useNoJurnal && filterParams.noJurnal) {
+            if (filterParams.noJurnal.trim()) {
                 params.noJurnal = filterParams.noJurnal.trim();
             }
 
@@ -63,19 +136,46 @@ const JurnalTidakSeimbang = () => {
                     title: 'BERHASIL',
                     text: `Ditemukan ${rawData.length} jurnal tidak seimbang`,
                     icon: 'success',
-                    confirmButtonColor: '#2563eb'
+                    timer: 1500,
+                    showConfirmButton: false
                 });
             }
         } catch (err) {
-            console.error("Gagal narik Jurnal Tidak Seimbang:", err);
+            console.error("Gagal mengambil data jurnal tidak seimbang:", err);
             setJurnalList([]);
         } finally {
             setLoading(false);
         }
     };
 
+    const handleResetFilter = () => {
+        const defaultFilter = {
+            cabangId: isHoldingUser ? '' : currentActiveAgen.id,
+            tanggalStart: todayStr,
+            tanggalEnd: todayStr,
+            noJurnal: ''
+        };
+        setFilterParams(defaultFilter);
+
+        const token = localStorage.getItem('token');
+        const ptId = localStorage.getItem('pt_id') || 'C';
+        setLoading(true);
+        api.get('/gl/jurnal-tidak-seimbang', {
+            params: {
+                pt_id: ptId,
+                cabang_id: defaultFilter.cabangId || undefined,
+                agen_id: defaultFilter.cabangId || undefined,
+                tanggalStart: defaultFilter.tanggalStart,
+                tanggalEnd: defaultFilter.tanggalEnd
+            },
+            headers: { Authorization: `Bearer ${token}` }
+        }).then(res => {
+            const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+            setJurnalList(list);
+        }).finally(() => setLoading(false));
+    };
+
     // 📥 Handler Download CSV
-    // 📥 Handler Download CSV Nyata
     const handleDownloadCSV = async (type) => {
         const jenisLabel = type === 'coa' ? 'Jurnal + COA' : 'Jurnal + Selisih';
 
@@ -88,15 +188,17 @@ const JurnalTidakSeimbang = () => {
             });
 
             const token = localStorage.getItem('token');
-            const params = { type };
+            const ptId = localStorage.getItem('pt_id') || 'C';
+            const params = { type, pt_id: ptId };
 
-            if (filterParams.useTanggal) {
-                params.tanggalStart = filterParams.tanggalStart;
-                params.tanggalEnd = filterParams.tanggalEnd;
+            const activeFilterCabang = !isHoldingUser ? currentActiveAgen.id : filterParams.cabangId;
+            if (activeFilterCabang) {
+                params.cabang_id = activeFilterCabang;
+                params.agen_id = activeFilterCabang;
             }
-            if (filterParams.useNoJurnal && filterParams.noJurnal) {
-                params.noJurnal = filterParams.noJurnal.trim();
-            }
+            if (filterParams.tanggalStart) params.tanggalStart = filterParams.tanggalStart;
+            if (filterParams.tanggalEnd) params.tanggalEnd = filterParams.tanggalEnd;
+            if (filterParams.noJurnal.trim()) params.noJurnal = filterParams.noJurnal.trim();
 
             const response = await api.get('/gl/jurnal-tidak-seimbang/export-csv', {
                 params,
@@ -104,7 +206,6 @@ const JurnalTidakSeimbang = () => {
                 responseType: 'blob'
             });
 
-            // Eksekusi trigger download di browser
             const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
             const downloadUrl = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
@@ -119,7 +220,8 @@ const JurnalTidakSeimbang = () => {
                 title: 'BERHASIL',
                 text: `File CSV ${jenisLabel} berhasil diunduh.`,
                 icon: 'success',
-                confirmButtonColor: '#059669'
+                timer: 1500,
+                showConfirmButton: false
             });
         } catch (err) {
             console.error("Gagal export CSV:", err);
@@ -132,7 +234,7 @@ const JurnalTidakSeimbang = () => {
         }
     };
 
-    // 📌 Definisi Kolom Tabel (Replika gl_t_jurnal_unbalanced.asp)
+    // 📌 Kolom Tabel
     const columns = [
         {
             header: 'NO. JURNAL',
@@ -200,7 +302,6 @@ const JurnalTidakSeimbang = () => {
         }
     ];
 
-    // Filter Search Global
     const filteredData = jurnalList.filter(i => {
         if (!globalSearch.trim()) return true;
         const q = globalSearch.toLowerCase();
@@ -213,7 +314,7 @@ const JurnalTidakSeimbang = () => {
     return (
         <div className={`p-6 space-y-6 min-h-screen ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-slate-50 text-slate-800'}`}>
 
-            {/* Header Page */}
+            {/* Header Halaman */}
             <div className="flex items-center justify-between border-b border-gray-200 pb-3">
                 <div>
                     <h1 className="text-base font-black uppercase tracking-wider text-blue-600 flex items-center gap-2">
@@ -225,7 +326,7 @@ const JurnalTidakSeimbang = () => {
                 </div>
             </div>
 
-            {/* 🔍 PANEL FILTER (TOGGLE SESUAI TOMBOL FILTER) */}
+            {/* 🔍 PANEL FILTER (MODERN TANPA CHECKBOX & TANPA TOMBOL KELUAR) */}
             {showFilter && (
                 <div className={`p-5 rounded-2xl border shadow-xs space-y-4 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-slate-200'}`}>
                     <div className="flex items-center gap-2 text-blue-600 font-black tracking-wider border-b border-slate-100 pb-2 text-xs">
@@ -233,71 +334,90 @@ const JurnalTidakSeimbang = () => {
                         <span>PANEL FILTER AUDIT JURNAL</span>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
-                        {/* Filter No Jurnal */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-semibold">
+                        {/* 1. Filter Cabang / Agen */}
                         <div className="space-y-1.5">
-                            <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-600 uppercase">
-                                <input
-                                    type="checkbox"
-                                    checked={filterParams.useNoJurnal}
-                                    onChange={e => setFilterParams({ ...filterParams, useNoJurnal: e.target.checked })}
-                                    className="rounded text-blue-600 cursor-pointer"
-                                />
+                            <label className="block font-bold text-slate-600 uppercase">
+                                Cabang / Agen / Counter
+                            </label>
+                            <select
+                                value={!isHoldingUser && currentActiveAgen.id ? currentActiveAgen.id : filterParams.cabangId}
+                                disabled={!isHoldingUser}
+                                onChange={(e) => setFilterParams({ ...filterParams, cabangId: e.target.value })}
+                                className={`w-full p-2.5 border rounded-lg bg-white font-bold outline-none transition cursor-pointer ${!isHoldingUser ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'border-slate-300 text-slate-900 focus:border-blue-500'
+                                    }`}
+                            >
+                                {isHoldingUser && <option value="">-- SEMUA CABANG (ALL) --</option>}
+                                {!isHoldingUser ? (
+                                    <option value={currentActiveAgen.id}>{currentActiveAgen.nama}</option>
+                                ) : (
+                                    cabangList.map((c, i) => (
+                                        <option key={i} value={c.agen_id || c.AgenID}>
+                                            {c.agen_nama || c.AgenNama}
+                                        </option>
+                                    ))
+                                )}
+                            </select>
+                        </div>
+
+                        {/* 2. Filter No Jurnal */}
+                        <div className="space-y-1.5">
+                            <label className="block font-bold text-slate-600 uppercase">
                                 No. Jurnal
                             </label>
                             <input
                                 type="text"
-                                placeholder="Masukkan No Jurnal..."
+                                placeholder="Cari No Jurnal (Opsional)..."
                                 value={filterParams.noJurnal}
-                                disabled={!filterParams.useNoJurnal}
                                 onChange={e => setFilterParams({ ...filterParams, noJurnal: e.target.value.toUpperCase() })}
-                                className="w-full p-2.5 border border-slate-300 rounded-lg bg-white font-mono font-bold text-slate-900 uppercase disabled:opacity-40 outline-none"
+                                className="w-full p-2.5 border border-slate-300 rounded-lg bg-white font-mono font-bold text-slate-900 uppercase outline-none focus:border-blue-500 transition"
                             />
                         </div>
 
-                        {/* Filter Tanggal Start */}
+                        {/* 3. Filter Tanggal Mulai */}
                         <div className="space-y-1.5">
-                            <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-600 uppercase">
-                                <input
-                                    type="checkbox"
-                                    checked={filterParams.useTanggal}
-                                    onChange={e => setFilterParams({ ...filterParams, useTanggal: e.target.checked })}
-                                    className="rounded text-blue-600 cursor-pointer"
-                                />
+                            <label className="block font-bold text-slate-600 uppercase">
                                 Tanggal Awal
                             </label>
                             <input
                                 type="date"
                                 value={filterParams.tanggalStart}
-                                disabled={!filterParams.useTanggal}
                                 onChange={e => setFilterParams({ ...filterParams, tanggalStart: e.target.value })}
-                                className="w-full p-2.5 border border-slate-300 rounded-lg bg-white font-bold text-slate-900 disabled:opacity-40 outline-none"
+                                className="w-full p-2.5 border border-slate-300 rounded-lg bg-white font-bold text-slate-900 outline-none focus:border-blue-500 transition cursor-pointer"
                             />
                         </div>
 
-                        {/* Filter Tanggal End */}
+                        {/* 4. Filter Tanggal Selesai */}
                         <div className="space-y-1.5">
-                            <label className="font-bold text-slate-600 uppercase block pt-0.5">
+                            <label className="block font-bold text-slate-600 uppercase">
                                 Sampai Tanggal
                             </label>
                             <input
                                 type="date"
                                 value={filterParams.tanggalEnd}
-                                disabled={!filterParams.useTanggal}
                                 onChange={e => setFilterParams({ ...filterParams, tanggalEnd: e.target.value })}
-                                className="w-full p-2.5 border border-slate-300 rounded-lg bg-white font-bold text-slate-900 disabled:opacity-40 outline-none"
+                                className="w-full p-2.5 border border-slate-300 rounded-lg bg-white font-bold text-slate-900 outline-none focus:border-blue-500 transition cursor-pointer"
                             />
                         </div>
                     </div>
 
+                    {/* Tombol Aksi Filter */}
                     <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
                         <div className="flex flex-wrap gap-2">
                             <button
                                 type="button"
                                 onClick={fetchJurnalTidakSeimbang}
-                                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow-xs cursor-pointer flex items-center gap-2 transition"
+                                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow-xs cursor-pointer flex items-center gap-2 transition"
                             >
-                                <RefreshCw size={14} /> REFRESH
+                                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> REFRESH
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={handleResetFilter}
+                                className="px-4 py-2.5 border border-slate-300 hover:bg-slate-100 active:scale-98 text-slate-700 font-bold rounded-xl text-xs uppercase tracking-wider cursor-pointer flex items-center gap-2 transition"
+                            >
+                                <RotateCcw size={14} /> RESET
                             </button>
 
                             <button
@@ -316,19 +436,11 @@ const JurnalTidakSeimbang = () => {
                                 <Download size={14} /> DOWNLOAD CSV JURNAL + SELISIH
                             </button>
                         </div>
-
-                        <button
-                            type="button"
-                            onClick={() => window.history.back()}
-                            className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-98 text-white font-bold rounded-xl text-xs uppercase tracking-wider cursor-pointer transition"
-                        >
-                            KELUAR
-                        </button>
                     </div>
                 </div>
             )}
 
-            {/* 📋 DATATABLE (TERHUBUNG KE TOGGLE FILTER & TANPA TOMBOL TAMBAH) */}
+            {/* 📋 DATATABLE */}
             <DataTableTemplate
                 title={`DATALIST JURNAL TIDAK SEIMBANG (${filteredData.length} ITEMS)`}
                 columns={columns}

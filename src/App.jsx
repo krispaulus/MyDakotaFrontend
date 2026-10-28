@@ -141,6 +141,7 @@ import UploadHasilLoperCSV from './pages/UploadHasilLoperCSV';
 import SettingOperasional from './pages/SettingOperasional';
 import ManajemenBanner from './pages/settings/ManajemenBanner';
 import MasterUangMuka from './pages/MasterUangMuka';
+import MobileValidasiSuratTugas from './pages/MobileValidasiSuratTugas';
 
 const getCompanyName = (pt) => {
   if (pt === 'A') return 'Dakota Buana Sarana';
@@ -755,6 +756,7 @@ function App() {
       <Route path="/settings/manajemen-banner" element={<MainLayout><ManajemenBanner menuName="Manajemen Banner Depan" /></MainLayout>} />
 
       <Route path="/master/uang-muka" element={<MainLayout><MasterUangMuka menuName="MasterUangMuka" /></MainLayout>} />
+      <Route path="/scan-surat-tugas" element={<MobileValidasiSuratTugas />} />
 
       {/* Jika nanti ada halaman lain, tinggal bungkus lagi pakai MainLayout 
       <Route
