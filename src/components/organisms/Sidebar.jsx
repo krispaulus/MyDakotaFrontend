@@ -304,7 +304,6 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
         { name: 'Loper', path: '/operasional/loper', roles: ['S', 'A'] },
         { name: 'BTT Melewati Tengat Waktu', path: '/operasional/loper-deadline', roles: ['S', 'A'] },
         { name: 'Pembongkaran Barang', path: '/operasional/pembongkaran-barang', roles: ['S', 'A'] },
-
         { name: 'Pengeluaran Inventory Customer', path: '/operasional/pengeluaran-inventory-customer', roles: ['S', 'A'] },
 
         {
@@ -325,6 +324,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
         },
         { name: 'Pengisian BBM', path: '/operasional/pengisian-bbm', roles: ['S', 'A'] },
         { name: 'Surat Tugas Supir', path: '/operasional/surat-tugas', roles: ['S', 'A'] },
+        { name: 'Scan Surat Tugas Supir', path: '/operasional/scan-surat-tugas', roles: ['S'] },
         { name: 'Surat Muatan Udara', path: '/operasional/surat-muatan-udara', roles: ['S', 'A'] },
         {
           name: 'Surat Pengantar',

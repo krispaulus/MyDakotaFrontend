@@ -931,8 +931,6 @@ const SuratTugas = () => {
         currentPrintTarget.sjh_tanggal
     );
 
-    const validationUrl = `${window.location.origin}/scan-surat-tugas?no=${encodeURIComponent(officialNoSuratTugas)}`;
-
     // Validasi session login Checker
     const token = localStorage.getItem('token');
     const userRole = localStorage.getItem('user_role'); // atau decode dari token
@@ -942,6 +940,12 @@ const SuratTugas = () => {
         window.location.href = `/login?redirect=/scan-surat-tugas?no=${noSuratTugas}`;
         return null;
     }
+
+    const currentHost = window.location.hostname === 'localhost'
+        ? '192.168.22.25' // Ganti dengan IP lokal laptop Anda
+        : window.location.hostname;
+
+    const validationUrl = `http://${currentHost}:5173/operasional/scan-surat-tugas?no=${encodeURIComponent(officialNoSuratTugas)}`;
 
     return (
         <div className="space-y-4 font-sans">

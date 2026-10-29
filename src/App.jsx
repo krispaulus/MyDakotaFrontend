@@ -620,6 +620,10 @@ function App() {
 
       <Route path="/operasional/pengisian-bbm" element={<MainLayout><PengisianBBM menuName="PengisianBBM" /></MainLayout>} />
       <Route path="/operasional/surat-tugas" element={<MainLayout><SuratTugas menuName="SuratTugas" /></MainLayout>} />
+
+      <Route path="/operasional/scan-surat-tugas" element={<MobileValidasiSuratTugas />} />
+      <Route path="/scan-surat-tugas" element={<MobileValidasiSuratTugas />} />
+
       <Route path="/operasional/surat-muatan-udara" element={<MainLayout><SuratMuatanUdara menuName="SuratMuatanUdara" /></MainLayout>} />
       <Route path="/operasional/cetak-surat-pengiriman" element={<MainLayout><CetakSuratPengiriman menuName="CetakSuratPengiriman" /></MainLayout>} />
 
@@ -756,7 +760,7 @@ function App() {
       <Route path="/settings/manajemen-banner" element={<MainLayout><ManajemenBanner menuName="Manajemen Banner Depan" /></MainLayout>} />
 
       <Route path="/master/uang-muka" element={<MainLayout><MasterUangMuka menuName="MasterUangMuka" /></MainLayout>} />
-      <Route path="/scan-surat-tugas" element={<MobileValidasiSuratTugas />} />
+
 
       {/* Jika nanti ada halaman lain, tinggal bungkus lagi pakai MainLayout 
       <Route
