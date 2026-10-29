@@ -500,7 +500,7 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
                                             <tr>
                                                 <th className="p-2.5 text-center border-r border-sky-800">NO</th>
                                                 <th className="p-2.5 text-center border-r border-sky-800">AKSI</th>
-                                                <th className="p-2.5 border-r border-sky-800 min-w-[200px]">CONSIGNEE (ANAK CUSTOMER)</th>
+                                                <th className="p-2.5 border-r border-sky-800 w-[300px] min-w-[280px] max-w-[320px]">CONSIGNEE (ANAK CUSTOMER)</th>
                                                 <th className="p-2.5 border-r border-sky-800 min-w-[240px]">ADDRESS</th>
                                                 <th className="p-2.5 border-r border-sky-800 min-w-[130px]">PROPINSI</th>
                                                 <th className="p-2.5 border-r border-sky-800 min-w-[130px]">KOTA/KABUPATEN</th>
@@ -575,85 +575,17 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
                                                             )}
                                                         </td>
 
-
-
-
-
-                                                        <td className="p-2.5 font-bold text-slate-800 uppercase border-r border-slate-100">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                                                            {row.consignee}
-                                                            <span className="block text-[10px] text-sky-700 font-mono font-normal">
-                                                                DN: {row.dn_list || '-'}
-                                                            </span>
-
-
-
+                                                        <td className="p-2.5 font-bold text-slate-800 uppercase border-r border-slate-100 w-[300px] min-w-[280px] max-w-[320px] whitespace-normal">
+                                                            <div className="leading-tight">{row.consignee}</div>
+                                                            {row.dn_list && (
+                                                                <div className="mt-1 text-[10px] text-sky-700 font-mono font-normal break-words leading-relaxed bg-sky-50/70 p-1 rounded border border-sky-100">
+                                                                    <span className="font-bold text-slate-600">DN: </span>{row.dn_list}
+                                                                </div>
+                                                            )}
                                                         </td>
 
                                                         <td className="p-2.5 text-slate-600 border-r border-slate-100 max-w-xs truncate" title={row.address}>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
                                                             {row.address || "-"}
-
-
-
-
-
                                                         </td>
 
                                                         {/* Wilayah Editable */}
@@ -723,19 +655,6 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
                                                         <td className="p-2.5 text-center font-mono border-r border-slate-100">{row.kode_packing || "-"}</td>
                                                         <td className="p-2.5 border-r border-slate-100">{row.up || "-"}</td>
                                                         <td className="p-2.5 border-r border-slate-100 font-mono text-[11px]">{row.telp || "-"}</td>
-
-
-
-
-
-
-
-
-
-
-
-
-
                                                         <td className="p-2.5 text-center border-r border-slate-100">
                                                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${row.status_wilayah === "DALAM KOTA" ? "bg-emerald-100 text-emerald-800" : "bg-sky-100 text-sky-800"}`}>
                                                                 {row.status_wilayah}
@@ -744,22 +663,11 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
                                                         <td className="p-2.5 text-slate-600 border-r border-slate-100">{row.keterangan || "-"}</td>
                                                         <td className="p-2.5 text-center font-mono font-bold text-slate-700">{row.kode_group_carter || "-"}</td>
                                                     </tr>
-
-
-
-
-
-
-
-
-
                                                 );
                                             })}
                                         </tbody>
                                     </table>
                                 </div>
-
-
                             )}
 
                             {/* TAB 2: DATA TERTOLAK */}
