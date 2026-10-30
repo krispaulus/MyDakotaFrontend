@@ -415,12 +415,33 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
         }
     };
 
-    const handleSaveUpdatedWilayah = (updatedRow) => {
+    const handleSaveUpdatedWilayah = async (updatedRow) => {
+        // 1. Update tampilan lokal tabel Preview 1 seketika (responsif tanpa jeda)
         setDataValid(prev => {
             const next = [...prev];
             next[editingRowIndex] = updatedRow;
             return next;
         });
+
+        // 2. Simpan permanen ke database mkt_m_customer_history_merck di latar belakang
+        try {
+            const token = localStorage.getItem('token');
+            await api.post('/marketing/transport-planning/save-wilayah-history', {
+                consignee: updatedRow.consignee,
+                address: updatedRow.address,
+                propinsi: updatedRow.propinsi,
+                kota: updatedRow.kota,
+                kecamatan: updatedRow.kecamatan,
+                kelurahan: updatedRow.kelurahan,
+                kodepos: updatedRow.kodepos
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            console.log(`✅ [Auto-Learn] Wilayah untuk "${updatedRow.consignee}" berhasil disimpan permanen ke master database.`);
+        } catch (err) {
+            console.warn("⚠️ Gagal auto-save ke master wilayah:", err);
+        }
     };
 
     return (
