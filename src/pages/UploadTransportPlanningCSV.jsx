@@ -2,37 +2,46 @@ import React, { useState, useEffect, useRef } from "react";
 import {
     UploadCloud, CheckCircle2, RefreshCw, X, Building,
     ArrowRight, Table, Download, Info, ChevronDown, ChevronUp, AlertCircle,
-    Edit3, Trash2, Check, AlertTriangle
+    Edit3, Trash2, Check, AlertTriangle, ArrowLeft, DollarSign
 } from "lucide-react";
 import api from "../api/axios";
 import Swal from "sweetalert2";
+import EditWilayahModal from '../components/organisms/EditWilayahModal';
 
 export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
-    // Autocomplete Principal
     const [queryCust, setQueryCust] = useState("");
     const [suggestList, setSuggestList] = useState([]);
     const [selectedCust, setSelectedCust] = useState(null);
     const [showSuggest, setShowSuggest] = useState(false);
     const suggestRef = useRef(null);
 
-    // File
     const [fileCSV, setFileCSV] = useState(null);
 
-    // State Data Hasil Parse
+    const [editingRowIndex, setEditingRowIndex] = useState(null);
+    const [isEditWilayahOpen, setIsEditWilayahOpen] = useState(false);
     const [loadingParse, setLoadingParse] = useState(false);
     const [dataValid, setDataValid] = useState([]);
     const [dataRejected, setDataRejected] = useState([]);
     const [showReviewModal, setShowReviewModal] = useState(false);
-    const [activeTab, setActiveTab] = useState("valid"); // "valid" atau "rejected"
+    const [activeTab, setActiveTab] = useState("valid");
 
-    // Inline Editing
+    // 🌟 State Alur Dua Tahap: Preview 1 vs Preview 2
+    const [currentStep, setCurrentStep] = useState(1); // 1 = Preview 1, 2 = Preview 2
+    const [loadingPreview2, setLoadingPreview2] = useState(false);
+    const [summaryPreview2, setSummaryPreview2] = useState({
+        totalAkanProses: 0,
+        totalDilewati: 0,
+        grandTotalHarga: 0,
+        grandTotalPacking: 0
+    });
+
+    // Inline Editing di Preview 1
     const [editIdx, setEditIdx] = useState(null);
     const [editRow, setEditRow] = useState({});
 
     const [savingBatch, setSavingBatch] = useState(false);
     const [showGuide, setShowGuide] = useState(false);
 
-    // Suggest Customer Debounce
     useEffect(() => {
         if (queryCust.length < 2 || (selectedCust && queryCust === `${selectedCust.cust_id} - ${selectedCust.cust_name}`)) {
             setSuggestList([]);
@@ -84,9 +93,9 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
         setDataValid([]);
         setDataRejected([]);
         setShowReviewModal(false);
+        setCurrentStep(1);
     };
 
-    // Download Template CSV Resmi
     const handleDownloadTemplate = () => {
         const headers = [
             "No", "createdate", "orderkey", "dn", "Wave", "Colly", "so", "invoice_req",
@@ -126,7 +135,7 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
         URL.revokeObjectURL(url);
     };
 
-    // Eksekusi Parse CSV
+    // Eksekusi PREVIEW 1
     const handleParseAndReview = async (e) => {
         e.preventDefault();
         if (!selectedCust) {
@@ -157,6 +166,7 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
 
             setDataValid(valid);
             setDataRejected(rejected);
+            setCurrentStep(1); // Mulai dari Preview 1
 
             if (valid.length === 0 && rejected.length === 0) {
                 Swal.fire("Pemberitahuan", "Berkas CSV tidak memiliki baris data yang terbaca.", "info");
@@ -165,36 +175,63 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
                 setShowReviewModal(true);
             }
         } catch (err) {
-            Swal.fire("Gagal", err.response?.data?.message || "Gagal memproses file CSV", "error");
+            Swal.fire("Gagal", err.response?.data?.message || "Gagal membaca berkas CSV", "error");
         } finally {
             setLoadingParse(false);
         }
     };
 
-    // Hapus Baris Valid
+    // 🌟 Masuk ke PREVIEW 2 (Kalkulasi Tarif Master & Biaya Packing & Cek Duplikat)
+    const handleGoToPreview2 = async () => {
+        if (dataValid.length === 0) return;
+
+        setLoadingPreview2(true);
+        try {
+            const token = localStorage.getItem("token");
+            const payload = {
+                customer_id: selectedCust.cust_id,
+                rows: dataValid,
+            };
+
+            const res = await api.post("/marketing/transport-planning/calculate-preview2", payload, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            setDataValid(res.data?.rows || []);
+            setSummaryPreview2({
+                totalAkanProses: res.data?.total_akan_proses || 0,
+                totalDilewati: res.data?.total_dilewati || 0,
+                grandTotalHarga: res.data?.grand_total_harga || 0,
+                grandTotalPacking: res.data?.grand_total_packing || 0,
+            });
+
+            setCurrentStep(2); // Pindah tampilan ke Preview 2
+        } catch (err) {
+            Swal.fire("Gagal", err.response?.data?.message || "Gagal mengkalkulasi tarif Preview 2", "error");
+        } finally {
+            setLoadingPreview2(false);
+        }
+    };
+
     const handleDeleteRow = (idx) => {
         setDataValid(prev => prev.filter((_, i) => i !== idx));
     };
 
-    // Mulai Edit Baris
     const handleStartEdit = (idx, row) => {
         setEditIdx(idx);
         setEditRow({ ...row });
     };
 
-    // Simpan Edit Baris
     const handleSaveEdit = (idx) => {
         setDataValid(prev => prev.map((item, i) => i === idx ? { ...editRow } : item));
         setEditIdx(null);
     };
 
-    // Batal Edit
     const handleCancelEdit = () => {
         setEditIdx(null);
         setEditRow({});
     };
 
-    // Download Data Tertolak (CSV)
     const handleDownloadRejected = () => {
         if (dataRejected.length === 0) return;
 
@@ -224,21 +261,21 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
         URL.revokeObjectURL(url);
     };
 
-    // Simpan Batch ke DB
+    // Simpan Final ke Database (dari Preview 2)
     const handleFinalSave = async () => {
-        if (dataValid.length === 0) {
-            Swal.fire("Perhatian", "Tidak ada baris data valid yang siap disimpan.", "warning");
+        if (summaryPreview2.totalAkanProses === 0) {
+            Swal.fire("Perhatian", "Tidak ada data baru yang akan diproses (semua duplikat/dilewati).", "warning");
             return;
         }
 
         const confirm = await Swal.fire({
-            title: "Simpan ke Database?",
-            text: `Yakin ingin memproses ${dataValid.length} BTT Transport Planning ke database?`,
+            title: "Konfirmasi Simpan ke Database?",
+            text: `Anda akan memproses ${summaryPreview2.totalAkanProses} BTT ke database. Tindakan ini tidak dapat dibatalkan.`,
             icon: "question",
             showCancelButton: true,
             confirmButtonColor: "#059669",
             cancelButtonColor: "#64748b",
-            confirmButtonText: "Ya, Simpan!",
+            confirmButtonText: "Ya, Proses ke Database!",
             cancelButtonText: "Batal"
         });
 
@@ -259,8 +296,8 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
 
             Swal.fire({
                 icon: "success",
-                title: "Unggah Berhasil!",
-                text: res.data?.message || "Data Transport Planning berhasil disimpan ke database.",
+                title: "Berhasil Disimpan!",
+                text: res.data?.message || "Data Transport Planning siap dibuatkan BTT.",
                 confirmButtonColor: "#004b84",
             });
 
@@ -270,6 +307,7 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
             setFileCSV(null);
             setQueryCust("");
             setSelectedCust(null);
+            setCurrentStep(1);
         } catch (err) {
             Swal.fire("Gagal", err.response?.data?.message || "Gagal menyimpan batch", "error");
         } finally {
@@ -277,10 +315,103 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
         }
     };
 
+    const handleProceedToPreview2 = async () => {
+        // 🛡️ 1. Pengecekan Validasi: Cari baris yang wilayahnya belum lengkap
+        const barisKosong = [];
+
+        dataValid.forEach((row, index) => {
+            const propinsiKosong = !row.propinsi || row.propinsi.trim() === '-' || row.propinsi.trim() === '';
+            const kotaKosong = !row.kota || row.kota.trim() === '-' || row.kota.trim() === '';
+            const kecamatanKosong = !row.kecamatan || row.kecamatan.trim() === '-' || row.kecamatan.trim() === '';
+            const kelurahanKosong = !row.kelurahan || row.kelurahan.trim() === '-' || row.kelurahan.trim() === '';
+
+            if (propinsiKosong || kotaKosong || kecamatanKosong || kelurahanKosong) {
+                barisKosong.push({
+                    no: index + 1,
+                    consignee: row.consignee,
+                    missing: [
+                        propinsiKosong ? 'Propinsi' : null,
+                        kotaKosong ? 'Kota' : null,
+                        kecamatanKosong ? 'Kecamatan' : null,
+                        kelurahanKosong ? 'Kelurahan' : null
+                    ].filter(Boolean).join(', ')
+                });
+            }
+        });
+
+        // 🛑 2. Jika ada yang kosong, cegah lanjut dan tampilkan SweetAlert peringatan
+        if (barisKosong.length > 0) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Data Wilayah Belum Lengkap!',
+                html: `
+                <div class="text-left text-xs text-slate-700 space-y-2 p-3 bg-rose-50 border border-rose-200 rounded-xl mt-2 max-h-64 overflow-y-auto font-sans">
+                    <p class="font-bold text-rose-800">
+                        Ditemukan <b>${barisKosong.length} baris</b> dengan data wilayah belum lengkap. Seluruh wilayah wajib diisi karena menentukan perhitungan Tarif Master di Preview 2!
+                    </p>
+                    <div class="divide-y divide-rose-100">
+                        ${barisKosong.map((b) => `
+                            <div class="py-1.5 flex items-start gap-2">
+                                <span class="font-bold text-rose-600">[Baris ${b.no}]</span>
+                                <div>
+                                    <div class="font-bold text-slate-800">${b.consignee}</div>
+                                    <div class="text-[11px] text-rose-600 font-medium">Kolom kosong: ${b.missing}</div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `,
+                confirmButtonColor: '#004b84',
+                confirmButtonText: 'OKE, SAYA LENGKAPI DULU',
+                customClass: { container: 'z-[999999]' }
+            });
+            return; // Hentikan proses, tidak boleh lanjut ke Preview 2!
+        }
+
+        // ✅ 3. Jika SEMUA baris sudah lengkap, lanjutkan request ke backend untuk kalkulasi Preview 2
+        try {
+            const token = localStorage.getItem('token');
+            const res = await api.post('/marketing/transport-planning/calculate-preview2', {
+                customer_id: selectedCustomer,
+                rows: dataValid
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (res.data && res.data.status === 'success') {
+                setDataPreview2(res.data.rows || []);
+                setSummaryPreview2({
+                    totalAkanProses: res.data.total_akan_proses,
+                    totalDilewati: res.data.total_dilewati,
+                    grandTotalHarga: res.data.grand_total_harga,
+                    grandTotalPacking: res.data.grand_total_packing
+                });
+                setCurrentStep(2); // Pindah ke layar Preview 2
+            }
+        } catch (err) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal Kalkulasi Preview 2',
+                text: err.response?.data?.message || err.message,
+                confirmButtonColor: '#ef4444',
+                customClass: { container: 'z-[999999]' }
+            });
+        }
+    };
+
+    const handleSaveUpdatedWilayah = (updatedRow) => {
+        setDataValid(prev => {
+            const next = [...prev];
+            next[editingRowIndex] = updatedRow;
+            return next;
+        });
+    };
+
     return (
         <div className={`p-6 min-h-screen space-y-5 font-sans ${isDarkMode ? "bg-gray-900 text-white" : "bg-slate-50 text-slate-800"}`}>
 
-            {/* Header Halaman */}
+            {/* Header Halaman & Action Download */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                 <div className="flex items-center gap-3.5">
                     <div className="p-3 bg-[#004b84] text-white rounded-2xl shadow-md">
@@ -381,7 +512,6 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
 
             {/* Form Input Upload */}
             <form onSubmit={handleParseAndReview} className="p-6 rounded-2xl border border-slate-200 bg-white shadow-sm space-y-5">
-
                 <div className="relative" ref={suggestRef}>
                     <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
                         Pilih Customer (Principal/Shipper) <span className="text-rose-500">*</span>
@@ -417,7 +547,6 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
                     )}
                 </div>
 
-
                 <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
                         Pilih File CSV Transport Planning <span className="text-rose-500">*</span>
@@ -434,7 +563,6 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
                     </p>
                 </div>
 
-
                 <div className="flex justify-end pt-3 border-t border-slate-100">
                     <button
                         type="submit"
@@ -447,59 +575,90 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
                 </div>
             </form>
 
-            {/* 🌟 MODAL POP-UP FULL WIDTH (HORIZONTAL SCROLLABLE & 24 KOLOM LENGKAP) 🌟 */}
+            {/* 🌟 MODAL POP-UP (MENDUKUNG PREVIEW 1 & PREVIEW 2) 🌟 */}
             {showReviewModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-2 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
                     <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-[98vw] max-h-[94vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
 
-                        {/* Header Modal & Tabs */}
+                        {/* Header Modal */}
                         <div className="px-6 py-3.5 bg-[#004b84] text-white flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-md shrink-0">
                             <div className="flex items-center gap-2.5">
                                 <Table size={20} className="text-sky-200" />
                                 <div>
-                                    <h2 className="text-sm font-black uppercase tracking-wider">
-                                        Review Transport Planning &mdash; {selectedCust?.cust_name}
-                                    </h2>
+                                    <div className="flex items-center gap-2">
+                                        <h2 className="text-sm font-black uppercase tracking-wider">
+                                            {currentStep === 1 ? "PREVIEW 1 — REVIEW DATA TRANSPORT PLANNING" : "PREVIEW 2 — KONFIRMASI DATA & HARGA FINAL"}
+                                        </h2>
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${currentStep === 1 ? 'bg-amber-400 text-slate-900' : 'bg-emerald-400 text-slate-900'}`}>
+                                            {currentStep === 1 ? "EDIT DATA" : "BELUM DISIMPAN KE DB"}
+                                        </span>
+                                    </div>
                                     <p className="text-[11px] text-sky-200 font-medium">
-                                        {dataValid.length} BTT Terbentuk (Hasil Grouping) &bull; {dataRejected.length} Baris Tertolak
+                                        Customer: {selectedCust?.cust_name} &bull; {dataValid.length} BTT Terbentuk (Hasil Grouping)
                                     </p>
                                 </div>
                             </div>
 
-
-                            <div className="flex items-center gap-2 bg-black/20 p-1 rounded-xl">
-                                <button
-                                    type="button"
-                                    onClick={() => setActiveTab("valid")}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${activeTab === "valid" ? "bg-white text-[#004b84] shadow-xs" : "text-sky-100 hover:text-white"
-                                        }`}
-                                >
-                                    <CheckCircle2 size={14} className={activeTab === "valid" ? "text-emerald-600" : ""} />
-                                    <span>Data Valid ({dataValid.length})</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setActiveTab("rejected")}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${activeTab === "rejected" ? "bg-white text-rose-700 shadow-xs" : "text-sky-100 hover:text-white"
-                                        }`}
-                                >
-                                    <AlertTriangle size={14} className={activeTab === "rejected" ? "text-rose-600" : ""} />
-                                    <span>Data Tertolak ({dataRejected.length})</span>
-                                </button>
-                            </div>
+                            {/* Tab Switcher (Hanya aktif di Preview 1) */}
+                            {currentStep === 1 && (
+                                <div className="flex items-center gap-2 bg-black/20 p-1 rounded-xl">
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveTab("valid")}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${activeTab === "valid" ? "bg-white text-[#004b84] shadow-xs" : "text-sky-100 hover:text-white"
+                                            }`}
+                                    >
+                                        <CheckCircle2 size={14} className={activeTab === "valid" ? "text-emerald-600" : ""} />
+                                        <span>Data Valid ({dataValid.length})</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveTab("rejected")}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${activeTab === "rejected" ? "bg-white text-rose-700 shadow-xs" : "text-sky-100 hover:text-white"
+                                            }`}
+                                    >
+                                        <AlertTriangle size={14} className={activeTab === "rejected" ? "text-rose-600" : ""} />
+                                        <span>Data Tertolak ({dataRejected.length})</span>
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
-                        {/* Konten Tabel dengan Scroll Horizontal & Vertikal Lengkap */}
-                        <div className="p-4 overflow-y-auto overflow-x-auto flex-1">
+                        {/* Konten Modal */}
+                        <div className="p-4 overflow-y-auto overflow-x-auto flex-1 space-y-4">
 
-                            {/* TAB 1: DATA VALID (24 KOLOM RESMI DAKOTA LOGISTIK) */}
+                            {/* 🌟 JIKA DI PREVIEW 2: TAMPILKAN 4 SUMMARY CARDS PERSIS ASP LAWAS 🌟 */}
+                            {currentStep === 2 && (
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200 shrink-0">
+                                    <div className="text-center p-3 bg-white rounded-xl shadow-xs border border-slate-100">
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Akan Diproses</span>
+                                        <span className="block text-2xl font-black text-emerald-600 mt-1">{summaryPreview2.totalAkanProses}</span>
+                                    </div>
+                                    <div className="text-center p-3 bg-white rounded-xl shadow-xs border border-slate-100">
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Dilewati (Duplikat)</span>
+                                        <span className="block text-2xl font-black text-amber-500 mt-1">{summaryPreview2.totalDilewati}</span>
+                                    </div>
+                                    <div className="text-center p-3 bg-white rounded-xl shadow-xs border border-slate-100">
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Total Baris</span>
+                                        <span className="block text-2xl font-black text-[#004b84] mt-1">{dataValid.length}</span>
+                                    </div>
+                                    <div className="text-center p-3 bg-white rounded-xl shadow-xs border border-slate-100">
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Estimasi Total Harga</span>
+                                        <span className="block text-xl font-black text-sky-700 mt-1">
+                                            Rp {Number(summaryPreview2.grandTotalHarga || 0).toLocaleString("id-ID")}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* TAB 1: DATA VALID (PREVIEW 1 & PREVIEW 2) */}
                             {activeTab === "valid" && (
                                 <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-xs min-w-max">
                                     <table className="w-full text-xs text-left border-collapse">
                                         <thead className="bg-[#004b84] text-white text-[11px] font-bold uppercase sticky top-0 z-20">
                                             <tr>
                                                 <th className="p-2.5 text-center border-r border-sky-800">NO</th>
-                                                <th className="p-2.5 text-center border-r border-sky-800">AKSI</th>
+                                                {currentStep === 1 && <th className="p-2.5 text-center border-r border-sky-800">AKSI</th>}
                                                 <th className="p-2.5 border-r border-sky-800 w-[300px] min-w-[280px] max-w-[320px]">CONSIGNEE (ANAK CUSTOMER)</th>
                                                 <th className="p-2.5 border-r border-sky-800 min-w-[240px]">ADDRESS</th>
                                                 <th className="p-2.5 border-r border-sky-800 min-w-[130px]">PROPINSI</th>
@@ -514,67 +673,64 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
                                                 <th className="p-2.5 text-right border-r border-sky-800">TOTAL VOLUME</th>
                                                 <th className="p-2.5 text-right border-r border-sky-800">TOTAL PACKING</th>
                                                 <th className="p-2.5 text-center border-r border-sky-800 min-w-[90px]">KODE KENDARAAN</th>
-                                                <th className="p-2.5 text-right border-r border-sky-800 min-w-[90px]">HARGA</th>
                                                 <th className="p-2.5 text-center border-r border-sky-800">DG (B3)</th>
-                                                <th className="p-2.5 text-center border-r border-sky-800">MULTIDROP / EXPRESS</th>
+                                                <th className="p-2.5 text-center border-r border-sky-800">MULTIDROP</th>
                                                 <th className="p-2.5 text-center border-r border-sky-800 min-w-[90px]">KODE PACKING</th>
                                                 <th className="p-2.5 border-r border-sky-800 min-w-[120px]">UP</th>
                                                 <th className="p-2.5 border-r border-sky-800 min-w-[120px]">TELEPON</th>
-                                                <th className="p-2.5 text-center border-r border-sky-800 min-w-[120px]">ZONASI</th>
+                                                <th className="p-2.5 text-center border-r border-sky-800 min-w-[120px]">KODE GROUP CARTER</th>
+
+                                                {/* 🌟 KOLOM KHUSUS PREVIEW 2 (SUMBER HARGA, HARGA FINAL, BIAYA PACKING, STATUS) 🌟 */}
+                                                {currentStep === 2 && (
+                                                    <>
+                                                        <th className="p-2.5 text-center border-r border-sky-800 min-w-[130px] bg-sky-900">SUMBER HARGA</th>
+                                                        <th className="p-2.5 text-right border-r border-sky-800 min-w-[110px] bg-sky-900">HARGA FINAL (RP)</th>
+                                                        <th className="p-2.5 text-right border-r border-sky-800 min-w-[110px] bg-sky-900">BIAYA PACKING</th>
+                                                        <th className="p-2.5 text-center border-r border-sky-800 min-w-[120px] bg-sky-900">STATUS PROSES</th>
+                                                    </>
+                                                )}
+
                                                 <th className="p-2.5 border-r border-sky-800 min-w-[180px]">KETERANGAN</th>
-                                                <th className="p-2.5 text-center min-w-[120px]">KODE GROUP CARTER</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
                                             {dataValid.map((row, idx) => {
                                                 const isEditing = editIdx === idx;
+                                                const isRowDup = row.is_duplicate;
                                                 return (
-                                                    <tr key={idx} className="hover:bg-sky-50/50 transition">
+                                                    <tr key={idx} className={`transition ${isRowDup ? 'bg-amber-50/70 hover:bg-amber-100/70' : 'hover:bg-sky-50/50'}`}>
                                                         <td className="p-2.5 text-center font-bold text-slate-500 border-r border-slate-100">{idx + 1}</td>
 
-                                                        {/* Tombol Aksi Edit & Delete */}
-                                                        <td className="p-2.5 text-center border-r border-slate-100">
-                                                            {isEditing ? (
+                                                        {currentStep === 1 && (
+                                                            <td className="p-2.5 text-center border-r border-slate-100 whitespace-nowrap">
                                                                 <div className="flex items-center justify-center gap-1">
+                                                                    {/* Tombol Pensil: LANGSUNG BUKA MODAL AUTOCOMPLETE WILAYAH BTT */}
                                                                     <button
                                                                         type="button"
-                                                                        onClick={() => handleSaveEdit(idx)}
-                                                                        className="p-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded transition cursor-pointer"
-                                                                        title="Simpan"
+                                                                        onClick={() => {
+                                                                            setEditingRowIndex(idx);
+                                                                            setIsEditWilayahOpen(true);
+                                                                        }}
+                                                                        title="Lengkapi Wilayah (Kecamatan, Kelurahan, Kodepos)"
+                                                                        className="p-1.5 text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
                                                                     >
-                                                                        <Check size={14} />
+                                                                        <Edit3 size={15} />
                                                                     </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={handleCancelEdit}
-                                                                        className="p-1 bg-slate-300 hover:bg-slate-400 text-slate-700 rounded transition cursor-pointer"
-                                                                        title="Batal"
-                                                                    >
-                                                                        <X size={14} />
-                                                                    </button>
-                                                                </div>
-                                                            ) : (
-                                                                <div className="flex items-center justify-center gap-1">
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleStartEdit(idx, row)}
-                                                                        className="p-1 text-amber-600 hover:bg-amber-50 rounded transition cursor-pointer"
-                                                                        title="Edit"
-                                                                    >
-                                                                        <Edit3 size={14} />
-                                                                    </button>
+
+                                                                    {/* Tombol Hapus Baris */}
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => handleDeleteRow(idx)}
-                                                                        className="p-1 text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
-                                                                        title="Hapus"
+                                                                        title="Hapus Baris"
+                                                                        className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                                                                     >
-                                                                        <Trash2 size={14} />
+                                                                        <Trash2 size={15} />
                                                                     </button>
                                                                 </div>
-                                                            )}
-                                                        </td>
+                                                            </td>
+                                                        )}
 
+                                                        {/* Consignee dengan Wrap DN */}
                                                         <td className="p-2.5 font-bold text-slate-800 uppercase border-r border-slate-100 w-[300px] min-w-[280px] max-w-[320px] whitespace-normal">
                                                             <div className="leading-tight">{row.consignee}</div>
                                                             {row.dn_list && (
@@ -588,7 +744,7 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
                                                             {row.address || "-"}
                                                         </td>
 
-                                                        {/* Wilayah Editable */}
+                                                        {/* Wilayah */}
                                                         <td className="p-2.5 border-r border-slate-100">
                                                             {isEditing ? (
                                                                 <input
@@ -638,8 +794,6 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
                                                                     className="w-20 p-1 border border-sky-400 rounded text-xs text-center"
                                                                 />
                                                             ) : (row.kodepos || "-")}
-
-
                                                         </td>
 
                                                         <td className="p-2.5 text-center font-bold border-r border-slate-100">{row.serv_id}</td>
@@ -649,19 +803,44 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
                                                         <td className="p-2.5 text-right font-mono border-r border-slate-100">{row.total_volume}</td>
                                                         <td className="p-2.5 text-right font-mono border-r border-slate-100">{row.total_packing}</td>
                                                         <td className="p-2.5 text-center font-mono border-r border-slate-100">{row.kode_kendaraan || "-"}</td>
-                                                        <td className="p-2.5 text-right font-mono border-r border-slate-100">{Number(row.harga || 0).toLocaleString("id-ID")}</td>
+
                                                         <td className="p-2.5 text-center font-bold border-r border-slate-100">{row.is_dg}</td>
                                                         <td className="p-2.5 text-center font-bold border-r border-slate-100">{row.is_multidrop}</td>
                                                         <td className="p-2.5 text-center font-mono border-r border-slate-100">{row.kode_packing || "-"}</td>
                                                         <td className="p-2.5 border-r border-slate-100">{row.up || "-"}</td>
                                                         <td className="p-2.5 border-r border-slate-100 font-mono text-[11px]">{row.telp || "-"}</td>
-                                                        <td className="p-2.5 text-center border-r border-slate-100">
-                                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${row.status_wilayah === "DALAM KOTA" ? "bg-emerald-100 text-emerald-800" : "bg-sky-100 text-sky-800"}`}>
-                                                                {row.status_wilayah}
-                                                            </span>
-                                                        </td>
-                                                        <td className="p-2.5 text-slate-600 border-r border-slate-100">{row.keterangan || "-"}</td>
-                                                        <td className="p-2.5 text-center font-mono font-bold text-slate-700">{row.kode_group_carter || "-"}</td>
+                                                        <td className="p-2.5 text-center font-mono font-bold text-slate-700 border-r border-slate-100">{row.kode_group_carter || "-"}</td>
+
+                                                        {/* 🌟 DETAIL HARGA & STATUS DI PREVIEW 2 🌟 */}
+                                                        {currentStep === 2 && (
+                                                            <>
+                                                                <td className="p-2.5 text-center border-r border-slate-100">
+                                                                    {row.sumber_harga === "TARIF MASTER" && <span className="text-emerald-700 font-black">✓ MASTER TARIF</span>}
+                                                                    {row.sumber_harga === "HARGA CSV" && <span className="text-amber-600 font-bold">⚠ HARGA CSV</span>}
+                                                                    {row.sumber_harga === "TIDAK ADA" && <span className="text-rose-600 font-bold">✗ TIDAK ADA</span>}
+                                                                </td>
+                                                                <td className="p-2.5 text-right font-mono font-black text-slate-900 border-r border-slate-100">
+                                                                    Rp {Number(row.harga_final || 0).toLocaleString("id-ID")}
+                                                                </td>
+                                                                <td className="p-2.5 text-right font-mono text-slate-700 border-r border-slate-100">
+                                                                    {row.biaya_packing > 0 ? `Rp ${row.biaya_packing.toLocaleString("id-ID")}` : "-"}
+                                                                </td>
+                                                                <td className="p-2.5 text-center border-r border-slate-100">
+                                                                    {row.is_duplicate ? (
+                                                                        <div className="bg-amber-100 text-amber-800 font-black px-2 py-0.5 rounded text-[10px]">
+                                                                            DILEWATI
+                                                                            <span className="block text-[9px] font-mono">{row.existing_btt}</span>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <span className="bg-emerald-100 text-emerald-800 font-black px-2 py-0.5 rounded text-[10px]">
+                                                                            AKAN DIPROSES
+                                                                        </span>
+                                                                    )}
+                                                                </td>
+                                                            </>
+                                                        )}
+
+                                                        <td className="p-2.5 text-slate-600">{row.keterangan || "-"}</td>
                                                     </tr>
                                                 );
                                             })}
@@ -671,7 +850,7 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
                             )}
 
                             {/* TAB 2: DATA TERTOLAK */}
-                            {activeTab === "rejected" && (
+                            {activeTab === "rejected" && currentStep === 1 && (
                                 <div className="space-y-4">
                                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 bg-rose-50 border border-rose-200 rounded-2xl">
                                         <div className="flex items-center gap-2.5 text-rose-800 text-xs">
@@ -724,30 +903,71 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
 
                         </div>
 
-                        {/* Footer Modal */}
-                        <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-3 shrink-0">
-                            <button
-                                type="button"
-                                onClick={() => setShowReviewModal(false)}
-                                disabled={savingBatch}
-                                className="px-5 h-10 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-bold rounded-xl text-xs uppercase tracking-wider transition cursor-pointer disabled:opacity-50"
-                            >
-                                BATAL
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleFinalSave}
-                                disabled={savingBatch || dataValid.length === 0}
-                                className="px-6 h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs uppercase tracking-wider shadow-md transition flex items-center gap-2 cursor-pointer disabled:opacity-50 active:scale-95"
-                            >
-                                {savingBatch ? <RefreshCw size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
-                                {savingBatch ? "MENYIMPAN BATCH..." : `KONFIRMASI & SIMPAN (${dataValid.length} BTT)`}
-                            </button>
+                        {/* Footer Modal: Tombol Aksi Preview 1 & Preview 2 */}
+                        <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3 shrink-0">
+                            <div>
+                                {currentStep === 2 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setCurrentStep(1)}
+                                        className="px-4 h-10 bg-slate-600 hover:bg-slate-700 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition flex items-center gap-1.5 cursor-pointer"
+                                    >
+                                        <ArrowLeft size={14} /> Kembali ke Preview 1 (Edit Data)
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowReviewModal(false)}
+                                    disabled={savingBatch || loadingPreview2}
+                                    className="px-5 h-10 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-bold rounded-xl text-xs uppercase tracking-wider transition cursor-pointer disabled:opacity-50"
+                                >
+                                    BATAL
+                                </button>
+
+                                {/* Di Preview 1: Tombol Lanjut ke Preview 2 */}
+                                {currentStep === 1 && (
+                                    <button
+                                        type="button"
+                                        onClick={handleProceedToPreview2}
+                                        disabled={loadingPreview2 || dataValid.length === 0}
+                                        className="px-6 h-10 bg-[#004b84] hover:bg-[#003863] text-white font-black rounded-xl text-xs uppercase tracking-wider shadow-md transition flex items-center gap-2 cursor-pointer disabled:opacity-50 active:scale-95"
+                                    >
+                                        {loadingPreview2 ? <RefreshCw size={15} className="animate-spin" /> : <DollarSign size={15} />}
+                                        {loadingPreview2 ? "MENGHITUNG TARIF..." : "PREVIEW 2 (KONFIRMASI HARGA)"}
+                                    </button>
+                                )}
+
+                                {/* Di Preview 2: Tombol Konfirmasi Simpan ke Database */}
+                                {currentStep === 2 && (
+                                    <button
+                                        type="button"
+                                        onClick={handleFinalSave}
+                                        disabled={savingBatch || summaryPreview2.totalAkanProses === 0}
+                                        className="px-6 h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs uppercase tracking-wider shadow-md transition flex items-center gap-2 cursor-pointer disabled:opacity-50 active:scale-95"
+                                    >
+                                        {savingBatch ? <RefreshCw size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
+                                        {savingBatch ? "MENYIMPAN KE DATABASE..." : `KONFIRMASI & PROSES KE DATABASE (${summaryPreview2.totalAkanProses} BTT)`}
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
                     </div>
                 </div>
             )}
+
+            <EditWilayahModal
+                isOpen={isEditWilayahOpen}
+                onClose={() => {
+                    setIsEditWilayahOpen(false);
+                    setEditingRowIndex(null);
+                }}
+                rowData={editingRowIndex !== null ? dataValid[editingRowIndex] : null}
+                onSave={handleSaveUpdatedWilayah}
+            />
 
         </div>
     );

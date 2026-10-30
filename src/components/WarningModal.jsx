@@ -6,7 +6,6 @@ const WarningModal = ({ isOpen, onClose, title = "WARNING", message, countdown =
   const [timeLeft, setTimeLeft] = useState(countdown);
 
   useEffect(() => {
-    // Sync external countdown state
     setTimeLeft(countdown);
   }, [countdown]);
 
@@ -17,7 +16,6 @@ const WarningModal = ({ isOpen, onClose, title = "WARNING", message, countdown =
         setTimeLeft((prev) => {
           if (prev <= 1) {
             clearInterval(timer);
-            // Optionally auto-close or allow user to close, depends on logic outside
             return 0;
           }
           return prev - 1;
@@ -27,18 +25,32 @@ const WarningModal = ({ isOpen, onClose, title = "WARNING", message, countdown =
     return () => clearInterval(timer);
   }, [isOpen, timeLeft]);
 
+  // JIKA BUKAN SESSION EXPIRED, biarkan perilaku normal
+  const isSessionExpired = title?.toUpperCase().includes("SESSION EXPIRED") || message?.toLowerCase().includes("sesi anda telah berakhir");
+
+  // Fungsi khusus untuk keluar ke login
+  const handleForceLogout = () => {
+    // 1. Bersihkan token dari storage
+    localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
+    localStorage.removeItem('user');
+    sessionStorage.removeItem('user');
+
+    // 2. Jika ada callback onClose bawaan
+    if (onClose) onClose();
+
+    // 3. Redirect keras ke halaman login agar seluruh state aplikasi ter-reset
+    window.location.href = '/login';
+  };
+
   if (!isOpen) return null;
 
-  // Process message to inject dynamic timer and split by line breaks for rendering
   const renderMessage = () => {
     if (!message) return null;
     let finalMessage = message;
     if (timeLeft > 0) {
-      // Replace dynamic tokens if needed, but since we know the specific string, 
       finalMessage = finalMessage.replace('{time}', `${timeLeft} detik`);
     } else {
-      // If time is 0 but it had a time token, maybe text should change?
-      // Revert if time is 0 and it was a countdown modal
       finalMessage = finalMessage.replace('{time}', `0 detik`);
     }
 
@@ -53,8 +65,11 @@ const WarningModal = ({ isOpen, onClose, title = "WARNING", message, countdown =
   return (
     <div className="warning-modal-overlay" style={{ zIndex: 999999 }}>
       <div className="warning-modal-content">
-        {/* Optional close icon on top right */}
-        <button className="warning-modal-close" onClick={onClose}>
+        {/* Tombol silang di pojok kanan atas */}
+        <button
+          className="warning-modal-close"
+          onClick={isSessionExpired ? handleForceLogout : onClose}
+        >
           <X size={20} />
         </button>
 
@@ -69,8 +84,12 @@ const WarningModal = ({ isOpen, onClose, title = "WARNING", message, countdown =
           {renderMessage()}
         </p>
 
-        <button className="warning-modal-button" onClick={onClose}>
-          Back
+        {/* Tombol Aksi di Bawah */}
+        <button
+          className="warning-modal-button"
+          onClick={isSessionExpired ? handleForceLogout : onClose}
+        >
+          {isSessionExpired ? "Ke Halaman Login" : "Back"}
         </button>
       </div>
     </div>

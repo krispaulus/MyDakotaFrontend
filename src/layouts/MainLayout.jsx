@@ -15,10 +15,10 @@ const MainLayout = ({ children }) => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
 
     useEffect(() => {
-        if (!token) {
+        if (!token && !isIdleModalOpen) {
             navigate('/login', { replace: true });
         }
-    }, [token, navigate]);
+    }, [token, navigate, isIdleModalOpen]);
 
     // ================= LOGIKA AUTO LOGOUT ON IDLE ================
     useEffect(() => {
@@ -32,7 +32,16 @@ const MainLayout = ({ children }) => {
         };
 
         const triggerIdleModal = () => {
-            console.log("⏰ Batas waktu idle tercapai. Memunculkan WarningModal...");
+            console.log("⏰ Batas waktu idle tercapai. Menghapus sesi & memunculkan WarningModal...");
+
+            // 🚨 HAPUS TOKEN SEKETIKA AGAR JIKA DI-REFRESH LANGSUNG TERLEMPAR KE LOGIN
+            localStorage.removeItem('token');
+            sessionStorage.removeItem('token');
+            localStorage.removeItem('user_name');
+            localStorage.removeItem('selected_pt');
+            localStorage.removeItem('pt_ID');
+            sessionStorage.clear();
+
             setIsIdleModalOpen(true);
         };
 
@@ -64,23 +73,24 @@ const MainLayout = ({ children }) => {
             });
             window.removeEventListener('idle_time_changed', handleTimeChange);
         };
-    }, [navigate, isIdleModalOpen, token]);
+    }, [isIdleModalOpen, token]);
 
     // FUNGSI EKSEKUSI LOGOUT
     const handleConfirmLogout = () => {
         setIsIdleModalOpen(false);
 
         localStorage.removeItem('token');
+        sessionStorage.removeItem('token');
         localStorage.removeItem('user_name');
         localStorage.removeItem('selected_pt');
         localStorage.removeItem('pt_ID');
         sessionStorage.clear();
 
-        navigate('/login', { replace: true });
+        window.location.href = '/login';
     };
 
-    // 🔒 2. CEGAH RENDER LAYOUT JIKA TIDAK ADA TOKEN
-    if (!token) {
+    // 🔒 CEGAH RENDER LAYOUT JIKA TIDAK ADA TOKEN DAN MODAL SEDANG TIDAK MUNCUL
+    if (!token && !isIdleModalOpen) {
         return <Navigate to="/login" replace />;
     }
 
@@ -96,7 +106,7 @@ const MainLayout = ({ children }) => {
                 {/* HEADER */}
                 <Header onMenuClick={toggleSidebar} />
 
-                {/* CONTENT AREA: Mendukung children atau Outlet React Router */}
+                {/* CONTENT AREA */}
                 <main className={`flex-1 overflow-y-auto p-8 transition-colors ${isDarkMode ? 'bg-gray-900' : 'bg-[#f4f7fe]'}`}>
                     {children || <Outlet />}
                 </main>
