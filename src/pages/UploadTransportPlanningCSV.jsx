@@ -316,9 +316,8 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
     };
 
     const handleProceedToPreview2 = async () => {
-        // 🛡️ 1. Pengecekan Validasi: Cari baris yang wilayahnya belum lengkap
+        // 1. Validasi baris wilayah kosong
         const barisKosong = [];
-
         dataValid.forEach((row, index) => {
             const propinsiKosong = !row.propinsi || row.propinsi.trim() === '-' || row.propinsi.trim() === '';
             const kotaKosong = !row.kota || row.kota.trim() === '-' || row.kota.trim() === '';
@@ -339,7 +338,6 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
             }
         });
 
-        // 🛑 2. Jika ada yang kosong, cegah lanjut dan tampilkan SweetAlert peringatan
         if (barisKosong.length > 0) {
             Swal.fire({
                 icon: 'warning',
@@ -347,7 +345,7 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
                 html: `
                 <div class="text-left text-xs text-slate-700 space-y-2 p-3 bg-rose-50 border border-rose-200 rounded-xl mt-2 max-h-64 overflow-y-auto font-sans">
                     <p class="font-bold text-rose-800">
-                        Ditemukan <b>${barisKosong.length} baris</b> dengan data wilayah belum lengkap. Seluruh wilayah wajib diisi karena menentukan perhitungan Tarif Master di Preview 2!
+                        Ditemukan <b>${barisKosong.length} baris</b> dengan data wilayah belum lengkap. Seluruh wilayah wajib diisi sebelum masuk ke Preview 2!
                     </p>
                     <div class="divide-y divide-rose-100">
                         ${barisKosong.map((b) => `
@@ -363,33 +361,48 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
                 </div>
             `,
                 confirmButtonColor: '#004b84',
-                confirmButtonText: 'OKE, SAYA LENGKAPI DULU',
+                confirmButtonText: 'OKE, SAYA LENGKAPI',
                 customClass: { container: 'z-[999999]' }
             });
-            return; // Hentikan proses, tidak boleh lanjut ke Preview 2!
+            return;
         }
 
-        // ✅ 3. Jika SEMUA baris sudah lengkap, lanjutkan request ke backend untuk kalkulasi Preview 2
+        if (!selectedCust || !selectedCust.cust_id) {
+            Swal.fire("Perhatian", "Customer Principal tidak terdeteksi. Silakan pilih ulang Customer.", "warning");
+            return;
+        }
+
+        // 2. Kirim ke backend dengan selectedCust.cust_id
+        setLoadingPreview2(true);
+        console.log("%c🚀 [Frontend] Mengirim data ke /calculate-preview2...", "color: #0284c7; font-weight: bold;");
+        console.log("Customer ID:", selectedCust.cust_id);
+        console.log("Total Baris Valid:", dataValid.length);
+
         try {
             const token = localStorage.getItem('token');
-            const res = await api.post('/marketing/transport-planning/calculate-preview2', {
-                customer_id: selectedCustomer,
+            const payload = {
+                customer_id: selectedCust.cust_id, // 👈 gunakan selectedCust.cust_id
                 rows: dataValid
-            }, {
+            };
+
+            const res = await api.post('/marketing/transport-planning/calculate-preview2', payload, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
+            console.log("%c📥 [Frontend] Respon calculate-preview2:", "color: #10b981; font-weight: bold;", res.data);
+
             if (res.data && res.data.status === 'success') {
-                setDataPreview2(res.data.rows || []);
+                setDataValid(res.data.rows || []);
                 setSummaryPreview2({
-                    totalAkanProses: res.data.total_akan_proses,
-                    totalDilewati: res.data.total_dilewati,
-                    grandTotalHarga: res.data.grand_total_harga,
-                    grandTotalPacking: res.data.grand_total_packing
+                    totalAkanProses: res.data.total_akan_proses || 0,
+                    totalDilewati: res.data.total_dilewati || 0,
+                    grandTotalHarga: res.data.grand_total_harga || 0,
+                    grandTotalPacking: res.data.grand_total_packing || 0
                 });
-                setCurrentStep(2); // Pindah ke layar Preview 2
+                setCurrentStep(2); // Pindah ke tampilan Preview 2
             }
         } catch (err) {
+            console.error("%c❌ [Frontend] Gagal calculate-preview2:", "color: #ef4444; font-weight: bold;", err);
             Swal.fire({
                 icon: 'error',
                 title: 'Gagal Kalkulasi Preview 2',
@@ -397,6 +410,8 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
                 confirmButtonColor: '#ef4444',
                 customClass: { container: 'z-[999999]' }
             });
+        } finally {
+            setLoadingPreview2(false);
         }
     };
 

@@ -945,7 +945,7 @@ const SuratTugas = () => {
         ? '192.168.22.25' // Ganti dengan IP lokal laptop Anda
         : window.location.hostname;
 
-    const validationUrl = `http://${currentHost}:5173/operasional/scan-surat-tugas?no=${encodeURIComponent(officialNoSuratTugas)}`;
+    const validationUrl = `http://${currentHost}/operasional/scan-surat-tugas?no=${encodeURIComponent(officialNoSuratTugas)}`;
 
     return (
         <div className="space-y-4 font-sans">
