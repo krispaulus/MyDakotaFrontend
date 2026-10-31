@@ -70,7 +70,7 @@ import PengeluaranInventoryCustomer from './pages/PengeluaranInventoryCustomer';
 import PengembalianBTT from './pages/PengembalianBTT';
 import BarangRetur from './pages/BarangRetur';
 import PengisianBBM from './pages/PengisianBBM';
-import SuratTugas from './pages/SuratTugas';
+
 import SuratMuatanUdara from './pages/SuratMuatanUdara';
 import HasilLoper from './pages/HasilLoper';
 import CetakSuratPengiriman from './pages/CetakSuratPengiriman';
@@ -141,7 +141,9 @@ import UploadHasilLoperCSV from './pages/UploadHasilLoperCSV';
 import SettingOperasional from './pages/SettingOperasional';
 import ManajemenBanner from './pages/settings/ManajemenBanner';
 import MasterUangMuka from './pages/MasterUangMuka';
+import SuratTugas from './pages/SuratTugas';
 import MobileValidasiSuratTugas from './pages/MobileValidasiSuratTugas';
+import ScanSuratTugas from './pages/ScanSuratTugas';
 
 const getCompanyName = (pt) => {
   if (pt === 'A') return 'Dakota Buana Sarana';
@@ -620,9 +622,9 @@ function App() {
 
       <Route path="/operasional/pengisian-bbm" element={<MainLayout><PengisianBBM menuName="PengisianBBM" /></MainLayout>} />
       <Route path="/operasional/surat-tugas" element={<MainLayout><SuratTugas menuName="SuratTugas" /></MainLayout>} />
-
       <Route path="/operasional/scan-surat-tugas" element={<MobileValidasiSuratTugas />} />
       <Route path="/scan-surat-tugas" element={<MobileValidasiSuratTugas />} />
+      <Route path="/operasional/scan-surat-tugas" element={<ScanSuratTugas />} />
 
       <Route path="/operasional/surat-muatan-udara" element={<MainLayout><SuratMuatanUdara menuName="SuratMuatanUdara" /></MainLayout>} />
       <Route path="/operasional/cetak-surat-pengiriman" element={<MainLayout><CetakSuratPengiriman menuName="CetakSuratPengiriman" /></MainLayout>} />

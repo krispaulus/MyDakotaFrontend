@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Html5Qrcode } from 'html5-qrcode';
 import api from '../api/axios';
-import { CheckCircle2, XCircle, Truck, Calendar, MapPin, User, Search, RefreshCw } from 'lucide-react';
+import { CheckCircle2, XCircle, Truck, Calendar, MapPin, User, Search, RefreshCw, Camera, X } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 const MobileValidasiSuratTugas = () => {
@@ -14,7 +15,12 @@ const MobileValidasiSuratTugas = () => {
     const [loading, setLoading] = useState(false);
     const [processing, setProcessing] = useState(false);
 
-    // Ambil identitas petugas yang login di browser
+    // State untuk Scanner Kamera
+    const [isCameraOpen, setIsCameraOpen] = useState(false);
+    const [cameraLoading, setCameraLoading] = useState(false);
+    const html5QrCodeRef = useRef(null);
+
+    // Identitas petugas yang login di browser
     const loggedUser = localStorage.getItem('username')
         || localStorage.getItem('realname')
         || 'PETUGAS CHECKER';
@@ -41,7 +47,74 @@ const MobileValidasiSuratTugas = () => {
         }
     }, [noSuratTugas]);
 
-    // Handle tombol PROSES
+    // =========================================================================
+    // 📷 LOGIKA SCANNER KAMERA WEB (HTML5 QR CODE)
+    // =========================================================================
+    const startScanner = async () => {
+        setIsCameraOpen(true);
+        setCameraLoading(true);
+
+        setTimeout(async () => {
+            try {
+                const scanner = new Html5Qrcode("qr-reader-box");
+                html5QrCodeRef.current = scanner;
+
+                const config = {
+                    fps: 10,
+                    qrbox: { width: 230, height: 230 },
+                    aspectRatio: 1.0
+                };
+
+                await scanner.start(
+                    { facingMode: "environment" }, // Kamera belakang smartphone
+                    config,
+                    (decodedText) => {
+                        // 🎯 Saat barcode / QR code surat tugas terdeteksi
+                        stopScanner();
+                        const cleanCode = decodedText.trim().toUpperCase();
+                        setInputManualNo(cleanCode);
+                        setSearchParams({ no: cleanCode });
+                    },
+                    () => {
+                        // Scan sedang berjalan frame per frame
+                    }
+                );
+                setCameraLoading(false);
+            } catch (err) {
+                console.error("Gagal menyalakan kamera:", err);
+                setCameraLoading(false);
+                setIsCameraOpen(false);
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Kamera Tidak Tersedia',
+                    text: 'Izin kamera ditolak atau perangkat tidak mendukung. Silakan gunakan input nomor manual.',
+                    confirmButtonColor: '#004b84'
+                });
+            }
+        }, 300);
+    };
+
+    const stopScanner = async () => {
+        if (html5QrCodeRef.current) {
+            try {
+                await html5QrCodeRef.current.stop();
+                html5QrCodeRef.current.clear();
+            } catch (err) {
+                console.warn("Gagal stop kamera:", err);
+            }
+            html5QrCodeRef.current = null;
+        }
+        setIsCameraOpen(false);
+        setCameraLoading(false);
+    };
+
+    useEffect(() => {
+        return () => {
+            stopScanner();
+        };
+    }, []);
+
+    // Handle tombol PROSES keberangkatan
     const handleProses = async () => {
         const confirm = await Swal.fire({
             title: 'Proses Surat Tugas?',
@@ -100,12 +173,53 @@ const MobileValidasiSuratTugas = () => {
                 </span>
             </div>
 
-            {/* 2. Form Input Manual jika URL dibuka tanpa ?no=... */}
+            {/* 2. Form Input & Kamera Scan jika data belum dipilih */}
             {!noSuratTugas && !data && (
-                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-3 mb-4">
+                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4 mb-4">
                     <label className="block text-xs font-black text-slate-700 uppercase tracking-wide">
                         Scan / Masukkan No. Surat Tugas :
                     </label>
+
+                    {/* 🌟 TOMBOL / VIEWFINDER SCAN KAMERA */}
+                    {!isCameraOpen ? (
+                        <button
+                            type="button"
+                            onClick={startScanner}
+                            className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                            <Camera size={18} />
+                            <span>Buka Kamera Scan QR</span>
+                        </button>
+                    ) : (
+                        <div className="space-y-2">
+                            <div className="relative w-full aspect-square max-w-[260px] mx-auto rounded-2xl overflow-hidden border-2 border-emerald-500 bg-black flex items-center justify-center">
+                                <div id="qr-reader-box" className="w-full h-full"></div>
+                                {cameraLoading && (
+                                    <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white text-xs gap-2">
+                                        <RefreshCw size={24} className="animate-spin text-emerald-400" />
+                                        <span>Menyiapkan Kamera...</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={stopScanner}
+                                className="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                                <X size={16} /> Tutup Kamera
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Pembatas "ATAU" */}
+                    <div className="flex items-center gap-2 py-1">
+                        <div className="flex-1 border-t border-slate-200"></div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Atau Ketik Manual</span>
+                        <div className="flex-1 border-t border-slate-200"></div>
+                    </div>
+
+                    {/* Input Text & Tombol Cari Manual */}
                     <div className="flex gap-2">
                         <input
                             type="text"
@@ -113,16 +227,20 @@ const MobileValidasiSuratTugas = () => {
                             value={inputManualNo}
                             onChange={(e) => setInputManualNo(e.target.value.toUpperCase())}
                             onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    setSearchParams({ no: inputManualNo });
+                                if (e.key === 'Enter' && inputManualNo.trim()) {
+                                    setSearchParams({ no: inputManualNo.trim() });
                                 }
                             }}
                             className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-mono font-bold text-xs outline-none focus:border-[#004b84]"
                         />
                         <button
                             type="button"
-                            onClick={() => setSearchParams({ no: inputManualNo })}
-                            className="px-4 py-2.5 bg-[#004b84] hover:bg-[#003863] text-white font-bold rounded-xl text-xs uppercase cursor-pointer"
+                            onClick={() => {
+                                if (inputManualNo.trim()) {
+                                    setSearchParams({ no: inputManualNo.trim() });
+                                }
+                            }}
+                            className="px-5 py-2.5 bg-[#004b84] hover:bg-[#003863] text-white font-bold rounded-xl text-xs uppercase cursor-pointer transition active:scale-95"
                         >
                             Cari
                         </button>
@@ -151,8 +269,7 @@ const MobileValidasiSuratTugas = () => {
                                 {data.no_surat_tugas || noSuratTugas}
                             </h1>
                         </div>
-                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${data.status === 'PROSES' ? 'bg-emerald-500 text-white' : 'bg-amber-400 text-slate-900'
-                            }`}>
+                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${data.status === 'PROSES' ? 'bg-emerald-500 text-white' : 'bg-amber-400 text-slate-900'}`}>
                             {data.status || 'DRAFT'}
                         </span>
                     </div>
@@ -225,7 +342,10 @@ const MobileValidasiSuratTugas = () => {
                     <p className="text-xs text-slate-500 font-mono">Nomor: {noSuratTugas}</p>
                     <button
                         type="button"
-                        onClick={() => setSearchParams({})}
+                        onClick={() => {
+                            setSearchParams({});
+                            setInputManualNo('');
+                        }}
                         className="w-full py-2.5 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-xl text-xs uppercase cursor-pointer"
                     >
                         Coba Nomor Lain

@@ -111,6 +111,8 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
           currentRole = 'S';
         } else if (rawRole === 'A' || rawRole === 'ADMIN') {
           currentRole = 'A';
+        } else if (rawRole === 'CHECKER' || rawRole === 'C') {
+          currentRole = 'CHECKER';
         }
 
         const imgRaw = d.profileimage || d.ProfileImage || d.profile_image || '';
@@ -533,6 +535,18 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
         { name: 'Manajemen Banner Depan', path: '/settings/manajemen-banner', roles: ['S', 'A'] }
       ]
     },
+    {
+      name: 'Operasional Checker',
+      icon: <Truck size={20} />, // 🚚 Icon Truk khas operasional lapangan
+      roles: ['CHECKER', 'C', 'S', 'A'],
+      children: [
+        {
+          name: 'Scan QR Surat Tugas',
+          path: '/operasional/scan-surat-tugas',
+          roles: ['CHECKER', 'C', 'S', 'A']
+        },
+      ]
+    },
   ];
 
 
@@ -542,15 +556,11 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
 
   const filteredMenus = allMenus
     .filter(menu => {
-      // 👑 JIKA SUPERADMIN: Loloskan seluruh menu tanpa syarat!
-      if (isSuperAdmin) return true;
+      if (isSuperAdmin) return true; // Superadmin melihat semua menu
       return menu.roles && menu.roles.includes(user.role);
     })
     .map(menu => {
-      // 👑 JIKA SUPERADMIN: Loloskan seluruh sub-menu (children) tanpa disaring!
-      if (isSuperAdmin) {
-        return menu;
-      }
+      if (isSuperAdmin) return menu;
 
       if (menu.children) {
         return {
