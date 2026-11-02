@@ -287,8 +287,8 @@ const MobileValidasiSuratTugas = () => {
                             disabled={processing || data.status === 'PROSES'}
                             onClick={handleProses}
                             className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider shadow-sm transition flex items-center gap-1.5 cursor-pointer ${data.status === 'PROSES'
-                                    ? 'bg-emerald-500 text-white cursor-default'
-                                    : 'bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95'
+                                ? 'bg-emerald-500 text-white cursor-default'
+                                : 'bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95'
                                 }`}
                         >
                             <CheckCircle2 size={14} />
@@ -339,7 +339,7 @@ const MobileValidasiSuratTugas = () => {
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                         <div className="bg-sky-50/80 px-4 py-2 border-b border-sky-100 flex items-center justify-between">
                             <span className="font-black text-sky-900 text-xs uppercase tracking-wide">
-                                JUMLAH BTT TERDAFTAR : {data.btt_list?.length || data.total_btt || 1}
+                                JUMLAH BTT TERDAFTAR : {data.btt_list?.length || 0}
                             </span>
                         </div>
 
@@ -357,16 +357,9 @@ const MobileValidasiSuratTugas = () => {
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
                                     {(!data.btt_list || data.btt_list.length === 0) ? (
-                                        <tr className="bg-white">
-                                            <td className="py-2.5 px-3 font-mono font-bold text-sky-800">2026C002094</td>
-                                            <td className="py-2.5 px-3 uppercase text-slate-800 font-bold">PASURUAN KAB.</td>
-                                            <td className="py-2.5 px-1.5 text-center font-bold text-slate-900">3</td>
-                                            <td className="py-2.5 px-1.5 text-center font-bold text-emerald-600">3</td>
-                                            <td className="py-2.5 px-1.5 text-center font-bold text-slate-400">0</td>
-                                            <td className="py-2.5 px-2 text-center">
-                                                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-sky-500 text-white font-bold text-[10px]">
-                                                    ✓
-                                                </span>
+                                        <tr>
+                                            <td colSpan="6" className="text-center py-6 text-slate-400 italic font-normal">
+                                                Belum ada BTT muatan yang terdaftar pada surat tugas ini.
                                             </td>
                                         </tr>
                                     ) : (
@@ -391,14 +384,39 @@ const MobileValidasiSuratTugas = () => {
                     </div>
 
                     {/* Tombol Hapus / Batal Floating */}
-                    <div className="fixed bottom-0 left-0 right-0 p-3 bg-white/95 backdrop-blur-md border-t border-slate-200 max-w-md mx-auto flex gap-3 z-30">
+                    <div className="fixed bottom-0 left-0 right-0 p-3 bg-white/95 backdrop-blur-md border-t border-slate-200 max-w-md mx-auto flex items-center gap-3 z-30">
+                        {/* Tombol BATAL (Kiri) */}
                         <button
                             type="button"
                             onClick={handleBatal}
-                            className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-98 text-white font-black rounded-xl text-xs uppercase tracking-wider shadow-sm transition cursor-pointer"
+                            className="flex-1 py-3 bg-[#e2e8f0] hover:bg-slate-300 active:scale-98 text-slate-700 font-bold rounded-xl text-xs uppercase tracking-wider transition cursor-pointer text-center shadow-xs"
                         >
-                            HAPUS / KEMBALI
+                            BATAL
                         </button>
+
+                        {/* Tombol PROSES / SUDAH PROSES (Kanan) */}
+                        {data.status === 'PROSES' ? (
+                            // 🌟 Tampilan Gambar 3: Sudah Diproses (Tombol Abu-abu Disabled)
+                            <button
+                                type="button"
+                                disabled
+                                className="flex-1 py-3 bg-[#94a3b8] text-white font-black rounded-xl text-xs uppercase tracking-wider shadow-xs flex items-center justify-center gap-1.5 cursor-not-allowed opacity-90"
+                            >
+                                <CheckCircle2 size={16} />
+                                <span>SUDAH PROSES</span>
+                            </button>
+                        ) : (
+                            // 🌟 Tampilan Gambar 2: Belum Diproses (Tombol Hijau Aktif)
+                            <button
+                                type="button"
+                                disabled={processing}
+                                onClick={handleProses}
+                                className="flex-1 py-3 bg-[#059669] hover:bg-emerald-700 active:scale-98 text-white font-black rounded-xl text-xs uppercase tracking-wider shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                                <CheckCircle2 size={16} />
+                                <span>{processing ? 'MEMPROSES...' : 'PROSES'}</span>
+                            </button>
+                        )}
                     </div>
                 </div>
             )}
