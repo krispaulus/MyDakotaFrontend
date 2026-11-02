@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../api/axios';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
@@ -6,7 +6,7 @@ import {
     RefreshCw, X as XIcon, Truck, Printer, Plus,
     Search, Trash2, CheckCircle, XCircle,
     DollarSign, Eye, Route, Power, Filter,
-    PlusCircle, Layers
+    PlusCircle, Layers, Upload, Download, FileSpreadsheet, Pencil
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import dliLogo from '../assets/logoDLI.png';
@@ -40,12 +40,25 @@ const MasterUangMuka = () => {
     // Modal Print
     const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
-    // 🌟 STATE BARU: MODAL INPUT MULTI-ROW TAMBAH KOMPONEN BIAYA BPLK
+    // Modal Input Multi-Row Tambah Komponen Biaya
     const [isTambahBiayaModalOpen, setIsTambahBiayaModalOpen] = useState(false);
     const [kamusBiayaList, setKamusBiayaList] = useState([]);
     const [rowsBiayaBaru, setRowsBiayaBaru] = useState([
         { kode_biaya: '', nama_biaya: '', nominal: '', um_yn: 'Ya' }
     ]);
+
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editForm, setEditForm] = useState({
+        trh_id: '',
+        trh_name: '',
+        trh_jnskend: ''
+    });
+
+    // 🌟 STATE BARU: MODAL UPLOAD FILE CSV / EXCEL
+    const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+    const [uploadFile, setUploadFile] = useState(null);
+    const [uploading, setUploading] = useState(false);
+    const fileInputRef = useRef(null);
 
     useEffect(() => {
         fetchUangMukaData();
@@ -65,7 +78,6 @@ const MasterUangMuka = () => {
         }
     };
 
-    // Mengambil kamus biaya murni dari database melalui API
     const fetchKamusBiaya = async () => {
         try {
             const token = localStorage.getItem('token');
@@ -80,7 +92,6 @@ const MasterUangMuka = () => {
         }
     };
 
-    // Fetch List Utama Trayek Uang Muka
     const fetchUangMukaData = async () => {
         setLoading(true);
         try {
@@ -97,6 +108,81 @@ const MasterUangMuka = () => {
             setDataList([]);
         } finally {
             setLoading(false);
+        }
+    };
+
+    // 🌟 FITUR DOWNLOAD FILE CSV
+    const handleDownloadFile = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await api.get('/master/uang-muka/export-csv', {
+                params: { q: filterKeyword },
+                headers: { Authorization: `Bearer ${token}` },
+                responseType: 'blob'
+            });
+
+            const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Master_Uang_Muka_${new Date().toISOString().slice(0, 10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Download Berhasil',
+                text: 'Data Master Uang Muka berhasil diexport ke CSV.',
+                timer: 1500,
+                showConfirmButton: false
+            });
+        } catch (err) {
+            Swal.fire('Gagal Download', 'Terjadi kesalahan saat mendownload file master.', 'error');
+        }
+    };
+
+    // 🌟 FITUR SUBMIT UPLOAD FILE CSV
+    const handleExecuteUpload = async (e) => {
+        e.preventDefault();
+        if (!uploadFile) {
+            Swal.fire('Perhatian', 'Pilih file CSV terlebih dahulu!', 'warning');
+            return;
+        }
+
+        setUploading(true);
+        try {
+            const token = localStorage.getItem('token');
+            const formData = new FormData();
+            formData.append('file', uploadFile);
+
+            const res = await api.post('/master/uang-muka/import-csv', formData, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Import Selesai!',
+                text: res.data?.message || 'Data berhasil diimport ke master uang muka.',
+                confirmButtonColor: '#004b84'
+            });
+
+            setIsUploadModalOpen(false);
+            setUploadFile(null);
+            fetchUangMukaData();
+        } catch (err) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal Import',
+                text: err.response?.data?.message || 'Gagal memproses file upload.',
+                confirmButtonColor: '#ef4444'
+            });
+        } finally {
+            setUploading(false);
         }
     };
 
@@ -122,7 +208,6 @@ const MasterUangMuka = () => {
         }
     };
 
-    // 🌟 HAPUS SATU BARIS KOMPONEN BIAYA DARI TRAYEK
     const handleDeleteBiayaItem = (biayaItem) => {
         Swal.fire({
             title: 'Hapus Biaya?',
@@ -146,8 +231,8 @@ const MasterUangMuka = () => {
                     });
 
                     Swal.fire('Terhapus!', 'Komponen biaya berhasil dihapus.', 'success');
-                    handleOpenDetail(selectedItem); // Reload rincian
-                    fetchUangMukaData(); // Reload list utama
+                    handleOpenDetail(selectedItem);
+                    fetchUangMukaData();
                 } catch (err) {
                     Swal.fire('Gagal', err.response?.data?.message || 'Gagal menghapus komponen biaya', 'error');
                 }
@@ -155,16 +240,14 @@ const MasterUangMuka = () => {
         });
     };
 
-    // 🌟 BUKA MODAL TAMBAH MULTI-ROW BIAYA
     const handleOpenModalTambahBiaya = () => {
-        fetchKamusBiaya(); // Memastikan list selalu termutakhir dari database
+        fetchKamusBiaya();
         setRowsBiayaBaru([
             { kode_biaya: '', nama_biaya: '', nominal: '', um_yn: 'Ya' }
         ]);
         setIsTambahBiayaModalOpen(true);
     };
 
-    // Tambah Baris Kosong Baru
     const handleAddRowBiaya = () => {
         setRowsBiayaBaru(prev => [
             ...prev,
@@ -172,7 +255,6 @@ const MasterUangMuka = () => {
         ]);
     };
 
-    // Hapus Baris Input
     const handleRemoveRowBiaya = (indexToRemove) => {
         if (rowsBiayaBaru.length === 1) {
             Swal.fire('Info', 'Minimal harus ada 1 baris pengisian.', 'info');
@@ -181,7 +263,6 @@ const MasterUangMuka = () => {
         setRowsBiayaBaru(prev => prev.filter((_, idx) => idx !== indexToRemove));
     };
 
-    // Update Nilai Field Baris Dinamis
     const handleUpdateRowBiaya = (index, field, value) => {
         setRowsBiayaBaru(prev => {
             const copy = [...prev];
@@ -196,11 +277,8 @@ const MasterUangMuka = () => {
         });
     };
 
-    // 🌟 SUBMIT SIMPAN BIAYA MULTI-ROW
     const handleSubmitSimpanBiaya = async (e) => {
         e.preventDefault();
-
-        // Validasi
         const validRows = rowsBiayaBaru.filter(r => r.kode_biaya && r.nominal !== '');
         if (validRows.length === 0) {
             Swal.fire('Peringatan', 'Lengkapi minimal satu komponen biaya beserta nominalnya!', 'warning');
@@ -224,14 +302,13 @@ const MasterUangMuka = () => {
 
             Swal.fire('Sukses!', 'Rincian komponen biaya operasional berhasil disimpan.', 'success');
             setIsTambahBiayaModalOpen(false);
-            handleOpenDetail(selectedItem); // Refresh rincian biaya di modal
-            fetchUangMukaData(); // Refresh list master
+            handleOpenDetail(selectedItem);
+            fetchUangMukaData();
         } catch (err) {
             Swal.fire('Gagal', err.response?.data?.message || 'Gagal menyimpan komponen biaya', 'error');
         }
     };
 
-    // Toggle Status Aktif / Non-Aktif
     const handleToggleStatus = (item) => {
         const isCurrentlyActive = item.trh_aktifyn === 'Y' || item.trh_aktifyn === '';
         const targetStatus = isCurrentlyActive ? 'N' : 'Y';
@@ -269,7 +346,6 @@ const MasterUangMuka = () => {
         });
     };
 
-    // Handler Print Dokumen
     const handlePrintSingle = (item) => {
         handleOpenDetail(item);
         setTimeout(() => setIsPrintModalOpen(true), 400);
@@ -322,7 +398,6 @@ const MasterUangMuka = () => {
         };
     };
 
-    // Filter Global
     const filteredList = dataList.filter(item => {
         if (!globalSearch.trim()) return true;
         const q = globalSearch.toLowerCase();
@@ -333,7 +408,6 @@ const MasterUangMuka = () => {
         );
     });
 
-    // Kolom Grid Utama
     const columns = [
         {
             header: 'KODE',
@@ -414,6 +488,14 @@ const MasterUangMuka = () => {
                 <div className="flex items-center justify-center gap-1.5">
                     <button
                         type="button"
+                        onClick={() => handleOpenEdit(item)}
+                        title="Edit Trayek & Jenis Kendaraan"
+                        className="p-1.5 text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-lg transition cursor-pointer"
+                    >
+                        <Pencil size={15} />
+                    </button>
+                    <button
+                        type="button"
                         onClick={() => handleOpenDetail(item)}
                         title="Buka Rincian Biaya BPLK"
                         className="p-1.5 text-sky-600 hover:text-sky-800 hover:bg-sky-50 rounded-lg transition cursor-pointer"
@@ -443,9 +525,94 @@ const MasterUangMuka = () => {
 
     const totalNominalDetail = biayaList.reduce((sum, b) => sum + Number(b.nominal || 0), 0);
 
+    // 📄 FUNGSI GENERATE & DOWNLOAD SAMPLE TEMPLATE CSV
+    const handleDownloadTemplate = () => {
+        // Susunan Header & Baris Contoh (Sample Data BPLK Real)
+        const csvRows = [
+            // Header Kolom
+            ['KODE_TRAYEK', 'NAMA_TRAYEK', 'KODE_KENDARAAN', 'NAMA_KENDARAAN', 'STATUS_AKTIF', 'KODE_BIAYA', 'NAMA_BIAYA', 'NOMINAL', 'UANG_MUKA_YN'],
+            // Baris Contoh 1: BBM LK
+            ['TR2026C000026', 'APL - DENPASAR', '001', 'Colt Diesel Double', 'Y', '084000000137', 'BBM LK', '3046654', 'Ya'],
+            // Baris Contoh 2: Biaya Operasional BPLK
+            ['TR2026C000026', 'APL - DENPASAR', '001', 'Colt Diesel Double', 'Y', '084000000138', 'Biaya Operasional BPLK', '1570000', 'Ya'],
+            // Baris Contoh 3: Biaya Tol LK
+            ['TR2026C000026', 'APL - DENPASAR', '001', 'Colt Diesel Double', 'Y', '084000000140', 'Biaya Tol LK', '1300000', 'Ya'],
+            // Baris Contoh 4: Biaya Retribusi LK
+            ['TR2026C000026', 'APL - DENPASAR', '001', 'Colt Diesel Double', 'Y', '084000000141', 'Biaya Retribusi LK', '470000', 'Ya'],
+            // Baris Contoh 5: Biaya Penyebrangan LK
+            ['TR2026C000026', 'APL - DENPASAR', '001', 'Colt Diesel Double', 'Y', '084000000142', 'Biaya Penyebrangan LK', '1809846', 'Ya'],
+            // Baris Contoh 6: Biaya Bongkar Muat / Parkir
+            ['TR2026C000026', 'APL - DENPASAR', '001', 'Colt Diesel Double', 'Y', '084000000144', 'Biaya Bongkar Muat / Parkir', '20000', 'Ya'],
+            // Baris Contoh 7: Trayek Lain (Contoh Jambi - Padang)
+            ['TR2026C000021', 'APL - JAMBI - PADANG', '001', 'Colt Diesel Double', 'Y', '084000000137', 'BBM LK', '3850000', 'Ya'],
+            ['TR2026C000021', 'APL - JAMBI - PADANG', '001', 'Colt Diesel Double', 'Y', '084000000138', 'Biaya Operasional BPLK', '1650000', 'Ya']
+        ];
+
+        // Format CSV dengan pemisah koma (CSV Standard)
+        const csvContent = csvRows
+            .map(row => row.map(val => `"${val}"`).join(','))
+            .join('\n');
+
+        // Buat Blob dan Trigger Download
+        const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', 'Template_Sample_Master_Uang_Muka_BPLK.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        Swal.fire({
+            icon: 'success',
+            title: 'Template Berhasil Diunduh!',
+            text: 'File Template_Sample_Master_Uang_Muka_BPLK.csv siap digunakan sebagai contoh pengisian.',
+            timer: 2000,
+            showConfirmButton: false,
+            customClass: { container: 'z-[999999]' }
+        });
+    };
+
+    const handleOpenEdit = (item) => {
+        // Cari ID kendaraan yang cocok berdasarkan list opsi
+        const foundKend = kendaraanOptions.find(
+            k => (k.jnskend_nama || k.kend_nama) === item.jnskend_nama
+        );
+        setEditForm({
+            trh_id: item.trh_id,
+            trh_name: item.trh_name || '',
+            trh_jnskend: foundKend ? (foundKend.jnskend_id || foundKend.id) : (item.trh_jnskend || '')
+        });
+        setIsEditModalOpen(true);
+    };
+
+    const handleSaveEditHeader = async (e) => {
+        e.preventDefault();
+        try {
+            const token = localStorage.getItem('token');
+            await api.post('/master/uang-muka/update-header', editForm, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Berhasil Diperbarui!',
+                text: `Data trayek ${editForm.trh_id} berhasil diupdate.`,
+                timer: 1500,
+                showConfirmButton: false
+            });
+
+            setIsEditModalOpen(false);
+            fetchUangMukaData();
+        } catch (err) {
+            Swal.fire('Gagal', err.response?.data?.message || 'Gagal mengupdate data trayek', 'error');
+        }
+    };
+
     return (
         <div className="space-y-4 font-sans">
-            {/* Filter */}
+            {/* Filter Section */}
             {showFilter && (
                 <div className="p-5 bg-white rounded-2xl shadow-sm border border-slate-200 space-y-4 text-xs font-bold text-slate-600">
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
@@ -488,10 +655,28 @@ const MasterUangMuka = () => {
                             </button>
                         </div>
                     </div>
+
+                    {/* 🌟 TOMBOL UPLOAD FILE & DOWNLOAD FILE (PERSIS SEPERTI GAMBAR 2) */}
+                    <div className="flex items-center gap-3 pt-1 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={() => setIsUploadModalOpen(true)}
+                            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center gap-2 transition text-xs uppercase shadow-sm cursor-pointer"
+                        >
+                            <Upload size={16} /> Upload File
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleDownloadFile}
+                            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center gap-2 transition text-xs uppercase shadow-sm cursor-pointer"
+                        >
+                            <Download size={16} /> Download File
+                        </button>
+                    </div>
                 </div>
             )}
 
-            {/* 🌟 3. DATA TABLE TEMPLATE (HILANGKAN TOMBOL FILTER BAWAAN) */}
+            {/* Data Table */}
             <DataTableTemplate
                 title="MASTER UANG MUKA BIAYA OPERASIONAL (BPLK / BPDK)"
                 columns={columns}
@@ -509,12 +694,96 @@ const MasterUangMuka = () => {
             />
 
             {/* ========================================================================= */}
-            {/* 🌟 1. MODAL DETAIL RINCIAN BIAYA DENGAN TOMBOL TAMBAH & ACTION EDIT/HAPUS */}
+            {/* 🌟 MODAL UPLOAD FILE CSV / EXCEL MASTER UANG MUKA */}
             {/* ========================================================================= */}
+            {isUploadModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+                    <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+                        {/* Header Modal */}
+                        <div className="px-6 py-4 bg-[#004b84] text-white flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                                <FileSpreadsheet size={20} className="text-emerald-300" />
+                                <h3 className="font-bold text-sm tracking-wide uppercase">
+                                    Upload File Master Uang Muka (BPLK)
+                                </h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => { setIsUploadModalOpen(false); setUploadFile(null); }}
+                                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer font-bold"
+                            >
+                                <XIcon size={18} />
+                            </button>
+                        </div>
+
+                        {/* Body Form Upload */}
+                        <form onSubmit={handleExecuteUpload} className="p-6 space-y-4 text-xs font-bold text-slate-700">
+                            <div className="p-4 bg-sky-50 border border-sky-200 rounded-2xl space-y-1 text-sky-900 font-normal">
+                                <p className="font-bold text-xs text-[#004b84] uppercase">Petunjuk Format File :</p>
+                                <ul className="list-disc pl-4 text-[11px] space-y-0.5 text-slate-600">
+                                    <li>Format file: <b>.CSV</b> (Comma atau Semicolon Delimited).</li>
+                                    <li>Kolom standar: <i>KODE_TRAYEK, NAMA_TRAYEK, KODE_KENDARAAN, NAMA_KENDARAAN, STATUS_AKTIF, KODE_BIAYA, NAMA_BIAYA, NOMINAL, UANG_MUKA_YN</i>.</li>
+                                    <li>Anda dapat mengklik tombol <b>Download File</b> terlebih dahulu untuk mendapatkan template resmi.</li>
+                                </ul>
+                            </div>
+
+                            <div
+                                onClick={() => fileInputRef.current?.click()}
+                                className="border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-2xl p-6 text-center cursor-pointer bg-slate-50 transition"
+                            >
+                                <Upload size={32} className="mx-auto text-blue-600 mb-2" />
+                                <span className="block text-xs font-bold text-slate-700">
+                                    {uploadFile ? uploadFile.name : 'Pilih atau Seret File CSV di sini'}
+                                </span>
+                                <span className="text-[10px] text-slate-400 mt-1 block font-medium">
+                                    {uploadFile ? `${(uploadFile.size / 1024).toFixed(1)} KB` : 'Maksimal ukuran file: 10MB'}
+                                </span>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept=".csv,text/csv"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                        if (e.target.files?.[0]) {
+                                            setUploadFile(e.target.files[0]);
+                                        }
+                                    }}
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsUploadModalOpen(false); setUploadFile(null); }}
+                                    className="px-5 py-2.5 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={uploading || !uploadFile}
+                                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-xl uppercase transition cursor-pointer shadow-sm flex items-center gap-1.5"
+                                >
+                                    {uploading ? (
+                                        <>
+                                            <RefreshCw size={14} className="animate-spin" /> Memproses...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Upload size={14} /> Proses Upload
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL DETAIL RINCIAN BIAYA */}
             {isDetailModalOpen && selectedItem && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
                     <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 max-h-[92vh]">
-                        {/* Header Modal */}
                         <div className="px-8 py-5 bg-[#004b84] text-white flex justify-between items-center">
                             <div className="flex items-center gap-3">
                                 <div className="p-2.5 bg-white/10 rounded-2xl shadow-md">
@@ -538,9 +807,7 @@ const MasterUangMuka = () => {
                             </button>
                         </div>
 
-                        {/* Body Modal */}
                         <div className="p-6 space-y-4 text-xs overflow-y-auto flex-1">
-                            {/* Metadata Trayek */}
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700">
                                 <div>
                                     <span className="block text-slate-400 text-[10px] uppercase">KODE TRAYEK :</span>
@@ -564,7 +831,6 @@ const MasterUangMuka = () => {
                                 </div>
                             </div>
 
-                            {/* 🌟 BARIS TOMBOL TAMBAH KOMPONEN BIAYA (MODERN SEPERTI GAMBAR 2) */}
                             <div className="flex items-center justify-between pt-2">
                                 <div className="flex items-center gap-2">
                                     <span className="font-black text-slate-800 text-xs uppercase tracking-wide flex items-center gap-1.5">
@@ -575,7 +841,6 @@ const MasterUangMuka = () => {
                                     </span>
                                 </div>
 
-                                {/* 🌟 TOMBOL TAMBAH BIAYA OPERASIONAL */}
                                 <button
                                     type="button"
                                     onClick={handleOpenModalTambahBiaya}
@@ -585,7 +850,6 @@ const MasterUangMuka = () => {
                                 </button>
                             </div>
 
-                            {/* Tabel Rincian Biaya BPLK dengan Kolom Action Hapus */}
                             <div className="overflow-hidden rounded-xl border border-slate-300 shadow-xs">
                                 <table className="w-full text-left text-xs border-collapse">
                                     <thead className="bg-[#004b84] text-white font-bold uppercase text-[11px] tracking-wider">
@@ -652,7 +916,6 @@ const MasterUangMuka = () => {
                             </div>
                         </div>
 
-                        {/* Footer Modal */}
                         <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
                             <button
                                 type="button"
@@ -684,13 +947,10 @@ const MasterUangMuka = () => {
                 </div>
             )}
 
-            {/* ========================================================================= */}
-            {/* 🌟 2. MODAL ENTRI MULTI-ROW TAMBAH KOMPONEN BIAYA (MODERN SEPERTI GAMBAR 3) */}
-            {/* ========================================================================= */}
+            {/* MODAL INPUT MULTI-ROW TAMBAH KOMPONEN BIAYA */}
             {isTambahBiayaModalOpen && selectedItem && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-[70] p-4 animate-in fade-in duration-200">
                     <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 max-h-[90vh]">
-                        {/* Header Modal */}
                         <div className="px-6 py-4 bg-[#004b84] text-white flex justify-between items-center">
                             <div>
                                 <h3 className="font-black text-sm uppercase tracking-wide flex items-center gap-2">
@@ -709,7 +969,6 @@ const MasterUangMuka = () => {
                             </button>
                         </div>
 
-                        {/* Body Form Multi-Row */}
                         <form onSubmit={handleSubmitSimpanBiaya} className="flex flex-col flex-1 overflow-hidden">
                             <div className="p-6 overflow-y-auto space-y-3 flex-1">
                                 <div className="flex items-center justify-between pb-2 border-b border-slate-200">
@@ -728,12 +987,10 @@ const MasterUangMuka = () => {
                                 <div className="space-y-2.5">
                                     {rowsBiayaBaru.map((row, idx) => (
                                         <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex flex-wrap md:flex-nowrap items-center gap-3 hover:border-sky-300 transition">
-                                            {/* Nomor Urut */}
                                             <span className="w-6 h-6 rounded-full bg-slate-200 font-mono text-slate-700 flex items-center justify-center text-xs font-bold shrink-0">
                                                 {idx + 1}
                                             </span>
 
-                                            {/* Pilih Komponen Biaya */}
                                             <div className="flex-1 min-w-[220px]">
                                                 <label className="block text-[10px] text-slate-500 font-bold uppercase mb-1">
                                                     Komponen Biaya :
@@ -753,7 +1010,6 @@ const MasterUangMuka = () => {
                                                 </select>
                                             </div>
 
-                                            {/* Nominal (Rp) */}
                                             <div className="w-48 min-w-[160px]">
                                                 <label className="block text-[10px] text-slate-500 font-bold uppercase mb-1">
                                                     Nominal (Rp) :
@@ -768,7 +1024,6 @@ const MasterUangMuka = () => {
                                                 />
                                             </div>
 
-                                            {/* Uang Muka Flag */}
                                             <div className="w-28 min-w-[100px]">
                                                 <label className="block text-[10px] text-slate-500 font-bold uppercase mb-1">
                                                     U. Muka :
@@ -783,7 +1038,6 @@ const MasterUangMuka = () => {
                                                 </select>
                                             </div>
 
-                                            {/* Tombol Hapus Baris */}
                                             <div className="pt-4 shrink-0">
                                                 <button
                                                     type="button"
@@ -799,7 +1053,6 @@ const MasterUangMuka = () => {
                                 </div>
                             </div>
 
-                            {/* Footer Modal Input */}
                             <div className="px-6 py-4 bg-slate-100 border-t border-slate-200 flex justify-between items-center">
                                 <button
                                     type="button"
@@ -830,9 +1083,7 @@ const MasterUangMuka = () => {
                 </div>
             )}
 
-            {/* ========================================================================= */}
-            {/* 🌟 3. MODAL TAMBAH TRAYEK HEADER BARU */}
-            {/* ========================================================================= */}
+            {/* MODAL TAMBAH TRAYEK HEADER BARU */}
             {isAddModalOpen && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
                     <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
@@ -932,7 +1183,7 @@ const MasterUangMuka = () => {
                 </div>
             )}
 
-            {/* Modal Cetak Dokumen */}
+            {/* MODAL PRINT DOKUMEN */}
             {isPrintModalOpen && selectedItem && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
                     <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[95vh]">
@@ -1019,6 +1270,194 @@ const MasterUangMuka = () => {
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* 🌟 MODAL UPLOAD FILE CSV MASTER UANG MUKA */}
+            {/* ========================================================================= */}
+            {isUploadModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+                    <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+                        {/* Header Modal */}
+                        <div className="px-6 py-4 bg-[#004b84] text-white flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                                <FileSpreadsheet size={20} className="text-emerald-300" />
+                                <h3 className="font-bold text-sm tracking-wide uppercase">
+                                    Upload File Master Uang Muka (BPLK)
+                                </h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => { setIsUploadModalOpen(false); setUploadFile(null); }}
+                                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer font-bold"
+                            >
+                                <XIcon size={18} />
+                            </button>
+                        </div>
+
+                        {/* Body Form Upload */}
+                        <form onSubmit={handleExecuteUpload} className="p-6 space-y-4 text-xs font-bold text-slate-700">
+                            {/* Kotak Petunjuk Format File + Tombol Download Template */}
+                            <div className="p-4 bg-sky-50 border border-sky-200 rounded-2xl space-y-2.5 text-sky-900 font-normal">
+                                <div className="flex items-center justify-between">
+                                    <p className="font-bold text-xs text-[#004b84] uppercase">Petunjuk Format File :</p>
+
+                                    {/* 🌟 TOMBOL DOWNLOAD SAMPLE TEMPLATE CSV */}
+                                    <button
+                                        type="button"
+                                        onClick={handleDownloadTemplate}
+                                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-xl text-[11px] flex items-center gap-1.5 transition shadow-sm cursor-pointer"
+                                        title="Unduh contoh template CSV"
+                                    >
+                                        <Download size={13} />
+                                        <span>Download Template CSV</span>
+                                    </button>
+                                </div>
+
+                                <ul className="list-disc pl-4 text-[11px] space-y-0.5 text-slate-600">
+                                    <li>Format file: <b>.CSV</b> (Comma Delimited).</li>
+                                    <li>Kolom standar: <i>KODE_TRAYEK, NAMA_TRAYEK, KODE_KENDARAAN, NAMA_KENDARAAN, STATUS_AKTIF, KODE_BIAYA, NAMA_BIAYA, NOMINAL, UANG_MUKA_YN</i>.</li>
+                                    <li>Gunakan tombol <b>Download Template CSV</b> di atas untuk mendapatkan berkas contoh format yang valid.</li>
+                                </ul>
+                            </div>
+
+                            {/* Dropzone Pilih File */}
+                            <div
+                                onClick={() => fileInputRef.current?.click()}
+                                className="border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-2xl p-6 text-center cursor-pointer bg-slate-50 transition"
+                            >
+                                <Upload size={32} className="mx-auto text-blue-600 mb-2" />
+                                <span className="block text-xs font-bold text-slate-700">
+                                    {uploadFile ? uploadFile.name : 'Pilih atau Seret File CSV di sini'}
+                                </span>
+                                <span className="text-[10px] text-slate-400 mt-1 block font-medium">
+                                    {uploadFile ? `${(uploadFile.size / 1024).toFixed(1)} KB` : 'Maksimal ukuran file: 10MB'}
+                                </span>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept=".csv,text/csv"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                        if (e.target.files?.[0]) {
+                                            setUploadFile(e.target.files[0]);
+                                        }
+                                    }}
+                                />
+                            </div>
+
+                            {/* Tombol Aksi Batal & Proses Upload */}
+                            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsUploadModalOpen(false); setUploadFile(null); }}
+                                    className="px-5 py-2.5 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={uploading || !uploadFile}
+                                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-xl uppercase transition cursor-pointer shadow-sm flex items-center gap-1.5"
+                                >
+                                    {uploading ? (
+                                        <>
+                                            <RefreshCw size={14} className="animate-spin" /> Memproses...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Upload size={14} /> Proses Upload
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* 🌟 MODAL EDIT TRAYEK & JENIS KENDARAAN */}
+            {/* ========================================================================= */}
+            {isEditModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+                    <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+                        <div className="px-6 py-4 bg-[#004b84] text-white flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                                <Pencil size={18} className="text-amber-300" />
+                                <h3 className="font-bold text-sm tracking-wide uppercase">Edit Master Uang Muka</h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsEditModalOpen(false)}
+                                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer font-bold"
+                            >
+                                <XIcon size={18} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSaveEditHeader} className="p-6 space-y-4 text-xs font-bold text-slate-700">
+                            <div>
+                                <label className="block mb-1 text-slate-500 uppercase">KODE TRAYEK (READONLY) :</label>
+                                <input
+                                    type="text"
+                                    disabled
+                                    className="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-xl font-mono text-slate-500 cursor-not-allowed uppercase"
+                                    value={editForm.trh_id}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block mb-1 text-slate-600 uppercase">NAMA TRAYEK / OPERASIONAL :</label>
+                                <input
+                                    type="text"
+                                    required
+                                    className="w-full p-2.5 border border-slate-300 rounded-xl outline-none focus:border-indigo-600 uppercase"
+                                    value={editForm.trh_name}
+                                    onChange={e => setEditForm({ ...editForm, trh_name: e.target.value.toUpperCase() })}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block mb-1 text-slate-600 uppercase">JENIS KENDARAAN :</label>
+                                <select
+                                    required
+                                    className="w-full p-2.5 border border-slate-300 rounded-xl outline-none focus:border-indigo-600 uppercase bg-white cursor-pointer font-medium text-slate-800"
+                                    value={editForm.trh_jnskend}
+                                    onChange={e => setEditForm({ ...editForm, trh_jnskend: e.target.value.replace(/^\uFEFF/, '').trim() })}
+                                >
+                                    <option value="">-- PILIH JENIS ARMADA --</option>
+                                    {kendaraanOptions.map((k, i) => {
+                                        // Bersihkan ID kendaraan dari karakter BOM
+                                        const rawId = (k.jnskend_id || k.id || k.kend_id || '').toString().replace(/^\uFEFF/, '').trim();
+                                        const nama = k.jnskend_nama || k.kend_nama || k.kend_identid;
+                                        return (
+                                            <option key={i} value={rawId}>
+                                                {nama} ({rawId})
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsEditModalOpen(false)}
+                                    className="px-5 py-2.5 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl uppercase transition cursor-pointer shadow-sm"
+                                >
+                                    Simpan Perubahan
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

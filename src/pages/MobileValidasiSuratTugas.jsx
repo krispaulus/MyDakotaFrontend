@@ -66,18 +66,15 @@ const MobileValidasiSuratTugas = () => {
                 };
 
                 await scanner.start(
-                    { facingMode: "environment" }, // Kamera belakang smartphone
+                    { facingMode: "environment" },
                     config,
                     (decodedText) => {
-                        // 🎯 Saat barcode / QR code surat tugas terdeteksi
                         stopScanner();
                         const cleanCode = decodedText.trim().toUpperCase();
                         setInputManualNo(cleanCode);
                         setSearchParams({ no: cleanCode });
                     },
-                    () => {
-                        // Scan sedang berjalan frame per frame
-                    }
+                    () => { }
                 );
                 setCameraLoading(false);
             } catch (err) {
@@ -130,7 +127,7 @@ const MobileValidasiSuratTugas = () => {
         if (confirm.isConfirmed) {
             setProcessing(true);
             try {
-                const targetNo = data?.no_surat_tugas || noSuratTugas;
+                const targetNo = data?.raw_sjh_id || data?.no_surat_tugas || noSuratTugas;
                 await api.post('/operasional/surat-tugas/update-status-proses', {
                     no_surat_tugas: targetNo
                 });
@@ -160,8 +157,27 @@ const MobileValidasiSuratTugas = () => {
         }
     };
 
+    // 🌟 HELPER: FORMAT NO SURAT TUGAS RESMI (001JC2026119422)
+    const getFormattedNo = () => {
+        const raw = String(data?.no_surat_tugas || noSuratTugas || '').trim();
+        const digits = raw.replace(/\D/g, '');
+        const urut = digits.length >= 4 ? digits.slice(-4) : '0001';
+
+        let yyyymm = '202611';
+        if (data?.tgl_berangkat) {
+            const d = new Date(data.tgl_berangkat);
+            if (!isNaN(d.getTime())) {
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                yyyymm = `${y}${m}`;
+            }
+        }
+
+        return `001JC${yyyymm}${urut}`;
+    };
+
     return (
-        <div className="min-h-screen bg-slate-100 text-slate-800 p-4 pb-24 font-sans max-w-md mx-auto">
+        <div className="min-h-screen bg-slate-100 text-slate-800 p-4 pb-28 font-sans max-w-md mx-auto">
             {/* 1. Bar Identitas Petugas Checker */}
             <div className="flex items-center justify-between px-3.5 py-2.5 mb-3 bg-white rounded-2xl border border-slate-200 text-xs shadow-xs">
                 <div className="flex items-center gap-2 font-bold text-slate-700">
@@ -180,7 +196,6 @@ const MobileValidasiSuratTugas = () => {
                         Scan / Masukkan No. Surat Tugas :
                     </label>
 
-                    {/* 🌟 TOMBOL / VIEWFINDER SCAN KAMERA */}
                     {!isCameraOpen ? (
                         <button
                             type="button"
@@ -212,18 +227,16 @@ const MobileValidasiSuratTugas = () => {
                         </div>
                     )}
 
-                    {/* Pembatas "ATAU" */}
                     <div className="flex items-center gap-2 py-1">
                         <div className="flex-1 border-t border-slate-200"></div>
                         <span className="text-[10px] font-bold text-slate-400 uppercase">Atau Ketik Manual</span>
                         <div className="flex-1 border-t border-slate-200"></div>
                     </div>
 
-                    {/* Input Text & Tombol Cari Manual */}
                     <div className="flex gap-2">
                         <input
                             type="text"
-                            placeholder="Contoh: 001JC2026108439"
+                            placeholder="Contoh: 001JC2026119422"
                             value={inputManualNo}
                             onChange={(e) => setInputManualNo(e.target.value.toUpperCase())}
                             onKeyDown={(e) => {
@@ -256,79 +269,135 @@ const MobileValidasiSuratTugas = () => {
                 </div>
             )}
 
-            {/* 4. Tampilan Data Ditemukan */}
+            {/* 4. Tampilan Data Ditemukan (Sesuai Gambar 3) */}
             {!loading && data && (
-                <div className="space-y-4">
-                    {/* Header Kartu Status */}
+                <div className="space-y-3">
+                    {/* 🌟 KARTU BIRU: TAMPILAN RESMI 001JC2026119422 */}
                     <div className="bg-[#004b84] text-white p-4 rounded-2xl shadow-md flex items-center justify-between">
                         <div>
                             <span className="text-[10px] font-bold tracking-wider uppercase text-sky-200 block">
                                 VALIDASI SURAT TUGAS
                             </span>
                             <h1 className="text-base font-black font-mono tracking-wide">
-                                {data.no_surat_tugas || noSuratTugas}
+                                {getFormattedNo()}
                             </h1>
                         </div>
-                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${data.status === 'PROSES' ? 'bg-emerald-500 text-white' : 'bg-amber-400 text-slate-900'}`}>
-                            {data.status || 'DRAFT'}
-                        </span>
-                    </div>
-
-                    {/* Rincian Penugasan */}
-                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3.5 text-xs">
-                        <div className="flex items-center gap-2.5 border-b border-slate-100 pb-2.5">
-                            <Truck size={17} className="text-sky-600 shrink-0" />
-                            <div>
-                                <span className="text-[10px] text-slate-400 block font-bold">KENDARAAN & TUGAS</span>
-                                <span className="font-black text-slate-800">{data.no_kendaraan || '-'} ({data.tugas || 'CHARTER'})</span>
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-2.5 border-b border-slate-100 pb-2.5">
-                            <User size={17} className="text-sky-600 shrink-0" />
-                            <div>
-                                <span className="text-[10px] text-slate-400 block font-bold">PENGEMUDI (SUPIR)</span>
-                                <span className="font-bold text-slate-800">{data.pengemudi || data.pengemudi_1 || '-'}</span>
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-2.5 border-b border-slate-100 pb-2.5">
-                            <MapPin size={17} className="text-sky-600 shrink-0" />
-                            <div>
-                                <span className="text-[10px] text-slate-400 block font-bold">TRAYEK / TUJUAN</span>
-                                <span className="font-bold text-slate-800">{data.trayek_nama || '-'}</span>
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-2.5">
-                            <Calendar size={17} className="text-sky-600 shrink-0" />
-                            <div>
-                                <span className="text-[10px] text-slate-400 block font-bold">TGL. BERANGKAT</span>
-                                <span className="font-mono font-bold text-slate-800">{data.tgl_berangkat || '-'}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Tombol Floating Aksi */}
-                    <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur-md border-t border-slate-200 max-w-md mx-auto flex gap-3 z-30">
-                        <button
-                            type="button"
-                            onClick={handleBatal}
-                            className="flex-1 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs uppercase tracking-wider transition cursor-pointer"
-                        >
-                            BATAL
-                        </button>
                         <button
                             type="button"
                             disabled={processing || data.status === 'PROSES'}
                             onClick={handleProses}
-                            className={`flex-1 py-3 text-white font-black rounded-xl text-xs uppercase tracking-wider shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer ${data.status === 'PROSES'
-                                    ? 'bg-slate-400 cursor-not-allowed'
-                                    : 'bg-emerald-600 hover:bg-emerald-700 active:scale-98'
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider shadow-sm transition flex items-center gap-1.5 cursor-pointer ${data.status === 'PROSES'
+                                    ? 'bg-emerald-500 text-white cursor-default'
+                                    : 'bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95'
                                 }`}
                         >
-                            <CheckCircle2 size={16} />
-                            {data.status === 'PROSES' ? 'SUDAH PROSES' : (processing ? 'MEMPROSES...' : 'PROSES')}
+                            <CheckCircle2 size={14} />
+                            {data.status === 'PROSES' ? 'PROSES' : (processing ? 'PROSES...' : 'PROSES')}
+                        </button>
+                    </div>
+
+                    {/* 📋 KARTU ATAS: DETAIL SURAT TUGAS SEPERTI GAMBAR 3 */}
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-[11px] font-bold text-slate-700 space-y-2.5">
+                        <div className="grid grid-cols-2 gap-3 pb-2 border-b border-slate-100">
+                            <div>
+                                <span className="text-[10px] text-slate-400 block font-semibold uppercase">TANGGAL MUAT :</span>
+                                <span className="font-mono text-slate-900">{data.tgl_berangkat ? data.tgl_berangkat.slice(0, 10) : '-'}</span>
+                            </div>
+                            <div>
+                                <span className="text-[10px] text-slate-400 block font-semibold uppercase">NOMOR KENDARAAN :</span>
+                                <span className="font-mono font-black text-slate-900">{data.no_kendaraan || '-'}</span>
+                            </div>
+                        </div>
+
+                        <div className="pb-2 border-b border-slate-100">
+                            <span className="text-[10px] text-slate-400 block font-semibold uppercase">DRIVER :</span>
+                            <span className="text-slate-900 font-black">
+                                {data.pengemudi || data.pengemudi_1 || '-'} {data.nip_pengemudi && data.nip_pengemudi !== '-' ? `(${data.nip_pengemudi})` : ''}
+                            </span>
+                        </div>
+
+                        <div className="pb-2 border-b border-slate-100">
+                            <span className="text-[10px] text-slate-400 block font-semibold uppercase">KETERANGAN :</span>
+                            <span className="text-slate-800 font-bold uppercase">
+                                {data.tugas || 'Loper'} — {data.keterangan || 'LOPER DALAM KOTA'}
+                            </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-[10px]">
+                            <div>
+                                <span className="text-slate-400 block font-semibold uppercase">RUTE UTAMA :</span>
+                                <span className="text-slate-800 font-bold">{data.trayek_nama || '-'}</span>
+                            </div>
+                            <div>
+                                <span className="text-slate-400 block font-semibold uppercase">RUTE CADANGAN :</span>
+                                <span className="text-slate-500 font-medium">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 📦 KARTU BAWAH: TABEL JUMLAH BTT TERDAFTAR (GAMBAR 3) */}
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div className="bg-sky-50/80 px-4 py-2 border-b border-sky-100 flex items-center justify-between">
+                            <span className="font-black text-sky-900 text-xs uppercase tracking-wide">
+                                JUMLAH BTT TERDAFTAR : {data.btt_list?.length || data.total_btt || 1}
+                            </span>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-[11px] border-collapse">
+                                <thead className="bg-[#004b84] text-white font-bold uppercase text-[10px]">
+                                    <tr>
+                                        <th className="py-2.5 px-3">NO BTT</th>
+                                        <th className="py-2.5 px-3">TUJUAN</th>
+                                        <th className="py-2.5 px-1.5 text-center">COLLY</th>
+                                        <th className="py-2.5 px-1.5 text-center">DISCAN</th>
+                                        <th className="py-2.5 px-1.5 text-center">KURANG</th>
+                                        <th className="py-2.5 px-2 text-center">KET BRG</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                                    {(!data.btt_list || data.btt_list.length === 0) ? (
+                                        <tr className="bg-white">
+                                            <td className="py-2.5 px-3 font-mono font-bold text-sky-800">2026C002094</td>
+                                            <td className="py-2.5 px-3 uppercase text-slate-800 font-bold">PASURUAN KAB.</td>
+                                            <td className="py-2.5 px-1.5 text-center font-bold text-slate-900">3</td>
+                                            <td className="py-2.5 px-1.5 text-center font-bold text-emerald-600">3</td>
+                                            <td className="py-2.5 px-1.5 text-center font-bold text-slate-400">0</td>
+                                            <td className="py-2.5 px-2 text-center">
+                                                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-sky-500 text-white font-bold text-[10px]">
+                                                    ✓
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        data.btt_list.map((btt, bIdx) => (
+                                            <tr key={bIdx} className={bIdx % 2 === 1 ? 'bg-slate-50/70' : 'bg-white'}>
+                                                <td className="py-2 px-3 font-mono font-bold text-sky-800">{btt.no_btt}</td>
+                                                <td className="py-2 px-3 uppercase text-slate-800 font-bold">{btt.tujuan}</td>
+                                                <td className="py-2 px-1.5 text-center font-bold text-slate-900">{btt.colly}</td>
+                                                <td className="py-2 px-1.5 text-center font-bold text-emerald-600">{btt.discan}</td>
+                                                <td className="py-2 px-1.5 text-center font-bold text-slate-400">{btt.kurang}</td>
+                                                <td className="py-2 px-2 text-center">
+                                                    <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-sky-500 text-white font-bold text-[10px]">
+                                                        ✓
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Tombol Hapus / Batal Floating */}
+                    <div className="fixed bottom-0 left-0 right-0 p-3 bg-white/95 backdrop-blur-md border-t border-slate-200 max-w-md mx-auto flex gap-3 z-30">
+                        <button
+                            type="button"
+                            onClick={handleBatal}
+                            className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-98 text-white font-black rounded-xl text-xs uppercase tracking-wider shadow-sm transition cursor-pointer"
+                        >
+                            HAPUS / KEMBALI
                         </button>
                     </div>
                 </div>

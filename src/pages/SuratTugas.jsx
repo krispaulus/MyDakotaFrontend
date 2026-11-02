@@ -869,54 +869,33 @@ const SuratTugas = () => {
         if (!rawCode) return '-';
         let clean = String(rawCode).trim();
 
-        // 1. Ambil kode agen 3 digit
+        // 1. Cabang selalu 001 (jika kosong, PST, atau OTA)
         let agen = String(agenId).trim();
         if (!agen || agen.toUpperCase() === 'PST' || agen.toUpperCase() === 'OTA') agen = '001';
         agen = agen.padStart(3, '0').slice(-3);
 
-        // 2. Ekstrak 4 digit nomor urut terakhir
+        // 2. Ekstrak 4 digit nomor urut terakhir (contoh: 9422)
         const digits = clean.replace(/\D/g, '');
         let urut = digits.length >= 4 ? digits.slice(-4) : '0001';
 
-        // 3. Jika rawCode sudah memiliki tahun dan bulan (contoh: PSTJC202610288439 atau 001JC2026108439)
+        // 3. Ambil Tahun & Bulan (YYYYMM), abaikan tanggal hari
+        let yyyy = '2026';
+        let mm = '11';
+
         if (clean.includes('JC')) {
-            const parts = clean.split('JC');
-            const afterJC = parts[1] || '';
+            const afterJC = clean.split('JC')[1] || '';
             if (afterJC.length >= 6) {
-                const yyyy = afterJC.slice(0, 4);
-                const mm = afterJC.slice(4, 6);
-                if (!isNaN(Number(yyyy)) && !isNaN(Number(mm))) {
-                    return `${agen}JC${yyyy}${mm}${urut}`;
-                }
+                yyyy = afterJC.slice(0, 4);
+                mm = afterJC.slice(4, 6);
+                return `${agen}JC${yyyy}${mm}${urut}`;
             }
         }
 
-        // 4. Fallback: Ekstraksi aman dari rawDate jika format DD/MM/YYYY atau YYYY-MM-DD
-        let yyyy = '2026';
-        let mm = '10';
-
         if (rawDate) {
-            const strDate = String(rawDate).trim();
-            if (strDate.includes('/')) {
-                // Format DD/MM/YYYY
-                const parts = strDate.split(' ')[0].split('/');
-                if (parts.length === 3) {
-                    mm = parts[1].padStart(2, '0');
-                    yyyy = parts[2];
-                }
-            } else if (strDate.includes('-')) {
-                // Format YYYY-MM-DD
-                const parts = strDate.split(' ')[0].split('-');
-                if (parts.length === 3) {
-                    yyyy = parts[0];
-                    mm = parts[1].padStart(2, '0');
-                }
-            } else {
-                const d = new Date(rawDate);
-                if (!isNaN(d.getTime())) {
-                    yyyy = String(d.getFullYear());
-                    mm = String(d.getMonth() + 1).padStart(2, '0');
-                }
+            const d = new Date(rawDate);
+            if (!isNaN(d.getTime())) {
+                yyyy = String(d.getFullYear());
+                mm = String(d.getMonth() + 1).padStart(2, '0');
             }
         }
 
@@ -937,7 +916,7 @@ const SuratTugas = () => {
 
     if (!token) {
         // Arahkan ke halaman login dengan query redirect
-        window.location.href = `/login?redirect=/scan-surat-tugas?no=${noSuratTugas}`;
+        window.location.href = `/login?redirect=/scan-surat-tugas?no=${officialNoSuratTugas}`;
         return null;
     }
 
@@ -946,6 +925,8 @@ const SuratTugas = () => {
         : window.location.hostname;
 
     const validationUrl = `http://${currentHost}/operasional/scan-surat-tugas?no=${encodeURIComponent(officialNoSuratTugas)}`;
+
+
 
     return (
         <div className="space-y-4 font-sans">
