@@ -48,6 +48,9 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
     const [errors, setErrors] = useState({});
     const [loadingTarif, setLoadingTarif] = useState(false);
 
+    const userRole = (localStorage.getItem('role_akses') || '').toUpperCase();
+    const isSupervisor = userRole === 'SUPERVISOR' || userRole === 'MANAGER' || userRole === 'SUPERADMIN' || userRole === 'S';
+
     // Inisialisasi Data Form BTT
     const [formData, setFormData] = useState({
         bttt_tanggal: todayStr,
@@ -201,29 +204,28 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
     }, [keywordCustomer]);
 
     // ✅ PERBAIKAN: Berat Volume MURNI hanya dari Dimensi (P x L x T) / 4.000
+    // ✅ KODE BARU (Hanya timpa jika P, L, T diisi lengkap):
     useEffect(() => {
         const p = parseFloat(formData.bttt_panjang) || 0;
         const l = parseFloat(formData.bttt_lebar) || 0;
         const t = parseFloat(formData.bttt_tinggi) || 0;
         const divisor = formData.bttt_layanan_nama === 'Udara' ? 6000 : 4000;
 
-        // Hanya hitung jika P, L, dan T semuanya lebih besar dari 0
+        // 🌟 Jika P, L, T lengkap diisi (> 0), hitung otomatis by system
         if (p > 0 && l > 0 && t > 0) {
             const hitungVol = (p * l * t) / divisor;
-            // Pembulatan atau format desimal
             const finalVol = Math.round(hitungVol * 100) / 100;
+
+            // Hitung kubikasi sekalian jika P x L x T diisi
+            const hitungKubikasi = (p * l * t) / 1000000;
 
             setFormData(prev => ({
                 ...prev,
-                bttt_beratvol: finalVol
-            }));
-        } else {
-            // Jika salah satu dari P, L, T adalah 0, Berat Vol WAJIB 0
-            setFormData(prev => ({
-                ...prev,
-                bttt_beratvol: 0
+                bttt_beratvol: finalVol,
+                bttt_ukuran: Number(hitungKubikasi.toFixed(3))
             }));
         }
+        // ⚠️ JANGAN di-reset ke 0 di blok 'else', agar nilai input manual lapangan tidak hilang!
     }, [formData.bttt_panjang, formData.bttt_lebar, formData.bttt_tinggi, formData.bttt_layanan_nama]);
 
     const handlePilihCustomer = (cust) => {
@@ -880,7 +882,10 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
         }
 
         // Validasi Override Supervisor
-        const isBypassed = isSupervisor && parseFloat(formData.bttt_harga) !== parseFloat(formData.original_harga);
+        const originalHarga = parseFloat(formData.original_harga || 0);
+        const currentHarga = parseFloat(formData.bttt_harga || 0);
+        const isBypassed = Boolean(isSupervisor && originalHarga > 0 && currentHarga !== originalHarga);
+
         if (isBypassed && !formData.bttt_alasan_override?.trim()) {
             newErrors.bttt_alasan_override = true;
             errorMessages.push("Alasan perubahan / bypass tarif wajib diisi");
@@ -1669,15 +1674,53 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                                         placeholder="0"
                                     />
                                 </div>
-                                <div>
-                                    <label className="block font-bold text-slate-600 text-[11px] uppercase mb-1">Berat Vol (Kg) :</label>
-                                    <input
-                                        type="text"
-                                        readOnly
-                                        value={formData.bttt_beratvol}
-                                        className="w-full p-2 bg-slate-100 border border-slate-300 rounded-lg font-black text-right text-amber-700 cursor-not-allowed outline-none"
-                                    />
-                                </div>
+
+                                {/* ✅ KODE BARU (Hybrid Input: Otomatis jika ada P,L,T; Manual jika kosong): */}
+                                {(() => {
+                                    const isAutoVol = (parseFloat(formData.bttt_panjang) || 0) > 0 &&
+                                        (parseFloat(formData.bttt_lebar) || 0) > 0 &&
+                                        (parseFloat(formData.bttt_tinggi) || 0) > 0;
+
+                                    return (
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1">
+                                                <label className="block font-bold text-slate-600 text-[11px] uppercase">
+                                                    Berat Vol (Kg) :
+                                                </label>
+                                                {isAutoVol ? (
+                                                    <span className="text-[9px] bg-sky-100 text-sky-800 px-1 py-0.2 rounded font-bold">
+                                                        Auto
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded font-bold">
+                                                        Manual
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                name="bttt_beratvol"
+                                                readOnly={isAutoVol}
+                                                value={formData.bttt_beratvol !== undefined && formData.bttt_beratvol !== null ? formData.bttt_beratvol : ''}
+                                                onChange={(e) => {
+                                                    // Hanya bisa diketik jika dimensi P, L, T kosong
+                                                    if (!isAutoVol) {
+                                                        const val = e.target.value === '' ? '' : parseFloat(e.target.value) || 0;
+                                                        setFormData(prev => ({ ...prev, bttt_beratvol: val }));
+                                                    }
+                                                }}
+                                                placeholder="0"
+                                                className={`w-full p-2 border rounded-lg font-black text-right outline-none transition ${isAutoVol
+                                                    ? 'bg-slate-100 border-slate-300 text-amber-700 cursor-not-allowed'
+                                                    : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500 focus:ring-1 focus:ring-sky-200'
+                                                    }`}
+                                            />
+                                        </div>
+                                    );
+                                })()}
+
                                 <div>
                                     <label className="block font-bold text-slate-600 text-[11px] uppercase mb-1">Kubikasi (m³) :</label>
                                     <input
