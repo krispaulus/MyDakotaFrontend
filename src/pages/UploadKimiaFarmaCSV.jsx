@@ -182,7 +182,7 @@ const UploadKimiaFarmaCSV = () => {
             const ptId = localStorage.getItem('pt_id') || 'C';
 
             // Mengarah ke endpoint resmi di main.go
-            const res = await api.post(`/marketing/upload-kf-csv?pt_id=${ptId}`, formData, {
+            const res = await api.post(`/marketing/customer-upload-CSV/upload-kimia-farma-csv?pt_id=${ptId}`, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                     Authorization: `Bearer ${token}`
