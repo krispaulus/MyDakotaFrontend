@@ -763,7 +763,7 @@ function App() {
       <Route path="/settings/manajemen-banner" element={<MainLayout><ManajemenBanner menuName="Manajemen Banner Depan" /></MainLayout>} />
 
       <Route path="/master/uang-muka" element={<MainLayout><MasterUangMuka menuName="MasterUangMuka" /></MainLayout>} />
-      <Route path="/marketing/upload-kimia-farma-csv" element={<MainLayout><UploadKimiaFarmaCSV menuName="UploadKimiaFarmaCSV" /></MainLayout>} />
+      <Route path="/marketing/customer-upload-CSV/upload-kimia-farma-csv" element={<MainLayout><UploadKimiaFarmaCSV menuName="UploadKimiaFarmaCSV" /></MainLayout>} />
 
 
       {/* Jika nanti ada halaman lain, tinggal bungkus lagi pakai MainLayout 

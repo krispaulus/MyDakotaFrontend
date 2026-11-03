@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
-    Upload, FileText, Download, AlertCircle, CheckCircle2,
-    X, RefreshCw, ChevronDown, ChevronUp, Info, HelpCircle
+    Upload, FileText, Download, X, RefreshCw,
+    ChevronDown, ChevronUp, Info, HelpCircle
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import api from '../api/axios';
@@ -20,13 +20,14 @@ const UploadKimiaFarmaCSV = () => {
     const [custList, setCustList] = useState([]);
     const [searchingCust, setSearchingCust] = useState(false);
 
-    const [delimiter, setDelimiter] = useState(';');
+    // Auto-detect delimiter (; atau ,)
+    const [detectedDelimiter, setDetectedDelimiter] = useState(';');
     const [tipePengiriman, setTipePengiriman] = useState('DALAM_KOTA'); // DALAM_KOTA (38 kol) | LUAR_KOTA (37 kol)
     const [selectedFile, setSelectedFile] = useState(null);
 
     // State UI & Preview
     const [showGuideline, setShowGuideline] = useState(true);
-    const [showSOPModal, setShowSOPModal] = useState(true); // Otomatis muncul seperti file ASP lawas
+    const [showSOPModal, setShowSOPModal] = useState(true);
     const [loadingUpload, setLoadingUpload] = useState(false);
     const [previewData, setPreviewData] = useState([]);
 
@@ -54,7 +55,14 @@ const UploadKimiaFarmaCSV = () => {
         return () => clearTimeout(delay);
     }, [searchCustQuery]);
 
-    // Handle File Change & Quick Parsing
+    // Helper: Cek otomatis apakah file memakai ';' atau ','
+    const detectCsvDelimiter = (firstLine) => {
+        const countSemicolon = (firstLine.match(/;/g) || []).length;
+        const countComma = (firstLine.match(/,/g) || []).length;
+        return countSemicolon >= countComma ? ';' : ',';
+    };
+
+    // Handle File Change & Auto-detect Delimiter
     const handleFileChange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -69,16 +77,20 @@ const UploadKimiaFarmaCSV = () => {
 
         setSelectedFile(file);
 
-        // Baca 5 baris pertama untuk preview visual
+        // Baca 5 baris pertama untuk preview tabel visual
         const reader = new FileReader();
         reader.onload = (evt) => {
             const text = evt.target.result;
             const lines = text.split(/\r\n|\n/).filter(l => l.trim() !== '');
             if (lines.length > 0) {
-                const headers = lines[0].split(delimiter).map(h => h.trim().replace(/^"|"$/g, ''));
+                // Smart auto-detect delimiter
+                const autoSep = detectCsvDelimiter(lines[0]);
+                setDetectedDelimiter(autoSep);
+
+                const headers = lines[0].split(autoSep).map(h => h.trim().replace(/^"|"$/g, ''));
                 const rows = [];
                 for (let i = 1; i < Math.min(lines.length, 6); i++) {
-                    const cols = lines[i].split(delimiter).map(c => c.trim().replace(/^"|"$/g, ''));
+                    const cols = lines[i].split(autoSep).map(c => c.trim().replace(/^"|"$/g, ''));
                     const rowObj = {};
                     headers.forEach((h, idx) => {
                         rowObj[h] = cols[idx] || '';
@@ -107,7 +119,7 @@ const UploadKimiaFarmaCSV = () => {
             ];
             sampleRow = [
                 '1', '3000069221', 'PT. KIMIA FARMA TBK - NDC 1', 'JL VETERAN NO. 9, GAMBIR', 'JAKARTA PUSAT', '021123456',
-                'KFTD SERANG', 'KFTD', '-', 'Jl. Ranca Utama No. 1', '081317173683', 'BANTEN',
+                'KFTD SERANG', 'KFTD', '-', 'Jl. Ranca Utama Link. Ranca Tales No. 1', '081317173683', 'BANTEN',
                 'SERANG KOTA', 'TAKTAKAN', 'PANGGUNGJATI', '42162', 'OBAT', '92',
                 '819', '0', '4.999', '0', 'N', '-',
                 '0', 'N', '0', 'PULO GADUNG', '1',
@@ -132,7 +144,7 @@ const UploadKimiaFarmaCSV = () => {
             ];
         }
 
-        const csvContent = headers.join(delimiter) + '\r\n' + sampleRow.join(delimiter);
+        const csvContent = headers.join(';') + '\r\n' + sampleRow.join(';');
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -143,7 +155,7 @@ const UploadKimiaFarmaCSV = () => {
         document.body.removeChild(link);
     };
 
-    // Submit Upload ke Backend
+    // Submit Upload ke Backend Go
     const handleUploadReview = async (e) => {
         e.preventDefault();
 
@@ -161,7 +173,7 @@ const UploadKimiaFarmaCSV = () => {
         formData.append('file', selectedFile);
         formData.append('cust_id', selectedCustomer.id);
         formData.append('cust_name', selectedCustomer.name);
-        formData.append('delimiter', delimiter);
+        formData.append('delimiter', detectedDelimiter);
         formData.append('tipe_pengiriman', tipePengiriman);
 
         setLoadingUpload(true);
@@ -169,7 +181,8 @@ const UploadKimiaFarmaCSV = () => {
             const token = localStorage.getItem('token');
             const ptId = localStorage.getItem('pt_id') || 'C';
 
-            const res = await api.post(`/marketing/upload-kimia-farma-csv?pt_id=${ptId}`, formData, {
+            // Mengarah ke endpoint resmi di main.go
+            const res = await api.post(`/marketing/upload-kf-csv?pt_id=${ptId}`, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                     Authorization: `Bearer ${token}`
@@ -180,7 +193,7 @@ const UploadKimiaFarmaCSV = () => {
                 title: 'BERHASIL DIUNGGAH!',
                 text: res.data?.message || 'Data pesanan Kimia Farma berhasil diproses ke sistem.',
                 icon: 'success',
-                confirmButtonColor: '#0284c7'
+                confirmButtonColor: '#004b84'
             });
 
             setSelectedFile(null);
@@ -197,7 +210,7 @@ const UploadKimiaFarmaCSV = () => {
 
     return (
         <div className="space-y-6">
-            {/* SOP MODAL POP-UP (Persis Logika ASP Lawas) */}
+            {/* SOP MODAL POP-UP - Versi Smart Tanpa Pilihan Delimiter */}
             {showSOPModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
                     <div className="w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
@@ -206,25 +219,25 @@ const UploadKimiaFarmaCSV = () => {
                                 <HelpCircle size={18} className="text-amber-300" />
                                 SOP Upload CSV Khusus Kimia Farma
                             </h3>
-                            <button onClick={() => setShowSOPModal(false)} className="text-white/80 hover:text-white">
+                            <button onClick={() => setShowSOPModal(false)} className="text-white/80 hover:text-white cursor-pointer">
                                 <X size={20} />
                             </button>
                         </div>
                         <div className="p-6 text-xs text-slate-700 space-y-3 leading-relaxed">
                             <ol className="list-decimal pl-4 space-y-2 font-medium">
-                                <li>Pilih customer <b>PT. KIMIA FARMA TBK</b> terlebih dahulu.</li>
-                                <li>Pilih <b>Delimiter</b> yang digunakan file CSV Anda (biasanya Titik Koma <code className="bg-slate-100 px-1 py-0.5 rounded font-mono">;</code>).</li>
+                                <li>Pilih customer <b>PT. KIMIA FARMA TBK</b>.</li>
                                 <li>Tentukan <b>Tipe Pengiriman</b> yang sesuai: <b>DALAM KOTA</b> (38 Kolom) atau <b>LUAR KOTA</b> (37 Kolom).</li>
+                                <li>Pilih file CSV. Sistem otomatis mengenali pemisah titik koma (;) maupun koma (,) secara otomatis.</li>
                                 <li>Pastikan format tanggal berformat <code className="bg-slate-100 px-1 py-0.5 rounded font-mono">MM/DD/YYYY</code> (contoh: 10/30/2026).</li>
-                                <li>Klik tombol <b>Download Template CSV</b> jika Anda belum memiliki format resminya.</li>
+                                <li>Klik tombol <b>Download Template CSV</b> jika Anda ingin melihat susunan kolom standar[cite: 14].</li>
                             </ol>
                             <div className="bg-rose-50 border-l-4 border-rose-500 p-3 rounded text-[11px] text-rose-800 font-bold mt-3">
-                                * Catatan: Untuk kolom desimal (Berat/Volume), gunakan titik (.) bukan koma. Nilai kosong pada angka wajib diisi angka 0.
+                                * Catatan: Untuk kolom desimal (Berat/Volume), gunakan titik (.) bukan koma. Nilai kosong pada angka wajib diisi angka 0[cite: 13, 14].
                             </div>
                             <div className="pt-3 text-center">
                                 <button
                                     onClick={() => setShowSOPModal(false)}
-                                    className="px-6 py-2.5 bg-[#004b84] hover:bg-[#003863] text-white font-bold rounded-xl uppercase transition shadow"
+                                    className="px-6 py-2.5 bg-[#004b84] hover:bg-[#003863] text-white font-bold rounded-xl uppercase transition shadow cursor-pointer"
                                 >
                                     SAYA MENGERTI
                                 </button>
@@ -245,7 +258,7 @@ const UploadKimiaFarmaCSV = () => {
                             UPLOAD TRANSPORT PLANNING KHUSUS KIMIA FARMA (CSV)
                         </h1>
                         <p className="text-xs text-slate-500">
-                            Import berkas pesanan massal dari principal logistik PT. Kimia Farma Tbk (38 Kolom)
+                            Import berkas pesanan massal dari principal logistik PT. Kimia Farma Tbk (Auto-Detect Delimiter)
                         </p>
                     </div>
                 </div>
@@ -287,17 +300,16 @@ const UploadKimiaFarmaCSV = () => {
                     <div className="p-5 space-y-4 text-slate-700">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                                <div className="font-bold text-slate-800 mb-1">1. Format & Delimiter Berkas</div>
+                                <div className="font-bold text-slate-800 mb-1">1. Format & Delimiter Berkas (Smart Auto-Detect)</div>
                                 <div className="text-[11px] text-slate-500">
-                                    File berekstensi <code className="font-mono text-rose-600 font-bold">.csv</code>.
-                                    Gunakan pemisah <b>Titik Koma (;)</b> sesuai standar template resmi Kimia Farma dengan encoding UTF-8.
+                                    File berekstensi <code className="font-mono text-rose-600 font-bold">.csv</code>. Sistem secara otomatis mendeteksi pemisah <b>Titik Koma (;)</b> maupun <b>Koma (,)</b>[cite: 14].
                                 </div>
                             </div>
                             <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                                 <div className="font-bold text-slate-800 mb-1">2. Baris Header & Jumlah Kolom</div>
                                 <div className="text-[11px] text-slate-500">
-                                    Baris pertama wajib berisi nama header kolom persis
-                                    <b> {tipePengiriman === 'DALAM_KOTA' ? '38 Kolom (Termasuk Harga)' : '37 Kolom'}</b>.
+                                    Baris pertama berisi nama header kolom persis
+                                    <b> {tipePengiriman === 'DALAM_KOTA' ? '38 Kolom (Termasuk Nilai Harga)' : '37 Kolom (Tarif Master)'}</b>[cite: 14].
                                 </div>
                             </div>
                         </div>
@@ -314,9 +326,9 @@ const UploadKimiaFarmaCSV = () => {
                 )}
             </div>
 
-            {/* FORM UPLOAD BERKAS */}
+            {/* FORM UPLOAD BERKAS (LEBIH RINGKAS & BERSIH) */}
             <form onSubmit={handleUploadReview} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5 text-xs">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {/* 1. Customer */}
                     <div className="relative">
                         <label className="font-bold text-slate-700 block mb-1.5 uppercase text-[11px]">
@@ -361,22 +373,7 @@ const UploadKimiaFarmaCSV = () => {
                         )}
                     </div>
 
-                    {/* 2. Delimiter */}
-                    <div>
-                        <label className="font-bold text-slate-700 block mb-1.5 uppercase text-[11px]">
-                            DELIMITER PEMISAH <span className="text-rose-600 font-bold">*</span>
-                        </label>
-                        <select
-                            value={delimiter}
-                            onChange={(e) => setDelimiter(e.target.value)}
-                            className="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-800 outline-none focus:border-sky-500 cursor-pointer"
-                        >
-                            <option value=";">TITIK KOMA ( ; ) — Rekomendasi Kimia Farma</option>
-                            <option value=",">KOMA ( , )</option>
-                        </select>
-                    </div>
-
-                    {/* 3. Tipe Pengiriman */}
+                    {/* 2. Tipe Pengiriman */}
                     <div>
                         <label className="font-bold text-slate-700 block mb-1.5 uppercase text-[11px]">
                             TIPE PENGIRIMAN <span className="text-rose-600 font-bold">*</span>
@@ -411,7 +408,9 @@ const UploadKimiaFarmaCSV = () => {
                                 {selectedFile ? selectedFile.name : 'Klik atau seret berkas CSV Kimia Farma ke area ini'}
                             </div>
                             <div className="text-[10px] text-slate-400">
-                                {selectedFile ? `${(selectedFile.size / 1024).toFixed(1)} KB` : 'Format wajib .csv berstandar UTF-8'}
+                                {selectedFile
+                                    ? `${(selectedFile.size / 1024).toFixed(1)} KB — Pemisah Terdeteksi: "${detectedDelimiter}"`
+                                    : 'Format wajib .csv berstandar UTF-8 (Pemisah Titik Koma atau Koma terdeteksi otomatis)'}
                             </div>
                         </div>
                     </div>
@@ -422,11 +421,16 @@ const UploadKimiaFarmaCSV = () => {
                     <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 space-y-2">
                         <div className="flex justify-between items-center">
                             <span className="font-bold text-slate-700 uppercase text-[10px] tracking-wide">
-                                PREVIEW FORMAT DATA TERBACA (5 BARIS PERTAMA)
+                                PREVIEW DATA TERBACA OTOMATIS (5 BARIS PERTAMA)
                             </span>
-                            <span className="font-mono text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded text-[10px] font-bold">
-                                {Object.keys(previewData[0] || {}).length} Kolom Terdeteksi
-                            </span>
+                            <div className="flex items-center gap-2">
+                                <span className="font-mono text-sky-700 bg-sky-50 px-2 py-0.5 rounded text-[10px] font-bold border border-sky-200">
+                                    Pemisah: '{detectedDelimiter}'
+                                </span>
+                                <span className="font-mono text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded text-[10px] font-bold">
+                                    {Object.keys(previewData[0] || {}).length} Kolom Terdeteksi
+                                </span>
+                            </div>
                         </div>
                         <div className="border border-slate-300 rounded-lg overflow-x-auto max-h-48 bg-white text-[10px]">
                             <table className="w-full text-left border-collapse">
