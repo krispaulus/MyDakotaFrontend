@@ -3,7 +3,10 @@ import ReactDOM from 'react-dom';
 import api from '../api/axios';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
-import { Filter, Printer, X, ArrowLeft, Search, Trash2, RotateCcw, RefreshCw } from 'lucide-react';
+import {
+    Filter, Printer, X, ArrowLeft, Search, Trash2,
+    RotateCcw, RefreshCw, Plus, FileSpreadsheet, FileCheck, ScanLine
+} from 'lucide-react';
 import Swal from 'sweetalert2';
 import logoDakota from '../assets/new_logo 2.png';
 
@@ -32,8 +35,15 @@ const KasMasukKeluar = () => {
     const [cabangList, setCabangList] = useState([]);
     const [loading, setLoading] = useState(false);
 
+    const [isCashFlowOpen, setIsCashFlowOpen] = useState(false);
+    const [cashFlowData, setCashFlowData] = useState(null);
+    const [loadingCashFlow, setLoadingCashFlow] = useState(false);
+
+    const [isBPLKModalOpen, setIsBPLKModalOpen] = useState(false);
+    const [noSuratTugas, setNoSuratTugas] = useState('');
+
     // 🌟 STATE TOGGLE FILTER (BUKA / TUTUP)
-    const [showFilter, setShowFilter] = useState(false);
+    const [showFilter, setShowFilter] = useState(true);
 
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
@@ -1116,9 +1126,235 @@ const KasMasukKeluar = () => {
         });
     };
 
+    // 🌟 Handler Cetak Laporan Cash Flow
+    const handleOpenLaporanCashFlow = async () => {
+        setLoadingCashFlow(true);
+        try {
+            const token = localStorage.getItem('token');
+            const ptId = localStorage.getItem('pt_id') || 'C';
+
+            let url = `/gl/cashbank/laporan-cashflow?pt_id=${ptId}&start_date=${startDate}&end_date=${endDate}`;
+            if (selectedCabang && selectedCabang !== '-- SEMUA CABANG --') {
+                url += `&cabang_nama=${encodeURIComponent(selectedCabang)}`;
+            }
+
+            const res = await api.get(url, { headers: { Authorization: `Bearer ${token}` } });
+            setCashFlowData(res.data);
+            setIsCashFlowOpen(true);
+        } catch (err) {
+            Swal.fire('Gagal!', err.response?.data?.message || 'Gagal mengambil data laporan cash flow.', 'error');
+        } finally {
+            setLoadingCashFlow(false);
+        }
+    };
+
+    // 🌟 Handler Proses Input BPLK (Surat Tugas)
+    const handleProsesBPLK = (stNumber) => {
+        const cleanST = (stNumber || noSuratTugas).trim();
+        if (!cleanST) {
+            Swal.fire('Peringatan', 'Silakan masukkan nomor surat tugas!', 'warning');
+            return;
+        }
+
+        setIsBPLKModalOpen(false);
+        setNoSuratTugas('');
+
+        // Redirect atau buka modul BPLK sesuai format aplikasi Anda
+        Swal.fire({
+            title: 'Proses BPLK',
+            text: `Memproses Surat Tugas: ${cleanST}`,
+            icon: 'info',
+            timer: 1500,
+            showConfirmButton: false
+        });
+    };
+
+    {/* 🌟 MODAL BPLK (INPUT / SCAN NO SURAT TUGAS) */ }
+    const bplkModalElement = isBPLKModalOpen ? (
+        <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
+            <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
+                <div className="bg-[#004b84] p-4 text-white flex justify-between items-center">
+                    <h3 className="font-black text-sm uppercase tracking-wider flex items-center gap-2">
+                        <ScanLine size={18} className="text-amber-300" />
+                        BPLK (BIAYA PENYELESAIAN LEMBAR KERJA)
+                    </h3>
+                    <button onClick={() => setIsBPLKModalOpen(false)} className="text-white/80 hover:text-white cursor-pointer">
+                        <X size={20} />
+                    </button>
+                </div>
+                <div className="p-6 space-y-4 text-xs text-slate-700">
+                    <div>
+                        <label className="font-bold text-slate-800 block mb-1">
+                            MASUKKAN NOMOR SURAT TUGAS :
+                        </label>
+                        <input
+                            type="text"
+                            autoFocus
+                            placeholder="Ketikkan Nomor Surat Tugas atau scan barcode..."
+                            value={noSuratTugas}
+                            onChange={(e) => setNoSuratTugas(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleProsesBPLK(e.target.value);
+                            }}
+                            className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-mono font-bold text-slate-800 outline-none focus:border-sky-500 shadow-inner uppercase"
+                        />
+                        <span className="text-[10px] text-slate-400 italic block mt-1">
+                            * Ketikkan Nomor Surat Tugas atau gunakan barcode scanner (tekan Enter untuk proses)
+                        </span>
+                    </div>
+
+                    <div className="flex justify-between items-center gap-2 pt-3 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={() => handleProsesBPLK(noSuratTugas)}
+                            className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl uppercase transition cursor-pointer shadow-sm"
+                        >
+                            PROSES ST
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setIsBPLKModalOpen(false)}
+                            className="px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl uppercase transition cursor-pointer"
+                        >
+                            KELUAR
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    ) : null;
+
+    {/* 🌟 MODAL CETAK LAPORAN CASH FLOW LENGKAP */ }
+    const cashFlowModalElement = isCashFlowOpen && cashFlowData ? (
+        <div className="fixed inset-0 z-[99999] bg-white overflow-y-auto p-6 print:p-0">
+            <div className="max-w-5xl mx-auto flex justify-between items-center mb-6 pb-3 border-b print:hidden">
+                <button
+                    onClick={() => setIsCashFlowOpen(false)}
+                    className="px-4 py-2 text-xs bg-slate-200 hover:bg-slate-300 rounded-lg font-bold uppercase transition"
+                >
+                    ← Kembali
+                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => window.print()}
+                        className="px-5 py-2 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold flex items-center gap-1.5 shadow uppercase transition cursor-pointer"
+                    >
+                        <Printer size={15} /> Print Laporan
+                    </button>
+                </div>
+            </div>
+
+            <div className="max-w-5xl mx-auto border border-slate-300 p-8 rounded-xl shadow-sm print:border-none print:shadow-none print:p-0 text-slate-900 font-sans text-xs">
+                {/* Header Profil */}
+                <div className="flex justify-between items-start border-b-2 border-slate-800 pb-3 mb-3">
+                    <div className="space-y-0.5">
+                        <h2 className="font-black text-sm uppercase tracking-wide text-slate-900">
+                            PT DAKOTA LOGISTIK INDONESIA
+                        </h2>
+                        <p className="text-[11px] text-slate-600">Jl. Wibawa Mukti II No. 99 Jatiasih, Bekasi</p>
+                        <p className="text-[11px] text-slate-600">BEKASI KOTA - JAWA BARAT</p>
+                        <p className="text-[11px] text-slate-600">(021) 8603278 / (021) 86608589</p>
+                    </div>
+                    <div>
+                        <img src={logoDakota} alt="Dakota Cargo" className="h-10 w-auto object-contain" />
+                    </div>
+                </div>
+
+                {/* Judul Laporan */}
+                <div className="text-center my-4">
+                    <h1 className="font-black text-base uppercase tracking-wider text-slate-900">
+                        LAPORAN CASH FLOW
+                    </h1>
+                    <p className="text-xs font-bold text-slate-600 mt-0.5">
+                        PERIODE : <span className="font-mono">{startDate}</span> s/d <span className="font-mono">{endDate}</span>
+                    </p>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                        Tanggal Cetak : {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </p>
+                </div>
+
+                {/* Tabel Laporan Cashflow Identik Sistem Lawas */}
+                <table className="w-full border-collapse border border-slate-400 text-[11px] mt-4">
+                    <thead>
+                        <tr className="bg-slate-300 font-bold text-slate-900">
+                            <th className="border border-slate-400 p-2 text-center w-12">No. Urut</th>
+                            <th className="border border-slate-400 p-2 text-center w-28">Tanggal</th>
+                            <th className="border border-slate-400 p-2 text-left w-48">No. Transaksi</th>
+                            <th colSpan={2} className="border border-slate-400 p-2 text-left">Keterangan</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {(cashFlowData.data || []).map((h, idx) => (
+                            <React.Fragment key={idx}>
+                                <tr className="font-bold bg-slate-50 border-t border-slate-400">
+                                    <td className="border border-slate-400 p-2 text-center font-mono">{idx + 1}</td>
+                                    <td className="border border-slate-400 p-2 text-center font-mono">{formatDate(h.cb_tanggal)}</td>
+                                    <td className="border border-slate-400 p-2 font-mono text-sky-700">{h.cb_id}</td>
+                                    <td colSpan={2} className="border border-slate-400 p-2 text-slate-800">{h.cb_ket}</td>
+                                </tr>
+                                <tr className="bg-slate-200 font-bold text-[10px] text-slate-700">
+                                    <td className="border border-slate-400"></td>
+                                    <td className="border border-slate-400 p-1.5 text-center">Uraian</td>
+                                    <td className="border border-slate-400 p-1.5 text-center">Kode Perkiraan</td>
+                                    <td className="border border-slate-400 p-1.5 text-right w-36">Debit (Rp)</td>
+                                    <td className="border border-slate-400 p-1.5 text-right w-36">Kredit (Rp)</td>
+                                </tr>
+                                {(h.details || []).map((d, dIdx) => (
+                                    <tr key={dIdx} className="hover:bg-slate-50/80">
+                                        <td className="border border-slate-400"></td>
+                                        <td className="border border-slate-400 p-1.5 pl-3">{d.cbd_ket || h.cb_ket}</td>
+                                        <td className="border border-slate-400 p-1.5 text-center font-mono text-slate-600">{d.item_owncaid || '-'}</td>
+                                        <td className="border border-slate-400 p-1.5 text-right font-mono">
+                                            {Number(d.debet || 0).toLocaleString('id-ID', { minimumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="border border-slate-400 p-1.5 text-right font-mono">
+                                            {Number(d.kredit || 0).toLocaleString('id-ID', { minimumFractionDigits: 2 })}
+                                        </td>
+                                    </tr>
+                                ))}
+                                <tr className="bg-slate-100 font-bold text-[10px]">
+                                    <td colSpan={3} className="border border-slate-400 p-1.5 text-right uppercase">
+                                        SUBTOTAL :
+                                    </td>
+                                    <td className="border border-slate-400 p-1.5 text-right font-mono text-slate-900">
+                                        {Number(h.sub_debet || 0).toLocaleString('id-ID', { minimumFractionDigits: 2 })}
+                                    </td>
+                                    <td className="border border-slate-400 p-1.5 text-right font-mono text-slate-900">
+                                        {Number(h.sub_kredit || 0).toLocaleString('id-ID', { minimumFractionDigits: 2 })}
+                                    </td>
+                                </tr>
+                            </React.Fragment>
+                        ))}
+                    </tbody>
+                    <tfoot>
+                        <tr className="bg-slate-300 font-black text-xs">
+                            <td colSpan={3} className="border border-slate-400 p-2.5 text-right uppercase">
+                                TOTAL KESELURUHAN :
+                            </td>
+                            <td className="border border-slate-400 p-2.5 text-right font-mono text-slate-900">
+                                Rp {Number(cashFlowData.grand_total_debet || 0).toLocaleString('id-ID', { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="border border-slate-400 p-2.5 text-right font-mono text-slate-900">
+                                Rp {Number(cashFlowData.grand_total_kredit || 0).toLocaleString('id-ID', { minimumFractionDigits: 2 })}
+                            </td>
+                        </tr>
+                        <tr className="bg-emerald-50 font-black text-sm">
+                            <td colSpan={3} className="border border-slate-400 p-3 text-right uppercase text-emerald-900">
+                                SISA KAS :
+                            </td>
+                            <td colSpan={2} className="border border-slate-400 p-3 text-right font-mono text-emerald-700 text-base">
+                                Rp {Number(cashFlowData.sisa_kas || 0).toLocaleString('id-ID', { minimumFractionDigits: 2 })}
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    ) : null;
+
     return (
         <div className="space-y-4">
-            {/* 🌟 PANEL FILTER BERSYARAT (TOGGLE BUKA/TUTUP) */}
+            {/* 🌟 PANEL FILTER PENCATATAN CASH - BANK (DEFAULT TERBUKA) */}
             {showFilter && (
                 <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all">
                     <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
@@ -1163,10 +1399,36 @@ const KasMasukKeluar = () => {
                         </div>
                     </div>
 
-                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                    {/* 🌟 BARIS TOMBOL AKSI: CETAK CASHFLOW, BPLK, RESET, & TAMPILKAN TRANSAKSI */}
+                    <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                        {/* 1. CETAK LAPORAN CASHFLOW */}
+                        <button
+                            type="button"
+                            onClick={handleOpenLaporanCashFlow}
+                            disabled={loadingCashFlow}
+                            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 font-bold rounded-xl text-xs flex items-center gap-2 shadow-xs transition cursor-pointer uppercase tracking-wider"
+                            title="Cetak Laporan Cash Flow Sesuai Periode Tanggal"
+                        >
+                            <FileSpreadsheet size={15} className="text-emerald-600" />
+                            {loadingCashFlow ? 'MEMUAT...' : 'CETAK LAPORAN CASHFLOW'}
+                        </button>
+
+                        {/* 2. BPLK */}
+                        <button
+                            type="button"
+                            onClick={() => setIsBPLKModalOpen(true)}
+                            className="px-5 py-2 bg-amber-400 hover:bg-amber-500 text-slate-900 font-black rounded-xl text-xs flex items-center gap-2 shadow-xs transition cursor-pointer uppercase tracking-wider"
+                            title="Input / Scan Surat Tugas BPLK"
+                        >
+                            <FileCheck size={15} /> BPLK
+                        </button>
+
+                        {/* 3. RESET */}
                         <button type="button" onClick={handleResetFilter} className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-xl uppercase transition cursor-pointer flex items-center gap-1.5">
                             <RotateCcw size={14} /> RESET
                         </button>
+
+                        {/* 4. TAMPILKAN TRANSAKSI */}
                         <button type="submit" className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5">
                             <RefreshCw size={14} /> TAMPILKAN TRANSAKSI
                         </button>
@@ -1174,7 +1436,7 @@ const KasMasukKeluar = () => {
                 </form>
             )}
 
-            {/* 🌟 DataTableTemplate dengan Event onFilter */}
+            {/* DataTableTemplate */}
             <DataTableTemplate
                 title="PENCATATAN CASH - BANK"
                 columns={columns}
@@ -1190,6 +1452,8 @@ const KasMasukKeluar = () => {
             {modalElement && ReactDOM.createPortal(modalElement, document.body)}
             {postingModalElement && ReactDOM.createPortal(postingModalElement, document.body)}
             {printModalElement && ReactDOM.createPortal(printModalElement, document.body)}
+            {bplkModalElement && ReactDOM.createPortal(bplkModalElement, document.body)}
+            {cashFlowModalElement && ReactDOM.createPortal(cashFlowModalElement, document.body)}
         </div>
     );
 };
