@@ -2615,7 +2615,15 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                                         <input
                                             type="text"
                                             readOnly
-                                            value={formatNomorInvoiceResmi(activeInvoice.artih_id, activeInvoice.artih_tanggal, activeInvoice.artih_agenid)}
+                                            value={
+                                                savedInvoiceId || activeInvoice?.artih_id
+                                                    ? formatNomorInvoiceResmi(
+                                                        savedInvoiceId || activeInvoice?.artih_id,
+                                                        activeInvoice?.artih_tanggal || newInvoiceForm.artih_tanggal,
+                                                        newInvoiceForm.artih_agenid
+                                                    )
+                                                    : "[Otomatis Saat Disimpan]"
+                                            }
                                             className="w-full p-2 bg-slate-100 border border-slate-200 rounded font-mono font-bold text-sky-700"
                                         />
                                     </div>
@@ -2624,7 +2632,7 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                                         <input
                                             type="text"
                                             readOnly
-                                            value={savedKwitansiNo || "0006/DLI/001/09/26"}
+                                            value={savedKwitansiNo || activeInvoice?.artih_nokw || "[Otomatis Saat Disimpan]"}
                                             className="w-full p-1.5 bg-slate-50 border border-slate-300 rounded font-mono font-bold text-emerald-700"
                                         />
                                     </div>
