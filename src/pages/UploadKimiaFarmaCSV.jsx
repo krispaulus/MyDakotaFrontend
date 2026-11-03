@@ -169,7 +169,7 @@ const UploadKimiaFarmaCSV = () => {
             const token = localStorage.getItem('token');
             const ptId = localStorage.getItem('pt_id') || 'C';
 
-            const res = await api.post(`/marketing/upload-kf-csv?pt_id=${ptId}`, formData, {
+            const res = await api.post(`/marketing/upload-kimia-farma-csv?pt_id=${ptId}`, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                     Authorization: `Bearer ${token}`
@@ -457,8 +457,8 @@ const UploadKimiaFarmaCSV = () => {
                         type="submit"
                         disabled={loadingUpload || !selectedFile}
                         className={`px-8 py-2.5 font-black rounded-xl uppercase transition shadow-md text-xs flex items-center gap-2 ${loadingUpload || !selectedFile
-                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed select-none'
-                                : 'bg-[#004b84] hover:bg-[#003863] text-white cursor-pointer active:scale-95'
+                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed select-none'
+                            : 'bg-[#004b84] hover:bg-[#003863] text-white cursor-pointer active:scale-95'
                             }`}
                     >
                         {loadingUpload ? (
