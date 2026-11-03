@@ -144,7 +144,7 @@ import MasterUangMuka from './pages/MasterUangMuka';
 import SuratTugas from './pages/SuratTugas';
 import MobileValidasiSuratTugas from './pages/MobileValidasiSuratTugas';
 import ScanSuratTugas from './pages/ScanSuratTugas';
-import UploadKimiaFarma from "./pages/UploadKimiaFarmaCSV";
+import UploadKimiaFarmaCSV from "./pages/UploadKimiaFarmaCSV";
 
 const getCompanyName = (pt) => {
   if (pt === 'A') return 'Dakota Buana Sarana';
