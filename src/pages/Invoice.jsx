@@ -185,6 +185,36 @@ const Invoice = () => {
     const [searchInvoice, setSearchInvoice] = useState('');
     const [searchKwitansi, setSearchKwitansi] = useState('');
     const [searchBTT, setSearchBTT] = useState('');
+    const [searchCustQuery, setSearchCustQuery] = useState('');
+    const [showCustDropdown, setShowCustDropdown] = useState(false);
+    const [searchingCust, setSearchingCust] = useState(false);
+
+    useEffect(() => {
+        const query = searchCustQuery.trim();
+        if (query.length < 2) return;
+
+        const delayDebounce = setTimeout(async () => {
+            setSearchingCust(true);
+            try {
+                const token = localStorage.getItem('token');
+                // Bersihkan titik agar "PT." dan "PT " sama-sama terbaca
+                const cleanKeyword = query.replace(/\./g, ' ').replace(/\s+/g, ' ').trim();
+
+                const res = await api.get(`/customer?search=${encodeURIComponent(cleanKeyword)}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+
+                const resultList = res.data?.data || [];
+                setCustList(resultList);
+            } catch (err) {
+                console.warn("Gagal live search customer:", err);
+            } finally {
+                setSearchingCust(false);
+            }
+        }, 300);
+
+        return () => clearTimeout(delayDebounce);
+    }, [searchCustQuery]);
 
     useEffect(() => {
         if (!isHoldingUser && currentActiveAgen.id) {
@@ -238,10 +268,11 @@ const Invoice = () => {
             const token = localStorage.getItem('token');
             const [resCabang, resCust] = await Promise.all([
                 api.get('/gl/agen-ca?stt=', { headers: { Authorization: `Bearer ${token}` } }),
-                api.get('/gl/customers?limit=1000', { headers: { Authorization: `Bearer ${token}` } })
+                api.get('/gl/customers?limit=10000', { headers: { Authorization: `Bearer ${token}` } })
+                    .catch(() => api.get('/customer?aktif=Y', { headers: { Authorization: `Bearer ${token}` } }))
             ]);
             setCabangList(resCabang.data?.data || []);
-            setCustList(resCust.data?.data || []);
+            setCustList(resCust.data?.data || resCust.data || []);
         } catch (err) {
             console.error("Gagal load opsi filter:", err);
         }
@@ -2390,20 +2421,67 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                                 />
                             </div>
 
-                            <div className="md:col-span-2">
-                                <label className="font-bold text-slate-600 block mb-1">CUSTOMER :</label>
-                                <select
-                                    value={newInvoiceForm.artih_custid}
-                                    onChange={(e) => handleSelectCustomerForNewInvoice(e.target.value)}
-                                    className="w-full p-2.5 bg-white border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-blue-500 cursor-pointer"
-                                >
-                                    <option value="">-- PILIH CUSTOMER --</option>
-                                    {custList.map((cust, i) => (
-                                        <option key={i} value={cust.cust_id}>
-                                            {cust.cust_name} [{cust.cust_id}]
-                                        </option>
-                                    ))}
-                                </select>
+                            <div className="md:col-span-2 relative">
+                                <label className="font-bold text-slate-600 block mb-1">
+                                    CUSTOMER : <span className="text-slate-400 font-normal">(Ketik Nama / ID)</span>
+                                </label>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        placeholder="Ketik minimal 2 huruf (contoh: WIRA)..."
+                                        value={searchCustQuery || (newInvoiceForm.artih_custname ? `${newInvoiceForm.artih_custname} [${newInvoiceForm.artih_custid}]` : '')}
+                                        onFocus={() => setShowCustDropdown(true)}
+                                        onChange={(e) => {
+                                            setSearchCustQuery(e.target.value);
+                                            setShowCustDropdown(true);
+                                        }}
+                                        className="w-full p-2.5 bg-white border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-blue-500 uppercase"
+                                    />
+                                    {(searchCustQuery || newInvoiceForm.artih_custid) && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSearchCustQuery('');
+                                                setNewInvoiceForm(prev => ({ ...prev, artih_custid: '', artih_custname: '' }));
+                                            }}
+                                            className="absolute right-2.5 top-3 text-slate-400 hover:text-rose-600 font-bold"
+                                        >
+                                            ✕
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Dropdown Menu Hasil Pencarian */}
+                                {showCustDropdown && (
+                                    <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-300 rounded-xl shadow-2xl max-h-56 overflow-y-auto z-50 divide-y divide-slate-100 text-xs">
+                                        {searchingCust ? (
+                                            <div className="p-3 text-center text-slate-400 font-bold italic animate-pulse">
+                                                Mencari customer di database...
+                                            </div>
+                                        ) : custList.length > 0 ? (
+                                            custList.map((cust, i) => (
+                                                <div
+                                                    key={i}
+                                                    onClick={() => {
+                                                        handleSelectCustomerForNewInvoice(cust.cust_id || cust.CustID);
+                                                        setSearchCustQuery('');
+                                                        setShowCustDropdown(false);
+                                                    }}
+                                                    className="p-2.5 hover:bg-sky-50 cursor-pointer font-bold text-slate-800 flex justify-between items-center transition"
+                                                >
+                                                    <span>{cust.cust_name || cust.CustName}</span>
+                                                    <span className="font-mono text-sky-700 bg-sky-50 px-2 py-0.5 rounded border border-sky-200 text-[10px]">
+                                                        {cust.cust_id || cust.CustID}
+                                                    </span>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="p-3 text-center text-slate-400 italic">
+                                                Customer tidak ditemukan
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             <div>
