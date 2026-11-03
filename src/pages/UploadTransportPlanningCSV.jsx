@@ -268,15 +268,34 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
             return;
         }
 
+        const barisHargaNol = dataValid.filter(r => !r.is_duplicate && (!r.harga_final || r.harga_final === 0));
+
+        let pesanHtml = `<p class="text-xs text-slate-600">Anda akan memproses <b>${summaryPreview2.totalAkanProses} BTT</b> ke database.</p>`;
+
+        if (barisHargaNol.length > 0) {
+            pesanHtml = `
+                <div class="text-left text-xs space-y-2 p-2 font-sans">
+                    <p class="text-slate-600 leading-relaxed">
+                        Anda akan memproses <b>${summaryPreview2.totalAkanProses} BTT</b> ke database.
+                    </p>
+                    <div class="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800">
+                        <b class="text-rose-700 block mb-1">⚠️ Peringatan Sumber Harga:</b>
+                        Terdapat <b>${barisHargaNol.length} BTT</b> dengan harga <b>Rp 0 (Sumber Harga Tidak Ada)</b>. 
+                        Apakah Anda yakin ingin tetap memprosesnya ke database?
+                    </div>
+                </div>
+            `;
+        }
         const confirm = await Swal.fire({
-            title: "Konfirmasi Simpan ke Database?",
-            text: `Anda akan memproses ${summaryPreview2.totalAkanProses} BTT ke database. Tindakan ini tidak dapat dibatalkan.`,
-            icon: "question",
+            title: barisHargaNol.length > 0 ? "Lanjutkan dengan Harga Rp 0?" : "Konfirmasi Simpan ke Database?",
+            html: pesanHtml,
+            icon: barisHargaNol.length > 0 ? "warning" : "question",
             showCancelButton: true,
-            confirmButtonColor: "#059669",
+            confirmButtonColor: barisHargaNol.length > 0 ? "#d97706" : "#059669",
             cancelButtonColor: "#64748b",
-            confirmButtonText: "Ya, Proses ke Database!",
-            cancelButtonText: "Batal"
+            confirmButtonText: barisHargaNol.length > 0 ? "Ya, Tetap Proses!" : "Ya, Proses ke Database!",
+            cancelButtonText: "Batal & Periksa",
+            customClass: { container: 'z-[999999]' }
         });
 
         if (!confirm.isConfirmed) return;
@@ -686,6 +705,26 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
                                     </div>
                                 </div>
                             )}
+
+                            {currentStep === 2 && (() => {
+                                const listHargaKosong = dataValid.filter(r => !r.is_duplicate && (!r.harga_final || r.harga_final === 0));
+                                if (listHargaKosong.length === 0) return null;
+
+                                return (
+                                    <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl flex items-start gap-3 text-amber-900 animate-in fade-in">
+                                        <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={20} />
+                                        <div className="space-y-1 text-xs">
+                                            <span className="font-black uppercase tracking-wide block text-amber-800">
+                                                PERHATIAN: Ditemukan {listHargaKosong.length} BTT Tanpa Sumber Harga (Rp 0)!
+                                            </span>
+                                            <p className="text-[11px] text-amber-700 leading-relaxed font-medium">
+                                                Beberapa baris kiriman di bawah memiliki harga Rp 0 karena tidak tercantum di file CSV dan belum memiliki riwayat master tarif di database[cite: 30].
+                                                Anda dapat kembali ke <b>Preview 1</b> untuk melengkapi atau tetap melanjutkan jika harga akan disesuaikan kemudian.
+                                            </p>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
 
                             {/* TAB 1: DATA VALID (PREVIEW 1 & PREVIEW 2) */}
                             {activeTab === "valid" && (
