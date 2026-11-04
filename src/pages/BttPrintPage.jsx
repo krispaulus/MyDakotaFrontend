@@ -12,13 +12,12 @@ const BttPrintPage = () => {
   const payloadData = rawPayload ? JSON.parse(rawPayload) : {};
 
   // 2. NAMA CORPORATE / PT (Atas Kops Nota)
-  // Mengambil MURNI dari data PT BTT atau Session Corporate yang aktif (Anti-Hardcode)
   const corporateNama =
     payloadData?.pt_nama ||
     bttData?.pt_nama ||
     localStorage.getItem('active_pt_nama') ||
     localStorage.getItem('pt_nama') ||
-    '';
+    'PT DAKOTA LOGISTIK INDONESIA';
 
   // 3. NAMA AGEN PENGIRIM (Lokasi Cabang Tempat BTT Diterbitkan)
   const agenPengirimNama =
@@ -26,13 +25,13 @@ const BttPrintPage = () => {
     bttData?.bttt_inisial_asal ||
     payloadData?.agen_nama ||
     localStorage.getItem('active_agen_nama') ||
-    '';
+    'DLI PUSAT';
 
   const agenAlamat =
     payloadData?.bttt_asalalamat ||
     bttData?.bttt_asalalamat ||
     localStorage.getItem('active_agen_alamat') ||
-    '';
+    'Jl. Wibawa Mukti II No. 99, Jatiasih, Bekasi';
 
   const usernameMarketing =
     payloadData?.username ||
@@ -85,7 +84,6 @@ const BttPrintPage = () => {
       const opsiFormat = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
       return dateObj.toLocaleDateString('en-US', opsiFormat);
     } catch (err) {
-      console.error("Gagal melakukan enkripsi estimasi tanggal terima:", err.message);
       return new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     }
   };
@@ -99,10 +97,11 @@ const BttPrintPage = () => {
     }
   };
 
+  // Definisi konfigurasi 3 rangkap lembaran (Lembar 1 ada harga, Lembar 2 & 3 tanpa harga)
   const tipeLembaran = [
-    { label: "Untuk Pengirim", kasta: "Lembar 1 dari 3" },
-    { label: `Kembali Ke ${String(bttData.bttt_inisial_asal || agenPengirimNama || '').toUpperCase()}`, kasta: "Lembar 2 dari 3" },
-    { label: "Untuk Arsip", kasta: "Lembar 3 dari 3" }
+    { label: "Untuk Pengirim", kasta: "Lembar 1 dari 3", isHarga: true },
+    { label: "Kembali Ke Cab. Pengirim", kasta: "Lembar 2 dari 3", isHarga: false },
+    { label: "Untuk Arsip", kasta: "Lembar 3 dari 3", isHarga: false }
   ];
 
   return (
@@ -135,7 +134,7 @@ const BttPrintPage = () => {
       {/* TOOLBAR NO-PRINT */}
       <div className="no-print mb-5 p-4 bg-blue-50 rounded-xl flex justify-between items-center border border-blue-200 max-w-[850px] mx-auto">
         <span className="font-bold text-blue-800">Doc ID: {bttNum} 📄 Mode Cetak 3-in-1 Lembar Kertas A4</span>
-        <button onClick={() => window.print()} className="px-5 py-2 bg-blue-600 text-white font-bold rounded-lg shadow hover:bg-blue-700">
+        <button onClick={() => window.print()} className="px-5 py-2 bg-blue-600 text-white font-bold rounded-lg shadow hover:bg-blue-700 cursor-pointer">
           Cetak Dokumen BTT
         </button>
       </div>
@@ -157,24 +156,19 @@ const BttPrintPage = () => {
                     onError={(e) => { e.target.style.display = 'none'; }}
                   />
                   <div className="text-[8px] font-bold text-slate-700 text-left leading-none">
-
-                    {/* 🌟 FIX UTAMA 1: MEMANGGIL VARIABEL corporateNama DENGAN BENAR (BUKAN HARDCODE) */}
                     <span className="text-xs font-black block text-slate-900 tracking-tight uppercase">
                       {corporateNama}
                     </span>
-
-                    {/* 🌟 FIX UTAMA 2: MEMANGGIL VARIABEL agenPengirimNama */}
                     <span className="font-extrabold block text-slate-800 text-[9px] uppercase">
                       {agenPengirimNama}
                     </span>
-
                     <span className="font-mono text-[7.5px] text-slate-400 block truncate">
                       {agenAlamat}
                     </span>
                   </div>
                 </div>
 
-                {/* BARCODE VECTOR */}
+                {/* 🌟 MASALAH 1: BARCODE ATAS MENAMPILKAN NOMOR RESI PENGIRIMAN */}
                 <div className="flex flex-col items-end justify-center">
                   <span className="font-mono text-[8px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">[ NOMOR RESI PENGIRIMAN ]</span>
                   <Barcode value={bttNum} format="CODE128" width={1.2} height={23} displayValue={false} margin={0} />
@@ -198,7 +192,7 @@ const BttPrintPage = () => {
                 </div>
                 <div>
                   <span className="text-gray-400 block font-normal uppercase text-[7.5px]">Cab. Penerima :</span>
-                  <span className="text-slate-900 font-extrabold uppercase">{bttData.bttt_tujuanagennama || bttData.bttt_tujuanagenid || ''}</span>
+                  <span className="text-slate-900 font-extrabold uppercase">{bttData.bttt_tujuanagennama || bttData.bttt_tujuanagenid || bttData.bttt_tujuankota || ''}</span>
                 </div>
                 <div>
                   <span className="text-gray-400 block font-normal uppercase text-[7.5px]">Tujuan Wilayah :</span>
@@ -240,7 +234,7 @@ const BttPrintPage = () => {
                 </div>
               </div>
 
-              {/* 5. DETAILS TABLE & PAYMENT MATRIKS */}
+              {/* 5. DETAILS TABLE & PAYMENT MATRIKS (KONDISIONAL LEMBAR 1 vs LEMBAR 2 & 3) */}
               <div className="grid grid-cols-12 gap-3 items-center text-left">
                 <div className="col-span-7 space-y-1.5">
                   <table className="w-full text-center border-collapse border border-gray-300 text-[8.5px]">
@@ -262,24 +256,49 @@ const BttPrintPage = () => {
                     </tbody>
                   </table>
 
+                  {/* KOTAK NOMOR SURAT JALAN / SKB */}
                   <div className="p-1 border border-dashed border-slate-300 rounded-md bg-slate-50/50 text-center">
                     <span className="text-[7.5px] font-bold text-gray-400 uppercase tracking-wider block">SURAT JALAN / PACKAGE ID</span>
                     <span className="text-[11px] font-black font-mono text-indigo-700 block leading-none">{bttData.bttt_nosuratjalan || '---'}</span>
                   </div>
                 </div>
 
-                {/* FINANCIAL ACCOUNTING INFO */}
-                <div className="col-span-5 bg-slate-50 p-2 rounded-lg border border-gray-200 text-[8.5px] font-bold space-y-1 text-slate-600">
-                  <div className="flex justify-between"><span>Biaya Kirim :</span><span className="font-mono text-slate-900">Rp {Math.round(bttData.bttt_harga || 0).toLocaleString('id-ID')}</span></div>
-                  <div className="flex justify-between"><span>Biaya Penerus :</span><span className="font-mono text-slate-900">Rp {Math.round(bttData.bttt_biayatambahan || bttData.bttt_biayapenerus || 0).toLocaleString('id-ID')}</span></div>
-                  <div className="flex justify-between"><span>Packing :</span><span className="font-mono text-slate-900">Rp {Math.round(bttData.bttt_biayapacking || 0).toLocaleString('id-ID')}</span></div>
-                  <div className="flex justify-between text-slate-950 font-black text-[10px] pt-0.5 border-t border-dashed border-slate-300">
-                    <span>Total Biaya :</span>
-                    <span className="font-mono text-indigo-700">
-                      Rp {Math.round((parseFloat(bttData.bttt_harga) || 0) + (parseFloat(bttData.bttt_biayatambahan || bttData.bttt_biayapenerus) || 0) + (parseFloat(bttData.bttt_biayapacking) || 0)).toLocaleString('id-ID')}
-                    </span>
+                {/* Bagian Kanan: 🌟 LEMBAR 1 (ADA HARGA) vs LEMBAR 2 & 3 (TANPA HARGA, HANYA TANDA TERIMA) */}
+                {index === 0 ? (
+                  /* 🌟 LEMBAR 1 (UNTUK PENGIRIM): TAMPILKAN RINCIAN HARGA */
+                  <div className="col-span-5 bg-slate-50 p-2 rounded-lg border border-gray-200 text-[8.5px] font-bold space-y-1 text-slate-600">
+                    <div className="flex justify-between">
+                      <span>Biaya Kirim :</span>
+                      <span className="font-mono text-slate-900">Rp {Math.round(bttData.bttt_harga || 0).toLocaleString('id-ID')}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Biaya Penerus :</span>
+                      <span className="font-mono text-slate-900">Rp {Math.round(bttData.bttt_biayatambahan || bttData.bttt_biayapenerus || 0).toLocaleString('id-ID')}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Packing :</span>
+                      <span className="font-mono text-slate-900">Rp {Math.round(bttData.bttt_biayapacking || 0).toLocaleString('id-ID')}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-950 font-black text-[10px] pt-0.5 border-t border-dashed border-slate-300">
+                      <span>Total Biaya :</span>
+                      <span className="font-mono text-indigo-700">
+                        Rp {Math.round((parseFloat(bttData.bttt_harga) || 0) + (parseFloat(bttData.bttt_biayatambahan || bttData.bttt_biayapenerus) || 0) + (parseFloat(bttData.bttt_biayapacking) || 0)).toLocaleString('id-ID')}
+                      </span>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  /* 🌟 LEMBAR 2 & 3: HARGA HILANG, GANTIKAN KOTAK TANDA TERIMA PENERIMA */
+                  <div className="col-span-5 bg-slate-100 p-2.5 rounded-lg border border-slate-300 text-center flex flex-col justify-between" style={{ minHeight: '74px' }}>
+                    <div className="font-bold text-slate-800 text-[8px] leading-tight uppercase">
+                      DENGAN INI BARANG / PAKET KIRIMAN SUDAH DITERIMA DALAM KONDISI BAIK OLEH :
+                    </div>
+                    <div className="text-[7.5px] font-bold text-slate-500 uppercase mt-0.5">
+                      PARAF & NAMA JELAS PENERIMA
+                    </div>
+                    <div className="mt-4 border-b border-dashed border-slate-400 w-36 mx-auto"></div>
+                    <div className="text-[7.5px] text-slate-400 mt-0.5">[ ................................................ ]</div>
+                  </div>
+                )}
               </div>
 
               {/* 6. FOOTER SIGNATURES & QR TRACKING */}
@@ -294,35 +313,56 @@ const BttPrintPage = () => {
                   <span className="font-mono text-[6.5px] text-slate-500 font-bold leading-none text-left">SCAN<br />TRACKING</span>
                 </div>
 
-                {/* SIGNATURE SECTION */}
-                <div className="flex gap-4 text-center font-bold text-slate-600 uppercase text-[8px]">
-                  <div>
-                    MARKETING
-                    <div className="h-4"></div>
-                    <div className="border-b border-gray-300 w-16 font-mono text-[7px] text-indigo-600 uppercase">
-                      [{usernameMarketing}]
+                {/* SIGNATURE SECTION: Lembar 1 ada Marketing, Lembar 2 & 3 Kurir & Customer */}
+                {item.isHarga ? (
+                  <div className="flex gap-4 text-center font-bold text-slate-600 uppercase text-[8px]">
+                    <div>
+                      MARKETING
+                      <div className="h-4"></div>
+                      <div className="border-b border-gray-300 w-16 font-mono text-[7px] text-indigo-600 uppercase">
+                        [{usernameMarketing}]
+                      </div>
+                    </div>
+                    <div>CUSTOMER<div className="h-4"></div><div className="border-b border-gray-300 w-16"></div></div>
+                    <div>PENERIMA<div className="h-4"></div><div className="border-b border-gray-300 w-16"></div></div>
+                  </div>
+                ) : (
+                  <div className="flex gap-4 text-center font-bold text-slate-600 uppercase text-[7.5px]">
+                    <div>
+                      PENGANTAR PAKET
+                      <div className="h-4"></div>
+                      <div className="border-b border-gray-300 w-20 text-[6.5px] text-slate-400">
+                        (Paraf & Nama Kurir)
+                      </div>
+                    </div>
+                    <div>
+                      CUSTOMER
+                      <div className="h-4"></div>
+                      <div className="border-b border-gray-300 w-20 text-[6.5px] text-slate-400">
+                        (Paraf & Nama Pengirim)
+                      </div>
                     </div>
                   </div>
-                  <div>CUSTOMER<div className="h-4"></div><div className="border-b border-gray-300 w-16"></div></div>
-                  <div>PENERIMA<div className="h-4"></div><div className="border-b border-gray-300 w-16"></div></div>
-                </div>
+                )}
               </div>
 
             </div>
 
             {/* GARIS PUTUS-PUTUS PEMBATAS GUNTING */}
-            {index < 2 && (
-              <div className="separator-line no-print">
-                <span className="absolute left-1/2 -top-2 -translate-x-1/2 bg-white px-2 text-[7.5px] font-mono text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                  ✂️ Gunting Batas Potongan Lembaran Rangkap
-                </span>
-              </div>
-            )}
+            {
+              index < 2 && (
+                <div className="separator-line no-print">
+                  <span className="absolute left-1/2 -top-2 -translate-x-1/2 bg-white px-2 text-[7.5px] font-mono text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                    ✂️ Gunting Batas Potongan Lembaran Rangkap
+                  </span>
+                </div>
+              )
+            }
           </React.Fragment>
         ))}
 
       </div>
-    </div>
+    </div >
   );
 };
 
