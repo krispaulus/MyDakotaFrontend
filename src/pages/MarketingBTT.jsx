@@ -18,6 +18,9 @@ const MarketingBTT = () => {
 
     // Filter Form State
     const [showFilter, setShowFilter] = useState(true);
+
+    const now = new Date();
+    const firstDayStr = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
     const todayStr = new Date().toISOString().split('T')[0];
     const [filterStartDate, setFilterStartDate] = useState(todayStr);
     const [filterEndDate, setFilterEndDate] = useState(todayStr);
@@ -27,6 +30,22 @@ const MarketingBTT = () => {
     const [filterNoBtt, setFilterNoBtt] = useState('');
     const [filterKota, setFilterKota] = useState('');
     const [bypassTanggal, setBypassTanggal] = useState(false);
+    const [cabangList, setCabangList] = useState([]);
+
+    const fetchCabangList = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await api.get('/gl/agen-ca?stt=', { headers: { Authorization: `Bearer ${token}` } })
+                .catch(() => api.get('/agens?limit=1000', { headers: { Authorization: `Bearer ${token}` } }));
+            setCabangList(res.data?.data || res.data || []);
+        } catch (err) {
+            console.warn("Gagal load cabang:", err);
+        }
+    };
+
+    useEffect(() => {
+        fetchCabangList();
+    }, []);
 
     // 🖨️ FUNGSI CETAK RESI BTT
     const handlePrintBTT = (item) => {
@@ -147,6 +166,15 @@ const MarketingBTT = () => {
             )
         },
         {
+            header: 'CREATED BY',
+            accessor: 'create_by',
+            render: (item) => (
+                <span className="font-bold text-slate-800 bg-sky-50 text-sky-700 border border-sky-200 px-2.5 py-0.5 rounded text-[11px] uppercase tracking-wide">
+                    {item.create_by || 'SYSTEM'}
+                </span>
+            )
+        },
+        {
             header: 'ACTION',
             accessor: 'action',
             render: (row) => (
@@ -185,12 +213,15 @@ const MarketingBTT = () => {
             const currentToken = localStorage.getItem('token');
             const agenIdFix = targetAgenId || localStorage.getItem('active_agen_id') || '';
 
+            // Tentukan cabang yang difilter
+            const selectedBranch = customParams.cabang !== undefined ? customParams.cabang : filterCabang;
+
             const queryParams = new URLSearchParams({
                 agen_id: agenIdFix,
                 start_date: bypassTanggal ? '' : (customParams.start_date ?? filterStartDate),
                 end_date: bypassTanggal ? '' : (customParams.end_date ?? filterEndDate),
                 bypass_tanggal: bypassTanggal ? 'Y' : 'N',
-                ...(customParams.cabang && { cabang: customParams.cabang }),
+                cabang: selectedBranch || '', // Kirim string kosong jika "-- SEMUA CABANG --"
                 ...(customParams.jenis_btt && { jenis_btt: customParams.jenis_btt }),
                 ...(customParams.customer && { customer: customParams.customer }),
                 ...(customParams.no_btt && { no_btt: customParams.no_btt }),
@@ -220,13 +251,16 @@ const MarketingBTT = () => {
     };
 
     useEffect(() => {
+        fetchCabangList();
         const initialAgen = localStorage.getItem('active_agen_id') || '';
-        fetchBTT(initialAgen);
+
+        // Panggil pertama kali dengan bypass tanggal aktif
+        fetchBTT(initialAgen, { bypass_tanggal: 'Y' });
 
         const handleAgenChange = () => {
             const latestAgenId = localStorage.getItem('active_agen_id') || '';
             setFilterAgenId(latestAgenId);
-            fetchBTT(latestAgenId);
+            fetchBTT(latestAgenId, { bypass_tanggal: 'Y' });
         };
 
         window.addEventListener('storage', handleAgenChange);
@@ -236,7 +270,7 @@ const MarketingBTT = () => {
             window.removeEventListener('storage', handleAgenChange);
             window.removeEventListener('agen_changed', handleAgenChange);
         };
-    }, [filterAgenId, bypassTanggal]);
+    }, [filterAgenId]);
 
     const handleApplyFilter = () => {
         fetchBTT(filterAgenId, {
@@ -251,15 +285,23 @@ const MarketingBTT = () => {
     };
 
     const handleResetFilter = () => {
-        setFilterStartDate(todayStr);
+        setFilterStartDate(firstDayStr);
         setFilterEndDate(todayStr);
         setFilterCabang('');
         setFilterJenisBtt('');
         setFilterCustomer('');
         setFilterNoBtt('');
         setFilterKota('');
-        setBypassTanggal(false);
-        fetchBTT(filterAgenId, { start_date: todayStr, end_date: todayStr });
+
+        // Tetap true agar data tidak kosong saat reset
+        setBypassTanggal(true);
+
+        fetchBTT(filterAgenId, {
+            start_date: '',
+            end_date: '',
+            cabang: '',
+            bypass_tanggal: 'Y'
+        });
     };
 
     return (
@@ -307,7 +349,11 @@ const MarketingBTT = () => {
                                 className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 bg-white outline-none focus:border-sky-500 cursor-pointer"
                             >
                                 <option value="">-- SEMUA CABANG --</option>
-                                <option value="001">001 - DLI PUSAT</option>
+                                {cabangList.map((cab, idx) => (
+                                    <option key={idx} value={cab.agen_id || cab.AgenID}>
+                                        {String(cab.agen_id || cab.AgenID).padStart(3, '0')} - {cab.agen_nama || cab.AgenNama}
+                                    </option>
+                                ))}
                             </select>
                         </div>
 
