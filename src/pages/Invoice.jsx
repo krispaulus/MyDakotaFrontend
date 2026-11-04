@@ -1330,17 +1330,17 @@ const Invoice = () => {
 
                     return `
                         <tr style="font-size: 9.5px; font-family: Arial, sans-serif;">
-                            <td style="border: 1px solid #cbd5e1; padding: 4px 2px; text-align: center;">${idx + 1}</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 4px; font-family: monospace; font-weight: bold; color: #0284c7;">${b.bttt_id}</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 4px 2px; text-align: center;">${formatTanggalIndonesia(b.bttt_tanggal)}</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 4px;">${b.bttt_tujuankota || '-'}</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 4px 2px; text-align: center; font-family: monospace; font-weight: 600;">${kodepos}</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 4px; font-weight: 500;">${b.bttt_tujuannama || '-'}</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 4px 2px; text-align: center;">${b.bttt_nosuratjalan || '-'}</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 4px; text-align: right; font-family: monospace; font-weight: 600;">${biayaKirim.toLocaleString('id-ID')}</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 4px 2px; text-align: center; font-weight: bold; font-size: 8.5px; color: #0f172a;">${viaTransport}</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 4px; text-align: right; font-family: monospace;">${berat.toLocaleString('id-ID')}</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 4px; color: #475569;">${b.bttt_namabarang || '-'}</td>
+                            <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center;">${idx + 1}</td>
+                            <td style="border: 1px solid #94a3b8; padding: 4px; font-family: monospace; font-weight: bold; color: #0284c7;">${b.bttt_id}</td>
+                            <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center;">${formatTanggalIndonesia(b.bttt_tanggal)}</td>
+                            <td style="border: 1px solid #94a3b8; padding: 4px;">${b.bttt_tujuankota || '-'}</td>
+                            <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center; font-family: monospace; font-weight: 600;">${kodepos}</td>
+                            <td style="border: 1px solid #94a3b8; padding: 4px; font-weight: 500;">${b.bttt_tujuannama || '-'}</td>
+                            <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center;">${b.bttt_nosuratjalan || '-'}</td>
+                            <td style="border: 1px solid #94a3b8; padding: 4px; text-align: right; font-family: monospace; font-weight: 600;">${biayaKirim.toLocaleString('id-ID')}</td>
+                            <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center; font-weight: bold; font-size: 8.5px; color: #0f172a;">${viaTransport}</td>
+                            <td style="border: 1px solid #94a3b8; padding: 4px; text-align: right; font-family: monospace;">${berat.toLocaleString('id-ID')}</td>
+                            <td style="border: 1px solid #94a3b8; padding: 4px; color: #475569;">${b.bttt_namabarang || '-'}</td>
                         </tr>
                     `;
                 }).join('');
@@ -1356,10 +1356,9 @@ const Invoice = () => {
                     <head>
                         <title>KWITANSI - ${kwitansiDisplayNo || noInvoiceResmi}</title>
                         <style>
-                            /* 🌟 3. CETAK RESMI FORMAT PORTRAIT */
                             @page { size: A4 portrait; margin: 8mm; }
                             body { font-family: Arial, sans-serif; font-size: 10.5px; margin: 0; padding: 8px; color: #1e293b; }
-                            table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+                            table { width: 100%; border-collapse: collapse; }
                             th { border: 1px solid #94a3b8; padding: 5px 2px; background-color: #e2e8f0; font-size: 8.5px; text-align: center; font-weight: bold; color: #0f172a; text-transform: uppercase; }
                             .no-print { margin-bottom: 10px; text-align: right; }
                             .btn-print { padding: 6px 16px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; color: white; margin: 0 4px; font-size: 11px; text-transform: uppercase; }
@@ -1371,139 +1370,157 @@ const Invoice = () => {
                             <button class="btn-print" style="background:#16a34a;" onclick="window.print()">PRINT</button>
                             <button class="btn-print" style="background:#e11d48;" onclick="window.close()">TUTUP</button>
                         </div>
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <img src="${dakotaLogo}" alt="Logo" style="height:44px; object-fit:contain;" />
-                                <div>
-                                    <h2 style="margin:0; font-size:14px; font-weight:900; color:#004b84; letter-spacing:0.3px;">PT DAKOTA LOGISTIK INDONESIA</h2>
-                                    <div style="font-size:9.5px; color:#64748b; margin-top:2px;">Jl. Wibawa Mukti II No. 99, Jatiasih, Bekasi - Jawa Barat</div>
-                                </div>
-                            </div>
-                            <div style="text-align:right;">
-                                <h1 style="margin:0; font-size:17px; font-weight:900; letter-spacing:0.5px; color:#004b84;">KWITANSI PENAGIHAN</h1>
-                            </div>
-                        </div>
-                        <div style="height:2px; background:#004b84; margin:6px 0 8px 0; border-radius:2px;"></     
+                        
+                        <!-- HEADER LOGO & PERUSAHAAN -->
+                        <table style="width: 100%; margin-bottom: 6px; border: none;">
+                            <tr>
+                                <td style="width: 60%; vertical-align: middle;">
+                                    <table style="border: none;">
+                                        <tr>
+                                            <td style="width: 50px; vertical-align: middle;">
+                                                <img src="${dakotaLogo}" alt="Logo" style="height: 42px; object-fit: contain;" />
+                                            </td>
+                                            <td style="padding-left: 10px; vertical-align: middle;">
+                                                <div style="font-size: 14px; font-weight: 900; color: #004b84; letter-spacing: 0.3px;">PT DAKOTA LOGISTIK INDONESIA</div>
+                                                <div style="font-size: 9.5px; color: #64748b; margin-top: 1px;">Jl. Wibawa Mukti II No. 99, Jatiasih, Bekasi - Jawa Barat</div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                                <td style="width: 40%; text-align: right; vertical-align: middle;">
+                                    <div style="font-size: 17px; font-weight: 900; letter-spacing: 0.5px; color: #004b84;">KWITANSI PENAGIHAN</div>
+                                </td>
+                            </tr>
+                        </table>
 
-                        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; font-size:10px; background:#f8fafc; padding:6px 10px; border-radius:6px; border:1px solid #e2e8f0;">
-                            <div style="width: 48%;">
-                                <div style="color:#64748b; font-size:9.5px; text-transform:uppercase; font-weight:bold;">Nama Pelanggan :</div>
-                                <div style="font-weight:900; font-size:12px; color:#0f172a; text-transform:uppercase; margin-top:2px;">${header.cust_name || header.artih_custname || '-'}</div>
-                                <div style="font-size:9.5px; color:#475569; margin-top:2px;">${header.cust_alamat || header.cust_alamat1 || 'KANTOR PUSAT OPERASIONAL'}</div>
-                            </div>
-                            <div style="width: 50%;">
-                                <table style="width: 100%; border: none; margin: 0; font-size: 10px;">
-                                    <tr>
-                                        <td style="padding: 1.5px 0; width: 40%; color:#475569;">Tanggal Kwitansi</td>
-                                        <td style="padding: 1.5px 0; width: 4%;">:</td>
-                                        <td style="padding: 1.5px 0; font-weight: bold; color:#0f172a;">${tglKwitansiIndo}</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 1.5px 0; color:#475569; font-weight: bold;">Nomor Kwitansi</td>
-                                        <td style="padding: 1.5px 0;">:</td>
-                                        <td style="padding: 1.5px 0; font-family: monospace; font-weight: 800; color:#004b84;">${kwitansiDisplayNo || '-'}</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 1.5px 0; color:#475569;">Nomor Invoice</td>
-                                        <td style="padding: 1.5px 0;">:</td>
-                                        <td style="padding: 1.5px 0; font-weight: 800; font-family: monospace; color:#0284c7;">${noInvoiceResmi}</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 1.5px 0; color:#475569;">Nomor Faktur Pajak</td>
-                                        <td style="padding: 1.5px 0;">:</td>
-                                        <td style="padding: 1.5px 0; font-family: monospace; font-weight: 600; color:#0f172a;">${noFakturPajak}</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 1.5px 0; color:#475569;">Tanggal Jatuh Tempo</td>
-                                        <td style="padding: 1.5px 0;">:</td>
-                                        <td style="padding: 1.5px 0; font-weight: bold; color:#b91c1c;">${tglJatuhTempoIndo}</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 1.5px 0; color:#475569; font-weight: 600;">Nomor PO</td>
-                                        <td style="padding: 1.5px 0;">:</td>
-                                        <td style="padding: 1.5px 0; font-family: monospace; font-weight: bold; color:#0f172a;">
-                                            ${nomorPOCustomer !== '' ? nomorPOCustomer : '-'}
-                                        </td>
-                                    </tr>
-                                </table>
-                            </div>
-                        </div>
+                        <div style="height: 2px; background: #004b84; margin-bottom: 8px;"></div>
+                        
+                        <!-- INFORMASI PELANGGAN & DETAIL KWITANSI -->
+                        <table style="width: 100%; margin-bottom: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px;">
+                            <tr>
+                                <td style="width: 48%; vertical-align: top; padding: 4px;">
+                                    <div style="color: #64748b; font-size: 9px; text-transform: uppercase; font-weight: bold;">Nama Pelanggan :</div>
+                                    <div style="font-weight: 900; font-size: 12px; color: #0f172a; text-transform: uppercase; margin-top: 2px;">${header.cust_name || header.artih_custname || '-'}</div>
+                                    <div style="font-size: 9.5px; color: #475569; margin-top: 2px;">${header.cust_alamat || header.cust_alamat1 || 'KANTOR PUSAT OPERASIONAL'}</div>
+                                </td>
+                                <td style="width: 52%; vertical-align: top; padding: 4px;">
+                                    <table style="width: 100%; border: none; font-size: 10px;">
+                                        <tr>
+                                            <td style="padding: 1.5px 0; width: 38%; color: #475569;">Tanggal Kwitansi</td>
+                                            <td style="padding: 1.5px 0; width: 4%;">:</td>
+                                            <td style="padding: 1.5px 0; font-weight: bold; color: #0f172a;">${tglKwitansiIndo}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 1.5px 0; color: #475569; font-weight: bold;">Nomor Kwitansi</td>
+                                            <td style="padding: 1.5px 0;">:</td>
+                                            <td style="padding: 1.5px 0; font-family: monospace; font-weight: 800; color: #004b84;">${kwitansiDisplayNo || '-'}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 1.5px 0; color: #475569;">Nomor Invoice</td>
+                                            <td style="padding: 1.5px 0;">:</td>
+                                            <td style="padding: 1.5px 0; font-weight: 800; font-family: monospace; color: #0284c7;">${noInvoiceResmi}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 1.5px 0; color: #475569;">Nomor Faktur Pajak</td>
+                                            <td style="padding: 1.5px 0;">:</td>
+                                            <td style="padding: 1.5px 0; font-family: monospace; font-weight: 600; color: #0f172a;">${noFakturPajak}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 1.5px 0; color: #475569;">Tanggal Jatuh Tempo</td>
+                                            <td style="padding: 1.5px 0;">:</td>
+                                            <td style="padding: 1.5px 0; font-weight: bold; color: #b91c1c;">${tglJatuhTempoIndo}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 1.5px 0; color: #475569; font-weight: 600;">Nomor PO</td>
+                                            <td style="padding: 1.5px 0;">:</td>
+                                            <td style="padding: 1.5px 0; font-family: monospace; font-weight: bold; color: #0f172a;">
+                                                ${nomorPOCustomer !== '' ? nomorPOCustomer : '-'}
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
 
-                        <table>
+                        <!-- TABEL RESI BTT -->
+                        <table style="width: 100%; margin-bottom: 6px;">
                             <thead>
                                 <tr>
-                                    <th style="width:3%;">No Urut</th>
-                                    <th style="width:13%;">No Resi Pengiriman</th>
-                                    <th style="width:10%;">Tanggal Kirim</th>
-                                    <th style="width:9%;">Kota Tujuan</th>
-                                    <th style="width:6%;">Kodepos</th>
-                                    <th style="width:16%;">Penerima</th>
-                                    <th style="width:11%;">No Surat Jalan / POD</th>
-                                    <th style="width:8%;">Biaya Kirim</th>
-                                    <th style="width:5%;">Via</th>
-                                    <th style="width:5%;">Berat</th>
-                                    <th style="width:14%;">Keterangan</th>
+                                    <th style="width: 3%;">NO URUT</th>
+                                    <th style="width: 13%;">NO RESI PENGIRIMAN</th>
+                                    <th style="width: 10%;">TANGGAL KIRIM</th>
+                                    <th style="width: 9%;">KOTA TUJUAN</th>
+                                    <th style="width: 6%;">KODEPOS</th>
+                                    <th style="width: 16%;">PENERIMA</th>
+                                    <th style="width: 11%;">NO SURAT JALAN / POD</th>
+                                    <th style="width: 8%;">BIAYA KIRIM</th>
+                                    <th style="width: 5%;">VIA</th>
+                                    <th style="width: 5%;">BERAT</th>
+                                    <th style="width: 14%;">KETERANGAN</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                ${kwitansiRowsHtml || '<tr><td colspan="11" style="text-align:center; padding:8px;">Tidak ada rincian resi</td></tr>'}
+                                ${kwitansiRowsHtml || '<tr><td colspan="11" style="text-align: center; padding: 8px;">Tidak ada rincian resi</td></tr>'}
                             </tbody>
                         </table>
 
-                        <div style="display:flex; border: 1px solid #94a3b8; border-top: none; font-size: 9.5px; background:#ffffff;">
-                            <div style="width: 35%; padding: 8px; border-right: 1px solid #cbd5e1; display:flex; flex-direction:column; justify-content:center;">
-                                <div style="font-weight:bold; color:#004b84; margin-bottom:2px; font-size:10px;">Transfer ke :</div>
-                                <div style="font-weight:bold; color:#0f172a;">DAKOTA LOGISTIK INDONESIA PT</div>
-                                <div style="color:#334155;">BANK CENTRAL ASIA (BCA)</div>
-                                <div style="color:#334155;">KCU KALIMALANG</div>
-                                <div style="font-weight:900; font-family:monospace; color:#0284c7; font-size:11px; margin-top:2px;">
-                                    NO REKENING : 2303937226
-                                </div>
-                            </div>
-                            <div style="width: 35%; padding: 8px; text-align: center; display: flex; flex-direction: column; justify-content: space-between; border-right: 1px solid #cbd5e1;">
-                                <div style="font-weight:bold; color:#0f172a;">PT. DAKOTA LOGISTIK INDONESIA</div>
-                                <div style="height: 45px;"></div>
-                                <div>
-                                    <div style="font-weight:bold; text-decoration:underline; color:#0f172a; font-size:10px; text-transform:uppercase;">${pejabatAccounting}</div>
-                                </div>
-                            </div>
-                            <div style="width: 30%;">
-                                <table style="width: 100%; border: none; margin: 0; font-size: 9.5px;">
-                                    <tr>
-                                        <td style="padding: 2px 5px; font-weight: bold; border-bottom: 1px solid #e2e8f0; color:#334155;">JUMLAH</td>
-                                        <td style="padding: 2px 5px; text-align: right; font-family: monospace; font-weight: bold; border-bottom: 1px solid #e2e8f0;">${totalBiayaKirim.toLocaleString('id-ID')}.00</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 1.5px 5px; border-bottom: 1px solid #e2e8f0; color:#64748b;">(-) DISKON</td>
-                                        <td style="padding: 1.5px 5px; text-align: right; font-family: monospace; border-bottom: 1px solid #e2e8f0;">0.00</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 1.5px 5px; border-bottom: 1px solid #e2e8f0; color:#64748b;">(+) ASURANSI/LOLO</td>
-                                        <td style="padding: 1.5px 5px; text-align: right; font-family: monospace; border-bottom: 1px solid #e2e8f0;">0.00</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 1.5px 5px; border-bottom: 1px solid #e2e8f0; color:#64748b;">(+) PACKING/BM/LAIN</td>
-                                        <td style="padding: 1.5px 5px; text-align: right; font-family: monospace; border-bottom: 1px solid #e2e8f0;">${totalPacking.toLocaleString('id-ID')}.00</td>
-                                    </tr>
-                                    <tr style="background:#f8fafc;">
-                                        <td style="padding: 2px 5px; font-weight: bold; border-bottom: 1px solid #e2e8f0; color:#0f172a;">NILAI JUAL</td>
-                                        <td style="padding: 2px 5px; text-align: right; font-family: monospace; font-weight: bold; border-bottom: 1px solid #e2e8f0;">${nilaiJual.toLocaleString('id-ID')}.00</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 1.5px 5px; border-bottom: 1px solid #e2e8f0; color:#64748b;">DPP</td>
-                                        <td style="padding: 1.5px 5px; text-align: right; font-family: monospace; border-bottom: 1px solid #e2e8f0;">${dpp.toLocaleString('id-ID')}.00</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 1.5px 5px; border-bottom: 1px solid #e2e8f0; color:#64748b;">PPN 1.1%</td>
-                                        <td style="padding: 1.5px 5px; text-align: right; font-family: monospace; border-bottom: 1px solid #e2e8f0;">${ppn.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                                    </tr>
-                                    <tr style="background:#f1f5f9; font-weight: bold;">
-                                        <td style="padding: 3px 5px; color:#004b84; font-size:10px;">TOTAL TAGIHAN</td>
-                                        <td style="padding: 3px 5px; text-align: right; font-family: monospace; font-weight: 900; font-size: 11px; color:#b91c1c;">Rp ${totalTagihan.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                                    </tr>
-                                </table>
-                            </div>
-                        </div>
+                        <!-- FOOTER REKAPITULASI BIAYA & TANDA TANGAN -->
+                        <table style="width: 100%; border: 1px solid #94a3b8; border-collapse: collapse; font-size: 9.5px; background: #ffffff;">
+                            <tr>
+                                <td style="width: 35%; padding: 8px; border-right: 1px solid #cbd5e1; vertical-align: top;">
+                                    <div style="font-weight: bold; color: #004b84; margin-bottom: 2px; font-size: 10px;">Transfer ke :</div>
+                                    <div style="font-weight: bold; color: #0f172a;">DAKOTA LOGISTIK INDONESIA PT</div>
+                                    <div style="color: #334155;">BANK CENTRAL ASIA (BCA)</div>
+                                    <div style="color: #334155;">KCU KALIMALANG</div>
+                                    <div style="font-weight: 900; font-family: monospace; color: #0284c7; font-size: 11px; margin-top: 3px;">
+                                        NO REKENING : 2303937226
+                                    </div>
+                                </td>
+                                <td style="width: 35%; padding: 8px; border-right: 1px solid #cbd5e1; text-align: center; vertical-align: top;">
+                                    <div style="font-weight: bold; color: #0f172a;">PT. DAKOTA LOGISTIK INDONESIA</div>
+                                    <div style="height: 55px;"></div>
+                                    <div style="font-weight: bold; text-decoration: underline; color: #0f172a; font-size: 10px; text-transform: uppercase;">
+                                        ${pejabatAccounting}
+                                    </div>
+                                </td>
+                                <td style="width: 30%; padding: 0; vertical-align: top;">
+                                    <table style="width: 100%; border-collapse: collapse; font-size: 9.5px;">
+                                        <tr>
+                                            <td style="padding: 2.5px 5px; font-weight: bold; border-bottom: 1px solid #e2e8f0; color: #334155;">JUMLAH</td>
+                                            <td style="padding: 2.5px 5px; text-align: right; font-family: monospace; font-weight: bold; border-bottom: 1px solid #e2e8f0;">${totalBiayaKirim.toLocaleString('id-ID')}.00</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 1.5px 5px; border-bottom: 1px solid #e2e8f0; color: #64748b;">(-) DISKON</td>
+                                            <td style="padding: 1.5px 5px; text-align: right; font-family: monospace; border-bottom: 1px solid #e2e8f0;">0.00</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 1.5px 5px; border-bottom: 1px solid #e2e8f0; color: #64748b;">(+) ASURANSI/LOLO</td>
+                                            <td style="padding: 1.5px 5px; text-align: right; font-family: monospace; border-bottom: 1px solid #e2e8f0;">0.00</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 1.5px 5px; border-bottom: 1px solid #e2e8f0; color: #64748b;">(+) PACKING/BM/LAIN</td>
+                                            <td style="padding: 1.5px 5px; text-align: right; font-family: monospace; border-bottom: 1px solid #e2e8f0;">${totalPacking.toLocaleString('id-ID')}.00</td>
+                                        </tr>
+                                        <tr style="background: #f8fafc;">
+                                            <td style="padding: 2.5px 5px; font-weight: bold; border-bottom: 1px solid #e2e8f0; color: #0f172a;">NILAI JUAL</td>
+                                            <td style="padding: 2.5px 5px; text-align: right; font-family: monospace; font-weight: bold; border-bottom: 1px solid #e2e8f0;">${nilaiJual.toLocaleString('id-ID')}.00</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 1.5px 5px; border-bottom: 1px solid #e2e8f0; color: #64748b;">DPP</td>
+                                            <td style="padding: 1.5px 5px; text-align: right; font-family: monospace; border-bottom: 1px solid #e2e8f0;">${dpp.toLocaleString('id-ID')}.00</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 1.5px 5px; border-bottom: 1px solid #e2e8f0; color: #64748b;">PPN 1.1%</td>
+                                            <td style="padding: 1.5px 5px; text-align: right; font-family: monospace; border-bottom: 1px solid #e2e8f0;">${ppn.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                        </tr>
+                                        <tr style="background: #f1f5f9; font-weight: bold;">
+                                            <td style="padding: 3.5px 5px; color: #004b84; font-size: 10px;">TOTAL TAGIHAN</td>
+                                            <td style="padding: 3.5px 5px; text-align: right; font-family: monospace; font-weight: 900; font-size: 11px; color: #b91c1c;">Rp ${totalTagihan.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
                     </body>
                     </html>
                 `);
