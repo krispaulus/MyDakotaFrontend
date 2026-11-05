@@ -248,15 +248,44 @@ const MasterTarifCustomer = () => {
             accessor: 'jml_reguler',
             render: (row) => (
                 <div className="flex items-center gap-1.5">
-                    <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${row.jml_reguler > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-400'}`}>
+                    {/* Kotak Reguler (R) */}
+                    <button
+                        type="button"
+                        onClick={() => handleTarifBadgeClick(row, 'reguler', row.jml_reguler)}
+                        title="Klik untuk Download CSV atau Copy ke Customer Lain"
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-mono font-black transition cursor-pointer shadow-xs active:scale-95 ${row.jml_reguler > 0
+                                ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-400 border border-slate-200'
+                            }`}
+                    >
                         R: {row.jml_reguler || 0}
-                    </span>
-                    <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${row.jml_charter > 0 ? 'bg-sky-100 text-sky-800' : 'bg-slate-100 text-slate-400'}`}>
+                    </button>
+
+                    {/* Kotak Charter (C) */}
+                    <button
+                        type="button"
+                        onClick={() => handleTarifBadgeClick(row, 'charter', row.jml_charter)}
+                        title="Klik untuk Download CSV atau Copy ke Customer Lain"
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-mono font-black transition cursor-pointer shadow-xs active:scale-95 ${row.jml_charter > 0
+                                ? 'bg-sky-100 hover:bg-sky-200 text-sky-800 border border-sky-300'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-400 border border-slate-200'
+                            }`}
+                    >
                         C: {row.jml_charter || 0}
-                    </span>
-                    <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${row.jml_multidrop > 0 ? 'bg-purple-100 text-purple-800' : 'bg-slate-100 text-slate-400'}`}>
+                    </button>
+
+                    {/* Kotak Multidrop (M) */}
+                    <button
+                        type="button"
+                        onClick={() => handleTarifBadgeClick(row, 'multidrop', row.jml_multidrop)}
+                        title="Klik untuk Download CSV atau Copy ke Customer Lain"
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-mono font-black transition cursor-pointer shadow-xs active:scale-95 ${row.jml_multidrop > 0
+                                ? 'bg-purple-100 hover:bg-purple-200 text-purple-800 border border-purple-300'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-400 border border-slate-200'
+                            }`}
+                    >
                         M: {row.jml_multidrop || 0}
-                    </span>
+                    </button>
                 </div>
             )
         },
@@ -354,6 +383,102 @@ const MasterTarifCustomer = () => {
             )
         }
     ];
+
+    // 🌟 Aksi saat badge jumlah tarif diklik (R: 3981 / C: 0 / M: 0)
+    const handleTarifBadgeClick = (row, tipe = 'reguler', count = 0) => {
+        if (!count || count === 0) {
+            Swal.fire('Informasi', `Customer ${row.cust_name} belum memiliki data tarif untuk tipe ${tipe.toUpperCase()}.`, 'info');
+            return;
+        }
+
+        Swal.fire({
+            title: `Kelola Tarif ${tipe.toUpperCase()} (${count} Rute)`,
+            html: `
+                <div style="font-size: 13px; text-align: left; margin-bottom: 12px; line-height: 1.6;">
+                    Customer: <b style="color: #004b84;">${row.cust_id} - ${row.cust_name}</b><br/>
+                    Total Rute Aktif: <b style="color: #16a34a;">${count.toLocaleString('id-ID')} Rute</b>
+                </div>
+                <div style="font-size: 12px; color: #64748b; text-align: left;">
+                    Silakan pilih tindakan yang ingin dilakukan:
+                </div>
+            `,
+            icon: 'question',
+            showCancelButton: true,
+            showDenyButton: true,
+            confirmButtonText: '📥 Download CSV',
+            confirmButtonColor: '#0284c7',
+            denyButtonText: '📋 Copy ke Customer Lain',
+            denyButtonColor: '#059669',
+            cancelButtonText: 'Tutup',
+            cancelButtonColor: '#94a3b8'
+        }).then(async (result) => {
+            // 📥 PILIHAN 1: DOWNLOAD CSV RESMI
+            if (result.isConfirmed) {
+                try {
+                    const token = localStorage.getItem('token');
+                    const ptId = localStorage.getItem('pt_id') || 'C';
+
+                    // Trigger download stream dari backend
+                    const downloadUrl = `${api.defaults.baseURL}/master/tarif/export-csv?customer_id=${encodeURIComponent(row.cust_id)}&tipe=${tipe}&pt_id=${ptId}`;
+                    const res = await api.get(`/master/tarif/export-csv?customer_id=${encodeURIComponent(row.cust_id)}&tipe=${tipe}&pt_id=${ptId}`, {
+                        headers: { Authorization: `Bearer ${token}` },
+                        responseType: 'blob'
+                    });
+
+                    const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' });
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    const cleanName = String(row.cust_name).replace(/[^a-zA-Z0-9]/g, '_');
+                    link.setAttribute('download', `${cleanName}_Reguler_${row.cust_id}.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    window.URL.revokeObjectURL(url);
+                } catch (err) {
+                    Swal.fire('Gagal Download', 'Terjadi kesalahan saat mengekspor berkas CSV: ' + err.message, 'error');
+                }
+            }
+            // 📋 PILIHAN 2: COPY / CLONE KE CUSTOMER LAIN
+            else if (result.isDenied) {
+                handleOpenCopyModal(row, tipe, count);
+            }
+        });
+    };
+
+    // Fungsi modal copy tarif antar customer
+    const handleOpenCopyModal = async (row, tipe, count) => {
+        const { value: targetCustId } = await Swal.fire({
+            title: 'Salin Tarif ke Customer Lain',
+            text: `Salin ${count} rute tarif milik "${row.cust_name}" ke customer:`,
+            input: 'text',
+            inputPlaceholder: 'Ketik Kode Customer Tujuan (contoh: 0010000073)',
+            inputValidator: (value) => {
+                if (!value || value.trim() === '') {
+                    return 'Kode Customer tujuan wajib diisi!';
+                }
+            },
+            showCancelButton: true,
+            confirmButtonText: 'Salin Sekarang',
+            confirmButtonColor: '#059669',
+            cancelButtonText: 'Batal'
+        });
+
+        if (targetCustId) {
+            try {
+                const res = await api.post('/master/tarif/copy-to-customer', {
+                    source_customer_id: row.cust_id,
+                    target_customer_id: targetCustId.trim(),
+                    tipe_tarif: tipe
+                });
+
+                Swal.fire('Berhasil Disalin!', res.data?.message || 'Tarif berhasil digandakan ke customer tujuan.', 'success');
+                fetchCustomers();
+            } catch (err) {
+                Swal.fire('Gagal Menyalin', err.response?.data?.message || err.message, 'error');
+            }
+        }
+    };
 
     return (
         <div className="relative space-y-4">
