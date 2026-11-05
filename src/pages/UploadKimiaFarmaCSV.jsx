@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Upload, FileText, Download, X, RefreshCw,
-    ChevronDown, ChevronUp, Info, HelpCircle, CheckCircle2, Printer
+    ChevronDown, ChevronUp, Info, HelpCircle, Printer
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import api from '../api/axios';
@@ -27,15 +27,10 @@ const UploadKimiaFarmaCSV = () => {
 
     // State UI & Preview
     const [showGuideline, setShowGuideline] = useState(true);
-    const [showSOPModal, setShowSOPModal] = useState(false);
+    const [showSOPModal, setShowSOPModal] = useState(true);
     const [loadingUpload, setLoadingUpload] = useState(false);
     const [previewData, setPreviewData] = useState([]);
-    const [summaryData, setSummaryData] = useState({
-        totalDN: 0,
-        totalKoli: 0,
-        totalBerat: 0,
-        totalHarga: 0
-    });
+    const [fullRowsData, setFullRowsData] = useState([]);
 
     // Live search customer
     useEffect(() => {
@@ -61,7 +56,7 @@ const UploadKimiaFarmaCSV = () => {
         return () => clearTimeout(delay);
     }, [searchCustQuery]);
 
-    // Deteksi Delimiter
+    // Helper Delimiter
     const detectCsvDelimiter = (firstLine) => {
         const countSemicolon = (firstLine.match(/;/g) || []).length;
         const countComma = (firstLine.match(/,/g) || []).length;
@@ -75,7 +70,7 @@ const UploadKimiaFarmaCSV = () => {
         return isNaN(num) ? 0 : num;
     };
 
-    // Handle File Change & Auto-detect Delimiter
+    // Handle File Change
     const handleFileChange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -85,6 +80,7 @@ const UploadKimiaFarmaCSV = () => {
             e.target.value = '';
             setSelectedFile(null);
             setPreviewData([]);
+            setFullRowsData([]);
             return;
         }
 
@@ -99,10 +95,8 @@ const UploadKimiaFarmaCSV = () => {
                 setDetectedDelimiter(autoSep);
 
                 const headers = lines[0].split(autoSep).map(h => h.trim().replace(/^"|"$/g, ''));
-                const rows = [];
-                let totKoli = 0;
-                let totBerat = 0;
-                let totHarga = 0;
+                const previewRows = [];
+                const allRows = [];
 
                 for (let i = 1; i < lines.length; i++) {
                     const cols = lines[i].split(autoSep).map(c => c.trim().replace(/^"|"$/g, ''));
@@ -113,26 +107,20 @@ const UploadKimiaFarmaCSV = () => {
                         rowObj[h] = cols[idx] || '';
                     });
 
-                    totKoli += parseInt(cleanNumber(rowObj['Koli'])) || 1;
-                    totBerat += cleanNumber(rowObj['Berat']);
-                    totHarga += cleanNumber(rowObj['Harga']);
-
-                    rows.push(rowObj);
+                    allRows.push(rowObj);
+                    if (i <= 5) {
+                        previewRows.push(rowObj);
+                    }
                 }
 
-                setPreviewData(rows);
-                setSummaryData({
-                    totalDN: rows.length,
-                    totalKoli: totKoli,
-                    totalBerat: totBerat,
-                    totalHarga: totHarga
-                });
+                setPreviewData(previewRows);
+                setFullRowsData(allRows);
             }
         };
         reader.readAsText(file);
     };
 
-    // Download Template CSV Resmi
+    // Download Template
     const handleDownloadTemplate = () => {
         let headers = [
             'GroupDN', 'NoDN', 'Pengirim', 'AlamatPengirim', 'KotaPengirim', 'TelpPengirim',
@@ -156,29 +144,29 @@ const UploadKimiaFarmaCSV = () => {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', `TEMPLATE_CSV_KIMIA_FARMA.csv`);
+        link.setAttribute('download', `TEMPLATE_CSV_KIMIA_FARMA_${tipePengiriman}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
     };
 
-    // Tombol BATAL
+    // 🔴 1. AKSI BATAL: Reset Pilihan Berkas & Pratinjau
     const handleBatal = () => {
         setSelectedFile(null);
         setPreviewData([]);
-        setSummaryData({ totalDN: 0, totalKoli: 0, totalBerat: 0, totalHarga: 0 });
+        setFullRowsData([]);
         const fileInput = document.getElementById('csvFileInput');
         if (fileInput) fileInput.value = '';
     };
 
-    // Tombol PROSES & PRINT
+    // 🟢 2. AKSI PROSES SIMPAN / PRINT SIMPAN & CETAK BTT RESMI (GAMBAR 2)
     const handleEksekusiSimpan = async (autoPrint = false) => {
         if (!selectedCustomer.id) {
             Swal.fire('Peringatan', 'Silakan pilih Customer Principal terlebih dahulu!', 'warning');
             return;
         }
 
-        if (!selectedFile || previewData.length === 0) {
+        if (!selectedFile) {
             Swal.fire('Peringatan', 'Silakan pilih file CSV yang ingin diunggah!', 'warning');
             return;
         }
@@ -202,105 +190,66 @@ const UploadKimiaFarmaCSV = () => {
                 }
             });
 
-            const createdBtts = res.data?.btt_list || res.data?.data || [];
+            const createdList = res.data?.btt_list || [];
+            const targetBttNo = res.data?.first_btt_id || (createdList.length > 0 ? createdList[0] : '');
 
             Swal.fire({
                 title: 'BERHASIL DISIMPAN!',
-                text: res.data?.message || 'Data pesanan Kimia Farma berhasil masuk ke database BTT.',
+                text: res.data?.message || 'Data pesanan Kimia Farma berhasil diproses ke sistem.',
                 icon: 'success',
                 confirmButtonColor: '#004b84'
             });
 
-            if (autoPrint) {
-                handlePrintManifest(previewData, createdBtts);
+            // 🌟 JIKA MEMILIH TOMBOL PRINT: LANGSUNG BUKA HALAMAN CETAK BTT 3-IN-1 RESMI DAKOTA
+            if (autoPrint && targetBttNo) {
+                const firstRow = fullRowsData[0] || {};
+                const activePtFromStorage = localStorage.getItem('active_pt_nama') || localStorage.getItem('pt_nama') || 'PT DAKOTA LOGISTIK INDONESIA';
+                const activeAgenNama = localStorage.getItem('active_agen_nama') || 'DLI PUSAT';
+
+                // Siapkan format payload cetak BttPrintPage.jsx
+                const payloadFormatPrint = {
+                    pt_nama: activePtFromStorage,
+                    bttt_tanggal: firstRow['Tanggal'] || new Date().toISOString().substring(0, 10),
+                    bttt_nosuratjalan: firstRow['NoDN'] || firstRow['NoSKB'] || '',
+                    bttt_ket: firstRow['Keterangan'] || 'SINGLE DROP',
+                    bttt_isikiriman: firstRow['IsiKiriman'] || 'OBAT',
+                    bttt_jmlkoli: parseInt(cleanNumber(firstRow['Koli'])) || 1,
+                    bttt_berat: cleanNumber(firstRow['Berat']) || 1,
+                    bttt_beratvol: cleanNumber(firstRow['BeratVol']) || 0,
+                    bttt_ukuran: cleanNumber(firstRow['Volume']) || 0,
+                    bttt_harga: cleanNumber(firstRow['Harga']) || 0,
+                    bttt_biayapenerus: cleanNumber(firstRow['BiayaPenerus']) || 0,
+                    bttt_biayapacking: cleanNumber(firstRow['BiayaPacking']) || 0,
+                    bttt_paketyn: 'Y',
+                    bttt_jenisharga: '2', // Kredit
+                    bttt_asalname: firstRow['Pengirim'] || selectedCustomer.name,
+                    bttt_asaltelp: firstRow['TelpPengirim'] || '',
+                    bttt_asalalamat: firstRow['AlamatPengirim'] || '',
+                    bttt_asalkota: firstRow['KotaPengirim'] || 'JAKARTA PUSAT',
+                    bttt_inisial_asal: activeAgenNama,
+                    bttt_tujuannama: firstRow['Penerima'] || '',
+                    bttt_tujuantelp: firstRow['TelpPenerima'] || '',
+                    bttt_tujuanalamat: firstRow['AlamatPenerima'] || '',
+                    bttt_tujuankecamatan: firstRow['Kecamatan'] || '',
+                    bttt_tujuankota: firstRow['KotaPenerima'] || '',
+                    bttt_tujuankodepos: firstRow['Kodepos'] || '',
+                    bttt_tujuanpropinsi: firstRow['Propinsi'] || ''
+                };
+
+                localStorage.setItem('print_btt_payload', JSON.stringify(payloadFormatPrint));
+                localStorage.setItem('print_btt_number', targetBttNo);
+
+                // Buka tab cetak BTT resmi
+                window.open(`/marketing/btt/print?id=${targetBttNo}`, '_blank');
             }
 
             handleBatal();
+
         } catch (err) {
-            Swal.fire('Gagal Menyimpan BTT', err.response?.data?.message || err.message, 'error');
+            Swal.fire('Gagal Upload', err.response?.data?.message || 'Terjadi kesalahan saat memproses file CSV.', 'error');
         } finally {
             setLoadingUpload(false);
         }
-    };
-
-    // Cetak Manifest
-    const handlePrintManifest = (rows, bttListGenerated) => {
-        const printWindow = window.open('', '_blank', 'width=1150,height=850');
-        if (!printWindow) return;
-
-        const tableRowsHtml = rows.map((r, i) => {
-            const bttNo = bttListGenerated[i]?.btt_id || bttListGenerated[i] || r['NoDN'] || '-';
-            return `
-                <tr style="font-size: 10px; font-family: monospace;">
-                    <td style="border: 1px solid #333; padding: 4px; text-align: center;">${i + 1}</td>
-                    <td style="border: 1px solid #333; padding: 4px; font-weight: bold; color: #004b84;">${bttNo}</td>
-                    <td style="border: 1px solid #333; padding: 4px;">${r['NoDN'] || '-'}</td>
-                    <td style="border: 1px solid #333; padding: 4px;">${r['Tanggal'] || '-'}</td>
-                    <td style="border: 1px solid #333; padding: 4px;">${r['Penerima'] || '-'}</td>
-                    <td style="border: 1px solid #333; padding: 4px;">${r['KotaPenerima'] || '-'}</td>
-                    <td style="border: 1px solid #333; padding: 4px; text-align: center;">${r['Koli'] || 1}</td>
-                    <td style="border: 1px solid #333; padding: 4px; text-align: right;">${cleanNumber(r['Berat']).toLocaleString('id-ID')}</td>
-                    <td style="border: 1px solid #333; padding: 4px; text-align: right; font-weight: bold;">Rp ${cleanNumber(r['Harga']).toLocaleString('id-ID')}</td>
-                </tr>
-            `;
-        }).join('');
-
-        printWindow.document.write(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>BUKTI MANIFEST UPLOAD KIMIA FARMA</title>
-                <style>
-                    @page { size: A4 portrait; margin: 8mm; }
-                    body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 10px; color: #1e293b; }
-                    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-                    th { border: 1px solid #000; padding: 6px 3px; background-color: #e2e8f0; font-size: 9.5px; text-align: center; }
-                    @media print { .no-print { display: none !important; } }
-                </style>
-            </head>
-            <body>
-                <div class="no-print" style="margin-bottom: 12px; text-align: right;">
-                    <button style="background:#16a34a;color:white;padding:6px 16px;border:none;border-radius:4px;font-weight:bold;cursor:pointer;" onclick="window.print()">PRINT</button>
-                    <button style="background:#e11d48;color:white;padding:6px 16px;border:none;border-radius:4px;font-weight:bold;cursor:pointer;margin-left:4px;" onclick="window.close()">TUTUP</button>
-                </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #004b84; padding-bottom:6px;">
-                    <div>
-                        <h2 style="margin:0; font-size:15px; font-weight:900; color:#004b84;">PT DAKOTA LOGISTIK INDONESIA</h2>
-                        <div style="font-size:10px; color:#64748b;">BUKTI SERAH TERIMA / MANIFEST UPLOAD CSV KIMIA FARMA</div>
-                    </div>
-                    <div style="text-align:right;">
-                        <div style="font-size:10px; font-weight:bold;">TANGGAL PROSES: ${new Date().toLocaleDateString('id-ID')}</div>
-                        <div style="font-size:10px; color:#64748b;">CUSTOMER: PT. KIMIA FARMA TBK</div>
-                    </div>
-                </div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="width:3%;">NO</th>
-                            <th style="width:16%;">NO. BTT</th>
-                            <th style="width:13%;">NO. DN</th>
-                            <th style="width:10%;">TANGGAL</th>
-                            <th style="width:18%;">PENERIMA</th>
-                            <th style="width:14%;">TUJUAN</th>
-                            <th style="width:5%;">KOLI</th>
-                            <th style="width:8%;">BERAT (KG)</th>
-                            <th style="width:13%;">TARIF</th>
-                        </tr>
-                    </thead>
-                    <tbody>${tableRowsHtml}</tbody>
-                    <tfoot>
-                        <tr style="background:#f8fafc; font-weight:bold; font-size:10px;">
-                            <td colspan="6" style="border:1px solid #333; padding:5px; text-align:center;">TOTAL KESELURUHAN :</td>
-                            <td style="border:1px solid #333; padding:5px; text-align:center;">${summaryData.totalKoli}</td>
-                            <td style="border:1px solid #333; padding:5px; text-align:right;">${summaryData.totalBerat.toLocaleString('id-ID')}</td>
-                            <td style="border:1px solid #333; padding:5px; text-align:right; color:#b91c1c;">Rp ${summaryData.totalHarga.toLocaleString('id-ID')}</td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </body>
-            </html>
-        `);
-        printWindow.document.close();
     };
 
     return (
@@ -312,7 +261,7 @@ const UploadKimiaFarmaCSV = () => {
                         <div className="bg-[#004b84] p-4 text-white flex justify-between items-center">
                             <h3 className="font-black text-sm uppercase tracking-wider flex items-center gap-2">
                                 <HelpCircle size={18} className="text-amber-300" />
-                                SOP UPLOAD CSV KHUSUS KIMIA FARMA
+                                SOP Upload CSV Khusus Kimia Farma
                             </h3>
                             <button onClick={() => setShowSOPModal(false)} className="text-white/80 hover:text-white cursor-pointer">
                                 <X size={20} />
@@ -320,14 +269,14 @@ const UploadKimiaFarmaCSV = () => {
                         </div>
                         <div className="p-6 text-xs text-slate-700 space-y-3 leading-relaxed">
                             <ol className="list-decimal pl-4 space-y-2 font-medium">
-                                <li>Pilih customer <b>PT. KIMIA FARMA TBK</b>[cite: 14].</li>
-                                <li>Tentukan <b>Tipe Pengiriman</b> yang sesuai: <b>DALAM KOTA</b> (38 Kolom) atau <b>LUAR KOTA</b> (37 Kolom)[cite: 14].</li>
-                                <li>Pilih file CSV. Sistem otomatis mengenali pemisah titik koma (;) maupun koma (,) secara otomatis[cite: 14].</li>
-                                <li>Pastikan format tanggal berformat <code className="bg-slate-100 px-1 py-0.5 rounded font-mono">MM/DD/YYYY</code> atau <code className="bg-slate-100 px-1 py-0.5 rounded font-mono">DD/MM/YYYY</code>[cite: 14].</li>
-                                <li>Klik tombol <b>Download Template CSV</b> jika Anda ingin melihat susunan kolom standar[cite: 14].</li>
+                                <li>Pilih customer <b>PT. KIMIA FARMA TBK</b>.</li>
+                                <li>Tentukan <b>Tipe Pengiriman</b> yang sesuai: <b>DALAM KOTA</b> (38 Kolom) atau <b>LUAR KOTA</b> (37 Kolom).</li>
+                                <li>Pilih file CSV. Sistem otomatis mengenali pemisah titik koma (;) maupun koma (,) secara otomatis.</li>
+                                <li>Pastikan format tanggal berformat <code className="bg-slate-100 px-1 py-0.5 rounded font-mono">MM/DD/YYYY</code> (contoh: 11/03/2026).</li>
+                                <li>Klik tombol <b>Download Template CSV</b> jika Anda ingin melihat susunan kolom standar.</li>
                             </ol>
                             <div className="bg-rose-50 border-l-4 border-rose-500 p-3 rounded text-[11px] text-rose-800 font-bold mt-3">
-                                * Catatan: Untuk kolom desimal (Berat/Volume), gunakan titik (.) bukan koma. Nilai kosong pada angka wajib diisi angka 0[cite: 13, 14].
+                                * Catatan: Untuk kolom desimal (Berat/Volume), gunakan titik (.) bukan koma. Nilai kosong pada angka wajib diisi angka 0.
                             </div>
                             <div className="pt-3 text-center">
                                 <button
@@ -342,7 +291,7 @@ const UploadKimiaFarmaCSV = () => {
                 </div>
             )}
 
-            {/* HEADER ATAS IDENTIK TAMPILAN AWAL (GAMBAR 1) */}
+            {/* HEADER ATAS IDENTIK TAMPILAN AWAL */}
             <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                 <div className="flex items-center gap-3">
                     <div className="p-3 bg-sky-50 text-sky-700 rounded-xl border border-sky-100">
@@ -376,7 +325,7 @@ const UploadKimiaFarmaCSV = () => {
                 </div>
             </div>
 
-            {/* PANEL PANDUAN PENGISIAN IDENTIK TAMPILAN AWAL */}
+            {/* PANEL PANDUAN PENGISIAN */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden text-xs">
                 <div
                     onClick={() => setShowGuideline(!showGuideline)}
@@ -397,14 +346,14 @@ const UploadKimiaFarmaCSV = () => {
                             <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                                 <div className="font-bold text-slate-800 mb-1">1. Format & Delimiter Berkas (Smart Auto-Detect)</div>
                                 <div className="text-[11px] text-slate-500">
-                                    File berekstensi <code className="font-mono text-rose-600 font-bold">.csv</code>. Sistem secara otomatis mendeteksi pemisah <b>Titik Koma (;)</b> maupun <b>Koma (,)</b>[cite: 14].
+                                    File berekstensi <code className="font-mono text-rose-600 font-bold">.csv</code>. Sistem secara otomatis mendeteksi pemisah <b>Titik Koma (;)</b> maupun <b>Koma (,)</b>.
                                 </div>
                             </div>
                             <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                                 <div className="font-bold text-slate-800 mb-1">2. Baris Header & Jumlah Kolom</div>
                                 <div className="text-[11px] text-slate-500">
                                     Baris pertama berisi nama header kolom persis
-                                    <b> {tipePengiriman === 'DALAM_KOTA' ? '38 Kolom (Termasuk Nilai Harga)' : '37 Kolom (Tarif Master)'}</b>[cite: 14].
+                                    <b> {tipePengiriman === 'DALAM_KOTA' ? '38 Kolom (Termasuk Nilai Harga)' : '37 Kolom (Tarif Master)'}</b>.
                                 </div>
                             </div>
                         </div>
@@ -421,10 +370,10 @@ const UploadKimiaFarmaCSV = () => {
                 )}
             </div>
 
-            {/* FORM UPLOAD BERKAS UTAMA IDENTIK GAMBAR 1 & 2 */}
+            {/* FORM UPLOAD BERKAS UTAMA */}
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5 text-xs">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    {/* Customer Picker */}
+                    {/* 1. Customer */}
                     <div className="relative">
                         <label className="font-bold text-slate-700 block mb-1.5 uppercase text-[11px]">
                             PILIH CUSTOMER (PRINCIPAL/SHIPPER) <span className="text-rose-600 font-bold">*</span>
@@ -468,7 +417,7 @@ const UploadKimiaFarmaCSV = () => {
                         )}
                     </div>
 
-                    {/* Tipe Pengiriman */}
+                    {/* 2. Tipe Pengiriman */}
                     <div>
                         <label className="font-bold text-slate-700 block mb-1.5 uppercase text-[11px]">
                             TIPE PENGIRIMAN <span className="text-rose-600 font-bold">*</span>
@@ -484,7 +433,7 @@ const UploadKimiaFarmaCSV = () => {
                     </div>
                 </div>
 
-                {/* Box Drag & Drop File */}
+                {/* File Input Box */}
                 <div>
                     <label className="font-bold text-slate-700 block mb-1.5 uppercase text-[11px]">
                         PILIH FILE CSV KIMIA FARMA <span className="text-rose-600 font-bold">*</span>
@@ -504,65 +453,44 @@ const UploadKimiaFarmaCSV = () => {
                             </div>
                             <div className="text-[10px] text-slate-400">
                                 {selectedFile
-                                    ? `${(selectedFile.size / 1024).toFixed(1)} KB — Pemisah: "${detectedDelimiter}"`
+                                    ? `${(selectedFile.size / 1024).toFixed(1)} KB — Pemisah Terdeteksi: "${detectedDelimiter}"`
                                     : 'Format wajib .csv berstandar UTF-8 (Pemisah Titik Koma atau Koma terdeteksi otomatis)'}
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* PREVIEW TABEL DATA REALTIME (TAMPIL DI BAWAH KOTAK FILE) */}
+                {/* PREVIEW TABEL 5 DATA PERTAMA (PERSIS TAMPILAN AWAL GAMBAR KOTAK MERAH) */}
                 {previewData.length > 0 && (
-                    <div className="border border-slate-200 rounded-xl overflow-hidden space-y-3 bg-white p-4 shadow-xs">
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
+                    <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 space-y-2">
+                        <div className="flex justify-between items-center">
+                            <span className="font-bold text-slate-700 uppercase text-[10px] tracking-wide">
+                                PREVIEW DATA TERBACA OTOMATIS (5 BARIS PERTAMA)
+                            </span>
                             <div className="flex items-center gap-2">
-                                <CheckCircle2 size={16} className="text-emerald-600" />
-                                <span className="font-black text-slate-800 text-xs uppercase tracking-wide">
-                                    PRATINJAU DATA BTT ({summaryData.totalDN} RESI TERDETEKSI)
+                                <span className="font-mono text-sky-700 bg-sky-50 px-2 py-0.5 rounded text-[10px] font-bold border border-sky-200">
+                                    Pemisah: '{detectedDelimiter}'
+                                </span>
+                                <span className="font-mono text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded text-[10px] font-bold">
+                                    {Object.keys(previewData[0] || {}).length} Kolom Terdeteksi
                                 </span>
                             </div>
-                            <div className="flex items-center gap-3 text-[11px]">
-                                <span className="text-slate-600 font-bold">Total Koli: <b>{summaryData.totalKoli}</b></span>
-                                <span className="text-slate-600 font-bold">Total Berat: <b>{summaryData.totalBerat.toLocaleString('id-ID')} Kg</b></span>
-                                <span className="text-rose-600 font-black">Total Tarif: <b>Rp {summaryData.totalHarga.toLocaleString('id-ID')}</b></span>
-                            </div>
                         </div>
-
-                        <div className="border border-slate-200 rounded-lg overflow-x-auto max-h-56 bg-white text-[10px]">
+                        <div className="border border-slate-300 rounded-lg overflow-x-auto max-h-48 bg-white text-[10px]">
                             <table className="w-full text-left border-collapse">
-                                <thead className="bg-[#004b84] text-white uppercase font-bold sticky top-0 z-10">
+                                <thead className="bg-[#004b84] text-white uppercase font-bold sticky top-0">
                                     <tr>
-                                        <th className="p-2 text-center w-8">NO</th>
-                                        <th className="p-2">NO. DN / DO</th>
-                                        <th className="p-2">TANGGAL</th>
-                                        <th className="p-2">PENERIMA</th>
-                                        <th className="p-2">ALAMAT</th>
-                                        <th className="p-2">TUJUAN</th>
-                                        <th className="p-2 text-center">KOLI</th>
-                                        <th className="p-2 text-right">BERAT</th>
-                                        <th className="p-2 text-right">VOLUME</th>
-                                        <th className="p-2 text-right">HARGA (RP)</th>
-                                        <th className="p-2">NO. MOBIL</th>
+                                        {Object.keys(previewData[0] || {}).map((col, idx) => (
+                                            <th key={idx} className="p-2 border-r border-slate-600 whitespace-nowrap">{col}</th>
+                                        ))}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 font-mono">
                                     {previewData.map((row, rIdx) => (
-                                        <tr key={rIdx} className="hover:bg-sky-50/50">
-                                            <td className="p-2 text-center text-slate-500">{rIdx + 1}</td>
-                                            <td className="p-2 font-bold text-sky-700">{row['NoDN'] || '-'}</td>
-                                            <td className="p-2 text-slate-700">{row['Tanggal'] || '-'}</td>
-                                            <td className="p-2 font-bold text-slate-800">{row['Penerima'] || '-'}</td>
-                                            <td className="p-2 text-slate-600 max-w-xs truncate" title={row['AlamatPenerima']}>
-                                                {row['AlamatPenerima'] || '-'}
-                                            </td>
-                                            <td className="p-2 text-slate-700">{row['KotaPenerima'] || '-'}</td>
-                                            <td className="p-2 text-center font-bold">{row['Koli'] || 1}</td>
-                                            <td className="p-2 text-right">{cleanNumber(row['Berat']).toLocaleString('id-ID')}</td>
-                                            <td className="p-2 text-right">{row['Volume'] || '0'}</td>
-                                            <td className="p-2 text-right font-bold text-emerald-700">
-                                                {cleanNumber(row['Harga']).toLocaleString('id-ID')}
-                                            </td>
-                                            <td className="p-2 text-slate-700">{row['NoMobil'] || '-'}</td>
+                                        <tr key={rIdx} className="hover:bg-sky-50">
+                                            {Object.values(row).map((val, cIdx) => (
+                                                <td key={cIdx} className="p-2 border-r border-slate-200 whitespace-nowrap">{val}</td>
+                                            ))}
                                         </tr>
                                     ))}
                                 </tbody>
@@ -571,31 +499,33 @@ const UploadKimiaFarmaCSV = () => {
                     </div>
                 )}
 
-                {/* TOMBOL AKSI: BATAL, PRINT, PROSES */}
+                {/* 🌟 3 BUTTON SESUAI GAMBAR 1: BATAL (KIRI), PRINT & PROSES (KANAN) */}
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-100">
+                    {/* BUTTON 1: BATAL (KIRI - MERAH) */}
                     <button
                         type="button"
                         disabled={loadingUpload || !selectedFile}
                         onClick={handleBatal}
-                        className={`px-5 py-2.5 font-bold rounded-xl text-xs uppercase transition cursor-pointer flex items-center gap-1.5 ${!selectedFile
+                        className={`px-6 py-2.5 font-black rounded-xl text-xs uppercase transition cursor-pointer flex items-center gap-2 ${!selectedFile
                             ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
-                            : 'bg-rose-600 hover:bg-rose-700 text-white shadow-sm'
+                            : 'bg-[#e11d48] hover:bg-[#be123c] text-white shadow-sm active:scale-95'
                             }`}
                     >
-                        <X size={14} /> BATAL
+                        <X size={15} /> BATAL
                     </button>
 
-                    <div className="flex items-center gap-2">
+                    {/* BUTTON 2 & 3: PRINT (SIMPAN & CETAK) + PROSES SIMPAN BTT (KANAN) */}
+                    <div className="flex items-center gap-3">
                         <button
                             type="button"
                             disabled={loadingUpload || !selectedFile}
                             onClick={() => handleEksekusiSimpan(true)}
-                            className={`px-5 py-2.5 font-bold rounded-xl text-xs uppercase transition shadow-sm flex items-center gap-1.5 ${!selectedFile || loadingUpload
+                            className={`px-6 py-2.5 font-black rounded-xl text-xs uppercase transition shadow-sm flex items-center gap-2 ${!selectedFile || loadingUpload
                                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed select-none'
-                                : 'bg-sky-600 hover:bg-sky-700 text-white cursor-pointer active:scale-95'
+                                : 'bg-[#0284c7] hover:bg-[#0369a1] text-white cursor-pointer active:scale-95'
                                 }`}
                         >
-                            <Printer size={14} /> PRINT (SIMPAN & CETAK)
+                            <Printer size={15} /> PRINT (SIMPAN & CETAK)
                         </button>
 
                         <button
@@ -609,12 +539,12 @@ const UploadKimiaFarmaCSV = () => {
                         >
                             {loadingUpload ? (
                                 <>
-                                    <RefreshCw size={14} className="animate-spin" />
+                                    <RefreshCw size={15} className="animate-spin" />
                                     MEMPROSES...
                                 </>
                             ) : (
                                 <>
-                                    <Upload size={14} />
+                                    <Upload size={15} />
                                     PROSES SIMPAN BTT
                                 </>
                             )}
