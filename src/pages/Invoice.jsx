@@ -55,6 +55,46 @@ function formatTanggalIndonesia(dateStr) {
     return `${d} ${m} ${y}`;
 }
 
+// Helper standarisasi Nomor Kwitansi Resmi: [urut 4 digit]/DLI/[agen 3 digit]/[bulan 2 digit]/[tahun 2 digit]
+function formatNomorKwitansiResmi(rawNoKW, rawInvoiceId, rawDate) {
+    if (rawNoKW && String(rawNoKW).trim() !== '' && String(rawNoKW).trim() !== '-') {
+        return String(rawNoKW).trim().replace(/\/OTA\//g, '/001/');
+    }
+    if (!rawInvoiceId) return '-';
+
+    const clean = String(rawInvoiceId).trim();
+    const d = rawDate ? new Date(rawDate) : new Date();
+    let mm = String(d.getMonth() + 1).padStart(2, '0');
+    let yy = String(d.getFullYear()).slice(-2);
+    let agen = '001';
+    let urut = '0001';
+
+    if (clean.includes('/FP')) {
+        const parts = clean.split('/');
+        if (parts[0].length >= 7) {
+            agen = parts[0].slice(0, 3);
+            urut = parts[0].slice(3);
+        }
+        if (parts.length >= 3) {
+            mm = parts[1];
+            yy = parts[2].slice(-2);
+        }
+    } else {
+        const digits = clean.replace(/\D/g, '');
+        if (digits.length >= 11) {
+            agen = digits.slice(0, 3);
+            mm = digits.slice(3, 5);
+            yy = digits.slice(5, 7);
+            urut = digits.slice(7);
+        } else if (digits.length >= 7) {
+            agen = digits.slice(0, 3);
+            urut = digits.slice(3, 7);
+        }
+    }
+
+    return `${urut.padStart(4, '0')}/DLI/${agen}/${mm}/${yy}`;
+}
+
 // Helper standarisasi Nomor Invoice ke format resmi: [agen3digit][urut4digit]/[bulan]/[tahun4digit]/FP
 function formatNomorInvoiceResmi(rawId, rawDate, fallbackAgenId = '') {
     if (!rawId) return '-';
@@ -493,7 +533,7 @@ const Invoice = () => {
     };
 
     // =========================================================================
-    // 🖨️ CETAK REKAP FAKTUR PAJAK
+    // 🖨️ CETAK REKAP FAKTUR PAJAK (100% SESUAI KWITANSI PENAGIHAN)
     // =========================================================================
     const handlePrintRekapFakturPajak = () => {
         if (!data || data.length === 0) {
@@ -504,50 +544,67 @@ const Invoice = () => {
         const printWindow = window.open('', '_blank', 'width=1350,height=850');
         if (!printWindow) return;
 
-        let totalJasa = 0;
-        let totalDiskon = 0;
-        let totalPenerus = 0;
-        let totalPacking = 0;
-        let totalJumlah = 0;
+        let totalHargaJual = 0;
         let totalPPN = 0;
         let totalPiutang = 0;
-        let totalDPP = 0;
 
         const rowsHtml = data.map((item, idx) => {
-            const sub = Number(item.artih_total || 0);
-            const dpp = Number(item.artih_dpp || sub);
-            const ppn = Number(item.artih_ppn_nominal || (dpp * 0.011));
-            const piutang = sub + ppn;
+            const piutangUsaha = Number(item.artih_total || 0);
 
-            totalJasa += sub;
-            totalJumlah += sub;
-            totalDPP += dpp;
-            totalPPN += ppn;
-            totalPiutang += piutang;
+            // 🌟 1. HARGA JUAL / NILAI JUAL / DPP (Persis Kwitansi Penagihan)
+            let hargaJual = Number(item.artih_dpp || 0);
+            if (hargaJual <= 0 && piutangUsaha > 0) {
+                hargaJual = Math.round((piutangUsaha / 1.011) * 100) / 100;
+            }
+
+            // 🌟 2. UTANG PPN (Persis Kwitansi Penagihan: 1.1% dari DPP)
+            let utangPPN = Number(item.artih_ppn || 0);
+            if (utangPPN <= 0 && hargaJual > 0) {
+                utangPPN = Math.round((hargaJual * 0.011) * 100) / 100;
+            }
+
+            totalHargaJual += hargaJual;
+            totalPPN += utangPPN;
+            totalPiutang += piutangUsaha;
+
+            const noKwitansiDisplay = formatNomorKwitansiResmi(item.artih_nokw, item.artih_id, item.artih_tanggal);
+            const noInvoiceDisplay = formatNomorInvoiceResmi(item.artih_id, item.artih_tanggal, item.artih_agenid);
+
+            // 🌟 3. ALAMAT LENGKAP (ALAMAT 1 + ALAMAT 2 DARI MASTER CUSTOMER)
+            const a1 = (item.cust_alamat || item.cust_alamat1 || '').trim();
+            const a2 = (item.cust_alamat2 || '').trim();
+            const npwpCustomer = item.cust_npwp || '-';
+
+            let alamatCustomer = a1;
+            if (a2 !== '' && a2 !== '-') {
+                alamatCustomer = a1 ? `${a1}, ${a2}` : a2;
+            }
+            if (!alamatCustomer) alamatCustomer = '-';
+
 
             return `
                 <tr style="font-size: 10px; font-family: monospace;">
                     <td style="border:1px solid #444; padding:3px; text-align:center;">${idx + 1}</td>
                     <td style="border:1px solid #444; padding:3px; text-align:center;">${item.artih_fktpajak || '010.'}</td>
-                    <td style="border:1px solid #444; padding:3px;">${item.artih_nokw || '-'}</td>
+                    <td style="border:1px solid #444; padding:3px; font-weight:bold; color:#004b84;">${noKwitansiDisplay}</td>
                     <td style="border:1px solid #444; padding:3px; text-align:center;">${String(item.artih_tanggal || '').substring(0, 10)}</td>
-                    <td style="border:1px solid #444; padding:3px;">${item.artih_id}</td>
+                    <td style="border:1px solid #444; padding:3px; font-weight:bold; color:#0284c7;">${noInvoiceDisplay}</td>
+                    <td style="border:1px solid #444; padding:3px;">${item.cust_name || item.artih_custname || '-'}</td>
+                    <td style="border:1px solid #444; padding:3px; font-size:9px;">${alamatCustomer}</td>
+                    <td style="border:1px solid #444; padding:3px; font-size:9px; text-align:center;">${npwpCustomer}</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:right;">${hargaJual.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:right;">0,00</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:right;">0,00</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:right;">0,00</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:right; font-weight:bold;">${hargaJual.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:right; font-weight:bold;">${hargaJual.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:right; color:#0f172a;">${utangPPN.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:right; font-weight:bold; color:#b91c1c;">${piutangUsaha.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:right;">${hargaJual.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td style="border:1px solid #444; padding:3px;">${item.cust_name || item.artih_custname || '-'}</td>
                     <td style="border:1px solid #444; padding:3px; text-align:center;">-</td>
                     <td style="border:1px solid #444; padding:3px; text-align:center;">-</td>
-                    <td style="border:1px solid #444; padding:3px; text-align:right;">${sub.toLocaleString('id-ID')}</td>
-                    <td style="border:1px solid #444; padding:3px; text-align:right;">0</td>
-                    <td style="border:1px solid #444; padding:3px; text-align:right;">0</td>
-                    <td style="border:1px solid #444; padding:3px; text-align:right;">0</td>
-                    <td style="border:1px solid #444; padding:3px; text-align:right; font-weight:bold;">${sub.toLocaleString('id-ID')}</td>
-                    <td style="border:1px solid #444; padding:3px; text-align:right;">${sub.toLocaleString('id-ID')}</td>
-                    <td style="border:1px solid #444; padding:3px; text-align:right;">${ppn.toLocaleString('id-ID')}</td>
-                    <td style="border:1px solid #444; padding:3px; text-align:right; font-weight:bold;">${piutang.toLocaleString('id-ID')}</td>
-                    <td style="border:1px solid #444; padding:3px; text-align:right;">${dpp.toLocaleString('id-ID')}</td>
-                    <td style="border:1px solid #444; padding:3px;">${item.cust_name || item.artih_custname || '-'}</td>
-                    <td style="border:1px solid #444; padding:3px; text-align:center;">-</td>
-                    <td style="border:1px solid #444; padding:3px; text-align:center;">-</td>
-                    <td style="border:1px solid #444; padding:3px; text-align:right;">0</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:right;">0,00</td>
                 </tr>
             `;
         }).join('');
@@ -590,8 +647,8 @@ const Invoice = () => {
                             <th rowspan="2" style="width:2%;">No</th>
                             <th colspan="4">FAKTUR PAJAK</th>
                             <th rowspan="2" style="width:12%;">CUSTOMER</th>
-                            <th rowspan="2" style="width:12%;">ALAMAT</th>
-                            <th rowspan="2" style="width:7%;">NPWP</th>
+                            <th rowspan="2" style="width:14%;">ALAMAT</th>
+                            <th rowspan="2" style="width:9%;">NPWP</th>
                             <th colspan="5">RINCIAN</th>
                             <th rowspan="2" style="width:6%;">Harga Jual</th>
                             <th rowspan="2" style="width:5%;">UTANG PPN</th>
@@ -620,15 +677,15 @@ const Invoice = () => {
                     <tfoot>
                         <tr style="background:#cbd5e1; font-weight:bold; font-size:10px; font-family:monospace;">
                             <td colspan="8" style="border:1px solid #444; padding:5px; text-align:right;">TOTAL KESELURUHAN</td>
-                            <td style="border:1px solid #444; padding:5px; text-align:right;">${totalJasa.toLocaleString('id-ID')}</td>
-                            <td style="border:1px solid #444; padding:5px; text-align:right;">${totalDiskon.toLocaleString('id-ID')}</td>
-                            <td style="border:1px solid #444; padding:5px; text-align:right;">${totalPenerus.toLocaleString('id-ID')}</td>
-                            <td style="border:1px solid #444; padding:5px; text-align:right;">${totalPacking.toLocaleString('id-ID')}</td>
-                            <td style="border:1px solid #444; padding:5px; text-align:right;">${totalJumlah.toLocaleString('id-ID')}</td>
-                            <td style="border:1px solid #444; padding:5px; text-align:right;">${totalJumlah.toLocaleString('id-ID')}</td>
-                            <td style="border:1px solid #444; padding:5px; text-align:right;">${totalPPN.toLocaleString('id-ID')}</td>
-                            <td style="border:1px solid #444; padding:5px; text-align:right;">${totalPiutang.toLocaleString('id-ID')}</td>
-                            <td style="border:1px solid #444; padding:5px; text-align:right;">${totalDPP.toLocaleString('id-ID')}</td>
+                            <td style="border:1px solid #444; padding:5px; text-align:right;">${totalHargaJual.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td style="border:1px solid #444; padding:5px; text-align:right;">0,00</td>
+                            <td style="border:1px solid #444; padding:5px; text-align:right;">0,00</td>
+                            <td style="border:1px solid #444; padding:5px; text-align:right;">0,00</td>
+                            <td style="border:1px solid #444; padding:5px; text-align:right;">${totalHargaJual.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td style="border:1px solid #444; padding:5px; text-align:right;">${totalHargaJual.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td style="border:1px solid #444; padding:5px; text-align:right;">${totalPPN.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td style="border:1px solid #444; padding:5px; text-align:right; color:#b91c1c;">${totalPiutang.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td style="border:1px solid #444; padding:5px; text-align:right;">${totalHargaJual.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                             <td colspan="4" style="border:1px solid #444;"></td>
                         </tr>
                     </tfoot>
@@ -1334,13 +1391,13 @@ const Invoice = () => {
                             <td style="border: 1px solid #94a3b8; padding: 4px; font-family: monospace; font-weight: bold; color: #0284c7;">${b.bttt_id}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center;">${formatTanggalIndonesia(b.bttt_tanggal)}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px;">${b.bttt_tujuankota || '-'}</td>
-                            <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center; font-family: monospace; font-weight: 600;">${kodepos}</td>
+                            <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center; font-family: monospace;">${kodepos}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px; font-weight: 500;">${b.bttt_tujuannama || '-'}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center;">${b.bttt_nosuratjalan || '-'}</td>
-                            <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center; font-weight: bold; font-size: 8.5px; color: #0f172a;">${viaTransport}</td>
+                            <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center; font-size: 8.5px; color: #0f172a;">${viaTransport}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px; color: #475569;">${b.bttt_namabarang || '-'}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px; text-align: right; font-family: monospace;">${berat.toLocaleString('id-ID')}</td>
-                            <td style="border: 1px solid #94a3b8; padding: 4px; text-align: right; font-family: monospace; font-weight: 600;">${biayaKirim.toLocaleString('id-ID')}</td>
+                            <td style="border: 1px solid #94a3b8; padding: 4px; text-align: right; font-family: monospace; font-weight: normal;">${biayaKirim.toLocaleString('id-ID')}</td>
                         </tr>
                     `;
                 }).join('');
@@ -1405,40 +1462,43 @@ const Invoice = () => {
                                 <td style="width: 48%; vertical-align: top; padding: 4px;">
                                     <div style="color: #64748b; font-size: 9px; text-transform: uppercase; font-weight: bold;">Nama Pelanggan :</div>
                                     <div style="font-weight: 900; font-size: 12px; color: #0f172a; text-transform: uppercase; margin-top: 2px;">${header.cust_name || header.artih_custname || '-'}</div>
-                                    <div style="font-size: 9.5px; color: #475569; margin-top: 2px;">${header.cust_alamat || header.cust_alamat1 || 'KANTOR PUSAT OPERASIONAL'}</div>
+                                    <div style="font-size: 9.5px; color: #475569; margin-top: 2px;">
+                                        ${header.cust_alamat || header.cust_alamat1 || 'KANTOR PUSAT OPERASIONAL'}
+                                        ${header.cust_alamat2 && header.cust_alamat2.trim() !== '' ? `<br/>${header.cust_alamat2.trim()}` : ''}
+                                    </div>
                                 </td>
                                 <td style="width: 52%; vertical-align: top; padding: 4px;">
                                     <table style="width: 100%; border: none; font-size: 10px;">
                                         <tr>
                                             <td style="padding: 1.5px 0; width: 38%; color: #475569;">Tanggal Kwitansi</td>
                                             <td style="padding: 1.5px 0; width: 4%;">:</td>
-                                            <td style="padding: 1.5px 0; font-weight: bold; color: #0f172a;">${tglKwitansiIndo}</td>
+                                            <td style="padding: 1.5px 0;  color: #0f172a;">${tglKwitansiIndo}</td>
                                         </tr>
                                         <tr>
-                                            <td style="padding: 1.5px 0; color: #475569; font-weight: bold;">Nomor Kwitansi</td>
+                                            <td style="padding: 1.5px 0; color: #475569;">Nomor Kwitansi</td>
                                             <td style="padding: 1.5px 0;">:</td>
-                                            <td style="padding: 1.5px 0; font-family: monospace; font-weight: 800; color: #004b84;">${kwitansiDisplayNo || '-'}</td>
+                                            <td style="padding: 1.5px 0; font-family: monospace;  color: #004b84;">${kwitansiDisplayNo || '-'}</td>
                                         </tr>
                                         <tr>
                                             <td style="padding: 1.5px 0; color: #475569;">Nomor Invoice</td>
                                             <td style="padding: 1.5px 0;">:</td>
-                                            <td style="padding: 1.5px 0; font-weight: 800; font-family: monospace; color: #0284c7;">${noInvoiceResmi}</td>
+                                            <td style="padding: 1.5px 0;  font-family: monospace; color: #0284c7;">${noInvoiceResmi}</td>
                                         </tr>
                                         <tr>
                                             <td style="padding: 1.5px 0; color: #475569;">Nomor Faktur Pajak</td>
                                             <td style="padding: 1.5px 0;">:</td>
-                                            <td style="padding: 1.5px 0; font-family: monospace; font-weight: 600; color: #0f172a;">${noFakturPajak}</td>
+                                            <td style="padding: 1.5px 0; font-family: monospace;  color: #0f172a;">${noFakturPajak}</td>
                                         </tr>
                                         <tr>
                                             <td style="padding: 1.5px 0; color: #475569;">Tanggal Jatuh Tempo</td>
                                             <td style="padding: 1.5px 0;">:</td>
-                                            <td style="padding: 1.5px 0; font-weight: bold; color: #b91c1c;">${tglJatuhTempoIndo}</td>
+                                            <td style="padding: 1.5px 0;  color: #b91c1c;">${tglJatuhTempoIndo}</td>
                                         </tr>
                                         ${isCustomerMerck ? `
                                         <tr>
-                                            <td style="padding: 1.5px 0; color: #475569; font-weight: 600;">Nomor PO</td>
+                                            <td style="padding: 1.5px 0; color: #475569; ">Nomor PO</td>
                                             <td style="padding: 1.5px 0;">:</td>
-                                            <td style="padding: 1.5px 0; font-family: monospace; font-weight: bold; color: #0f172a;">
+                                            <td style="padding: 1.5px 0; font-family: monospace;  color: #0f172a;">
                                                 ${nomorPOCustomer !== '' ? nomorPOCustomer : '-'}
                                             </td>
                                         </tr>
@@ -1475,9 +1535,9 @@ const Invoice = () => {
                                     <td colspan="4" style="border: 1px solid #94a3b8; padding: 8px; vertical-align: top;">
                                         <div style="font-weight: bold; color: #004b84; margin-bottom: 2px; font-size: 10px;">Transfer ke :</div>
                                         <div style="font-weight: bold; color: #0f172a;">DAKOTA LOGISTIK INDONESIA PT</div>
-                                        <div style="color: #334155;">BANK CENTRAL ASIA (BCA)</div>
-                                        <div style="color: #334155;">KCU KALIMALANG</div>
-                                        <div style="font-weight: 900; font-family: monospace; color: #0284c7; font-size: 11px; margin-top: 3px;">
+                                        <div style="color: #334155;" font-weight: bold; >BANK CENTRAL ASIA (BCA)</div>
+                                        <div style="color: #334155;" font-weight: bold; >KCU KALIMALANG</div>
+                                        <div style="font-weight: bold; font-family: monospace; color: #0284c7; font-size: 11px; margin-top: 3px;">
                                             NO REKENING : 2303937226
                                         </div>
                                     </td>
@@ -1773,7 +1833,10 @@ const Invoice = () => {
                             <div style="width: 52%;">
                                 <div style="color:#64748b; font-size:10px; font-weight:bold; text-transform:uppercase;">NAMA PELANGGAN :</div>
                                 <div style="font-weight:900; font-size:13px; color:#0f172a; text-transform:uppercase; margin-top:1px;">${header.cust_name || header.artih_custname || '-'}</div>
-                                <div style="font-size:10px; color:#475569; margin-top:2px;">${header.cust_alamat || 'KANTOR PUSAT OPERASIONAL'}</div>
+                                <div style="font-size:10px; color:#475569; margin-top:2px;">
+                                    ${header.cust_alamat || header.cust_alamat1 || 'KANTOR PUSAT OPERASIONAL'}
+                                    ${header.cust_alamat2 && header.cust_alamat2.trim() !== '' ? `<br/>${header.cust_alamat2.trim()}` : ''}
+                                </div>
                             </div>
                             <div style="width: 44%;">
                                 <table style="width: 100%; border: none; margin: 0; font-size: 10.5px;">
@@ -2205,7 +2268,10 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
         {
             header: 'NO. KWITANSI',
             accessor: 'artih_nokw',
-            render: (item) => <span className="font-mono font-bold text-emerald-700 select-all">{item.artih_nokw || '-'}</span>
+            render: (item) => {
+                const kwitansiDisplay = formatNomorKwitansiResmi(item.artih_nokw, item.artih_id, item.artih_tanggal);
+                return <span className="font-mono font-bold text-emerald-700 select-all">{kwitansiDisplay}</span>;
+            }
         },
         {
             header: 'TOTAL TAGIHAN (RP)',
