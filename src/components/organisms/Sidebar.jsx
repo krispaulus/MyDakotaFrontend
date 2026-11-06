@@ -293,8 +293,8 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
           icon: <FileArchive size={20} />,
           roles: ['S', 'A'],
           children: [
-            { name: 'Laporan LSBP', path: '/operasional/laporan-lsbp', roles: ['S', 'A'] },
-            { name: 'Laporan LSBP V2', path: '/operasional/laporan-lsbp-v2', roles: ['S', 'A'] },
+            { name: 'Laporan LSPB', path: '/operasional/laporan-lsbp', roles: ['S', 'A'] },
+            { name: 'Laporan LSPB V2', path: '/operasional/laporan-lsbp-v2', roles: ['S', 'A'] },
             { name: 'Laporan Barang Turun', path: '/operasional/laporan-barang-turun', roles: ['S', 'A'] },
             { name: 'Laporan BTT Belum Kembali', path: '/operasional/laporan-btt-belum-kembali', roles: ['S', 'A'] },
             { name: 'Laporan Data Penerima Customer', path: '/operasional/laporan-data-penerima-customer', roles: ['S', 'A'] },
