@@ -718,7 +718,7 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
                                                 PERHATIAN: Ditemukan {listHargaKosong.length} BTT Tanpa Sumber Harga (Rp 0)!
                                             </span>
                                             <p className="text-[11px] text-amber-700 leading-relaxed font-medium">
-                                                Beberapa baris kiriman di bawah memiliki harga Rp 0 karena tidak tercantum di file CSV dan belum memiliki riwayat master tarif di database[cite: 30].
+                                                Beberapa baris kiriman di bawah memiliki harga Rp 0 karena tidak tercantum di file CSV dan belum memiliki riwayat master tarif di database.
                                                 Anda dapat kembali ke <b>Preview 1</b> untuk melengkapi atau tetap melanjutkan jika harga akan disesuaikan kemudian.
                                             </p>
                                         </div>
