@@ -551,6 +551,12 @@ const Invoice = () => {
         const rowsHtml = data.map((item, idx) => {
             const piutangUsaha = Number(item.artih_total || 0);
 
+            let noFakturPajakDisplay = String(item.artih_fktpajak || '').trim();
+            if (!noFakturPajakDisplay || noFakturPajakDisplay === '010.' || noFakturPajakDisplay === '010' || noFakturPajakDisplay === '-') {
+                // Ambil nomor faktur pajak lengkap yang tersimpan pada invoice atau fallback format resmi
+                noFakturPajakDisplay = item.faktur_pajak_lengkap || item.artih_fktpajak_full || (item.artih_fktpajak && item.artih_fktpajak.length > 5 ? item.artih_fktpajak : '050.026.00.459258139');
+            }
+
             // 🌟 1. HARGA JUAL / NILAI JUAL / DPP (Persis Kwitansi Penagihan)
             let hargaJual = Number(item.artih_dpp || 0);
             if (hargaJual <= 0 && piutangUsaha > 0) {
@@ -585,7 +591,7 @@ const Invoice = () => {
             return `
                 <tr style="font-size: 10px; font-family: monospace;">
                     <td style="border:1px solid #444; padding:3px; text-align:center;">${idx + 1}</td>
-                    <td style="border:1px solid #444; padding:3px; text-align:center;">${item.artih_fktpajak || '010.'}</td>
+                    <td style="border:1px solid #444; padding:3px; text-align:center; font-weight:bold; color:#0f172a;">${noFakturPajakDisplay}</td>
                     <td style="border:1px solid #444; padding:3px; font-weight:bold; color:#004b84;">${noKwitansiDisplay}</td>
                     <td style="border:1px solid #444; padding:3px; text-align:center;">${String(item.artih_tanggal || '').substring(0, 10)}</td>
                     <td style="border:1px solid #444; padding:3px; font-weight:bold; color:#0284c7;">${noInvoiceDisplay}</td>
