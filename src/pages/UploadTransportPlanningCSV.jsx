@@ -7,6 +7,8 @@ import {
 import api from "../api/axios";
 import Swal from "sweetalert2";
 import EditWilayahModal from '../components/organisms/EditWilayahModal';
+import { exportDataToExcel, exportDataToCSV } from '../utils/exportTableHelper';
+import { FileSpreadsheet } from 'lucide-react'; // tambahkan icon excel jika mau
 
 export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
     const [queryCust, setQueryCust] = useState("");
@@ -461,6 +463,74 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
         } catch (err) {
             console.warn("⚠️ Gagal auto-save ke master wilayah:", err);
         }
+    };
+
+    // Definisi kolom ekspor lengkap Preview 2
+    const preview2ExportColumns = [
+        { header: 'NO', key: 'no', align: 'center' },
+        { header: 'NO. DN', key: 'dn_list' },
+        { header: 'CONSIGNEE (ANAK CUSTOMER)', key: 'consignee' },
+        { header: 'ADDRESS', key: 'address' },
+        { header: 'PROPINSI', key: 'propinsi' },
+        { header: 'KOTA/KABUPATEN', key: 'kota' },
+        { header: 'KECAMATAN', key: 'kecamatan' },
+        { header: 'KELURAHAN', key: 'kelurahan' },
+        { header: 'KODEPOS', key: 'kodepos', align: 'center' },
+        { header: 'SERVID', key: 'serv_id', align: 'center' },
+        { header: 'LAYANANID', key: 'layanan_id', align: 'center' },
+        { header: 'TOTAL COLLY', key: 'total_colly', align: 'center' },
+        { header: 'TOTAL WEIGHT', key: 'total_weight', align: 'right' },
+        { header: 'TOTAL VOLUME', key: 'total_volume', align: 'right' },
+        { header: 'TOTAL PACKING', key: 'total_packing', align: 'right' },
+        { header: 'KODE KENDARAAN', key: 'kode_kendaraan', align: 'center' },
+        { header: 'DG (B3)', key: 'is_dg', align: 'center' },
+        { header: 'MULTIDROP', key: 'is_multidrop', align: 'center' },
+        { header: 'KODE PACKING', key: 'kode_packing', align: 'center' },
+        { header: 'UP', key: 'up' },
+        { header: 'TELEPON', key: 'telp' },
+        { header: 'STATUS WILAYAH', key: 'status_wilayah' },
+        { header: 'SUMBER HARGA', key: 'sumber_harga', align: 'center' },
+        {
+            header: 'HARGA FINAL (RP)',
+            accessor: (r) => Number(r.harga_final || 0).toLocaleString('id-ID'),
+            align: 'right'
+        },
+        {
+            header: 'BIAYA PACKING (RP)',
+            accessor: (r) => Number(r.biaya_packing || 0).toLocaleString('id-ID'),
+            align: 'right'
+        },
+        {
+            header: 'STATUS PROSES',
+            accessor: (r) => r.is_duplicate ? `DILEWATI (${r.existing_btt || 'DUPLIKAT'})` : 'AKAN DIPROSES',
+            align: 'center'
+        },
+        { header: 'KETERANGAN', key: 'keterangan' }
+    ];
+
+    // Fungsi trigger tombol Excel
+    const handleExportPreview2Excel = () => {
+        const custName = selectedCust?.cust_name || 'CUSTOMER';
+        const dateStr = new Date().toISOString().slice(0, 10);
+        exportDataToExcel({
+            filename: `HASIL_PREVIEW2_${selectedCust?.cust_id || 'TP'}_${dateStr}.xls`,
+            sheetName: 'Preview 2',
+            title: 'KONFIRMASI DATA & HARGA FINAL TRANSPORT PLANNING',
+            customerName: custName,
+            columns: preview2ExportColumns,
+            data: dataValid
+        });
+    };
+
+    // Fungsi trigger tombol CSV
+    const handleExportPreview2CSV = () => {
+        const dateStr = new Date().toISOString().slice(0, 10);
+        exportDataToCSV({
+            filename: `HASIL_PREVIEW2_${selectedCust?.cust_id || 'TP'}_${dateStr}.csv`,
+            columns: preview2ExportColumns,
+            data: dataValid,
+            delimiter: ';'
+        });
     };
 
     return (
@@ -992,7 +1062,32 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
                                 )}
                             </div>
 
+
+
                             <div className="flex items-center gap-3">
+                                {/* 🌟 TOMBOL EXPORT EXCEL & CSV KHUSUS PREVIEW 2 (DITARUH DI KOTAK MERAH) */}
+                                {currentStep === 2 && (
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={handleExportPreview2Excel}
+                                            className="px-4 h-10 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95"
+                                            title="Download Data Preview 2 ke Format Excel (.xls)"
+                                        >
+                                            <Download size={14} /> EXPORT EXCEL
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={handleExportPreview2CSV}
+                                            className="px-4 h-10 bg-sky-700 hover:bg-sky-800 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95"
+                                            title="Download Data Preview 2 ke Format CSV (.csv)"
+                                        >
+                                            <Download size={14} /> EXPORT CSV
+                                        </button>
+                                    </div>
+                                )}
+
                                 <button
                                     type="button"
                                     onClick={() => setShowReviewModal(false)}
