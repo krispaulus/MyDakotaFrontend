@@ -138,20 +138,85 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
         pemicuGenerateID();
     }, []);
 
-    // Sinkronisasi Sesi Agen Pengirim Aktif
+    // 🌟 SINKRONISASI DATA EDIT (initialData) KE FORM
     useEffect(() => {
-        if (isOpen) {
-            const sessionAgenId = localStorage.getItem('active_agen_id') || sessionStorage.getItem('active_agen_id') || '1';
-            const sessionAgenNama = localStorage.getItem('active_agen_nama') || sessionStorage.getItem('active_agen_nama') || 'DENPASAR DLI AGEN';
+        if (isOpen && initialData && isEditMode) {
+            console.log("📥 [BttFormModal] Memuat Data Edit BTT:", initialData);
 
-            setFormData(prev => ({
-                ...prev,
-                bttt_asalagenid: sessionAgenId,
-                bttt_asalkota: sessionAgenNama,
-                bttt_tanggal: prev.bttt_tanggal || todayStr
-            }));
+            // Format tanggal BTT agar sesuai input type="date" (YYYY-MM-DD)
+            let formattedDate = todayStr;
+            const rawTgl = initialData.tanggal || initialData.bttt_tanggal;
+            if (rawTgl) {
+                try {
+                    const parsedDate = new Date(rawTgl);
+                    if (!isNaN(parsedDate.getTime())) {
+                        formattedDate = formatDateToYMD(parsedDate);
+                    }
+                } catch (e) {
+                    formattedDate = todayStr;
+                }
+            }
+
+            const namaPengirim = initialData.bttt_asalname || initialData.asal_name || 'UMUM';
+            setKeywordCustomer(namaPengirim);
+            setIsCustomerSelected(true);
+
+            setFormData({
+                bttt_nobtt: initialData.id || initialData.bttt_id || '',
+                bttt_tanggal: formattedDate,
+                bttt_nosuratjalan: initialData.bttt_nosuratjalan || initialData.no_surat_jalan || '',
+                bttt_ket: initialData.bttt_ket || initialData.keterangan || 'SURAT JALAN KEMBALI',
+                bttt_nobttmanual: initialData.bttt_nobttmanual || '',
+                bttt_dliexpryn: initialData.bttt_dliexpryn || 'N',
+                bttt_promoid: initialData.bttt_promoid || '',
+
+                // Pengirim
+                bttt_asalcustid: initialData.bttt_asalcustid || initialData.asal_custid || '',
+                bttt_asalname: namaPengirim,
+                bttt_asalalamat: initialData.bttt_asalalamat || initialData.asal_alamat || '',
+                bttt_asalkota: initialData.bttt_asalkota || initialData.asal_kota || '',
+                bttt_asaltelp: initialData.bttt_asaltelp || initialData.asal_telp || '',
+                bttt_asaltelp2: initialData.bttt_asaltelp2 || '',
+                bttt_asalemail: initialData.bttt_asalemail || '',
+                bttt_asalagenid: initialData.bttt_asalagenid || initialData.asal_agen_id || '1',
+
+                // Penerima
+                bttt_tujuannama: initialData.bttt_tujuannama || initialData.tujuan_nama || '',
+                bttt_up: initialData.bttt_up || initialData.up || '',
+                bttt_up_penerima: initialData.bttt_up_penerima || initialData.up || '',
+                bttt_tujuanalamat: initialData.bttt_tujuanalamat || initialData.tujuan_alamat || '',
+                bttt_tujuankota: initialData.bttt_tujuankota || initialData.tujuan_kota || '',
+                bttt_tujuankelurahan: initialData.bttt_tujuankelurahan || initialData.tujuan_kelurahan || '',
+                bttt_tujuankecamatan: initialData.bttt_tujuankecamatan || initialData.tujuan_kecamatan || '',
+                bttt_tujuankodepos: initialData.bttt_tujuankodepos || initialData.tujuan_kodepos || '',
+                bttt_tujuanemail: initialData.bttt_tujuanemail || '',
+                bttt_tujuantelp: initialData.bttt_tujuantelp || initialData.tujuan_telp || '',
+                bttt_tujuantelp2: initialData.bttt_tujuantelp2 || '',
+                bttt_tujuantelp3: initialData.bttt_tujuantelp3 || '',
+                bttt_tujuanpropinsi: initialData.bttt_tujuanpropinsi || initialData.tujuan_propinsi || '',
+                bttt_tujuanpulau: initialData.bttt_tujuanpulau || initialData.tujuan_propinsi || '',
+                bttt_tujuanagenid: initialData.bttt_tujuanagenid || initialData.tujuan_agen_id || '',
+                bttt_kodecabangagen: initialData.bttt_kodecabangagen || '',
+
+                // Layanan & Muatan
+                bttt_paketyn: initialData.bttt_paketyn || (initialData.jenis_layanan === 'REGULER' ? 'Y' : 'N'),
+                bttt_pilihcarter: initialData.bttt_charterjnskend || initialData.bttt_pilihcarter || '',
+                bttt_jenisharga: initialData.bttt_jenisharga || (initialData.metode_pembayaran === 'KREDIT' ? '2' : initialData.metode_pembayaran === 'TUNAI' ? '0' : '1'),
+                bttt_jeniskiriman: 'BERAT',
+                bttt_isikiriman: initialData.bttt_namabarang || initialData.nama_barang || initialData.bttt_isikiriman || 'PRODUK FARMASI / KESEHATAN',
+                bttt_jmlkoli: parseInt(initialData.bttt_jmlunit || initialData.jumlah_koli) || 1,
+                bttt_berat: parseFloat(initialData.bttt_berat || initialData.berat) || 1,
+                bttt_beratvol: parseFloat(initialData.bttt_beratvol || initialData.berat_volume) || 0,
+                bttt_panjang: 0,
+                bttt_lebar: 0,
+                bttt_tinggi: 0,
+                bttt_ukuran: initialData.bttt_ukuran || initialData.kubikasi || '',
+                bttt_harga: parseFloat(initialData.bttt_harga || initialData.harga) || 0,
+                bttt_biayapenerus: parseFloat(initialData.bttt_biayapenerus || initialData.biaya_penerus) || 0,
+                bttt_biayapacking: parseFloat(initialData.bttt_packing || initialData.biaya_packing) || 0
+            });
         }
-    }, [isOpen]);
+    }, [isOpen, initialData, isEditMode]);
 
     // Live search Pelanggan
     useEffect(() => {
@@ -724,6 +789,10 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
     };
 
     const fetchTarifOtomatis = async (kecamatanTujuan) => {
+        if (isEditMode && parseFloat(formData.bttt_harga) > 0 && formData.bttt_harga === initialData?.harga) {
+            return;
+        }
+
         const kec = kecamatanTujuan || formData.bttt_tujuankecamatan;
         if (!kec) return;
 
@@ -778,8 +847,13 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
         }
     };
 
-    // 🎯 HANYA 1 EFFECT DEBOUNCE UNTUK TARIF OTOMATIS (DUPLIKAT SUDAH DIHAPUS)
+    // 🎯 HANYA 1 EFFECT DEBOUNCE UNTUK TARIF OTOMATIS
     useEffect(() => {
+        // 🌟 JIKA SEDANG EDIT DATA DAN HARGA SUDAH ADA DARI DB, JANGAN TIMPA OTOMATIS!
+        if (isEditMode && initialData?.bttt_harga && parseFloat(formData.bttt_harga) === parseFloat(initialData.bttt_harga || initialData.harga)) {
+            return;
+        }
+
         if (isOpen && formData.bttt_tujuankecamatan) {
             const delayDebounceFn = setTimeout(() => {
                 fetchTarifOtomatis(formData.bttt_tujuankecamatan);
