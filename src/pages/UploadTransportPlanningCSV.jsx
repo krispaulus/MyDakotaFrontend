@@ -492,7 +492,7 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
         { header: 'SUMBER HARGA', key: 'sumber_harga', align: 'center' },
         {
             header: 'HARGA FINAL (RP)',
-            accessor: (r) => Number(r.harga_final || 0).toLocaleString('id-ID'),
+            accessor: (r) => Math.round(Number(r.harga_final || 0)),
             align: 'right'
         },
         {
