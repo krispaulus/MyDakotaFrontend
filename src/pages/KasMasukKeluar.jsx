@@ -99,6 +99,15 @@ const KasMasukKeluar = () => {
     const [selectedBank, setSelectedBank] = useState(null);
     const [showBankDropdown, setShowBankDropdown] = useState(false);
 
+    // 🌟 STATE ALUR LENGKAP BPLK
+    const [bplkStep, setBplkStep] = useState(1); // 1 = Input ST, 2 = Detail BPLK & Riwayat Kas
+    const [bplkData, setBplkData] = useState(null);
+    const [loadingBPLK, setLoadingBPLK] = useState(false);
+
+    // Modal Pencairan Uang Muka (Gambar 5 & 6)
+    const [isPencairanOpen, setIsPencairanOpen] = useState(false);
+    const [inputKreditValues, setInputKreditValues] = useState({});
+
     // Print Modal State
     const [printData, setPrintData] = useState(null);
     const [isPrintOpen, setIsPrintOpen] = useState(false);
@@ -117,6 +126,100 @@ const KasMasukKeluar = () => {
             console.error("Gagal load cabang:", err);
         }
     };
+
+    //start
+    // Eksekusi Cari Data Pengajuan Surat Tugas (Gambar 2 -> Gambar 3)
+    const handleFetchBPLKDetail = async (stNumber) => {
+        const cleanST = (stNumber || noSuratTugas).trim();
+        if (!cleanST) {
+            Swal.fire('Peringatan', 'Silakan masukkan nomor surat tugas!', 'warning');
+            return;
+        }
+
+        setLoadingBPLK(true);
+        try {
+            const token = localStorage.getItem('token');
+            const ptId = localStorage.getItem('pt_id') || 'C';
+            const res = await api.get(`/gl/cashbank/bplk/detail?st=${encodeURIComponent(cleanST)}&pt_id=${ptId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            setBplkData(res.data?.data);
+            setBplkStep(2); // Pindah ke tampilan Gambar 3
+        } catch (err) {
+            Swal.fire('Gagal!', err.response?.data?.message || 'Nomor Surat Tugas tidak ditemukan!', 'error');
+        } finally {
+            setLoadingBPLK(false);
+        }
+    };
+
+    // Buka Modal Pencairan Uang Muka (Gambar 4 -> Gambar 5)
+    const handleOpenPencairanUangMuka = () => {
+        if (!bplkData) return;
+        // Inisialisasi input kredit awal bernilai 0
+        const initialKredit = {};
+        bplkData.akun_kredit.forEach(ak => {
+            initialKredit[ak.acc_code] = 0;
+        });
+        setInputKreditValues(initialKredit);
+        setIsPencairanOpen(true);
+    };
+
+    // Simpan Kas Keluar Uang Muka BPLK (Gambar 6 -> Gambar 7)
+    const handleProsesKasKeluarBPLK = async () => {
+        const totalDebet = bplkData.total_uang_muka;
+        let totalInputKredit = 0;
+        const kreditPayload = [];
+
+        Object.keys(inputKreditValues).forEach(code => {
+            const val = Number(inputKreditValues[code] || 0);
+            totalInputKredit += val;
+            if (val > 0) {
+                const foundAkun = bplkData.akun_kredit.find(a => a.acc_code === code);
+                kreditPayload.push({
+                    acc_code: code,
+                    acc_name: foundAkun ? foundAkun.acc_name : '',
+                    nominal: val
+                });
+            }
+        });
+
+        if (totalInputKredit !== totalDebet) {
+            Swal.fire('Peringatan', `Total input kredit (Rp ${totalInputKredit.toLocaleString('id-ID')}) harus sama dengan total uang muka (Rp ${totalDebet.toLocaleString('id-ID')})!`, 'warning');
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            const ptId = localStorage.getItem('pt_id') || 'C';
+
+            const payload = {
+                sjh_id: bplkData.sjh_id,
+                tanggal: today,
+                debet_list: bplkData.item_debet,
+                kredit_list: kreditPayload
+            };
+
+            const res = await api.post(`/gl/cashbank/bplk/proses-uang-muka?pt_id=${ptId}`, payload, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            Swal.fire({
+                title: 'SUKSES!',
+                text: res.data?.message || 'Pencairan Kas Keluar BPLK Berhasil!',
+                icon: 'success'
+            });
+
+            setIsPencairanOpen(false);
+            // Refresh data BPLK agar tabel kas keluar langsung terupdate (Gambar 7)
+            handleFetchBPLKDetail(bplkData.sjh_id);
+            fetchCashBankData();
+        } catch (err) {
+            Swal.fire('Gagal!', err.response?.data?.message || 'Gagal memproses pencairan kas.', 'error');
+        }
+    };
+
+    //end
 
     const fetchCashBankData = async () => {
         setLoading(true);
@@ -1148,79 +1251,331 @@ const KasMasukKeluar = () => {
         }
     };
 
-    // 🌟 Handler Proses Input BPLK (Surat Tugas)
-    const handleProsesBPLK = (stNumber) => {
-        const cleanST = (stNumber || noSuratTugas).trim();
-        if (!cleanST) {
-            Swal.fire('Peringatan', 'Silakan masukkan nomor surat tugas!', 'warning');
-            return;
-        }
-
-        setIsBPLKModalOpen(false);
-        setNoSuratTugas('');
-
-        // Redirect atau buka modul BPLK sesuai format aplikasi Anda
-        Swal.fire({
-            title: 'Proses BPLK',
-            text: `Memproses Surat Tugas: ${cleanST}`,
-            icon: 'info',
-            timer: 1500,
-            showConfirmButton: false
-        });
-    };
-
-    {/* 🌟 MODAL BPLK (INPUT / SCAN NO SURAT TUGAS) */ }
+    {/* 🌟 MODAL LENGKAP BPLK 8 TAHAPAN SESUAI SISTEM LAWAS */ }
     const bplkModalElement = isBPLKModalOpen ? (
-        <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
-            <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
-                <div className="bg-[#004b84] p-4 text-white flex justify-between items-center">
-                    <h3 className="font-black text-sm uppercase tracking-wider flex items-center gap-2">
-                        <ScanLine size={18} className="text-amber-300" />
-                        BPLK (BIAYA PENYELESAIAN LEMBAR KERJA)
-                    </h3>
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 bg-slate-950/70 backdrop-blur-xs">
+            <div className="w-full max-w-5xl bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 flex flex-col max-h-[95vh]">
+
+                {/* Header Modal */}
+                <div className="bg-[#004b84] px-6 py-3.5 text-white flex justify-between items-center shrink-0">
+                    <div>
+                        <h2 className="font-black text-sm uppercase tracking-wider flex items-center gap-2">
+                            <ScanLine size={18} className="text-amber-300" />
+                            BPLK (BIAYA PENGELUARAN LEMBAR KERJA)
+                        </h2>
+                        {bplkData && bplkStep === 2 && (
+                            <span className="text-xs font-mono text-emerald-300 font-bold block mt-0.5">
+                                NO. SURAT TUGAS: {bplkData.sjh_id}
+                            </span>
+                        )}
+                    </div>
                     <button onClick={() => setIsBPLKModalOpen(false)} className="text-white/80 hover:text-white cursor-pointer">
                         <X size={20} />
                     </button>
                 </div>
-                <div className="p-6 space-y-4 text-xs text-slate-700">
-                    <div>
-                        <label className="font-bold text-slate-800 block mb-1">
-                            MASUKKAN NOMOR SURAT TUGAS :
-                        </label>
-                        <input
-                            type="text"
-                            autoFocus
-                            placeholder="Ketikkan Nomor Surat Tugas atau scan barcode..."
-                            value={noSuratTugas}
-                            onChange={(e) => setNoSuratTugas(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleProsesBPLK(e.target.value);
-                            }}
-                            className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-mono font-bold text-slate-800 outline-none focus:border-sky-500 shadow-inner uppercase"
-                        />
-                        <span className="text-[10px] text-slate-400 italic block mt-1">
-                            * Ketikkan Nomor Surat Tugas atau gunakan barcode scanner (tekan Enter untuk proses)
-                        </span>
-                    </div>
 
-                    <div className="flex justify-between items-center gap-2 pt-3 border-t border-slate-100">
-                        <button
-                            type="button"
-                            onClick={() => handleProsesBPLK(noSuratTugas)}
-                            className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl uppercase transition cursor-pointer shadow-sm"
-                        >
-                            PROSES ST
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setIsBPLKModalOpen(false)}
-                            className="px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl uppercase transition cursor-pointer"
-                        >
-                            KELUAR
-                        </button>
-                    </div>
+                <div className="p-6 overflow-y-auto space-y-5 text-xs text-slate-700 flex-1">
+                    {/* TAHAP 1: INPUT NO SURAT TUGAS (GAMBAR 2) */}
+                    {bplkStep === 1 && (
+                        <div className="max-w-lg mx-auto py-8 space-y-5">
+                            <div className="border border-slate-200 bg-slate-50 p-6 rounded-2xl shadow-inner space-y-3">
+                                <label className="font-bold text-slate-800 block text-xs tracking-wide uppercase">
+                                    MASUKKAN NOMOR SURAT TUGAS :
+                                </label>
+                                <input
+                                    type="text"
+                                    autoFocus
+                                    placeholder="Ketikkan Nomor Surat Tugas atau scan barcode..."
+                                    value={noSuratTugas}
+                                    onChange={(e) => setNoSuratTugas(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleFetchBPLKDetail(e.target.value);
+                                    }}
+                                    className="w-full p-3.5 bg-white border border-slate-300 rounded-xl font-mono font-bold text-slate-800 text-sm outline-none focus:border-sky-500 shadow-xs uppercase"
+                                />
+                                <span className="text-[11px] text-slate-400 italic block">
+                                    * Contoh: 001JC2026110114 (Tekan Enter atau klik tombol hijau di bawah)
+                                </span>
+                            </div>
+
+                            <div className="flex justify-between items-center pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => handleFetchBPLKDetail(noSuratTugas)}
+                                    disabled={loadingBPLK}
+                                    className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl uppercase transition cursor-pointer shadow-sm flex items-center gap-2"
+                                >
+                                    {loadingBPLK ? <RefreshCw size={14} className="animate-spin" /> : null}
+                                    DATA PENGAJUAN
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsBPLKModalOpen(false)}
+                                    className="px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl uppercase transition cursor-pointer"
+                                >
+                                    KELUAR
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* TAHAP 2: DETAIL SURAT TUGAS & DAFTAR KAS KELUAR (GAMBAR 3 & 4) */}
+                    {bplkStep === 2 && bplkData && (
+                        <div className="space-y-4">
+                            {/* Card Informasi Surat Jalan */}
+                            <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <div>
+                                        <span className="text-slate-400 font-bold block text-[10px] uppercase">Nomor Surat Tugas :</span>
+                                        <span className="font-mono font-black text-slate-900 text-sm">{bplkData.sjh_id}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-slate-400 font-bold block text-[10px] uppercase">Keterangan :</span>
+                                        <span className="font-bold text-slate-800 block">{bplkData.ass_nama}</span>
+                                        <span className="text-slate-600 text-[11px]">{bplkData.sjh_keterangan}</span>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <div>
+                                        <span className="text-slate-400 font-bold block text-[10px] uppercase">Nomor Kendaraan :</span>
+                                        <span className="font-mono font-black text-slate-900 text-sm">{bplkData.sjh_kendid}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-slate-400 font-bold block text-[10px] uppercase">Driver :</span>
+                                        <span className="font-bold text-slate-800">
+                                            {bplkData.nm_sopir1} {bplkData.nm_sopir2 ? `- ${bplkData.nm_sopir2}` : ''}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {bplkData.rute_utama && (
+                                    <div className="md:col-span-2 pt-2 border-t border-slate-200">
+                                        <span className="text-slate-400 font-bold block text-[10px] uppercase">Rute Utama :</span>
+                                        <span className="font-bold text-sky-800 font-mono text-[11px]">{bplkData.rute_utama}</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Tombol Aksi Utama: Uang Muka, Realisasi, Keluar */}
+                            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleOpenPencairanUangMuka}
+                                        className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-lg uppercase transition shadow cursor-pointer text-xs flex items-center gap-1.5"
+                                    >
+                                        Uang Muka
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => Swal.fire('Info', 'Fitur Realisasi BPLK akan dibuka pada proses berikutnya.', 'info')}
+                                        className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-lg uppercase transition shadow cursor-pointer text-xs"
+                                    >
+                                        Realisasi
+                                    </button>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setBplkStep(1)}
+                                        className="px-5 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold rounded-lg uppercase transition cursor-pointer text-xs"
+                                    >
+                                        GANTI ST
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsBPLKModalOpen(false)}
+                                        className="px-6 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg uppercase transition cursor-pointer text-xs"
+                                    >
+                                        Keluar
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Tabel Daftar Kas Keluar (Gambar 3 & 7) */}
+                            <div className="border border-slate-300 rounded-xl overflow-hidden shadow-xs mt-4">
+                                <div className="bg-[#004b84] text-white p-2.5 font-bold uppercase text-center text-xs tracking-wider">
+                                    DAFTAR KAS KELUAR
+                                </div>
+                                <table className="w-full text-left border-collapse text-xs">
+                                    <thead className="bg-slate-100 text-slate-700 uppercase font-bold border-b border-slate-300 text-[11px]">
+                                        <tr>
+                                            <th className="p-2.5 text-center">TANGGAL</th>
+                                            <th className="p-2.5">CABANG</th>
+                                            <th className="p-2.5 text-center">NO. KAS</th>
+                                            <th className="p-2.5 text-center">NO. JURNAL</th>
+                                            <th className="p-2.5 text-right">NOMINAL</th>
+                                            <th className="p-2.5 text-center w-28">ACTION</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {(bplkData.daftar_kas_keluar || []).map((k, idx) => (
+                                            <tr key={idx} className="hover:bg-sky-50 font-medium">
+                                                <td className="p-2.5 text-center font-mono">{k.cb_tanggal}</td>
+                                                <td className="p-2.5 uppercase">{k.agen_nama}</td>
+                                                <td className="p-2.5 text-center font-mono font-bold text-sky-700">{k.cb_id}</td>
+                                                <td className="p-2.5 text-center font-mono font-bold text-emerald-700">{k.cb_nojurnal}</td>
+                                                <td className="p-2.5 text-right font-mono font-black text-slate-800">
+                                                    Rp {Number(k.nominal || 0).toLocaleString('id-ID')}
+                                                </td>
+                                                <td className="p-2.5 text-center">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handlePrint({
+                                                            cb_id: k.cb_id,
+                                                            cb_nojurnal: k.cb_nojurnal,
+                                                            cb_tanggal: k.cb_tanggal,
+                                                            cb_tipe: 'K',
+                                                            cb_ket: `BPLK UANG MUKA ${bplkData.sjh_id}`,
+                                                            total_amount: k.nominal
+                                                        })}
+                                                        className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded text-[11px] transition cursor-pointer shadow-xs"
+                                                    >
+                                                        Cetak
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {(!bplkData.daftar_kas_keluar || bplkData.daftar_kas_keluar.length === 0) && (
+                                            <tr>
+                                                <td colSpan={6} className="p-4 text-center text-slate-400 italic">
+                                                    Belum ada kas keluar untuk nomor surat tugas ini. Silakan klik tombol <b>Uang Muka</b> di atas.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
+
+            {/* 🌟 SUB-MODAL PENCAIRAN UANG MUKA DEBET & KREDIT (GAMBAR 5 & 6) */}
+            {isPencairanOpen && bplkData && (
+                <div className="fixed inset-0 z-[999999] flex items-center justify-center p-3 bg-black/60 backdrop-blur-xs">
+                    <div className="w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-300 animate-in fade-in zoom-in-95 flex flex-col max-h-[90vh]">
+                        <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                            <div>
+                                <span className="font-mono font-bold text-emerald-600 block text-xs">{bplkData.sjh_id}</span>
+                                <h3 className="font-black text-slate-800 text-sm tracking-wide">Pencairan Uang Muka BPLK Debet</h3>
+                            </div>
+                            <button onClick={() => setIsPencairanOpen(false)} className="text-slate-400 hover:text-rose-600 cursor-pointer">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto space-y-5 text-xs">
+                            {/* Tabel Debet */}
+                            <div className="border border-slate-300 rounded-xl overflow-hidden shadow-xs">
+                                <table className="w-full border-collapse">
+                                    <thead className="bg-[#004b84] text-white font-bold text-[11px] uppercase">
+                                        <tr>
+                                            <th className="p-2 text-left">NAMA BIAYA</th>
+                                            <th className="p-2 text-right w-36">NOMINAL</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 font-medium">
+                                        {bplkData.item_debet.map((d, i) => (
+                                            <tr key={i} className="hover:bg-slate-50">
+                                                <td className="p-2">{d.item_name}</td>
+                                                <td className="p-2 text-right font-mono font-bold">
+                                                    {Number(d.nominal || 0).toLocaleString('id-ID')}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                    <tfoot className="bg-slate-100 font-black border-t-2 border-slate-300">
+                                        <tr>
+                                            <td className="p-2.5 text-right uppercase">TOTAL UANG MUKA DEBET :</td>
+                                            <td className="p-2.5 text-right font-mono text-emerald-700 text-sm">
+                                                {Number(bplkData.total_uang_muka || 0).toLocaleString('id-ID')}
+                                            </td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+
+                            {/* Section Kredit */}
+                            <div className="space-y-3 pt-2">
+                                <h4 className="font-black text-slate-800 text-xs tracking-wide uppercase border-b border-slate-200 pb-1">
+                                    Pencairan Uang Muka BPLK Kredit
+                                </h4>
+
+                                {bplkData.akun_kredit.map((ak, idx) => (
+                                    <div key={idx} className="space-y-1">
+                                        <div className="flex justify-between items-center">
+                                            <label className="font-bold text-slate-700 block text-[11px]">
+                                                {ak.acc_code} | {ak.acc_name}
+                                            </label>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const totalLain = Object.entries(inputKreditValues)
+                                                        .filter(([k]) => k !== ak.acc_code)
+                                                        .reduce((sum, [, v]) => sum + Number(v || 0), 0);
+                                                    const sisa = Math.max(0, bplkData.total_uang_muka - totalLain);
+                                                    setInputKreditValues({ ...inputKreditValues, [ak.acc_code]: sisa });
+                                                }}
+                                                className="text-[10px] text-sky-600 font-bold hover:underline cursor-pointer"
+                                            >
+                                                Gunakan Sisa
+                                            </button>
+                                        </div>
+                                        <input
+                                            type="number"
+                                            value={inputKreditValues[ak.acc_code] || ''}
+                                            onChange={(e) => {
+                                                const val = parseFloat(e.target.value) || 0;
+                                                setInputKreditValues({ ...inputKreditValues, [ak.acc_code]: val });
+                                            }}
+                                            placeholder="0"
+                                            className="w-full p-2.5 bg-cyan-50/50 border border-slate-300 rounded-lg font-mono font-bold text-slate-800 outline-none focus:border-sky-500 shadow-inner"
+                                        />
+                                    </div>
+                                ))}
+
+                                {(() => {
+                                    const totalInput = Object.values(inputKreditValues).reduce((a, b) => a + Number(b || 0), 0);
+                                    const sisa = bplkData.total_uang_muka - totalInput;
+
+                                    return (
+                                        <div className="flex justify-between items-center pt-2 font-bold text-xs">
+                                            <span>Total Input: <b className="font-mono text-emerald-700">{totalInput.toLocaleString('id-ID')}</b></span>
+                                            <span className={sisa === 0 ? 'text-emerald-600' : 'text-rose-600'}>
+                                                Sisa Input: <b className="font-mono">{sisa.toLocaleString('id-ID')}</b>
+                                            </span>
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+
+                            {/* Tombol Proses Kas Keluar (Gambar 6) */}
+                            {(() => {
+                                const totalInput = Object.values(inputKreditValues).reduce((a, b) => a + Number(b || 0), 0);
+                                const isValid = totalInput === bplkData.total_uang_muka && totalInput > 0;
+
+                                return (
+                                    <div className="flex justify-end pt-3 border-t border-slate-100">
+                                        <button
+                                            type="button"
+                                            disabled={!isValid}
+                                            onClick={handleProsesKasKeluarBPLK}
+                                            className={`px-8 py-2.5 font-black rounded-xl text-xs uppercase transition shadow-md cursor-pointer ${isValid
+                                                ? 'bg-amber-400 hover:bg-amber-500 text-slate-900 active:scale-95'
+                                                : 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300'
+                                                }`}
+                                        >
+                                            Proses Kas Keluar
+                                        </button>
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     ) : null;
 
@@ -1416,7 +1771,12 @@ const KasMasukKeluar = () => {
                         {/* 2. BPLK */}
                         <button
                             type="button"
-                            onClick={() => setIsBPLKModalOpen(true)}
+                            onClick={() => {
+                                setBplkStep(1);
+                                setNoSuratTugas('');
+                                setBplkData(null);
+                                setIsBPLKModalOpen(true);
+                            }}
                             className="px-5 py-2 bg-amber-400 hover:bg-amber-500 text-slate-900 font-black rounded-xl text-xs flex items-center gap-2 shadow-xs transition cursor-pointer uppercase tracking-wider"
                             title="Input / Scan Surat Tugas BPLK"
                         >
