@@ -8,7 +8,12 @@ import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
 import Swal from 'sweetalert2';
 import api from '../api/axios';
+
+// Import Sub-Views & Modals Terpisah
 import EditMasterHargaCargo from './EditMasterHargaCargo';
+import EditMasterHargaCharter from './EditMasterHargaCharter';
+import EditMasterHargaMultidrop from './EditMasterHargaMultidrop';
+import ModalUploadTarifCSV from './ModalUploadTarifCSV';
 
 const MasterTarifCustomer = () => {
     const { isDarkMode } = useDarkMode();
@@ -17,31 +22,27 @@ const MasterTarifCustomer = () => {
     const token = localStorage.getItem('token');
     const roleUser = localStorage.getItem('role_akses') || 'AGEN';
 
-    // State Transisi Tampilan: 'list' atau 'edit_cargo'
+    // State Navigasi View: 'list' | 'edit_cargo' | 'edit_charter' | 'edit_multidrop'
     const [currentView, setCurrentView] = useState('list');
     const [selectedCustomer, setSelectedCustomer] = useState(null);
-    const [selectedJenisHarga, setSelectedJenisHarga] = useState('0'); // 0: Berat, 1: Volume, 2: Kubikasi
+    const [selectedJenisHarga, setSelectedJenisHarga] = useState('0'); // 0-5
 
-    // Modal Pilihan General Cargo (Gambar 1)
+    // Modal Pilihan Tipe
     const [isCargoModalOpen, setIsCargoModalOpen] = useState(false);
+    const [isDgModalOpen, setIsDgModalOpen] = useState(false);
+    const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+    const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
 
-    // Filter Panel State
+    // State Filter Panel
     const [showFilter, setShowFilter] = useState(true);
     const [filterCustomer, setFilterCustomer] = useState('');
     const [filterCabang, setFilterCabang] = useState('');
     const [cabangOptions, setCabangOptions] = useState([]);
-
     const [hasReguler, setHasReguler] = useState(false);
     const [hasCharter, setHasCharter] = useState(false);
     const [hasMultidrop, setHasMultidrop] = useState(false);
 
-    // Modal Upload CSV & Adjust Tarif
-    const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-    const [uploadType, setUploadType] = useState('cargo');
-    const [csvFile, setCsvFile] = useState(null);
-    const [uploading, setUploading] = useState(false);
-
-    const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
+    // State Adjust Persentase
     const [adjustType, setAdjustType] = useState('+');
     const [adjustPercent, setAdjustPercent] = useState(5);
 
@@ -56,10 +57,9 @@ const MasterTarifCustomer = () => {
                     setCabangOptions(res.data.data || []);
                 }
             } catch (err) {
-                console.error(err);
+                console.error("Gagal load cabang:", err);
             }
         };
-
         if (token) fetchCabang();
     }, [token]);
 
@@ -133,52 +133,25 @@ const MasterTarifCustomer = () => {
         });
     };
 
-    // Aksi Klik Icon General Cargo -> Munculkan Pilihan Modal (Gambar 1)
+    // Handler Navigasi View
     const handleOpenCargoModal = (row) => {
         setSelectedCustomer(row);
         setIsCargoModalOpen(true);
     };
 
-    // Pilih Jenis Harga di Gambar 1 -> Pindah ke Gambar 2
+    const handleOpenDgModal = (row) => {
+        setSelectedCustomer(row);
+        setIsDgModalOpen(true);
+    };
+
     const handleSelectJenisHarga = (jenisCode) => {
         setSelectedJenisHarga(jenisCode);
         setIsCargoModalOpen(false);
+        setIsDgModalOpen(false);
         setCurrentView('edit_cargo');
     };
 
-    // Aksi Upload CSV
-    const handleUploadCSV = async (e) => {
-        e.preventDefault();
-        if (!csvFile || !selectedCustomer) return;
-
-        setUploading(true);
-        const formPayload = new FormData();
-        formPayload.append('file_csv', csvFile);
-        formPayload.append('customer_id', selectedCustomer.cust_id);
-        formPayload.append('jenis_tarif', uploadType);
-
-        try {
-            const res = await api.post('/tarif/upload-csv', formPayload, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            if (res.data && res.data.status === "success") {
-                setIsUploadModalOpen(false);
-                setCsvFile(null);
-                Swal.fire('Sukses!', `${res.data.inserted_count} baris tarif berhasil disinkronisasi.`, 'success');
-                fetchCustomers();
-            }
-        } catch (err) {
-            Swal.fire('Gagal', err.response?.data?.message || err.message, 'error');
-        } finally {
-            setUploading(false);
-        }
-    };
-
-    // Aksi Adjust Persentase
+    // Handler Adjust Persentase
     const handleAdjustTarif = async (e) => {
         e.preventDefault();
         try {
@@ -198,12 +171,36 @@ const MasterTarifCustomer = () => {
         }
     };
 
-    // Jika sedang dalam tampilan Edit Harga Cargo (Gambar 2)
+    // 🌟 ROUTING SUB-VIEWS BERSIH (Pemisahan File)
     if (currentView === 'edit_cargo') {
         return (
             <EditMasterHargaCargo
                 customer={selectedCustomer}
                 jenisHarga={selectedJenisHarga}
+                onBack={() => {
+                    setCurrentView('list');
+                    fetchCustomers();
+                }}
+            />
+        );
+    }
+
+    if (currentView === 'edit_charter') {
+        return (
+            <EditMasterHargaCharter
+                customer={selectedCustomer}
+                onBack={() => {
+                    setCurrentView('list');
+                    fetchCustomers();
+                }}
+            />
+        );
+    }
+
+    if (currentView === 'edit_multidrop') {
+        return (
+            <EditMasterHargaMultidrop
+                customer={selectedCustomer}
                 onBack={() => {
                     setCurrentView('list');
                     fetchCustomers();
@@ -303,7 +300,7 @@ const MasterTarifCustomer = () => {
                         <Printer size={16} />
                     </button>
 
-                    {/* 2. Edit General Cargo -> Membuka Gambar 1 */}
+                    {/* 2. Edit General Cargo (0: Berat, 1: Volume, 2: Kubikasi) */}
                     <button
                         onClick={() => handleOpenCargoModal(row)}
                         title="Edit Harga General Cargo"
@@ -312,18 +309,18 @@ const MasterTarifCustomer = () => {
                         <FileText size={16} />
                     </button>
 
-                    {/* 3. Edit B3 DG */}
+                    {/* 3. Edit B3 Dangerous Goods (3: Berat DG, 4: Volume DG, 5: Kubikasi DG) */}
                     <button
-                        onClick={() => Swal.fire('B3 Dangerous Goods', `Form edit tarif B3/DG untuk ${row.cust_id}`, 'info')}
+                        onClick={() => handleOpenDgModal(row)}
                         title="Edit Harga B3 Dangerous Goods"
                         className="p-1.5 text-orange-500 hover:bg-orange-50 rounded-lg transition"
                     >
                         <AlertOctagon size={16} />
                     </button>
 
-                    {/* 4. Edit Charter */}
+                    {/* 4. Edit Charter Armada */}
                     <button
-                        onClick={() => Swal.fire('Tarif Charter', `Form edit tarif charter armada untuk ${row.cust_id}`, 'info')}
+                        onClick={() => { setSelectedCustomer(row); setCurrentView('edit_charter'); }}
                         title="Edit Harga Charter Armada"
                         className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
                     >
@@ -332,7 +329,7 @@ const MasterTarifCustomer = () => {
 
                     {/* 5. Edit Multidrop */}
                     <button
-                        onClick={() => Swal.fire('Tarif Multidrop', `Form edit tarif multidrop untuk ${row.cust_id}`, 'info')}
+                        onClick={() => { setSelectedCustomer(row); setCurrentView('edit_multidrop'); }}
                         title="Edit Harga Multidrop"
                         className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition"
                     >
@@ -357,7 +354,7 @@ const MasterTarifCustomer = () => {
                         <Upload size={16} />
                     </button>
 
-                    {/* 8. Delete */}
+                    {/* 8. Delete Seluruh Tarif Customer */}
                     <button
                         onClick={() => {
                             Swal.fire({
@@ -384,7 +381,7 @@ const MasterTarifCustomer = () => {
         }
     ];
 
-    // 🌟 Aksi saat badge jumlah tarif diklik (R: 3981 / C: 0 / M: 0)
+    // Modal Copy / Export CSV saat badge diklik
     const handleTarifBadgeClick = (row, tipe = 'reguler', count = 0) => {
         if (!count || count === 0) {
             Swal.fire('Informasi', `Customer ${row.cust_name} belum memiliki data tarif untuk tipe ${tipe.toUpperCase()}.`, 'info');
@@ -412,14 +409,9 @@ const MasterTarifCustomer = () => {
             cancelButtonText: 'Tutup',
             cancelButtonColor: '#94a3b8'
         }).then(async (result) => {
-            // 📥 PILIHAN 1: DOWNLOAD CSV RESMI
             if (result.isConfirmed) {
                 try {
-                    const token = localStorage.getItem('token');
                     const ptId = localStorage.getItem('pt_id') || 'C';
-
-                    // Trigger download stream dari backend
-                    const downloadUrl = `${api.defaults.baseURL}/master/tarif/export-csv?customer_id=${encodeURIComponent(row.cust_id)}&tipe=${tipe}&pt_id=${ptId}`;
                     const res = await api.get(`/master/tarif/export-csv?customer_id=${encodeURIComponent(row.cust_id)}&tipe=${tipe}&pt_id=${ptId}`, {
                         headers: { Authorization: `Bearer ${token}` },
                         responseType: 'blob'
@@ -430,7 +422,7 @@ const MasterTarifCustomer = () => {
                     const link = document.createElement('a');
                     link.href = url;
                     const cleanName = String(row.cust_name).replace(/[^a-zA-Z0-9]/g, '_');
-                    link.setAttribute('download', `${cleanName}_Reguler_${row.cust_id}.csv`);
+                    link.setAttribute('download', `${cleanName}_${tipe}_${row.cust_id}.csv`);
                     document.body.appendChild(link);
                     link.click();
                     link.remove();
@@ -438,46 +430,38 @@ const MasterTarifCustomer = () => {
                 } catch (err) {
                     Swal.fire('Gagal Download', 'Terjadi kesalahan saat mengekspor berkas CSV: ' + err.message, 'error');
                 }
-            }
-            // 📋 PILIHAN 2: COPY / CLONE KE CUSTOMER LAIN
-            else if (result.isDenied) {
-                handleOpenCopyModal(row, tipe, count);
-            }
-        });
-    };
-
-    // Fungsi modal copy tarif antar customer
-    const handleOpenCopyModal = async (row, tipe, count) => {
-        const { value: targetCustId } = await Swal.fire({
-            title: 'Salin Tarif ke Customer Lain',
-            text: `Salin ${count} rute tarif milik "${row.cust_name}" ke customer:`,
-            input: 'text',
-            inputPlaceholder: 'Ketik Kode Customer Tujuan (contoh: 0010000073)',
-            inputValidator: (value) => {
-                if (!value || value.trim() === '') {
-                    return 'Kode Customer tujuan wajib diisi!';
-                }
-            },
-            showCancelButton: true,
-            confirmButtonText: 'Salin Sekarang',
-            confirmButtonColor: '#059669',
-            cancelButtonText: 'Batal'
-        });
-
-        if (targetCustId) {
-            try {
-                const res = await api.post('/master/tarif/copy-to-customer', {
-                    source_customer_id: row.cust_id,
-                    target_customer_id: targetCustId.trim(),
-                    tipe_tarif: tipe
+            } else if (result.isDenied) {
+                const { value: targetCustId } = await Swal.fire({
+                    title: 'Salin Tarif ke Customer Lain',
+                    text: `Salin ${count} rute tarif milik "${row.cust_name}" ke customer:`,
+                    input: 'text',
+                    inputPlaceholder: 'Ketik Kode Customer Tujuan (contoh: 0010000073)',
+                    inputValidator: (value) => {
+                        if (!value || value.trim() === '') {
+                            return 'Kode Customer tujuan wajib diisi!';
+                        }
+                    },
+                    showCancelButton: true,
+                    confirmButtonText: 'Salin Sekarang',
+                    confirmButtonColor: '#059669',
+                    cancelButtonText: 'Batal'
                 });
 
-                Swal.fire('Berhasil Disalin!', res.data?.message || 'Tarif berhasil digandakan ke customer tujuan.', 'success');
-                fetchCustomers();
-            } catch (err) {
-                Swal.fire('Gagal Menyalin', err.response?.data?.message || err.message, 'error');
+                if (targetCustId) {
+                    try {
+                        const res = await api.post('/master/tarif/copy-to-customer', {
+                            source_customer_id: row.cust_id,
+                            target_customer_id: targetCustId.trim(),
+                            tipe_tarif: tipe
+                        });
+                        Swal.fire('Berhasil Disalin!', res.data?.message || 'Tarif berhasil digandakan ke customer tujuan.', 'success');
+                        fetchCustomers();
+                    } catch (err) {
+                        Swal.fire('Gagal Menyalin', err.response?.data?.message || err.message, 'error');
+                    }
+                }
             }
-        }
+        });
     };
 
     return (
@@ -580,13 +564,10 @@ const MasterTarifCustomer = () => {
                 }}
             />
 
-            {/* ========================================================================= */}
-            {/* 🌟 MODAL PILIHAN GENERAL CARGO (PERSIS GAMBAR 1)                           */}
-            {/* ========================================================================= */}
+            {/* MODAL PILIHAN GENERAL CARGO (JENIS HARGA: 0, 1, 2) */}
             {isCargoModalOpen && selectedCustomer && (
                 <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white text-slate-800 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200 relative p-8 text-center space-y-6">
-
+                    <div className="bg-white text-slate-800 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-slate-200 p-8 text-center space-y-6 relative animate-in fade-in zoom-in-95 duration-200">
                         <button
                             onClick={() => setIsCargoModalOpen(false)}
                             className="absolute right-5 top-5 p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition cursor-pointer"
@@ -595,33 +576,33 @@ const MasterTarifCustomer = () => {
                         </button>
 
                         <div>
-                            <h2 className="text-2xl font-black text-slate-800 tracking-tight">
-                                General Cargo - {selectedCustomer.cust_id}
+                            <span className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-[11px] font-black uppercase tracking-wider">
+                                General Cargo
+                            </span>
+                            <h2 className="text-xl font-black text-slate-800 mt-2">
+                                {selectedCustomer.cust_id} - {selectedCustomer.cust_name}
                             </h2>
-                            <p className="text-xs text-slate-500 mt-2 font-medium">
-                                Pilih tipe tarif General Cargo untuk <b className="text-slate-800 uppercase">{selectedCustomer.cust_name}</b>:
+                            <p className="text-xs text-slate-500 mt-1 font-medium">
+                                Pilih kategori tarif General Cargo yang ingin dikelola:
                             </p>
                         </div>
 
-                        {/* 3 Tombol Sesuai Gambar 1 */}
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
                             <button
                                 onClick={() => handleSelectJenisHarga('0')}
-                                className="w-full sm:w-auto px-6 py-3 bg-[#0284c7] hover:bg-[#0369a1] text-white font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
+                                className="w-full sm:w-auto px-5 py-2.5 bg-[#0284c7] hover:bg-[#0369a1] text-white font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
                             >
                                 Harga Berat (Kg)
                             </button>
-
                             <button
                                 onClick={() => handleSelectJenisHarga('1')}
-                                className="w-full sm:w-auto px-6 py-3 bg-[#0d9488] hover:bg-[#0f766e] text-white font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
+                                className="w-full sm:w-auto px-5 py-2.5 bg-[#0d9488] hover:bg-[#0f766e] text-white font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
                             >
                                 Harga Volume (m³)
                             </button>
-
                             <button
                                 onClick={() => handleSelectJenisHarga('2')}
-                                className="w-full sm:w-auto px-6 py-3 bg-[#4f46e5] hover:bg-[#4338ca] text-white font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
+                                className="w-full sm:w-auto px-5 py-2.5 bg-[#4f46e5] hover:bg-[#4338ca] text-white font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
                             >
                                 Harga Kubikasi
                             </button>
@@ -630,63 +611,64 @@ const MasterTarifCustomer = () => {
                 </div>
             )}
 
-            {/* MODAL UPLOAD CSV */}
-            {isUploadModalOpen && selectedCustomer && (
-                <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="bg-white text-slate-800 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
-                        <div className="p-5 bg-slate-100 border-b flex justify-between items-center">
-                            <h3 className="font-black text-slate-800 flex items-center gap-2">
-                                <Upload size={18} className="text-sky-600" /> Upload File CSV Tarif Customer
-                            </h3>
-                            <button onClick={() => setIsUploadModalOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
-                                <X size={20} />
-                            </button>
+            {/* MODAL PILIHAN B3 DANGEROUS GOODS (JENIS HARGA: 3, 4, 5) */}
+            {isDgModalOpen && selectedCustomer && (
+                <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white text-slate-800 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-slate-200 p-8 text-center space-y-6 relative animate-in fade-in zoom-in-95 duration-200">
+                        <button
+                            onClick={() => setIsDgModalOpen(false)}
+                            className="absolute right-5 top-5 p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition cursor-pointer"
+                        >
+                            <X size={20} />
+                        </button>
+
+                        <div>
+                            <span className="px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-[11px] font-black uppercase tracking-wider">
+                                B3 / Dangerous Goods (DG)
+                            </span>
+                            <h2 className="text-xl font-black text-slate-800 mt-2">
+                                {selectedCustomer.cust_id} - {selectedCustomer.cust_name}
+                            </h2>
+                            <p className="text-xs text-slate-500 mt-1 font-medium">
+                                Pilih kategori tarif muatan barang berbahaya:
+                            </p>
                         </div>
 
-                        <form onSubmit={handleUploadCSV} className="p-6 space-y-4 text-xs">
-                            <div className="p-3 bg-sky-50 border border-sky-100 rounded-xl">
-                                <span className="font-bold text-sky-900 block">Customer:</span>
-                                <span className="font-mono text-sky-700">{selectedCustomer.cust_id} - {selectedCustomer.cust_name}</span>
-                            </div>
-
-                            <div>
-                                <label className="block font-bold text-slate-600 uppercase mb-2">Pilih Jenis Tarif</label>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <label className={`p-3 border-2 rounded-xl flex items-center gap-2 cursor-pointer font-bold ${uploadType === 'cargo' ? 'border-sky-600 bg-sky-50/30 text-sky-900' : 'border-slate-200'}`}>
-                                        <input type="radio" name="uploadType" value="cargo" checked={uploadType === 'cargo'} onChange={() => setUploadType('cargo')} className="text-sky-600" />
-                                        Cargo & Udara
-                                    </label>
-                                    <label className={`p-3 border-2 rounded-xl flex items-center gap-2 cursor-pointer font-bold ${uploadType === 'charter' ? 'border-sky-600 bg-sky-50/30 text-sky-900' : 'border-slate-200'}`}>
-                                        <input type="radio" name="uploadType" value="charter" checked={uploadType === 'charter'} onChange={() => setUploadType('charter')} className="text-sky-600" />
-                                        Charter Armada
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block font-bold text-slate-600 uppercase mb-1">Pilih Berkas CSV</label>
-                                <input
-                                    type="file"
-                                    accept=".csv"
-                                    required
-                                    onChange={(e) => setCsvFile(e.target.files[0])}
-                                    className="w-full p-2.5 border border-slate-300 rounded-xl file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-sky-50 file:text-sky-700 file:font-bold hover:file:bg-sky-100 cursor-pointer"
-                                />
-                            </div>
-
-                            <div className="flex justify-end gap-2 pt-4 border-t">
-                                <button type="button" onClick={() => setIsUploadModalOpen(false)} className="px-4 py-2 border rounded-xl font-bold text-slate-600 hover:bg-slate-50 cursor-pointer">Batal</button>
-                                <button type="submit" disabled={uploading} className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-bold flex items-center gap-1.5 shadow cursor-pointer">
-                                    {uploading ? <RefreshCw className="animate-spin" size={14} /> : <Upload size={14} />}
-                                    {uploading ? 'Mengimpor...' : 'Mulai Sinkronisasi'}
-                                </button>
-                            </div>
-                        </form>
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                            <button
+                                onClick={() => handleSelectJenisHarga('3')}
+                                className="w-full sm:w-auto px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
+                            >
+                                Berat B3 (Kg)
+                            </button>
+                            <button
+                                onClick={() => handleSelectJenisHarga('4')}
+                                className="w-full sm:w-auto px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
+                            >
+                                Volume B3 (m³)
+                            </button>
+                            <button
+                                onClick={() => handleSelectJenisHarga('5')}
+                                className="w-full sm:w-auto px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
+                            >
+                                Kubikasi B3
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
 
-            {/* MODAL PENYESUAIAN TARIF */}
+            {/* MODAL UPLOAD CSV (TERPISAH SEBAGAI KOMPONEN INDEPENDEN) */}
+            {isUploadModalOpen && selectedCustomer && (
+                <ModalUploadTarifCSV
+                    isOpen={isUploadModalOpen}
+                    onClose={() => setIsUploadModalOpen(false)}
+                    customer={selectedCustomer}
+                    onSuccess={() => fetchCustomers()}
+                />
+            )}
+
+            {/* MODAL PENYESUAIAN TARIF (%) */}
             {isAdjustModalOpen && selectedCustomer && (
                 <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-white text-slate-800 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-slate-100 animate-in fade-in zoom-in-95 duration-200">

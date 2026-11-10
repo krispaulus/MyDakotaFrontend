@@ -286,6 +286,7 @@ const Invoice = () => {
 
     const [newInvoiceForm, setNewInvoiceForm] = useState({
         artih_tanggal: today,
+        artih_tgltempo: today,
         artih_custid: '',
         artih_custname: '',
         artih_agenid: currentActiveAgen.id,
@@ -384,6 +385,7 @@ const Invoice = () => {
 
         setNewInvoiceForm({
             artih_tanggal: today,
+            artih_tgltempo: today,
             artih_custid: '',
             artih_custname: '',
             artih_agenid: currentActiveAgen.id,
@@ -815,6 +817,7 @@ const Invoice = () => {
                 const res = await api.post(`/piutang/invoice/update?pt_id=${ptId}`, {
                     artih_id: currentInvId,
                     artih_tanggal: newInvoiceForm.artih_tanggal,
+                    artih_tgltempo: newInvoiceForm.artih_tgltempo,
                     artih_fktpajak: newInvoiceForm.artih_fktpajak,
                     artih_keterangan: newInvoiceForm.artih_keterangan,
                     remove_btt_list: removedBttIds,
@@ -872,6 +875,7 @@ const Invoice = () => {
 
             const payload = {
                 artih_tanggal: newInvoiceForm.artih_tanggal,
+                artih_tgltempo: newInvoiceForm.artih_tgltempo,
                 artih_custid: newInvoiceForm.artih_custid,
                 artih_custname: newInvoiceForm.artih_custname,
                 artih_agenid: agenKode,
@@ -941,6 +945,11 @@ const Invoice = () => {
             const rawKW = String(header.artih_nokw || '').trim();
             const cleanKW = rawKW.replace(/\/OTA\//g, '/001/');
 
+            const tglInvoiceRaw = String(header.artih_tanggal || '').split('T')[0] || today;
+            const tglTempoRaw = String(header.artih_tgltempo || header.artih_jatuhtempo || header.tgl_jatuh_tempo || header.artih_tanggal || '').split('T')[0] || tglInvoiceRaw;
+
+            // Masukkan data ke form state
+
             // 1. Simpan nomor faktur & nomor kwitansi yang sudah dinormalisasi
             setSavedInvoiceId(header.artih_id);
             setSavedKwitansiNo(cleanKW);
@@ -954,7 +963,8 @@ const Invoice = () => {
 
             // 4. Masukkan data ke form state
             setNewInvoiceForm({
-                artih_tanggal: String(header.artih_tanggal || '').split('T')[0] || today,
+                artih_tanggal: tglInvoiceRaw,
+                artih_tgltempo: tglTempoRaw,
                 artih_custid: header.artih_custid || '',
                 artih_custname: header.cust_name || header.artih_custname || '',
                 artih_agenid: header.artih_agenid || '001',
@@ -1178,6 +1188,9 @@ const Invoice = () => {
     // =========================================================================
     const handlePrintDocument = async (invoiceItem, docType = 'FAKTUR') => {
         const item = invoiceItem || activeInvoice;
+        const tglKwitansiIndo = formatTanggalIndonesia(header.artih_tanggal);
+        const tglJatuhTempoIndo = formatTanggalIndonesia(header.artih_tgltempo || header.artih_jatuhtempo || header.artih_tanggal);
+        const tglCetakIndo = formatTanggalIndonesia(header.artih_tanggal);
 
         if (docType === 'JURNAL' || docType === 'VOUCHER') {
             const rawNo = String(postedJournalId || item?.artih_journalid || '').trim();
@@ -2837,9 +2850,9 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                                         <label className="font-bold text-slate-700 block mb-1">TGL JATUH TEMPO :</label>
                                         <input
                                             type="date"
-                                            value={newInvoiceForm.artih_tanggal}
-                                            onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, artih_tanggal: e.target.value })}
-                                            className="w-full p-1.5 bg-white border border-slate-300 rounded font-bold text-slate-800 outline-none"
+                                            value={newInvoiceForm.artih_tgltempo || newInvoiceForm.artih_tanggal}
+                                            onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, artih_tgltempo: e.target.value })}
+                                            className="w-full p-1.5 bg-white border border-slate-300 rounded font-bold text-slate-800 outline-none focus:border-sky-500"
                                         />
                                     </div>
                                     <div>
@@ -2887,7 +2900,7 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                                             type="date"
                                             value={newInvoiceForm.artih_tanggal}
                                             onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, artih_tanggal: e.target.value })}
-                                            className="w-full p-1.5 bg-white border border-slate-300 rounded font-bold text-slate-800 outline-none"
+                                            className="w-full p-1.5 bg-white border border-slate-300 rounded font-bold text-slate-800 outline-none focus:border-sky-500"
                                         />
                                     </div>
                                     <div>
