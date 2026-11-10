@@ -135,15 +135,17 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
     };
 
     useEffect(() => {
-        pemicuGenerateID();
-    }, []);
+        // Hanya generate ID retail jika BUKAN mode edit
+        if (!isEditMode && !initialData) {
+            pemicuGenerateID();
+        }
+    }, [isEditMode, initialData]);
 
     // 🌟 SINKRONISASI DATA EDIT (initialData) KE FORM
     useEffect(() => {
         if (isOpen && initialData && isEditMode) {
             console.log("📥 [BttFormModal] Memuat Data Edit BTT:", initialData);
 
-            // Format tanggal BTT agar sesuai input type="date" (YYYY-MM-DD)
             let formattedDate = todayStr;
             const rawTgl = initialData.tanggal || initialData.bttt_tanggal;
             if (rawTgl) {
@@ -157,7 +159,13 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                 }
             }
 
-            const namaPengirim = initialData.bttt_asalname || initialData.asal_name || 'UMUM';
+            const namaPengirim = initialData.bttt_asalname || initialData.asal_name || 'PT. MERCK CHEMICALS AND LIFE SCIENCES';
+            const idPengirim = initialData.bttt_asalcustid || initialData.asal_custid || '0010000073';
+
+            // 🌟 Deteksi apakah transaksi ini CARTER atau PAKET
+            const isCarter = (initialData.layanan_id === 'C' || initialData.bttt_layananid === 'C' || initialData.bttt_paketyn === 'N' || (initialData.bttt_charterjnskend && initialData.bttt_charterjnskend !== '-'));
+            const jenisKendaraanCarter = initialData.bttt_charterjnskend || initialData.kode_kendaraan || '';
+
             setKeywordCustomer(namaPengirim);
             setIsCustomerSelected(true);
 
@@ -171,8 +179,9 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                 bttt_promoid: initialData.bttt_promoid || '',
 
                 // Pengirim
-                bttt_asalcustid: initialData.bttt_asalcustid || initialData.asal_custid || '',
+                bttt_asalcustid: idPengirim,
                 bttt_asalname: namaPengirim,
+                bttt_up: initialData.bttt_up || initialData.up || namaPengirim, // 🌟 NAMA PENGIRIM / UP TERISI OTOMATIS
                 bttt_asalalamat: initialData.bttt_asalalamat || initialData.asal_alamat || '',
                 bttt_asalkota: initialData.bttt_asalkota || initialData.asal_kota || '',
                 bttt_asaltelp: initialData.bttt_asaltelp || initialData.asal_telp || '',
@@ -182,8 +191,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
 
                 // Penerima
                 bttt_tujuannama: initialData.bttt_tujuannama || initialData.tujuan_nama || '',
-                bttt_up: initialData.bttt_up || initialData.up || '',
-                bttt_up_penerima: initialData.bttt_up_penerima || initialData.up || '',
+                bttt_up_penerima: initialData.bttt_up_penerima || '',
                 bttt_tujuanalamat: initialData.bttt_tujuanalamat || initialData.tujuan_alamat || '',
                 bttt_tujuankota: initialData.bttt_tujuankota || initialData.tujuan_kota || '',
                 bttt_tujuankelurahan: initialData.bttt_tujuankelurahan || initialData.tujuan_kelurahan || '',
@@ -198,9 +206,9 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                 bttt_tujuanagenid: initialData.bttt_tujuanagenid || initialData.tujuan_agen_id || '',
                 bttt_kodecabangagen: initialData.bttt_kodecabangagen || '',
 
-                // Layanan & Muatan
-                bttt_paketyn: initialData.bttt_paketyn || (initialData.jenis_layanan === 'REGULER' ? 'Y' : 'N'),
-                bttt_pilihcarter: initialData.bttt_charterjnskend || initialData.bttt_pilihcarter || '',
+                // 🌟 Layanan & Muatan (Sesuai Kolom R CSV: R = Paket, C = Carter)
+                bttt_paketyn: isCarter ? 'N' : 'Y',
+                bttt_pilihcarter: isCarter ? (jenisKendaraanCarter || 'BUILD UP') : '',
                 bttt_jenisharga: initialData.bttt_jenisharga || (initialData.metode_pembayaran === 'KREDIT' ? '2' : initialData.metode_pembayaran === 'TUNAI' ? '0' : '1'),
                 bttt_jeniskiriman: 'BERAT',
                 bttt_isikiriman: initialData.bttt_namabarang || initialData.nama_barang || initialData.bttt_isikiriman || 'PRODUK FARMASI / KESEHATAN',
