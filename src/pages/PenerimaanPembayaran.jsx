@@ -6,7 +6,8 @@ import {
     Edit3, Trash2, Printer, X, CheckCircle2, Calendar,
     User, Search, RotateCcw, Building, FileText, Hash,
     FileCheck2, Layers, Calculator, CreditCard, Receipt,
-    PlusCircle, Check, ArrowRightLeft, ShieldCheck
+    PlusCircle, Check, ArrowRightLeft, ShieldCheck,
+    RefreshCw
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import logoDLI from '../assets/logoDLI.png';
@@ -38,14 +39,6 @@ const PenerimaanPembayaran = () => {
     const [filterPosting, setFilterPosting] = useState('ALL');
     const [isJurnalPrintModalOpen, setIsJurnalPrintModalOpen] = useState(false);
     const [isReportTipe1Open, setIsReportTipe1Open] = useState(false);
-
-    const handleOpenCetakJurnal = () => {
-        if (!editForm.nojurnal) {
-            Swal.fire('Info', 'Nomor jurnal belum tersedia atau transaksi belum diposting!', 'info');
-            return;
-        }
-        setIsJurnalPrintModalOpen(true);
-    };
 
     const handleCetakTipe1 = () => {
         if (!data || data.length === 0) {
@@ -1460,50 +1453,10 @@ const PenerimaanPembayaran = () => {
 
     const handleExecutePrintJurnal = () => {
         const jData = editForm || {};
-        const accounts = [];
+        const accountsToPrint = jurnalDetailRows.length > 0 ? jurnalDetailRows : [];
 
-        const totalBayar = (jData.pembayaran_customer || []).reduce(
-            (acc, curr) => acc + (parseFloat(curr.trectd_nilai || curr.nilai || 0) || 0),
-            0
-        );
-        if (totalBayar > 0) {
-            accounts.push({
-                kode: '11110',
-                nama: 'KAS / BANK PENERIMAAN',
-                debet: totalBayar,
-                kredit: 0
-            });
-        }
-
-        // Akun Kurang / Lebih Bayar
-        (jData.kurang_lebih || []).forEach(hub => {
-            const jml = parseFloat(hub.thrd_jumlah || hub.jumlah || 0);
-            const isLebih = (hub.thrd_kodelk || hub.kodelk) === 'L';
-            accounts.push({
-                kode: hub.thrd_caid || hub.caid || '-',
-                nama: hub.ca_name || hub.thrd_keterangan || hub.keterangan || (isLebih ? 'LEBIH BAYAR' : 'BIAYA KURANG BAYAR / PEMBULATAN'),
-                debet: isLebih ? 0 : jml,
-                kredit: isLebih ? jml : 0
-            });
-        });
-
-        // Akun Piutang Dagang Customer (Kredit dari total faktur terbayar)
-        const totalFaktur = (jData.pelunasan_faktur || []).reduce(
-            (acc, curr) => acc + (parseFloat(curr.trectdd_jumlah || curr.jumlah || 0) || 0),
-            0
-        );
-        if (totalFaktur > 0) {
-            accounts.push({
-                kode: '11210',
-                nama: 'PIUTANG DAGANG CUSTOMER',
-                debet: 0,
-                kredit: totalFaktur
-            });
-        }
-
-        // Kalkulasi Total Balance
-        const totalDebet = accounts.reduce((acc, curr) => acc + (curr.debet || 0), 0);
-        const totalKredit = accounts.reduce((acc, curr) => acc + (curr.kredit || 0), 0);
+        const totalDebet = accountsToPrint.reduce((acc, curr) => acc + (curr.debet || 0), 0);
+        const totalKredit = accountsToPrint.reduce((acc, curr) => acc + (curr.kredit || 0), 0);
 
         const printWindow = window.open('', '_blank', 'width=1100,height=800');
         if (!printWindow) {
@@ -1518,197 +1471,246 @@ const PenerimaanPembayaran = () => {
                 <meta charset="UTF-8">
                 <title>Bukti Jurnal - ${jData.nojurnal || '-'}</title>
                 <style>
-                    @page {
-                        size: A4 portrait;
-                        margin: 12mm 15mm;
-                    }
-                    * {
-                        box-sizing: border-box;
-                        font-family: Arial, Helvetica, sans-serif;
-                        -webkit-print-color-adjust: exact;
-                        print-color-adjust: exact;
-                    }
-                    body {
-                        margin: 0;
-                        padding: 10px;
-                        color: #000;
-                        background: #fff;
-                        font-size: 11px;
-                        line-height: 1.4;
-                    }
-                    .company-name {
-                        font-size: 12px;
-                        font-weight: 900;
-                        letter-spacing: 0.5px;
-                        text-transform: uppercase;
-                        margin-bottom: 8px;
-                    }
-                    .title-box {
-                        text-align: center;
-                        margin-bottom: 16px;
-                    }
-                    .title-box h2 {
-                        margin: 0;
-                        font-size: 14px;
-                        font-weight: 900;
-                        letter-spacing: 1px;
-                        font-family: 'Courier New', Courier, monospace;
-                        text-transform: uppercase;
-                    }
-                    .meta-grid {
-                        display: grid;
-                        grid-template-columns: 1fr 1fr;
-                        gap: 4px 24px;
-                        font-family: 'Courier New', Courier, monospace;
-                        font-size: 11px;
-                        margin-bottom: 12px;
-                        padding-bottom: 8px;
-                        border-bottom: 1.5px solid #000;
-                    }
-                    .meta-row {
-                        display: flex;
-                    }
-                    .meta-lbl {
-                        width: 120px;
-                        font-weight: bold;
-                    }
-                    .meta-val {
-                        flex: 1;
-                    }
-                    .section-hdr {
-                        font-weight: bold;
-                        font-size: 11px;
-                        margin: 10px 0 6px 0;
-                        text-transform: uppercase;
-                        letter-spacing: 0.3px;
-                    }
-                    table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        font-size: 11px;
-                        margin-bottom: 12px;
-                    }
-                    table th, table td {
-                        border: 1px solid #333;
-                        padding: 5px 8px;
-                    }
-                    table th {
-                        background-color: #f1f5f9 !important;
-                        font-weight: bold;
-                        text-align: center;
-                        font-size: 10.5px;
-                        letter-spacing: 0.3px;
-                    }
-                    .text-center { text-align: center; }
+                    @page { size: A4 portrait; margin: 10mm 14mm; }
+                    * { box-sizing: border-box; font-family: Arial, Helvetica, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    body { margin: 0; padding: 10px; color: #000; background: #fff; font-size: 11px; }
+                    .company-hdr { font-size: 13px; font-weight: 900; color: #004b84; letter-spacing: 0.5px; text-transform: uppercase; }
+                    .title-box { text-align: center; margin: 8px 0 14px 0; }
+                    .title-box h2 { margin: 0; font-size: 15px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; border-bottom: 2px solid #004b84; display: inline-block; padding-bottom: 2px; }
+                    .meta-table { width: 100%; border-collapse: collapse; font-size: 10.5px; margin-bottom: 12px; background: #f8fafc; border: 1px solid #cbd5e1; }
+                    .meta-table td { padding: 4px 8px; }
+                    table.data-table { width: 100%; border-collapse: collapse; font-size: 10.5px; margin-bottom: 12px; }
+                    table.data-table th, table.data-table td { border: 1px solid #475569; padding: 6px 8px; }
+                    table.data-table th { background-color: #e2e8f0 !important; font-weight: bold; text-align: center; font-size: 10px; }
                     .text-right { text-align: right; }
                     .font-mono { font-family: 'Courier New', Courier, monospace; }
                     .font-bold { font-weight: bold; }
-                    .row-total {
-                        background-color: #f8fafc !important;
-                        font-weight: bold;
-                    }
-                    /* 🌟 Blok Tanda Tangan 3 Kolom Sesuai Aplikasi Lawas */
-                    .sig-section {
-                        margin-top: 40px;
-                        display: flex;
-                        justify-content: space-around;
-                        text-align: center;
-                        font-size: 11px;
-                        page-break-inside: avoid;
-                    }
-                    .sig-col {
-                        width: 28%;
-                    }
-                    .sig-space {
-                        height: 55px;
-                    }
+                    .sig-section { margin-top: 36px; display: flex; justify-content: space-around; text-align: center; font-size: 10.5px; page-break-inside: avoid; }
+                    .sig-col { width: 28%; }
+                    .sig-space { height: 50px; }
+                    @media print { .no-print { display: none !important; } }
                 </style>
             </head>
             <body>
-                <div class="company-name">PT DAKOTA LOGISTIK INDONESIA</div>
+                <div class="no-print" style="text-align: right; margin-bottom: 8px;">
+                    <button style="background: #16a34a; color: #fff; border: none; padding: 6px 16px; border-radius: 6px; font-weight: bold; cursor: pointer;" onclick="window.print()">PRINT</button>
+                    <button style="background: #e11d48; color: #fff; border: none; padding: 6px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-left: 4px;" onclick="window.close()">TUTUP</button>
+                </div>
+
+                <div class="company-hdr">PT DAKOTA LOGISTIK INDONESIA</div>
+                <div style="font-size: 10px; color: #555;">Jl. Wibawa Mukti II No. 8 Jatiasih, Bekasi Kota</div>
 
                 <div class="title-box">
                     <h2>BUKTI MEMORIAL / JURNAL PENERIMAAN</h2>
                 </div>
 
-                <div class="meta-grid">
-                    <div class="meta-row"><span class="meta-lbl">NO. JURNAL</span><span class="meta-val">: <b>${jData.nojurnal || '-'}</b></span></div>
-                    <div class="meta-row"><span class="meta-lbl">TANGGAL</span><span class="meta-val">: ${jData.tanggal || '-'}</span></div>
-                    <div class="meta-row"><span class="meta-lbl">NO. RECEIPT</span><span class="meta-val">: ${jData.noreceipt || '-'}</span></div>
-                    <div class="meta-row"><span class="meta-lbl">CABANG / AGEN</span><span class="meta-val">: ${jData.cabang || 'DLI PUSAT'}</span></div>
-                    <div class="meta-row" style="grid-column: span 2;"><span class="meta-lbl">CUSTOMER</span><span class="meta-val">: ${jData.customer || '-'} [${jData.custid || '-'}]</span></div>
-                    <div class="meta-row" style="grid-column: span 2;"><span class="meta-lbl">KETERANGAN</span><span class="meta-val">: ${jData.keterangan || '-'}</span></div>
-                </div>
+                <table class="meta-table">
+                    <tr>
+                        <td style="width: 15%; font-weight: bold;">NO. JURNAL</td>
+                        <td style="width: 35%; font-family: monospace; font-weight: bold; color: #0284c7;">: ${jData.nojurnal || '-'}</td>
+                        <td style="width: 15%; font-weight: bold;">TANGGAL</td>
+                        <td style="width: 35%; font-family: monospace;">: ${jData.tanggal || '-'}</td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: bold;">NO. RECEIPT</td>
+                        <td style="font-family: monospace;">: ${jData.noreceipt || '-'}</td>
+                        <td style="font-weight: bold;">CABANG / AGEN</td>
+                        <td>: ${jData.cabang || 'DLI PUSAT'}</td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: bold;">CUSTOMER</td>
+                        <td colspan="3" style="font-weight: bold; text-transform: uppercase;">: ${jData.customer || '-'} [${jData.custid || '-'}]</td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: bold;">KETERANGAN</td>
+                        <td colspan="3">: ${jData.keterangan || 'Penerimaan Pembayaran Piutang Dagang'}</td>
+                    </tr>
+                </table>
 
-                <div class="section-hdr">RINCIAN AKUN (DEBET / KREDIT) :</div>
-                <table>
+                <table class="data-table">
                     <thead>
                         <tr>
-                            <th style="width: 140px;">KODE AKUN</th>
-                            <th>KETERANGAN AKUN</th>
+                            <th style="width: 150px;">KODE AKUN</th>
+                            <th>KETERANGAN AKUN (MASTER COA)</th>
                             <th style="width: 150px;">DEBET (RP)</th>
                             <th style="width: 150px;">KREDIT (RP)</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${accounts.length > 0 ? accounts.map(a => `
+                        ${accountsToPrint.map(a => `
                             <tr>
                                 <td class="font-mono font-bold">${a.kode}</td>
-                                <td>${a.nama}</td>
+                                <td style="text-transform: uppercase;">${a.nama}</td>
                                 <td class="text-right font-mono font-bold">${a.debet > 0 ? Number(a.debet).toLocaleString('id-ID') : '0'}</td>
                                 <td class="text-right font-mono font-bold">${a.kredit > 0 ? Number(a.kredit).toLocaleString('id-ID') : '0'}</td>
                             </tr>
-                        `).join('') : `
-                            <tr>
-                                <td class="font-mono font-bold">11110</td>
-                                <td>KAS / BANK PENERIMAAN</td>
-                                <td class="text-right font-mono font-bold">0</td>
-                                <td class="text-right font-mono">0</td>
-                            </tr>
-                        `}
+                        `).join('')}
                     </tbody>
                     <tfoot>
-                        <tr class="row-total">
-                            <td colspan="2" class="text-right font-bold" style="letter-spacing: 0.5px;">TOTAL BALANCE :</td>
+                        <tr style="background: #f1f5f9; font-weight: bold;">
+                            <td colspan="2" class="text-right" style="letter-spacing: 0.5px;">TOTAL BALANCE :</td>
                             <td class="text-right font-mono font-bold">Rp ${Number(totalDebet).toLocaleString('id-ID')}</td>
                             <td class="text-right font-mono font-bold">Rp ${Number(totalKredit).toLocaleString('id-ID')}</td>
                         </tr>
                     </tfoot>
                 </table>
 
-                <!-- 🌟 Tanda Tangan 3 Kolom Sesuai Format Aplikasi Lawas -->
                 <div class="sig-section">
                     <div class="sig-col">
                         <div class="font-bold">Diterima</div>
                         <div class="sig-space"></div>
-                        <div><b>( Keuangan )</b></div>
+                        <div><b><u>( Keuangan )</u></b></div>
                     </div>
                     <div class="sig-col">
                         <div class="font-bold">Disetujui</div>
                         <div class="sig-space"></div>
-                        <div><b>( Direksi )</b></div>
+                        <div><b><u>( Direksi )</u></b></div>
                     </div>
                     <div class="sig-col">
                         <div class="font-bold">Diketahui</div>
                         <div class="sig-space"></div>
-                        <div><b>( Akunting )</b></div>
+                        <div><b><u>( Akunting )</u></b></div>
                     </div>
                 </div>
 
                 <script>
                     window.onload = function() {
-                        setTimeout(function() {
-                            window.print();
-                        }, 300);
+                        setTimeout(function() { window.print(); }, 300);
                     };
                 </script>
             </body>
             </html>
-                    `;
+        `;
 
         printWindow.document.open();
         printWindow.document.write(htmlContent);
         printWindow.document.close();
+    };
+
+    // State rincian akun jurnal dinamis dari database/master
+    const [jurnalDetailRows, setJurnalDetailRows] = useState([]);
+    const [loadingJurnalDetail, setLoadingJurnalDetail] = useState(false);
+
+    // Ambil akun piutang default dari master
+    const getNamaAkun = (caId, fallbackNama = '') => {
+        if (!caId) return fallbackNama;
+        const found = accounts.find(a => String(a.ca_id).trim() === String(caId).trim());
+        return found ? found.ca_nama : fallbackNama;
+    };
+
+    const handleOpenCetakJurnal = async () => {
+        if (!editForm.nojurnal) {
+            Swal.fire('Info', 'Nomor jurnal belum tersedia atau transaksi belum diposting!', 'info');
+            return;
+        }
+
+        setIsJurnalPrintModalOpen(true);
+        setLoadingJurnalDetail(true);
+
+        try {
+            const token = localStorage.getItem('token');
+            const ptId = localStorage.getItem('pt_id') || 'C';
+
+            // Ambil rincian debet/kredit asli dari tabel gl_t_jurnald
+            const res = await api.get(`/gl/jurnal/detail/${encodeURIComponent(editForm.nojurnal)}?pt_id=${ptId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            const details = res.data?.details || res.data?.data?.details || [];
+            if (details.length > 0) {
+                setJurnalDetailRows(details.map(d => ({
+                    kode: d.tjurd_acccode || d.ca_id || '-',
+                    nama: d.sakun_nama || d.ca_name || getNamaAkun(d.tjurd_acccode, 'AKUN PERKIRAAN'),
+                    debet: parseFloat(d.tjurd_debet || d.debet || 0),
+                    kredit: parseFloat(d.tjurd_kredit || d.kredit || 0)
+                })));
+            } else {
+                buildFallbackJurnalRows();
+            }
+        } catch (err) {
+            console.warn("Menggunakan fallback kalkulasi lokal:", err);
+            buildFallbackJurnalRows();
+        } finally {
+            setLoadingJurnalDetail(false);
+        }
+    };
+
+    // Fallback kalkulasi jika detail jurnal di gl_t_jurnald belum ditemukan (404)
+    const buildFallbackJurnalRows = () => {
+        const rows = [];
+
+        // 1. Akun Kas / Bank Penerimaan (Debet)
+        const totalBayar = (editForm.pembayaran_customer || []).reduce(
+            (acc, curr) => acc + (parseFloat(curr.trectd_nilai || curr.nilai || 0) || 0),
+            0
+        );
+
+        if (totalBayar > 0) {
+            // Ambil akun bank pertama yang ada di master atau fallback akun kas/bank
+            const bankPayment = (editForm.pembayaran_customer || [])[0];
+            const bankName = bankPayment?.trectd_nmbank || '';
+
+            // Cari akun bank yang cocok dari master COA
+            const matchedBankAcc = accounts.find(a =>
+                (bankName && a.ca_nama.toUpperCase().includes(bankName.toUpperCase())) ||
+                a.ca_id.startsWith('B006') ||
+                a.ca_id.startsWith('A101')
+            );
+
+            const kodeBank = matchedBankAcc ? matchedBankAcc.ca_id : 'A101010000';
+            const namaBank = matchedBankAcc ? matchedBankAcc.ca_nama : (bankName ? `BANK ${bankName.toUpperCase()}` : 'KAS / BANK OPERASIONAL');
+
+            rows.push({
+                kode: kodeBank,
+                nama: namaBank,
+                debet: totalBayar,
+                kredit: 0
+            });
+        }
+
+        // 2. Akun Kurang / Lebih Bayar (Lookup langsung ke Master Data COA)
+        (editForm.kurang_lebih || []).forEach(hub => {
+            const jml = parseFloat(hub.thrd_jumlah || hub.jumlah || 0);
+            const isLebih = (hub.thrd_kodelk || hub.kodelk) === 'L';
+            const caId = hub.thrd_caid || hub.caid || 'A104010600';
+
+            // 🌟 Lookup nama akun asli dari master accounts (misal: UANG MUKA PPH 23 INTRANSIT)
+            const namaAkunResmi = getNamaAkun(caId, hub.ca_name || (isLebih ? 'PENDAPATAN LEBIH BAYAR' : 'BIAYA KURANG BAYAR'));
+
+            rows.push({
+                kode: caId,
+                nama: namaAkunResmi,
+                debet: isLebih ? 0 : jml,
+                kredit: isLebih ? jml : 0
+            });
+        });
+
+        // 3. Akun Piutang Usaha Dagang Customer (Kredit)
+        const totalFaktur = (editForm.pelunasan_faktur || []).reduce(
+            (acc, curr) => acc + (parseFloat(curr.trectdd_jumlah || curr.jumlah || 0) || 0),
+            0
+        );
+
+        if (totalFaktur > 0) {
+            // Cari akun piutang usaha dari master (biasanya diawali A103)
+            const piutangAccObj = accounts.find(a =>
+                a.ca_id.startsWith('A103') ||
+                a.ca_nama.toUpperCase().includes('PIUTANG USAHA') ||
+                a.ca_nama.toUpperCase().includes('PIUTANG DAGANG')
+            );
+
+            const kodePiutang = piutangAccObj ? piutangAccObj.ca_id : 'A103010000';
+            const namaPiutang = piutangAccObj ? piutangAccObj.ca_nama : 'PIUTANG USAHA DAGANG';
+
+            rows.push({
+                kode: kodePiutang,
+                nama: namaPiutang,
+                debet: 0,
+                kredit: totalFaktur
+            });
+        }
+
+        setJurnalDetailRows(rows);
     };
 
     return (
@@ -2988,141 +2990,151 @@ const PenerimaanPembayaran = () => {
 
 
             {/* ========================================================================= */}
-            {/* 🌟 MODAL CETAK BUKTI JURNAL MEMORIAL (TRANSAKSI POSTING)                 */}
+            {/* 🌟 MODAL CETAK BUKTI JURNAL MEMORIAL - MODERN & SINKRON MASTER COA       */}
             {/* ========================================================================= */}
             {isJurnalPrintModalOpen && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[85] p-4 animate-in fade-in duration-150">
-                    <div className="w-full max-w-3xl p-6 rounded-3xl shadow-2xl flex flex-col max-h-[92vh] bg-white text-black border border-slate-300">
-                        {/* Header Modal */}
-                        <div className="flex justify-between items-center pb-3 border-b border-slate-300 mb-4 print:hidden">
-                            <div className="flex items-center gap-2">
-                                <FileText size={18} className="text-emerald-600" />
-                                <h3 className="text-sm font-black uppercase text-black tracking-wide">
-                                    BUKTI JURNAL TRANSAKSI (MEMORIAL)
-                                </h3>
+                <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center z-[85] p-4 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="w-full max-w-4xl bg-white text-slate-800 rounded-3xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-100">
+                        {/* Header Modal Modern */}
+                        <div className="px-7 py-4.5 bg-gradient-to-r from-[#004b84] to-[#0284c7] text-white flex justify-between items-center shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 bg-white/15 backdrop-blur-md rounded-2xl shadow-inner">
+                                    <FileText size={20} className="text-sky-200" />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-black uppercase tracking-wider">
+                                        Bukti Jurnal Transaksi (Memorial)
+                                    </h3>
+                                    <p className="text-[11px] text-sky-100 font-mono">
+                                        No. Jurnal: <span className="font-bold text-white">{editForm.nojurnal}</span> &nbsp;|&nbsp; No. Receipt: {editForm.noreceipt}
+                                    </p>
+                                </div>
                             </div>
                             <div className="flex items-center gap-2">
                                 <button
                                     type="button"
                                     onClick={handleExecutePrintJurnal}
-                                    className="px-4 py-1.5 bg-[#004b84] hover:bg-[#003863] active:scale-95 text-white font-bold rounded-xl text-xs uppercase flex items-center gap-1.5 transition shadow-sm cursor-pointer"
+                                    className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-bold rounded-xl text-xs uppercase flex items-center gap-1.5 transition shadow-md cursor-pointer"
                                 >
-                                    <Printer size={14} /> Cetak Sekarang
+                                    <Printer size={15} /> Cetak Dokumen
                                 </button>
                                 <button
                                     onClick={() => setIsJurnalPrintModalOpen(false)}
-                                    className="p-1 hover:bg-slate-100 rounded-full cursor-pointer text-black"
+                                    className="p-2 text-white/80 hover:text-white hover:bg-white/15 rounded-full cursor-pointer transition"
                                 >
                                     <X size={20} />
                                 </button>
                             </div>
                         </div>
 
-                        {/* Area Kertas Cetak Voucher Jurnal */}
-                        <div className="space-y-4 overflow-y-auto text-xs p-3 text-black">
-                            <div className="border-b-2 border-slate-900 pb-3 space-y-1">
-                                <div className="text-xs font-black uppercase text-slate-900 tracking-wider">
-                                    PT DAKOTA LOGISTIK INDONESIA
+                        {/* Area Isi Dokumen */}
+                        <div className="p-7 overflow-y-auto space-y-5 text-xs flex-1 bg-white">
+                            {/* Kop & Identitas Transaksi */}
+                            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 space-y-4">
+                                <div className="flex justify-between items-start border-b border-slate-200 pb-3">
+                                    <div>
+                                        <div className="text-xs font-black uppercase tracking-widest text-[#004b84]">
+                                            PT DAKOTA LOGISTIK INDONESIA
+                                        </div>
+                                        <div className="text-[11px] text-slate-500">
+                                            Jl. Wibawa Mukti II No. 8 Jatiasih, Bekasi Kota
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                            JURNAL PENERIMAAN
+                                        </span>
+                                    </div>
                                 </div>
-                                <div className="text-base font-black text-center uppercase tracking-widest py-1 text-black font-mono">
-                                    BUKTI MEMORIAL / JURNAL PENERIMAAN
-                                </div>
-                                <div className="grid grid-cols-2 pt-2 font-mono gap-y-1.5 text-black">
-                                    <div>
-                                        <strong>NO. JURNAL : </strong>
-                                        <span className="font-bold ml-1 text-blue-800">{editForm.nojurnal}</span>
+
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-semibold text-slate-700">
+                                    <div className="p-2.5 bg-white rounded-xl border border-slate-200/60 shadow-2xs">
+                                        <span className="text-[10px] text-slate-400 font-bold uppercase block">NO. JURNAL</span>
+                                        <span className="font-mono font-black text-sky-700 text-xs">{editForm.nojurnal}</span>
                                     </div>
-                                    <div>
-                                        <strong>TANGGAL : </strong>
-                                        <span className="font-bold ml-1">{editForm.tanggal}</span>
+                                    <div className="p-2.5 bg-white rounded-xl border border-slate-200/60 shadow-2xs">
+                                        <span className="text-[10px] text-slate-400 font-bold uppercase block">TANGGAL TRANSAKSI</span>
+                                        <span className="font-mono font-bold text-slate-800 text-xs">{editForm.tanggal}</span>
                                     </div>
-                                    <div>
-                                        <strong>NO. RECEIPT : </strong>
-                                        <span className="font-bold ml-1">{editForm.noreceipt}</span>
+                                    <div className="p-2.5 bg-white rounded-xl border border-slate-200/60 shadow-2xs">
+                                        <span className="text-[10px] text-slate-400 font-bold uppercase block">NO. RECEIPT</span>
+                                        <span className="font-mono font-bold text-slate-800 text-xs">{editForm.noreceipt}</span>
                                     </div>
-                                    <div>
-                                        <strong>CABANG / AGEN : </strong>
-                                        <span className="font-bold ml-1">{editForm.cabang}</span>
+                                    <div className="p-2.5 bg-white rounded-xl border border-slate-200/60 shadow-2xs">
+                                        <span className="text-[10px] text-slate-400 font-bold uppercase block">CABANG / AGEN</span>
+                                        <span className="font-bold text-slate-800 text-xs">{editForm.cabang || 'DLI PUSAT'}</span>
                                     </div>
-                                    <div className="col-span-2">
-                                        <strong>CUSTOMER : </strong>
-                                        <span className="font-bold ml-1 uppercase">{editForm.customer} [{editForm.custid}]</span>
+                                    <div className="col-span-2 p-2.5 bg-white rounded-xl border border-slate-200/60 shadow-2xs">
+                                        <span className="text-[10px] text-slate-400 font-bold uppercase block">CUSTOMER / PELANGGAN</span>
+                                        <span className="font-bold text-slate-900 text-xs uppercase">{editForm.customer} [{editForm.custid}]</span>
                                     </div>
-                                    <div className="col-span-2">
-                                        <strong>KETERANGAN : </strong>
-                                        <span className="ml-1">{editForm.keterangan || 'Penerimaan Pembayaran Piutang Dagang'}</span>
+                                    <div className="col-span-2 p-2.5 bg-white rounded-xl border border-slate-200/60 shadow-2xs">
+                                        <span className="text-[10px] text-slate-400 font-bold uppercase block">KETERANGAN</span>
+                                        <span className="font-medium text-slate-700 text-xs">{editForm.keterangan || 'Penerimaan Pembayaran Piutang Dagang'}</span>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Tabel Jurnal Debet / Kredit */}
+                            {/* Tabel Rincian Akun Jurnal */}
                             <div className="space-y-2">
-                                <div className="font-black uppercase tracking-wider text-[11px] text-black">
-                                    RINCIAN AKUN (DEBET / KREDIT) :
+                                <div className="flex items-center justify-between">
+                                    <span className="font-black uppercase tracking-wider text-[11px] text-slate-800 flex items-center gap-1.5">
+                                        <ArrowRightLeft size={14} className="text-[#004b84]" /> RINCIAN POSISI AKUN (DEBET / KREDIT)
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 font-semibold italic">
+                                        *Data mengacu langsung pada Master Chart of Accounts (COA)
+                                    </span>
                                 </div>
-                                <div className="rounded-xl border border-slate-300 overflow-hidden">
+
+                                <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
                                     <table className="w-full text-left border-collapse text-xs">
-                                        <thead>
-                                            <tr className="bg-slate-100 text-black border-b border-slate-300 font-black text-[11px] uppercase">
-                                                <th className="p-2.5">Kode Akun</th>
-                                                <th className="p-2.5">Keterangan Akun</th>
-                                                <th className="p-2.5 text-right">Debet (Rp)</th>
-                                                <th className="p-2.5 text-right">Kredit (Rp)</th>
+                                        <thead className="bg-[#004b84] text-white font-bold text-[10px] uppercase tracking-wider">
+                                            <tr>
+                                                <th className="p-3 w-40">Kode Akun</th>
+                                                <th className="p-3">Nama / Keterangan Akun (Master COA)</th>
+                                                <th className="p-3 text-right w-44">Debet (Rp)</th>
+                                                <th className="p-3 text-right w-44">Kredit (Rp)</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-slate-200 bg-white font-mono text-black font-semibold">
-                                            <tr>
-                                                <td className="p-2.5 font-bold">11110</td>
-                                                <td className="p-2.5 font-sans">KAS / BANK PENERIMAAN</td>
-                                                <td className="p-2.5 text-right font-bold text-emerald-700">
-                                                    {totalPembayaranCustomer.toLocaleString('id-ID')}
-                                                </td>
-                                                <td className="p-2.5 text-right">0</td>
-                                            </tr>
-
-                                            {totalKurangBayar > 0 && (
+                                        <tbody className="divide-y divide-slate-100 font-semibold">
+                                            {loadingJurnalDetail ? (
                                                 <tr>
-                                                    <td className="p-2.5 font-bold">
-                                                        {editForm.kurang_lebih.find(k => (k.thrd_kodelk || k.kodelk) === 'K')?.thrd_caid || '51999'}
-                                                    </td>
-                                                    <td className="p-2.5 font-sans">BIAYA KURANG BAYAR / PEMBULATAN</td>
-                                                    <td className="p-2.5 text-right font-bold text-amber-700">
-                                                        {totalKurangBayar.toLocaleString('id-ID')}
-                                                    </td>
-                                                    <td className="p-2.5 text-right">0</td>
-                                                </tr>
-                                            )}
-
-                                            <tr>
-                                                <td className="p-2.5 font-bold">11210</td>
-                                                <td className="p-2.5 font-sans">PIUTANG DAGANG CUSTOMER</td>
-                                                <td className="p-2.5 text-right">0</td>
-                                                <td className="p-2.5 text-right font-bold text-blue-700">
-                                                    {totalPelunasanFaktur.toLocaleString('id-ID')}
-                                                </td>
-                                            </tr>
-
-                                            {totalLebihBayar > 0 && (
-                                                <tr>
-                                                    <td className="p-2.5 font-bold">
-                                                        {editForm.kurang_lebih.find(k => (k.thrd_kodelk || k.kodelk) === 'L')?.thrd_caid || '21999'}
-                                                    </td>
-                                                    <td className="p-2.5 font-sans">PENDAPATAN LEBIH BAYAR</td>
-                                                    <td className="p-2.5 text-right">0</td>
-                                                    <td className="p-2.5 text-right font-bold text-sky-700">
-                                                        {totalLebihBayar.toLocaleString('id-ID')}
+                                                    <td colSpan={4} className="p-8 text-center text-slate-400">
+                                                        <RefreshCw size={18} className="animate-spin inline mr-2 text-sky-600" />
+                                                        Memuat rincian akun jurnal dari database...
                                                     </td>
                                                 </tr>
+                                            ) : jurnalDetailRows.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={4} className="p-8 text-center text-slate-400 italic">
+                                                        Tidak ada rincian akun transaksi.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                jurnalDetailRows.map((acc, idx) => (
+                                                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                                        <td className="p-3 font-mono font-black text-sky-800">{acc.kode}</td>
+                                                        <td className="p-3 font-bold text-slate-900 uppercase">{acc.nama}</td>
+                                                        <td className="p-3 text-right font-mono font-black text-emerald-700">
+                                                            {acc.debet > 0 ? acc.debet.toLocaleString('id-ID') : '0'}
+                                                        </td>
+                                                        <td className="p-3 text-right font-mono font-black text-blue-700">
+                                                            {acc.kredit > 0 ? acc.kredit.toLocaleString('id-ID') : '0'}
+                                                        </td>
+                                                    </tr>
+                                                ))
                                             )}
                                         </tbody>
                                         <tfoot>
-                                            <tr className="bg-slate-100 font-black border-t-2 border-slate-900 text-black">
-                                                <td colSpan={2} className="p-2.5 text-right uppercase">TOTAL BALANCE :</td>
-                                                <td className="p-2.5 text-right font-mono text-sm font-black text-emerald-800">
-                                                    Rp {(totalPembayaranCustomer + totalKurangBayar).toLocaleString('id-ID')}
+                                            <tr className="bg-slate-100 font-black border-t-2 border-slate-300 text-slate-900">
+                                                <td colSpan={2} className="p-3 text-right uppercase tracking-wider">
+                                                    TOTAL BALANCE :
                                                 </td>
-                                                <td className="p-2.5 text-right font-mono text-sm font-black text-blue-800">
-                                                    Rp {(totalPelunasanFaktur + totalLebihBayar).toLocaleString('id-ID')}
+                                                <td className="p-3 text-right font-mono font-black text-emerald-800 text-sm">
+                                                    Rp {jurnalDetailRows.reduce((acc, c) => acc + (c.debet || 0), 0).toLocaleString('id-ID')}
+                                                </td>
+                                                <td className="p-3 text-right font-mono font-black text-blue-800 text-sm">
+                                                    Rp {jurnalDetailRows.reduce((acc, c) => acc + (c.kredit || 0), 0).toLocaleString('id-ID')}
                                                 </td>
                                             </tr>
                                         </tfoot>
@@ -3130,19 +3142,19 @@ const PenerimaanPembayaran = () => {
                                 </div>
                             </div>
 
-                            {/* 🌟 BLOK TANDA TANGAN 3 KOLOM SESUAI FORMAT APLIKASI LAWAS */}
-                            <div className="pt-8 pb-4 grid grid-cols-3 text-center text-xs text-slate-800 font-medium">
-                                <div>
-                                    <p className="font-bold text-slate-900 mb-14">Diterima</p>
-                                    <p className="font-bold text-slate-900">( Keuangan )</p>
+                            {/* Kolom Tanda Tangan Modern 3 Kolom */}
+                            <div className="pt-6 grid grid-cols-3 text-center text-xs text-slate-700 font-bold">
+                                <div className="space-y-16">
+                                    <p className="uppercase text-slate-500 font-bold">Diterima</p>
+                                    <p className="border-t border-slate-300 mx-8 pt-1.5 uppercase font-black text-slate-900">( Keuangan )</p>
                                 </div>
-                                <div>
-                                    <p className="font-bold text-slate-900 mb-14">Disetujui</p>
-                                    <p className="font-bold text-slate-900">( Direksi )</p>
+                                <div className="space-y-16">
+                                    <p className="uppercase text-slate-500 font-bold">Disetujui</p>
+                                    <p className="border-t border-slate-300 mx-8 pt-1.5 uppercase font-black text-slate-900">( Direksi )</p>
                                 </div>
-                                <div>
-                                    <p className="font-bold text-slate-900 mb-14">Diketahui</p>
-                                    <p className="font-bold text-slate-900">( Akunting )</p>
+                                <div className="space-y-16">
+                                    <p className="uppercase text-slate-500 font-bold">Diketahui</p>
+                                    <p className="border-t border-slate-300 mx-8 pt-1.5 uppercase font-black text-slate-900">( Akunting )</p>
                                 </div>
                             </div>
                         </div>
