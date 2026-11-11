@@ -90,6 +90,9 @@ const MarketingBTT = () => {
             bttt_tujuankota: item.tujuan_kota || item.bttt_tujuankota || "",
             bttt_tujuankodepos: item.tujuan_kodepos || item.bttt_tujuankodepos || "",
             bttt_tujuanpropinsi: item.tujuan_propinsi || item.bttt_tujuanpropinsi || "",
+            ket_do_kembali: item.ket_do_kembali || (item.storagecode?.startsWith('Y') ? 'DO Copy Kembali Jatiasih' : 'DO Asli Kembali Jatiasih'),
+            lampiran_keterangan: item.keterangan || item.bttt_ket || 'DO COPY KEMBALI JATIASIH',
+            bttt_biayapacking: parseFloat(item.biaya_packing || item.bttt_biayapacking || 0),
             estimasihari: item.estimasihari || item.lead_time || 2
         };
 

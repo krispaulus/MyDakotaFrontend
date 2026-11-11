@@ -65,6 +65,15 @@ const BttPrintPage = () => {
   const teksKiriman = (bttData.bttt_isikiriman || '').toUpperCase();
   const isDangerousGoods = teksKiriman.includes('CHEMICAL');
 
+  // 🌟 1. Keterangan Atas: Berasal dari mapping storagecode (Default: DO Asli/Copy Kembali Jatiasih)
+  const keteranganAtas = bttData.ket_do_kembali || bttData.storage_code_ket || bttData.bttt_ket || 'DO Asli Kembali Jatiasih';
+
+  // 🌟 2. Keterangan Bawah: Berasal dari teks kolom keterangan di CSV
+  const keteranganBawah = bttData.lampiran_keterangan || bttData.keterangan_csv || bttData.bttt_lampiran_ket || bttData.bttt_ket || 'DO COPY KEMBALI JATIASIH';
+
+  // 🌟 3. Biaya Packing: Dari kolom packing file CSV
+  const biayaPacking = parseFloat(bttData.bttt_biayapacking || bttData.biaya_packing || 0);
+
   const tipeLembaran = [
     { label: "Untuk Pengirim", kasta: "Lembar 1 dari 3", isHarga: true, isStempel: false },
     { label: "Kembali Ke Cab. Pengirim", kasta: "Lembar 2 dari 3", isHarga: false, isStempel: true },
@@ -296,7 +305,7 @@ const BttPrintPage = () => {
                   {/* KOTAK RINCIAN DETAIL (ISI KIRIMAN, KETERANGAN, JENIS HARGA) */}
                   <div className="p-1.5 border border-slate-200 rounded bg-slate-50/50 text-[7.5px] font-semibold text-slate-700 leading-tight space-y-0.5">
                     <div><b>Isi Kiriman :</b> {bttData.bttt_isikiriman || 'CHEMICALS / FARMASI'}</div>
-                    <div><b>Keterangan :</b> {keteranganFinal}</div>
+                    <div><b>Keterangan :</b> {keteranganAtas}</div>
                     <div><b>Jenis Harga :</b> {bttData.bttt_jeniskiriman || 'BERAT'}</div>
                   </div>
                 </div>
@@ -319,7 +328,8 @@ const BttPrintPage = () => {
                     <div className="flex justify-between text-slate-950 font-black text-[9.5px] pt-1 border-t border-dashed border-slate-300">
                       <span>Total Biaya :</span>
                       <span className="font-mono text-indigo-700">
-                        Rp {Math.round((parseFloat(bttData.bttt_harga) || 0) + (parseFloat(bttData.bttt_biayapenerus) || 0) + (parseFloat(bttData.bttt_biayapacking) || 0)).toLocaleString('id-ID')}
+                        {/* Rp {Math.round((parseFloat(bttData.bttt_harga) || 0) + (parseFloat(bttData.bttt_biayapenerus) || 0) + (parseFloat(bttData.bttt_biayapacking) || 0)).toLocaleString('id-ID')} */}
+                        Rp {Math.round((parseFloat(bttData.bttt_harga) || 0) + (parseFloat(bttData.bttt_biayapenerus) || 0) + (parseFloat(biayaPacking) || 0)).toLocaleString('id-ID')}
                       </span>
                     </div>
                   </div>
@@ -347,7 +357,7 @@ const BttPrintPage = () => {
                 </div>
                 <div>
                   <span className="text-slate-500">Lampiran Keterangan :</span>{' '}
-                  <span className="text-slate-900 font-extrabold">{keteranganFinal}</span> |{' '}
+                  <span className="text-slate-900 font-extrabold">{keteranganBawah}</span> |{' '}
                   <span className="text-slate-500">Layanan:</span>{' '}
                   <span className="text-indigo-700 font-extrabold">{layananText}</span>
                 </div>
