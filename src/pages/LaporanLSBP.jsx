@@ -206,7 +206,7 @@ const LaporanLSBP = () => {
         });
     };
 
-    // 🌟 37 KOLOM LENGKAP PERSIS GAMBAR 2
+    // 🌟 DAFTAR KOLOM YANG DITAMPILKAN (13 KOLOM TIDAK PENTING SUDAH DIELIMINASI)
     const columns = [
         {
             header: 'DN OD SJ',
@@ -228,7 +228,6 @@ const LaporanLSBP = () => {
         { header: 'TUJUAN KEPADA', accessor: 'bttt_tujuannama', render: (r) => <span className="font-bold">{r.bttt_tujuannama || '-'}</span> },
         { header: 'TUJUAN KOTA', accessor: 'bttt_tujuan_kota', render: (r) => <span className="font-bold uppercase text-slate-800">{r.bttt_tujuan_kota || '-'}</span> },
         { header: 'SERV', accessor: 'serv_name', render: (r) => <span className="font-bold text-indigo-900">{r.serv_name || '-'}</span> },
-        { header: 'TANGGAL BERANGKAT', accessor: 'tanggal_berangkat' },
         { header: 'DARAT', accessor: 'darat', align: 'center' },
         { header: 'LAUT', accessor: 'laut', align: 'center' },
         { header: 'UDARA', accessor: 'udara', align: 'center' },
@@ -258,10 +257,6 @@ const LaporanLSBP = () => {
         { header: 'NOMOR SPB', accessor: 'spb_id' },
         { header: 'NO. KWITANSI', accessor: 'artih_nokw' },
         { header: 'NO MOBIL', accessor: 'no_mobil', render: (r) => <span className="font-mono font-bold">{r.no_mobil || '-'}</span> },
-        { header: 'JAM MOBIL MASUK', accessor: 'jam_mobil_masuk' },
-        { header: 'JAM MOBIL KELUAR', accessor: 'jam_mobil_keluar' },
-        { header: 'KENDARAAN TIBA', accessor: 'tanggal_kend_tiba' },
-        { header: 'TANGGAL INV DISETUJUI', accessor: 'artih_tgl_acc' },
         { header: 'JUMLAH KOLI', accessor: 'bttt_jmlunit', align: 'center' },
         { header: 'BERAT VOLUME', accessor: 'bttt_beratvol', align: 'right' },
         { header: 'VOLUME', accessor: 'bttt_ukuran', align: 'right' },
