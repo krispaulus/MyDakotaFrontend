@@ -178,10 +178,10 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                 bttt_dliexpryn: initialData.bttt_dliexpryn || 'N',
                 bttt_promoid: initialData.bttt_promoid || '',
 
-                // Pengirim
+                // 🌟 PENGIRIM 
                 bttt_asalcustid: idPengirim,
                 bttt_asalname: namaPengirim,
-                bttt_up: initialData.bttt_up || initialData.up || namaPengirim, // 🌟 NAMA PENGIRIM / UP TERISI OTOMATIS
+                bttt_up: initialData.bttt_up_pengirim || initialData.pic_pengirim || namaPengirim,
                 bttt_asalalamat: initialData.bttt_asalalamat || initialData.asal_alamat || '',
                 bttt_asalkota: initialData.bttt_asalkota || initialData.asal_kota || '',
                 bttt_asaltelp: initialData.bttt_asaltelp || initialData.asal_telp || '',
@@ -189,16 +189,16 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                 bttt_asalemail: initialData.bttt_asalemail || '',
                 bttt_asalagenid: initialData.bttt_asalagenid || initialData.asal_agen_id || '1',
 
-                // Penerima
+                // 🌟 PENERIMA 
                 bttt_tujuannama: initialData.bttt_tujuannama || initialData.tujuan_nama || '',
-                bttt_up_penerima: initialData.bttt_up_penerima || '',
+                bttt_up_penerima: initialData.bttt_up_penerima || initialData.bttt_up || initialData.up || '',
                 bttt_tujuanalamat: initialData.bttt_tujuanalamat || initialData.tujuan_alamat || '',
                 bttt_tujuankota: initialData.bttt_tujuankota || initialData.tujuan_kota || '',
                 bttt_tujuankelurahan: initialData.bttt_tujuankelurahan || initialData.tujuan_kelurahan || '',
                 bttt_tujuankecamatan: initialData.bttt_tujuankecamatan || initialData.tujuan_kecamatan || '',
                 bttt_tujuankodepos: initialData.bttt_tujuankodepos || initialData.tujuan_kodepos || '',
                 bttt_tujuanemail: initialData.bttt_tujuanemail || '',
-                bttt_tujuantelp: initialData.bttt_tujuantelp || initialData.tujuan_telp || '',
+                bttt_tujuantelp: initialData.bttt_tujuantelp || initialData.tujuan_telp || initialData.telephone || '',
                 bttt_tujuantelp2: initialData.bttt_tujuantelp2 || '',
                 bttt_tujuantelp3: initialData.bttt_tujuantelp3 || '',
                 bttt_tujuanpropinsi: initialData.bttt_tujuanpropinsi || initialData.tujuan_propinsi || '',
