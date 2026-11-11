@@ -132,7 +132,7 @@ const BttPrintPage = () => {
                   <div
                     className="transform -rotate-[16deg] border-[6px] border-amber-600 rounded-2xl px-12 py-3 text-center bg-white/30"
                     style={{
-                      opacity: 0.55,
+                      opacity: 0.30,
                       mixBlendMode: 'multiply'
                     }}
                   >
@@ -152,7 +152,7 @@ const BttPrintPage = () => {
                   <div
                     className="transform -rotate-[16deg] border-[5px] border-red-600 rounded-2xl px-8 py-2.5 text-center bg-transparent"
                     style={{
-                      opacity: 0.5,
+                      opacity: 0.30,
                       mixBlendMode: 'multiply' // Efek cap tinta menyatu natural dengan kertas & teks di bawahnya
                     }}
                   >
