@@ -27,6 +27,11 @@ const MasterTarifCustomer = () => {
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [selectedJenisHarga, setSelectedJenisHarga] = useState('0'); // 0-5
 
+    // State Autocomplete Customer
+    const [custSuggestions, setCustSuggestions] = useState([]);
+    const [showCustSuggestions, setShowCustSuggestions] = useState(false);
+    const [isSearchingCust, setIsSearchingCust] = useState(false);
+
     // Modal Pilihan Tipe
     const [isCargoModalOpen, setIsCargoModalOpen] = useState(false);
     const [isDgModalOpen, setIsDgModalOpen] = useState(false);
@@ -102,6 +107,34 @@ const MasterTarifCustomer = () => {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        if (!filterCustomer || filterCustomer.trim().length < 2) {
+            setCustSuggestions([]);
+            setShowCustSuggestions(false);
+            return;
+        }
+
+        const delayDebounceFn = setTimeout(async () => {
+            try {
+                setIsSearchingCust(true);
+                const activeAgen = localStorage.getItem('active_agen_id') || '';
+                const roleAkses = localStorage.getItem('role_akses') === 'S' ? 'SUPERADMIN' : 'USER';
+                const res = await api.get(`/btt/search-customer?search=${encodeURIComponent(filterCustomer)}&agen_id=${encodeURIComponent(activeAgen)}&role_akses=${encodeURIComponent(roleAkses)}`);
+
+                if (res.data?.status === 'success') {
+                    setCustSuggestions(res.data.data || []);
+                    setShowCustSuggestions(true);
+                }
+            } catch (err) {
+                console.warn("Gagal fetch suggest customer:", err);
+            } finally {
+                setIsSearchingCust(false);
+            }
+        }, 300);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [filterCustomer]);
 
     useEffect(() => {
         if (token) fetchCustomers();
@@ -251,8 +284,8 @@ const MasterTarifCustomer = () => {
                         onClick={() => handleTarifBadgeClick(row, 'reguler', row.jml_reguler)}
                         title="Klik untuk Download CSV atau Copy ke Customer Lain"
                         className={`px-2.5 py-1 rounded-lg text-[11px] font-mono font-black transition cursor-pointer shadow-xs active:scale-95 ${row.jml_reguler > 0
-                                ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300'
-                                : 'bg-slate-100 hover:bg-slate-200 text-slate-400 border border-slate-200'
+                            ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-400 border border-slate-200'
                             }`}
                     >
                         R: {row.jml_reguler || 0}
@@ -264,8 +297,8 @@ const MasterTarifCustomer = () => {
                         onClick={() => handleTarifBadgeClick(row, 'charter', row.jml_charter)}
                         title="Klik untuk Download CSV atau Copy ke Customer Lain"
                         className={`px-2.5 py-1 rounded-lg text-[11px] font-mono font-black transition cursor-pointer shadow-xs active:scale-95 ${row.jml_charter > 0
-                                ? 'bg-sky-100 hover:bg-sky-200 text-sky-800 border border-sky-300'
-                                : 'bg-slate-100 hover:bg-slate-200 text-slate-400 border border-slate-200'
+                            ? 'bg-sky-100 hover:bg-sky-200 text-sky-800 border border-sky-300'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-400 border border-slate-200'
                             }`}
                     >
                         C: {row.jml_charter || 0}
@@ -277,8 +310,8 @@ const MasterTarifCustomer = () => {
                         onClick={() => handleTarifBadgeClick(row, 'multidrop', row.jml_multidrop)}
                         title="Klik untuk Download CSV atau Copy ke Customer Lain"
                         className={`px-2.5 py-1 rounded-lg text-[11px] font-mono font-black transition cursor-pointer shadow-xs active:scale-95 ${row.jml_multidrop > 0
-                                ? 'bg-purple-100 hover:bg-purple-200 text-purple-800 border border-purple-300'
-                                : 'bg-slate-100 hover:bg-slate-200 text-slate-400 border border-slate-200'
+                            ? 'bg-purple-100 hover:bg-purple-200 text-purple-800 border border-purple-300'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-400 border border-slate-200'
                             }`}
                     >
                         M: {row.jml_multidrop || 0}
@@ -478,15 +511,39 @@ const MasterTarifCustomer = () => {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
+                        <div className="relative">
                             <label className="font-bold text-slate-600 block mb-1 uppercase">CARI CUSTOMER</label>
                             <input
                                 type="text"
-                                placeholder="Ketik kode atau nama customer..."
+                                placeholder="Ketik nama customer (misal: Merck)..."
                                 value={filterCustomer}
                                 onChange={(e) => setFilterCustomer(e.target.value)}
-                                className="w-full p-2.5 border border-slate-300 rounded-xl font-semibold text-slate-800 bg-white outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+                                onFocus={() => { if (custSuggestions.length > 0) setShowCustSuggestions(true); }}
+                                className="w-full p-2.5 border border-slate-300 rounded-xl font-semibold text-slate-800 bg-white outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 uppercase"
                             />
+
+                            {/* Dropdown Suggestions Otomatis */}
+                            {showCustSuggestions && custSuggestions.length > 0 && (
+                                <div className="absolute left-0 right-0 top-[62px] bg-white border border-sky-400 rounded-xl shadow-2xl z-50 max-h-56 overflow-y-auto divide-y divide-slate-100 text-xs">
+                                    {custSuggestions.map((cust, idx) => (
+                                        <div
+                                            key={idx}
+                                            onClick={() => {
+                                                const namaCust = cust.cust_name || cust.cust_nama || '';
+                                                setFilterCustomer(namaCust);
+                                                setShowCustSuggestions(false);
+                                                fetchCustomers({ customer: namaCust });
+                                            }}
+                                            className="p-3 hover:bg-sky-50 cursor-pointer font-bold text-slate-800 flex justify-between items-center transition-colors"
+                                        >
+                                            <span>🏢 {cust.cust_name || cust.cust_nama}</span>
+                                            <span className="font-mono text-sky-700 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
+                                                [{cust.cust_id}]
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         <div>

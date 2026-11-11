@@ -25,6 +25,10 @@ const LaporanLSBP = () => {
     const [filterStatus, setFilterStatus] = useState('');
     const [globalSearch, setGlobalSearch] = useState('');
 
+    // State Suggestion Customer
+    const [custSuggestions, setCustSuggestions] = useState([]);
+    const [showCustSuggestions, setShowCustSuggestions] = useState(false);
+
     // Modal Form States (SESUAI FORM LEGACY GAMBAR 1)
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
@@ -248,6 +252,29 @@ const LaporanLSBP = () => {
         );
     });
 
+    useEffect(() => {
+        if (!filterCustomer || filterCustomer.trim().length < 2) {
+            setCustSuggestions([]);
+            setShowCustSuggestions(false);
+            return;
+        }
+
+        const timer = setTimeout(async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await api.get(`/marketing/transport-planning/suggest-customer?q=${encodeURIComponent(filterCustomer)}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                setCustSuggestions(res.data?.data || []);
+                setShowCustSuggestions(true);
+            } catch (err) {
+                console.error("Gagal cari customer:", err);
+            }
+        }, 250);
+
+        return () => clearTimeout(timer);
+    }, [filterCustomer]);
+
     return (
         <div className="space-y-4 font-sans">
             {/* PANEL FILTER ATAS */}
@@ -271,15 +298,43 @@ const LaporanLSBP = () => {
                             onChange={e => setFilterTgle(e.target.value)}
                         />
                     </div>
-                    <div className="col-span-3">
+                    <div className="col-span-3 relative">
                         <label className="block mb-1 text-slate-500 uppercase">NAMA CUSTOMER</label>
                         <input
                             type="text"
                             placeholder="CARI CUSTOMER..."
-                            className="w-full p-2.5 border border-slate-200 rounded-lg bg-white outline-none uppercase font-medium"
+                            className="w-full p-2.5 border border-slate-200 rounded-lg bg-white outline-none uppercase font-medium focus:border-indigo-500"
                             value={filterCustomer}
                             onChange={e => setFilterCustomer(e.target.value)}
+                            onFocus={() => { if (custSuggestions.length > 0) setShowCustSuggestions(true); }}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                    setShowCustSuggestions(false);
+                                    fetchReport();
+                                }
+                            }}
                         />
+
+                        {/* Dropdown Suggestion */}
+                        {showCustSuggestions && custSuggestions.length > 0 && (
+                            <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-indigo-200 rounded-xl shadow-xl max-h-48 overflow-y-auto z-50 divide-y divide-slate-100 text-xs">
+                                {custSuggestions.map((item, idx) => (
+                                    <div
+                                        key={idx}
+                                        onClick={() => {
+                                            setFilterCustomer(item.cust_name);
+                                            setShowCustSuggestions(false);
+                                        }}
+                                        className="p-2.5 hover:bg-indigo-50 cursor-pointer font-bold text-slate-700 flex justify-between items-center transition"
+                                    >
+                                        <span>🏢 {item.cust_name.toUpperCase()}</span>
+                                        <span className="font-mono text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded text-[10px]">
+                                            [{item.cust_id}]
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                     <div className="col-span-3">
                         <label className="block mb-1 text-slate-500 uppercase">NO. DN / OD / SJ</label>
