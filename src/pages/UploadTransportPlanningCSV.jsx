@@ -369,6 +369,7 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
             const payload = {
                 customer_id: selectedCust.cust_id,
                 customer_name: selectedCust.cust_name,
+                agen_id: localStorage.getItem("agen_id") || "",
                 rows: dataValid,
             };
 

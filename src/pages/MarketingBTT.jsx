@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Edit3, Printer, Filter, RefreshCw, Trash2, QrCode } from 'lucide-react';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import Swal from 'sweetalert2';
 import { useDarkMode } from "../context/DarkModeContext";
 import BttFormModal from '../components/organisms/BttFormModal';
 import api from '../api/axios';
+
 
 const MarketingBTT = () => {
     const { isDarkMode } = useDarkMode();
@@ -367,6 +368,34 @@ const MarketingBTT = () => {
         });
     };
 
+    const [custSuggestions, setCustSuggestions] = useState([]);
+    const [showCustDropdown, setShowCustDropdown] = useState(false);
+    const custDropdownRef = useRef(null);
+
+    useEffect(() => {
+        const q = (filterCustomer || "").trim();
+        if (q.length < 2) {
+            setCustSuggestions([]);
+            setShowCustDropdown(false);
+            return;
+        }
+
+        const timer = setTimeout(async () => {
+            try {
+                const token = localStorage.getItem("token");
+                const res = await api.get(`/marketing/transport-planning/suggest-customer?q=${encodeURIComponent(q)}`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                setCustSuggestions(res.data?.data || []);
+                setShowCustDropdown(true);
+            } catch (err) {
+                console.error("Gagal memuat suggestion customer:", err);
+            }
+        }, 250);
+
+        return () => clearTimeout(timer);
+    }, [filterCustomer]);
+
     return (
         <div className="relative space-y-4">
             {/* FORM FILTER */}
@@ -434,15 +463,39 @@ const MarketingBTT = () => {
                             </select>
                         </div>
 
-                        <div>
-                            <label className="font-bold text-slate-500 block mb-1">CUSTOMER</label>
+                        <div className="relative" ref={custDropdownRef}>
+                            <label className="font-bold text-slate-500 block mb-1">
+                                CUSTOMER
+                            </label>
                             <input
                                 type="text"
-                                placeholder="Cari nama customer..."
+                                autoComplete="off"
+                                placeholder="Ketik nama customer..."
                                 value={filterCustomer}
                                 onChange={(e) => setFilterCustomer(e.target.value)}
+                                onFocus={() => {
+                                    if (custSuggestions.length > 0) setShowCustDropdown(true);
+                                }}
                                 className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 bg-white outline-none focus:border-sky-500"
                             />
+
+                            {showCustDropdown && custSuggestions.length > 0 && (
+                                <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-52 overflow-y-auto z-50 divide-y divide-slate-100 text-xs">
+                                    {custSuggestions.map((item, idx) => (
+                                        <div
+                                            key={idx}
+                                            onClick={() => {
+                                                setFilterCustomer(item.cust_name);
+                                                setShowCustDropdown(false);
+                                            }}
+                                            className="px-3 py-2 hover:bg-sky-50 cursor-pointer text-slate-700 font-semibold transition"
+                                        >
+                                            <span className="font-mono text-sky-700 font-bold">[{item.cust_id}]</span>{" "}
+                                            {item.cust_name}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         <div>
