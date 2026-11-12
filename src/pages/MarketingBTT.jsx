@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Edit3, Printer, Filter, RefreshCw } from 'lucide-react';
+import { Edit3, Printer, Filter, RefreshCw, Trash2, QrCode } from 'lucide-react';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import Swal from 'sweetalert2';
 import { useDarkMode } from "../context/DarkModeContext";
@@ -108,6 +108,42 @@ const MarketingBTT = () => {
         setIsModalOpen(true);
     };
 
+    // 🗑️ FUNGSI HAPUS / NON-AKTIFKAN BTT (TONG SAMPAH)
+    const handleDeleteBTT = (row) => {
+        const targetBttID = row.id || row.bttt_id;
+        Swal.fire({
+            title: 'Non-Aktifkan / Hapus BTT?',
+            html: `Apakah Anda yakin ingin menghapus BTT <b>${targetBttID}</b>?<br/><span style="font-size:12px;color:#64748b;">Penerima: ${row.tujuan_nama || '-'}</span>`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc2626',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Ya, Hapus BTT!',
+            cancelButtonText: 'Batal'
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                try {
+                    const token = localStorage.getItem('token');
+                    await api.delete(`/marketing/btt/${encodeURIComponent(targetBttID)}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    Swal.fire('Terhapus!', `BTT ${targetBttID} berhasil dinonaktifkan.`, 'success');
+                    fetchBTT(filterAgenId);
+                } catch (err) {
+                    Swal.fire('Gagal', err.response?.data?.message || err.response?.data?.error || 'Gagal menghapus BTT', 'error');
+                }
+            }
+        });
+    };
+
+    // 🏷️ FUNGSI CETAK BARCODE KOLI (TOMBOL BARCODE)
+    const handlePrintBarcodeKoli = (row) => {
+        const targetBttID = row.id || row.bttt_id;
+        localStorage.setItem('print_barcode_btt_id', targetBttID);
+        localStorage.setItem('print_barcode_payload', JSON.stringify(row));
+        window.open(`/marketing/btt/barcode?id=${encodeURIComponent(targetBttID)}`, '_blank');
+    };
+
     // ➕ FUNGSI BUKA MODAL TAMBAH BTT
     const handleOpenCreateBTT = () => {
         const activeAgenId = localStorage.getItem('active_agen_id') || '';
@@ -185,8 +221,8 @@ const MarketingBTT = () => {
             header: 'ACTION',
             accessor: 'action',
             render: (row) => (
-                <div className="flex items-center justify-center gap-2">
-                    {/* Tombol Cetak Resi */}
+                <div className="flex items-center justify-center gap-1.5">
+                    {/* 1. Tombol Cetak Resi */}
                     <button
                         type="button"
                         onClick={() => handlePrintBTT(row)}
@@ -196,7 +232,7 @@ const MarketingBTT = () => {
                         <Printer size={15} />
                     </button>
 
-                    {/* Tombol Edit BTT */}
+                    {/* 2. Tombol Edit BTT */}
                     <button
                         type="button"
                         onClick={() => handleOpenEditBTT(row)}
@@ -204,6 +240,26 @@ const MarketingBTT = () => {
                         className="p-1.5 text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-lg transition cursor-pointer"
                     >
                         <Edit3 size={15} />
+                    </button>
+
+                    {/* 3. Tombol Hapus / Non-Aktifkan BTT (Tong Sampah Merah) */}
+                    <button
+                        type="button"
+                        onClick={() => handleDeleteBTT(row)}
+                        title="Hapus / Non-Aktifkan BTT"
+                        className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                    >
+                        <Trash2 size={15} />
+                    </button>
+
+                    {/* 4. Tombol Cetak Barcode Koli */}
+                    <button
+                        type="button"
+                        onClick={() => handlePrintBarcodeKoli(row)}
+                        title="Cetak Label Barcode Koli"
+                        className="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition cursor-pointer"
+                    >
+                        <QrCode size={15} />
                     </button>
                 </div>
             )

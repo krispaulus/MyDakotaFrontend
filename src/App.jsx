@@ -145,6 +145,7 @@ import SuratTugas from './pages/SuratTugas';
 import MobileValidasiSuratTugas from './pages/MobileValidasiSuratTugas';
 import ScanSuratTugas from './pages/ScanSuratTugas';
 import UploadKimiaFarmaCSV from "./pages/UploadKimiaFarmaCSV";
+import BttBarcodePrintPage from './pages/BttBarcodePrintPage';
 
 const getCompanyName = (pt) => {
   if (pt === 'A') return 'Dakota Buana Sarana';
@@ -764,7 +765,7 @@ function App() {
 
       <Route path="/master/uang-muka" element={<MainLayout><MasterUangMuka menuName="MasterUangMuka" /></MainLayout>} />
       <Route path="/marketing/customer-upload-CSV/upload-kimia-farma-csv" element={<MainLayout><UploadKimiaFarmaCSV menuName="UploadKimiaFarmaCSV" /></MainLayout>} />
-
+      <Route path="/marketing/btt/barcode" element={<BttBarcodePrintPage />} />
 
       {/* Jika nanti ada halaman lain, tinggal bungkus lagi pakai MainLayout 
       <Route
