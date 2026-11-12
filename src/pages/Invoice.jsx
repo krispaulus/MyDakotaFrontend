@@ -222,6 +222,8 @@ const Invoice = () => {
     const [selectedJenis, setSelectedJenis] = useState('');
     const [selectedTerbayar, setSelectedTerbayar] = useState('');
     const [searchCustomer, setSearchCustomer] = useState('');
+    const [showFilterCustDropdown, setShowFilterCustDropdown] = useState(false);
+    const [filterCustSuggestions, setFilterCustSuggestions] = useState([]);
     const [searchInvoice, setSearchInvoice] = useState('');
     const [searchKwitansi, setSearchKwitansi] = useState('');
     const [searchBTT, setSearchBTT] = useState('');
@@ -267,6 +269,44 @@ const Invoice = () => {
         window.addEventListener('click', handleOutsideClick);
         return () => window.removeEventListener('click', handleOutsideClick);
     }, []);
+
+    useEffect(() => {
+        const query = searchCustomer.trim();
+        if (query.length < 2) {
+            setFilterCustSuggestions([]);
+            return;
+        }
+
+        // Filter instan dari cache custList yang sudah ada
+        const cleanQ = query.replace(/\./g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+        const localMatches = custList
+            .filter(c => {
+                const name = String(c.cust_name || c.CustName || '').toLowerCase();
+                const id = String(c.cust_id || c.CustID || '').toLowerCase();
+                return name.includes(cleanQ) || id.includes(cleanQ);
+            })
+            .slice(0, 15);
+        setFilterCustSuggestions(localMatches);
+
+        // Lengkapi dengan live search ke server
+        const delayDebounce = setTimeout(async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const cleanKeyword = query.replace(/\./g, ' ').replace(/\s+/g, ' ').trim();
+                const res = await api.get(`/customer?search=${encodeURIComponent(cleanKeyword)}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const resultList = res.data?.data || [];
+                if (resultList.length > 0) {
+                    setFilterCustSuggestions(resultList.slice(0, 20));
+                }
+            } catch (err) {
+                console.warn("Gagal live search filter customer:", err);
+            }
+        }, 300);
+
+        return () => clearTimeout(delayDebounce);
+    }, [searchCustomer]);
 
     // =========================================================================
     // STATE MODAL BUAT INVOICE BARU
@@ -731,12 +771,25 @@ const Invoice = () => {
         }
     };
 
+    const calculateDueDateFromTOP = (baseDateStr, topDays) => {
+        const d = baseDateStr ? new Date(baseDateStr) : new Date();
+        if (isNaN(d.getTime())) return baseDateStr || today;
+        const days = parseInt(topDays, 10) || 0;
+        d.setDate(d.getDate() + days);
+        return d.toISOString().split('T')[0];
+    };
+
     const handleSelectCustomerForNewInvoice = (custId) => {
         const cust = custList.find(c => String(c.cust_id) === String(custId));
+        const topHari = Number(cust?.cust_kredit || cust?.cust_top || cust?.top || 0);
+        const autoTglTempo = calculateDueDateFromTOP(newInvoiceForm.artih_tanggal, topHari);
+
         setNewInvoiceForm(prev => ({
             ...prev,
             artih_custid: custId,
             artih_custname: cust ? (cust.cust_name || cust.CustName) : '',
+            artih_tgltempo: autoTglTempo,
+            cust_top: topHari,
             selected_btts: []
         }));
     };
@@ -958,9 +1011,14 @@ const Invoice = () => {
             const rawKW = String(header.artih_nokw || '').trim();
             const cleanKW = rawKW.replace(/\/OTA\//g, '/001/');
 
+            //tambahan 
             const tglInvoiceRaw = String(header.artih_tanggal || '').split('T')[0] || today;
-            const tglTempoRaw = String(header.artih_tgltempo || header.artih_jatuhtempo || header.tgl_jatuh_tempo || header.artih_tanggal || '').split('T')[0] || tglInvoiceRaw;
+            const dbTempoRaw = String(header.artih_tgltempo || header.artih_jatuhtempo || header.tgl_jatuh_tempo || '').split('T')[0];
+            const custTopDays = Number(header.cust_top || 0);
 
+            const tglTempoRaw = (dbTempoRaw && dbTempoRaw !== '0001-01-01')
+                ? dbTempoRaw
+                : calculateDueDateFromTOP(tglInvoiceRaw, custTopDays);
             // Masukkan data ke form state
 
             // 1. Simpan nomor faktur & nomor kwitansi yang sudah dinormalisasi
@@ -1376,9 +1434,10 @@ const Invoice = () => {
             ).trim();
 
             const tglKwitansiIndo = formatTanggalIndonesia(header.artih_tanggal);
-            const tglJatuhTempoIndo = formatTanggalIndonesia(header.artih_tanggal);
+            const tglJatuhTempoIndo = formatTanggalIndonesia(header.artih_tgltempo || header.artih_jatuhtempo || header.artih_tanggal);
             const tglCetakIndo = formatTanggalIndonesia(header.artih_tanggal);
             const noInvoiceResmi = formatNomorInvoiceResmi(header.artih_id, header.artih_tanggal);
+            const hasNomorPO = nomorPOCustomer !== '' && nomorPOCustomer !== '-';
 
             let noFakturPajak = String(header.artih_fktpajak || '').trim();
             if (!noFakturPajak || noFakturPajak === '010.' || noFakturPajak === '010') {
@@ -1519,16 +1578,18 @@ const Invoice = () => {
                                             <td style="padding: 1.5px 0; font-family: monospace;  color: #0f172a;">${noFakturPajak}</td>
                                         </tr>
                                         <tr>
-                                            <td style="padding: 1.5px 0; color: #475569;">Tanggal Jatuh Tempo</td>
-                                            <td style="padding: 1.5px 0;">:</td>
-                                            <td style="padding: 1.5px 0;  color: #b91c1c;">${tglJatuhTempoIndo}</td>
+                                            <td style="color:#334155; padding: 4px 0;">Tanggal Jatuh Tempo</td>
+                                            <td style="text-align: center;">:</td>
+                                            <td style="font-weight: 500; color:#1e293b;">
+                                                ${tglJatuhTempoIndo}
+                                            </td>
                                         </tr>
-                                        ${isCustomerMerck ? `
+                                        ${hasNomorPO ? `
                                         <tr>
-                                            <td style="padding: 1.5px 0; color: #475569; ">Nomor PO</td>
-                                            <td style="padding: 1.5px 0;">:</td>
-                                            <td style="padding: 1.5px 0; font-family: monospace;  color: #0f172a;">
-                                                ${nomorPOCustomer !== '' ? nomorPOCustomer : '-'}
+                                            <td style="font-weight: 600; padding: 2px 0;">Nomor PO</td>
+                                            <td style="padding: 2px 4px;">:</td>
+                                            <td style="font-weight: bold; color: #0f172a; padding: 2px 0;">
+                                                ${nomorPOCustomer}
                                             </td>
                                         </tr>
                                         ` : ''}
@@ -1711,21 +1772,22 @@ const Invoice = () => {
                                             Sesuai Faktur Penagihan : <span style="font-family: monospace; font-weight: bold; color:#0284c7;">${noInvoiceResmi}</span>
                                         </div>
                                     </td>
-                                </tr>
-                                <tr>
-                                    <td style="color:#334155; padding: 4px 0;">Tanggal Jatuh Tempo</td>
-                                    <td style="text-align: center;">:</td>
-                                    <td style="font-weight: 500; color:#1e293b;">
-                                        ${tglCetakIndo}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td style="font-weight: 600; padding: 2px 0;">Nomor PO</td>
-                                    <td style="padding: 2px 4px;">:</td>
-                                    <td style="font-weight: bold; color: #0f172a; padding: 2px 0;">
-                                        ${nomorPOCustomer !== '' ? nomorPOCustomer : '-'}
-                                    </td>
-                                </tr>
+                                    <tr>
+                                        <td style="color:#334155; padding: 4px 0;">Tanggal Jatuh Tempo</td>
+                                        <td style="text-align: center;">:</td>
+                                        <td style="font-weight: 500; color:#1e293b;">
+                                            ${tglJatuhTempoIndo}
+                                        </td>
+                                    </tr>
+                                    ${hasNomorPO ? `
+                                    <tr>
+                                        <td style="font-weight: 600; padding: 2px 0;">Nomor PO</td>
+                                        <td style="padding: 2px 4px;">:</td>
+                                        <td style="font-weight: bold; color: #0f172a; padding: 2px 0;">
+                                            ${nomorPOCustomer}
+                                        </td>
+                                    </tr>
+                                    ` : ''}
                             </table>
                             <div style="margin-top: 20px; display: flex; align-items: center;">
                                 <div style="border: 2px solid #004b84; background: #f0fdf4; border-radius: 8px; padding: 10px 20px; min-width: 250px;">
@@ -1885,17 +1947,21 @@ const Invoice = () => {
                                         <td style="padding: 1px 0; font-family: monospace; font-weight: 600;">${noFakturPajak}</td>
                                     </tr>
                                     <tr>
-                                        <td style="padding: 1px 0; color:#475569;">Tanggal Jatuh Tempo</td>
-                                        <td style="padding: 1px 0;">:</td>
-                                        <td style="padding: 1px 0; font-weight: bold; color:#b91c1c;">${tglCetakIndo}</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 1px 0; font-weight: 600;">Nomor PO</td>
-                                        <td style="padding: 1px 0; font-weight: 600;">:</td>
-                                        <td style="padding: 1px 0; font-weight: bold; color: #0f172a;">
-                                            ${nomorPOCustomer !== '' ? nomorPOCustomer : '-'}
+                                        <td style="color:#334155; padding: 4px 0;">Tanggal Jatuh Tempo</td>
+                                        <td style="text-align: center;">:</td>
+                                        <td style="font-weight: 500; color:#1e293b;">
+                                            ${tglJatuhTempoIndo}
                                         </td>
                                     </tr>
+                                    ${hasNomorPO ? `
+                                    <tr>
+                                        <td style="font-weight: 600; padding: 2px 0;">Nomor PO</td>
+                                        <td style="padding: 2px 4px;">:</td>
+                                        <td style="font-weight: bold; color: #0f172a; padding: 2px 0;">
+                                            ${nomorPOCustomer}
+                                        </td>
+                                    </tr>
+                                    ` : ''}
                                 </table>
                             </div>
                         </div>
@@ -2243,17 +2309,17 @@ const Invoice = () => {
         if (!item) return;
 
         const content = `{\\rtf1\\ansi\\deff0
-{\\fonttbl{\\f0\\fnil\\fcharset0 Arial;}}
-\\viewkind4\\uc1\\pard\\qc\\b\\fs24 PT DAKOTA LOGISTIK INDONESIA\\par
-\\fs20 TANDA TERIMA TAGIHAN\\par\\b0\\par
-\\pard\\fs18
-Nomor Invoice : ${item.artih_id}\\par
-Nomor Kwitansi: ${item.artih_nokw || '-'}\\par
-Pelanggan     : ${item.cust_name || item.artih_custname}\\par
-Tanggal       : ${String(item.artih_tanggal || '').substring(0, 10)}\\par
-Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par\\par
-\\pard\\qc ( Lembar Asli Untuk Pembawa Tagihan )\\par
-}`;
+            {\\fonttbl{\\f0\\fnil\\fcharset0 Arial;}}
+            \\viewkind4\\uc1\\pard\\qc\\b\\fs24 PT DAKOTA LOGISTIK INDONESIA\\par
+            \\fs20 TANDA TERIMA TAGIHAN\\par\\b0\\par
+            \\pard\\fs18
+            Nomor Invoice : ${item.artih_id}\\par
+            Nomor Kwitansi: ${item.artih_nokw || '-'}\\par
+            Pelanggan     : ${item.cust_name || item.artih_custname}\\par
+            Tanggal       : ${String(item.artih_tanggal || '').substring(0, 10)}\\par
+            Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par\\par
+            \\pard\\qc ( Lembar Asli Untuk Pembawa Tagihan )\\par
+            }`;
 
         const blob = new Blob([content], { type: 'application/rtf' });
         const url = URL.createObjectURL(blob);
@@ -3452,15 +3518,65 @@ Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par
                             </select>
                         </div>
 
-                        <div>
+                        <div className="relative" onClick={(e) => e.stopPropagation()}>
                             <label className="font-bold text-slate-500 block mb-1">CUSTOMER</label>
-                            <input
-                                type="text"
-                                placeholder="Cari nama customer..."
-                                value={searchCustomer}
-                                onChange={(e) => setSearchCustomer(e.target.value)}
-                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                            />
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="Ketik minimal 2 huruf (misal: MERCK)..."
+                                    value={searchCustomer}
+                                    onFocus={() => setShowFilterCustDropdown(true)}
+                                    onChange={(e) => {
+                                        setSearchCustomer(e.target.value);
+                                        setShowFilterCustDropdown(true);
+                                    }}
+                                    className="w-full p-2 pr-7 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500 uppercase"
+                                />
+                                {searchCustomer && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSearchCustomer('');
+                                            setFilterCustSuggestions([]);
+                                            setShowFilterCustDropdown(false);
+                                        }}
+                                        className="absolute right-2 top-2 text-slate-400 hover:text-rose-600 font-bold cursor-pointer"
+                                        title="Hapus filter customer"
+                                    >
+                                        ✕
+                                    </button>
+                                )}
+                            </div>
+
+                            {showFilterCustDropdown && searchCustomer.trim().length >= 2 && (
+                                <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-300 rounded-xl shadow-2xl max-h-60 overflow-y-auto z-50 divide-y divide-slate-100 text-xs">
+                                    {filterCustSuggestions.length > 0 ? (
+                                        filterCustSuggestions.map((cust, i) => {
+                                            const cName = cust.cust_name || cust.CustName || '';
+                                            const cId = cust.cust_id || cust.CustID || '';
+                                            return (
+                                                <div
+                                                    key={i}
+                                                    onClick={() => {
+                                                        setSearchCustomer(cName);
+                                                        setShowFilterCustDropdown(false);
+                                                    }}
+                                                    className="p-2.5 hover:bg-sky-50 cursor-pointer font-bold text-slate-800 flex justify-between items-center gap-2 transition"
+                                                >
+                                                    <span className="truncate">{cName}</span>
+                                                    <span className="font-mono text-sky-700 bg-sky-50 px-2 py-0.5 rounded border border-sky-200 text-[10px] shrink-0">
+                                                        {cId}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })
+                                    ) : (
+                                        <div className="p-3 text-center text-slate-400 italic">
+                                            Customer tidak ditemukan
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         <div>
