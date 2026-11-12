@@ -429,8 +429,8 @@ export default function ScanSuratTugas() {
                         </div>
                     </div>
 
-                    {/* TOMBOL "TAMBAH RINCIAN" (GAMBAR 2) — MUNCUL SAAT BELUM MODE LOADING & BELUM PROSES */}
-                    {!isLoadingMode && !isSudahProses && (
+                    {/* TOMBOL "TAMBAH RINCIAN" — MUNCUL SELAMA BELUM MODE LOADING */}
+                    {!isLoadingMode && (
                         <div className="bg-white p-4 rounded-2xl border border-sky-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
                             <div>
                                 <div className="font-black text-xs text-slate-800 uppercase">Input Muatan Koli BTT</div>

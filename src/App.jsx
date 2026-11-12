@@ -766,6 +766,7 @@ function App() {
       <Route path="/master/uang-muka" element={<MainLayout><MasterUangMuka menuName="MasterUangMuka" /></MainLayout>} />
       <Route path="/marketing/customer-upload-CSV/upload-kimia-farma-csv" element={<MainLayout><UploadKimiaFarmaCSV menuName="UploadKimiaFarmaCSV" /></MainLayout>} />
       <Route path="/marketing/btt/barcode" element={<BttBarcodePrintPage />} />
+      <Route path="/scan-surat-tugas" element={<ScanSuratTugas />} />
 
       {/* Jika nanti ada halaman lain, tinggal bungkus lagi pakai MainLayout 
       <Route
