@@ -1,13 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
 import api from '../api/axios';
-import { CheckCircle2, XCircle, Truck, Calendar, MapPin, User, Search, RefreshCw, Camera, X } from 'lucide-react';
+import {
+    CheckCircle2, XCircle, RefreshCw, Camera, X,
+    PlusCircle, QrCode, PackageCheck, Play, Trash2
+} from 'lucide-react';
 import Swal from 'sweetalert2';
 
 const MobileValidasiSuratTugas = () => {
     const [searchParams, setSearchParams] = useSearchParams();
-    const navigate = useNavigate();
     const noSuratTugas = searchParams.get('no') || '';
 
     const [inputManualNo, setInputManualNo] = useState('');
@@ -15,12 +17,22 @@ const MobileValidasiSuratTugas = () => {
     const [loading, setLoading] = useState(false);
     const [processing, setProcessing] = useState(false);
 
-    // State untuk Scanner Kamera
+    // State Proses Muat Barang (Loading Checker)
+    const [isLoadingMode, setIsLoadingMode] = useState(false);
+    const [loadingId, setLoadingId] = useState('');
+    const [isLoadingFinished, setIsLoadingFinished] = useState(false);
+    const [koliInput, setKoliInput] = useState('');
+    const [scanningKoli, setScanningKoli] = useState(false);
+
+    // State Scanner Kamera (Surat Tugas & Koli BTT)
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [cameraLoading, setCameraLoading] = useState(false);
-    const html5QrCodeRef = useRef(null);
+    const [isKoliCameraOpen, setIsKoliCameraOpen] = useState(false);
 
-    // Identitas petugas yang login di browser
+    const html5QrCodeRef = useRef(null);
+    const koliQrCodeRef = useRef(null);
+    const koliInputRef = useRef(null);
+
     const loggedUser = localStorage.getItem('username')
         || localStorage.getItem('realname')
         || 'PETUGAS CHECKER';
@@ -28,17 +40,20 @@ const MobileValidasiSuratTugas = () => {
         || localStorage.getItem('cabang_nama')
         || 'DLI PUSAT';
 
-    const fetchDetail = (nomor) => {
+    const fetchDetail = async (nomor) => {
         if (!nomor) return;
         setLoading(true);
-        api.get(`/operasional/surat-tugas/public-detail?no=${encodeURIComponent(nomor)}`)
-            .then(res => {
-                setData(res.data?.data || null);
-            })
-            .catch(() => {
-                setData(null);
-            })
-            .finally(() => setLoading(false));
+        try {
+            const ptId = localStorage.getItem('pt_id') || 'C';
+            const res = await api.get(`/operasional/surat-tugas/public-detail`, {
+                params: { no: nomor, pt_id: ptId }
+            });
+            setData(res.data?.data || null);
+        } catch {
+            setData(null);
+        } finally {
+            setLoading(false);
+        }
     };
 
     useEffect(() => {
@@ -48,7 +63,7 @@ const MobileValidasiSuratTugas = () => {
     }, [noSuratTugas]);
 
     // =========================================================================
-    // 📷 LOGIKA SCANNER KAMERA WEB (HTML5 QR CODE)
+    // 📷 1. SCANNER KAMERA SURAT TUGAS (TAHAP AWAL)
     // =========================================================================
     const startScanner = async () => {
         setIsCameraOpen(true);
@@ -59,18 +74,16 @@ const MobileValidasiSuratTugas = () => {
                 const scanner = new Html5Qrcode("qr-reader-box");
                 html5QrCodeRef.current = scanner;
 
-                const config = {
-                    fps: 10,
-                    qrbox: { width: 230, height: 230 },
-                    aspectRatio: 1.0
-                };
-
                 await scanner.start(
                     { facingMode: "environment" },
-                    config,
+                    { fps: 10, qrbox: { width: 230, height: 230 }, aspectRatio: 1.0 },
                     (decodedText) => {
                         stopScanner();
-                        const cleanCode = decodedText.trim().toUpperCase();
+                        let cleanCode = decodedText.trim();
+                        if (cleanCode.includes('no=')) {
+                            cleanCode = decodeURIComponent(cleanCode.split('no=')[1].split('&')[0]);
+                        }
+                        cleanCode = cleanCode.toUpperCase();
                         setInputManualNo(cleanCode);
                         setSearchParams({ no: cleanCode });
                     },
@@ -84,7 +97,7 @@ const MobileValidasiSuratTugas = () => {
                 Swal.fire({
                     icon: 'warning',
                     title: 'Kamera Tidak Tersedia',
-                    text: 'Izin kamera ditolak atau perangkat tidak mendukung. Silakan gunakan input nomor manual.',
+                    text: 'Izin kamera ditolak atau koneksi masih HTTP. Silakan gunakan input nomor manual.',
                     confirmButtonColor: '#004b84'
                 });
             }
@@ -96,31 +109,164 @@ const MobileValidasiSuratTugas = () => {
             try {
                 await html5QrCodeRef.current.stop();
                 html5QrCodeRef.current.clear();
-            } catch (err) {
-                console.warn("Gagal stop kamera:", err);
-            }
+            } catch { }
             html5QrCodeRef.current = null;
         }
         setIsCameraOpen(false);
         setCameraLoading(false);
     };
 
+    // =========================================================================
+    // 📦 2. KLIK "TAMBAH RINCIAN" -> MULAI PROSES MUAT BARANG (LOADING)
+    // =========================================================================
+    const handleTambahRincian = async () => {
+        if (!data) return;
+        try {
+            const ptId = localStorage.getItem('pt_id') || 'C';
+            const targetNo = data.raw_sjh_id || data.no_surat_tugas || noSuratTugas;
+            const res = await api.post(`/operasional/surat-tugas/start-loading?pt_id=${ptId}`, {
+                no_surat_tugas: targetNo
+            });
+
+            setLoadingId(res.data?.loading_id || `LC001${Date.now()}`);
+            setIsLoadingMode(true);
+            setIsLoadingFinished(false);
+
+            setTimeout(() => {
+                if (koliInputRef.current) koliInputRef.current.focus();
+            }, 250);
+        } catch (err) {
+            Swal.fire('Gagal', err.response?.data?.message || 'Gagal memulai proses muat barang', 'error');
+        }
+    };
+
+    // =========================================================================
+    // 📷 3. SCAN QR / BARCODE KOLI BTT KE DALAM SURAT TUGAS
+    // =========================================================================
+    const handleScanKoliSubmit = async (kodeKoliRaw) => {
+        const cleanKode = (kodeKoliRaw || '').trim().toUpperCase();
+        if (!cleanKode || !data || scanningKoli) return;
+
+        setScanningKoli(true);
+        try {
+            const ptId = localStorage.getItem('pt_id') || 'C';
+            const targetNo = data.raw_sjh_id || data.no_surat_tugas || noSuratTugas;
+
+            const res = await api.post(`/operasional/surat-tugas/scan-btt-koli?pt_id=${ptId}`, {
+                no_surat_tugas: targetNo,
+                kode_scan: cleanKode
+            });
+
+            await fetchDetail(targetNo);
+            setKoliInput('');
+
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'success',
+                title: res.data?.message || 'Koli berhasil di-scan!',
+                showConfirmButton: false,
+                timer: 1400
+            });
+        } catch (err) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Perhatian',
+                text: err.response?.data?.message || 'Kode BTT / Koli tidak ditemukan',
+                timer: 2200
+            });
+            setKoliInput('');
+        } finally {
+            setScanningKoli(false);
+            if (koliInputRef.current) koliInputRef.current.focus();
+        }
+    };
+
+    // Kamera Scan QR Koli BTT
+    const startKoliScanner = () => {
+        setIsKoliCameraOpen(true);
+        setTimeout(async () => {
+            try {
+                const scanner = new Html5Qrcode("koli-qr-reader-box");
+                koliQrCodeRef.current = scanner;
+
+                await scanner.start(
+                    { facingMode: "environment" },
+                    { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 },
+                    (decodedText) => {
+                        stopKoliScanner();
+                        handleScanKoliSubmit(decodedText);
+                    },
+                    () => { }
+                );
+            } catch {
+                setIsKoliCameraOpen(false);
+                Swal.fire('Kamera Tidak Tersedia', 'Gunakan scanner laser atau ketik nomor koli BTT secara manual.', 'info');
+            }
+        }, 300);
+    };
+
+    const stopKoliScanner = async () => {
+        if (koliQrCodeRef.current) {
+            try {
+                await koliQrCodeRef.current.stop();
+                koliQrCodeRef.current.clear();
+            } catch { }
+            koliQrCodeRef.current = null;
+        }
+        setIsKoliCameraOpen(false);
+    };
+
     useEffect(() => {
         return () => {
             stopScanner();
+            stopKoliScanner();
         };
     }, []);
 
-    // Handle tombol PROSES keberangkatan
-    const handleProses = async () => {
+    // Hapus BTT dari daftar muatan
+    const handleRemoveBTT = async (noBtt) => {
+        try {
+            const ptId = localStorage.getItem('pt_id') || 'C';
+            const targetNo = data.raw_sjh_id || data.no_surat_tugas || noSuratTugas;
+            await api.delete(`/operasional/surat-tugas/remove-btt`, {
+                params: { pt_id: ptId, sjh_id: targetNo, no_btt: noBtt }
+            });
+            fetchDetail(targetNo);
+        } catch {
+            Swal.fire('Gagal', 'Tidak dapat menghapus BTT dari daftar muat', 'error');
+        }
+    };
+
+    // =========================================================================
+    // ✅ 4. SELESAI SCAN CHECKER & JALANKAN TUGAS OLEH KEPALA OPERASIONAL
+    // =========================================================================
+    const handleSelesaiScanChecker = () => {
+        if (!data?.btt_list || data.btt_list.length === 0) {
+            Swal.fire('Peringatan', 'Belum ada BTT yang dipindai ke dalam surat tugas ini!', 'warning');
+            return;
+        }
+        stopKoliScanner();
+        setIsLoadingMode(false);
+        setIsLoadingFinished(true);
+
+        Swal.fire({
+            icon: 'success',
+            title: 'Pemindaian Barang Selesai!',
+            text: 'Muatan barang sudah masuk ke surat jalan. Kepala Operasional dapat menekan tombol "Jalankan Tugas".',
+            confirmButtonColor: '#004b84'
+        });
+    };
+
+    const handleJalankanTugas = async () => {
         const confirm = await Swal.fire({
-            title: 'Proses Surat Tugas?',
-            text: `Yakin ingin memproses keberangkatan armada ${data?.no_kendaraan || ''}?`,
+            title: 'Jalankan Tugas Operasional?',
+            text: `Aktifkan Surat Tugas ${getFormattedNo()} untuk armada ${data?.no_kendaraan || ''}?`,
             icon: 'question',
             showCancelButton: true,
             confirmButtonColor: '#059669',
             cancelButtonColor: '#64748b',
-            confirmButtonText: 'Ya, Proses!',
+            confirmButtonText: 'Ya, Jalankan Tugas!',
             cancelButtonText: 'Batal'
         });
 
@@ -134,15 +280,15 @@ const MobileValidasiSuratTugas = () => {
 
                 Swal.fire({
                     icon: 'success',
-                    title: 'BERHASIL DIPROSES',
-                    text: 'Status surat tugas berhasil diperbarui ke database.',
+                    title: 'TUGAS BERJALAN!',
+                    text: 'Surat Tugas berhasil diaktifkan (PROSES).',
                     timer: 1800,
                     showConfirmButton: false
                 }).then(() => {
                     setData(prev => ({ ...prev, status: 'PROSES' }));
                 });
             } catch (err) {
-                Swal.fire('Gagal', err.response?.data?.message || 'Gagal memproses data.', 'error');
+                Swal.fire('Gagal', err.response?.data?.message || 'Gagal mengaktifkan surat tugas.', 'error');
             } finally {
                 setProcessing(false);
             }
@@ -150,16 +296,22 @@ const MobileValidasiSuratTugas = () => {
     };
 
     const handleBatal = () => {
+        stopKoliScanner();
+        if (isLoadingMode) {
+            setIsLoadingMode(false);
+            return;
+        }
         if (window.history.length > 1) {
             window.history.back();
         } else {
-            window.close();
+            setSearchParams({});
+            setData(null);
         }
     };
 
-    // 🌟 HELPER: FORMAT NO SURAT TUGAS RESMI (001JC2026119422)
     const getFormattedNo = () => {
         const raw = String(data?.no_surat_tugas || noSuratTugas || '').trim();
+        if (raw.includes('JC') && raw.length >= 15) return raw;
         const digits = raw.replace(/\D/g, '');
         const urut = digits.length >= 4 ? digits.slice(-4) : '0001';
 
@@ -172,9 +324,10 @@ const MobileValidasiSuratTugas = () => {
                 yyyymm = `${y}${m}`;
             }
         }
-
         return `001JC${yyyymm}${urut}`;
     };
+
+    const isSudahProses = data?.status === 'PROSES' && (data?.btt_list?.length || 0) > 0 && isLoadingFinished;
 
     return (
         <div className="min-h-screen bg-slate-100 text-slate-800 p-4 pb-28 font-sans max-w-md mx-auto">
@@ -236,7 +389,7 @@ const MobileValidasiSuratTugas = () => {
                     <div className="flex gap-2">
                         <input
                             type="text"
-                            placeholder="Contoh: 001JC2026119422"
+                            placeholder="Contoh: 001JC2026117033"
                             value={inputManualNo}
                             onChange={(e) => setInputManualNo(e.target.value.toUpperCase())}
                             onKeyDown={(e) => {
@@ -269,34 +422,32 @@ const MobileValidasiSuratTugas = () => {
                 </div>
             )}
 
-            {/* 4. Tampilan Data Ditemukan (Sesuai Gambar 3) */}
+            {/* 4. Tampilan Detail Surat Tugas & Proses Muat Barang */}
             {!loading && data && (
                 <div className="space-y-3">
-                    {/* 🌟 KARTU BIRU: TAMPILAN RESMI 001JC2026119422 */}
+                    {/* KARTU BIRU HEADER */}
                     <div className="bg-[#004b84] text-white p-4 rounded-2xl shadow-md flex items-center justify-between">
                         <div>
                             <span className="text-[10px] font-bold tracking-wider uppercase text-sky-200 block">
-                                VALIDASI SURAT TUGAS
+                                {isLoadingMode ? 'PROSES MUAT BARANG' : 'VALIDASI SURAT TUGAS'}
                             </span>
                             <h1 className="text-base font-black font-mono tracking-wide">
                                 {getFormattedNo()}
                             </h1>
+                            {loadingId && (
+                                <span className="text-[10px] font-mono text-emerald-300 font-bold block mt-0.5">
+                                    LOADING ID: {loadingId}
+                                </span>
+                            )}
                         </div>
-                        <button
-                            type="button"
-                            disabled={processing || data.status === 'PROSES'}
-                            onClick={handleProses}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider shadow-sm transition flex items-center gap-1.5 cursor-pointer ${data.status === 'PROSES'
-                                ? 'bg-emerald-500 text-white cursor-default'
-                                : 'bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95'
-                                }`}
-                        >
+                        <span className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider shadow-sm flex items-center gap-1.5 ${data.status === 'PROSES' ? 'bg-emerald-500 text-white' : 'bg-amber-400 text-slate-900'
+                            }`}>
                             <CheckCircle2 size={14} />
-                            {data.status === 'PROSES' ? 'PROSES' : (processing ? 'PROSES...' : 'PROSES')}
-                        </button>
+                            {data.status || 'DRAFT'}
+                        </span>
                     </div>
 
-                    {/* 📋 KARTU ATAS: DETAIL SURAT TUGAS SEPERTI GAMBAR 3 */}
+                    {/* DETAIL ARMADA & DRIVER */}
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-[11px] font-bold text-slate-700 space-y-2.5">
                         <div className="grid grid-cols-2 gap-3 pb-2 border-b border-slate-100">
                             <div>
@@ -335,57 +486,157 @@ const MobileValidasiSuratTugas = () => {
                         </div>
                     </div>
 
-                    {/* 📦 KARTU BAWAH: TABEL JUMLAH BTT TERDAFTAR (GAMBAR 3) */}
+                    {/* 🌟 TOMBOL "TAMBAH RINCIAN" (GAMBAR 2 ASP LAWAS) */}
+                    {!isLoadingMode && (
+                        <div className="bg-white p-3.5 rounded-2xl border border-sky-200 shadow-xs flex items-center justify-between gap-2">
+                            <div>
+                                <div className="font-black text-xs text-slate-800 uppercase">Muatan Koli BTT</div>
+                                <div className="text-[10px] text-slate-500">Scan QR / Barcode stiker koli BTT</div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={handleTambahRincian}
+                                className="px-4 py-2.5 bg-[#00668c] hover:bg-[#004b66] text-white font-black rounded-xl text-xs uppercase flex items-center gap-1.5 shadow-sm cursor-pointer transition active:scale-95 shrink-0"
+                            >
+                                <PlusCircle size={15} /> TAMBAH RINCIAN
+                            </button>
+                        </div>
+                    )}
+
+                    {/* 🌟 AREA SCANNER QR / BARCODE KOLI BTT (AKTIF SAAT KLIK TAMBAH RINCIAN) */}
+                    {isLoadingMode && (
+                        <div className="bg-sky-50 border-2 border-sky-400 p-3.5 rounded-2xl space-y-2.5 shadow-sm">
+                            <div className="flex items-center justify-between">
+                                <span className="font-black text-[11px] text-sky-950 uppercase flex items-center gap-1">
+                                    <QrCode size={15} className="text-sky-600" /> Scan QR / Barcode Koli
+                                </span>
+                                {!isKoliCameraOpen ? (
+                                    <button
+                                        type="button"
+                                        onClick={startKoliScanner}
+                                        className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[10px] uppercase flex items-center gap-1 cursor-pointer"
+                                    >
+                                        <Camera size={12} /> Kamera QR
+                                    </button>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={stopKoliScanner}
+                                        className="px-2.5 py-1.5 bg-rose-600 text-white font-bold rounded-lg text-[10px] uppercase flex items-center gap-1 cursor-pointer"
+                                    >
+                                        <X size={12} /> Tutup
+                                    </button>
+                                )}
+                            </div>
+
+                            {isKoliCameraOpen && (
+                                <div className="w-full max-w-[230px] mx-auto rounded-xl overflow-hidden border-2 border-emerald-500 bg-black">
+                                    <div id="koli-qr-reader-box" className="w-full"></div>
+                                </div>
+                            )}
+
+                            <form
+                                onSubmit={(e) => {
+                                    e.preventDefault();
+                                    handleScanKoliSubmit(koliInput);
+                                }}
+                                className="flex gap-1.5"
+                            >
+                                <input
+                                    ref={koliInputRef}
+                                    type="text"
+                                    value={koliInput}
+                                    onChange={(e) => setKoliInput(e.target.value.toUpperCase())}
+                                    placeholder="Scan / Ketik Kode Koli BTT..."
+                                    className="flex-1 p-2.5 bg-white border border-slate-300 rounded-xl font-mono font-bold text-xs uppercase outline-none focus:border-sky-600"
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={scanningKoli || !koliInput.trim()}
+                                    className="px-4 py-2.5 bg-[#004b84] text-white font-black rounded-xl text-xs uppercase cursor-pointer disabled:opacity-50"
+                                >
+                                    {scanningKoli ? '...' : 'OK'}
+                                </button>
+                            </form>
+                        </div>
+                    )}
+
+                    {/* 📦 TABEL JUMLAH BTT TERDAFTAR */}
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                         <div className="bg-sky-50/80 px-4 py-2 border-b border-sky-100 flex items-center justify-between">
                             <span className="font-black text-sky-900 text-xs uppercase tracking-wide">
                                 JUMLAH BTT TERDAFTAR : {data.btt_list?.length || 0}
                             </span>
+                            {isLoadingFinished && (
+                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                                    ✓ Selesai Scan
+                                </span>
+                            )}
                         </div>
 
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-[11px] border-collapse">
                                 <thead className="bg-[#004b84] text-white font-bold uppercase text-[10px]">
                                     <tr>
-                                        <th className="py-2.5 px-3">NO BTT</th>
-                                        <th className="py-2.5 px-3">TUJUAN</th>
-                                        <th className="py-2.5 px-1.5 text-center">COLLY</th>
-                                        <th className="py-2.5 px-1.5 text-center">DISCAN</th>
-                                        <th className="py-2.5 px-1.5 text-center">KURANG</th>
-                                        <th className="py-2.5 px-2 text-center">KET BRG</th>
+                                        <th className="py-2.5 px-2.5">NO BTT</th>
+                                        <th className="py-2.5 px-2">TUJUAN</th>
+                                        <th className="py-2.5 px-1 text-center">COLLY</th>
+                                        <th className="py-2.5 px-1 text-center">DISCAN</th>
+                                        <th className="py-2.5 px-1 text-center">KURANG</th>
+                                        <th className="py-2.5 px-1.5 text-center">KET</th>
+                                        {isLoadingMode && <th className="py-2.5 px-1.5 text-center">HAPUS</th>}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
                                     {(!data.btt_list || data.btt_list.length === 0) ? (
                                         <tr>
-                                            <td colSpan="6" className="text-center py-6 text-slate-400 italic font-normal">
+                                            <td colSpan={isLoadingMode ? 7 : 6} className="text-center py-6 text-slate-400 italic font-normal">
                                                 Belum ada BTT muatan yang terdaftar pada surat tugas ini.
                                             </td>
                                         </tr>
                                     ) : (
-                                        data.btt_list.map((btt, bIdx) => (
-                                            <tr key={bIdx} className={bIdx % 2 === 1 ? 'bg-slate-50/70' : 'bg-white'}>
-                                                <td className="py-2 px-3 font-mono font-bold text-sky-800">{btt.no_btt}</td>
-                                                <td className="py-2 px-3 uppercase text-slate-800 font-bold">{btt.tujuan}</td>
-                                                <td className="py-2 px-1.5 text-center font-bold text-slate-900">{btt.colly}</td>
-                                                <td className="py-2 px-1.5 text-center font-bold text-emerald-600">{btt.discan}</td>
-                                                <td className="py-2 px-1.5 text-center font-bold text-slate-400">{btt.kurang}</td>
-                                                <td className="py-2 px-2 text-center">
-                                                    <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-sky-500 text-white font-bold text-[10px]">
-                                                        ✓
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))
+                                        data.btt_list.map((btt, bIdx) => {
+                                            const isSesuai = Number(btt.kurang) === 0 && Number(btt.discan) > 0;
+                                            return (
+                                                <tr key={bIdx} className={bIdx % 2 === 1 ? 'bg-slate-50/70' : 'bg-white'}>
+                                                    <td className="py-2 px-2.5 font-mono font-bold text-sky-800">{btt.no_btt}</td>
+                                                    <td className="py-2 px-2 uppercase text-slate-800 font-bold">{btt.tujuan}</td>
+                                                    <td className="py-2 px-1 text-center font-bold text-slate-900">{btt.colly}</td>
+                                                    <td className="py-2 px-1 text-center font-bold text-emerald-600">{btt.discan}</td>
+                                                    <td className="py-2 px-1 text-center font-bold text-rose-500">
+                                                        {btt.kurang > 0 ? btt.kurang : ''}
+                                                    </td>
+                                                    <td className="py-2 px-1.5 text-center">
+                                                        {isSesuai ? (
+                                                            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-sky-500 text-white font-bold text-[10px]">
+                                                                ✓
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-[9px] font-bold text-amber-600">-{btt.kurang}</span>
+                                                        )}
+                                                    </td>
+                                                    {isLoadingMode && (
+                                                        <td className="py-2 px-1.5 text-center">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRemoveBTT(btt.no_btt)}
+                                                                className="p-1 text-rose-500 hover:bg-rose-50 rounded cursor-pointer"
+                                                            >
+                                                                <Trash2 size={13} />
+                                                            </button>
+                                                        </td>
+                                                    )}
+                                                </tr>
+                                            );
+                                        })
                                     )}
                                 </tbody>
                             </table>
                         </div>
                     </div>
 
-                    {/* Tombol Hapus / Batal Floating */}
+                    {/* FOOTER TOMBOL FLOATING: BATAL | SELESAI (CHECKER) / JALANKAN TUGAS (KA. OPERASIONAL) */}
                     <div className="fixed bottom-0 left-0 right-0 p-3 bg-white/95 backdrop-blur-md border-t border-slate-200 max-w-md mx-auto flex items-center gap-3 z-30">
-                        {/* Tombol BATAL (Kiri) */}
                         <button
                             type="button"
                             onClick={handleBatal}
@@ -394,9 +645,16 @@ const MobileValidasiSuratTugas = () => {
                             BATAL
                         </button>
 
-                        {/* Tombol PROSES / SUDAH PROSES (Kanan) */}
-                        {data.status === 'PROSES' ? (
-                            // 🌟 Tampilan Gambar 3: Sudah Diproses (Tombol Abu-abu Disabled)
+                        {isLoadingMode ? (
+                            <button
+                                type="button"
+                                onClick={handleSelesaiScanChecker}
+                                className="flex-1 py-3 bg-[#16a34a] hover:bg-emerald-700 active:scale-98 text-white font-black rounded-xl text-xs uppercase tracking-wider shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                                <PackageCheck size={16} />
+                                <span>SELESAI</span>
+                            </button>
+                        ) : isSudahProses ? (
                             <button
                                 type="button"
                                 disabled
@@ -406,15 +664,14 @@ const MobileValidasiSuratTugas = () => {
                                 <span>SUDAH PROSES</span>
                             </button>
                         ) : (
-                            // 🌟 Tampilan Gambar 2: Belum Diproses (Tombol Hijau Aktif)
                             <button
                                 type="button"
                                 disabled={processing}
-                                onClick={handleProses}
+                                onClick={handleJalankanTugas}
                                 className="flex-1 py-3 bg-[#059669] hover:bg-emerald-700 active:scale-98 text-white font-black rounded-xl text-xs uppercase tracking-wider shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer"
                             >
-                                <CheckCircle2 size={16} />
-                                <span>{processing ? 'MEMPROSES...' : 'PROSES'}</span>
+                                <Play size={15} />
+                                <span>{processing ? 'MEMPROSES...' : 'JALANKAN TUGAS'}</span>
                             </button>
                         )}
                     </div>
