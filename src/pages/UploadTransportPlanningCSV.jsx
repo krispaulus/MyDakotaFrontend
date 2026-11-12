@@ -215,18 +215,79 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
         }
     };
 
+    // Helper untuk menghitung ulang summary kartu atas Preview 2 secara otomatis
+    const recalculatePreview2Summary = (rows) => {
+        let totalAkanProses = 0;
+        let totalDilewati = 0;
+        let grandTotalHarga = 0;
+        let grandTotalPacking = 0;
+
+        rows.forEach((r) => {
+            if (!r.is_duplicate) {
+                totalAkanProses++;
+                grandTotalHarga += Number(r.harga_final || 0);
+                grandTotalPacking += Number(r.biaya_packing || 0);
+            } else {
+                totalDilewati++;
+            }
+        });
+
+        setSummaryPreview2({
+            totalAkanProses,
+            totalDilewati,
+            grandTotalHarga,
+            grandTotalPacking,
+        });
+    };
+
     const handleDeleteRow = (idx) => {
-        setDataValid(prev => prev.filter((_, i) => i !== idx));
+        setDataValid((prev) => {
+            const updated = prev.filter((_, i) => i !== idx);
+            if (currentStep === 2) {
+                recalculatePreview2Summary(updated);
+            }
+            return updated;
+        });
+        if (editIdx === idx) {
+            setEditIdx(null);
+            setEditRow({});
+        }
     };
 
     const handleStartEdit = (idx, row) => {
         setEditIdx(idx);
-        setEditRow({ ...row });
+        setEditRow({
+            ...row,
+            harga_final: Number(row.harga_final || 0),
+            biaya_packing: Number(row.biaya_packing || 0),
+        });
     };
 
     const handleSaveEdit = (idx) => {
-        setDataValid(prev => prev.map((item, i) => i === idx ? { ...editRow } : item));
+        const newHarga = Number(editRow.harga_final) || 0;
+        const newPacking = Number(editRow.biaya_packing) || 0;
+
+        setDataValid((prev) => {
+            const updated = prev.map((item, i) => {
+                if (i !== idx) return item;
+                return {
+                    ...item,
+                    ...editRow,
+                    harga_final: newHarga,
+                    biaya_packing: newPacking,
+                    total_packing: newPacking,
+                    sumber_harga: newHarga !== Number(item.harga_final || 0) ? "MANUAL EDIT" : item.sumber_harga,
+                };
+            });
+
+            if (currentStep === 2) {
+                recalculatePreview2Summary(updated);
+            }
+            return updated;
+        });
+
         setEditIdx(null);
+        setEditRow({});
     };
 
     const handleCancelEdit = () => {
@@ -803,7 +864,7 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
                                         <thead className="bg-[#004b84] text-white text-[11px] font-bold uppercase sticky top-0 z-20">
                                             <tr>
                                                 <th className="p-2.5 text-center border-r border-sky-800">NO</th>
-                                                {currentStep === 1 && <th className="p-2.5 text-center border-r border-sky-800">AKSI</th>}
+                                                <th className="p-2.5 text-center border-r border-sky-800 min-w-[90px]">AKSI</th>
                                                 <th className="p-2.5 border-r border-sky-800 w-[300px] min-w-[280px] max-w-[320px]">CONSIGNEE (ANAK CUSTOMER)</th>
                                                 <th className="p-2.5 border-r border-sky-800 min-w-[240px]">ADDRESS</th>
                                                 <th className="p-2.5 border-r border-sky-800 min-w-[130px]">PROPINSI</th>
@@ -846,10 +907,9 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
                                                     <tr key={idx} className={`transition ${isRowDup ? 'bg-amber-50/70 hover:bg-amber-100/70' : 'hover:bg-sky-50/50'}`}>
                                                         <td className="p-2.5 text-center font-bold text-slate-500 border-r border-slate-100">{idx + 1}</td>
 
-                                                        {currentStep === 1 && (
-                                                            <td className="p-2.5 text-center border-r border-slate-100 whitespace-nowrap">
+                                                        <td className="p-2.5 text-center border-r border-slate-100 whitespace-nowrap">
+                                                            {currentStep === 1 ? (
                                                                 <div className="flex items-center justify-center gap-1">
-                                                                    {/* Tombol Pensil: LANGSUNG BUKA MODAL AUTOCOMPLETE WILAYAH BTT */}
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => {
@@ -861,8 +921,6 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
                                                                     >
                                                                         <Edit3 size={15} />
                                                                     </button>
-
-                                                                    {/* Tombol Hapus Baris */}
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => handleDeleteRow(idx)}
@@ -872,8 +930,46 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
                                                                         <Trash2 size={15} />
                                                                     </button>
                                                                 </div>
-                                                            </td>
-                                                        )}
+                                                            ) : isEditing ? (
+                                                                <div className="flex items-center justify-center gap-1">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleSaveEdit(idx)}
+                                                                        title="Simpan Perubahan Harga"
+                                                                        className="p-1.5 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg transition-colors cursor-pointer shadow-xs"
+                                                                    >
+                                                                        <Check size={14} />
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={handleCancelEdit}
+                                                                        title="Batal Edit"
+                                                                        className="p-1.5 bg-slate-200 text-slate-700 hover:bg-slate-300 rounded-lg transition-colors cursor-pointer"
+                                                                    >
+                                                                        <X size={14} />
+                                                                    </button>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex items-center justify-center gap-1">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleStartEdit(idx, row)}
+                                                                        title="Edit Harga Final & Biaya Packing"
+                                                                        className="p-1.5 text-sky-600 hover:text-sky-800 hover:bg-sky-50 rounded-lg transition-colors cursor-pointer"
+                                                                    >
+                                                                        <Edit3 size={15} />
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleDeleteRow(idx)}
+                                                                        title="Hapus Baris"
+                                                                        className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                                                    >
+                                                                        <Trash2 size={15} />
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </td>
 
                                                         {/* Consignee dengan Wrap DN */}
                                                         <td className="p-2.5 font-bold text-slate-800 uppercase border-r border-slate-100 w-[300px] min-w-[280px] max-w-[320px] whitespace-normal">
@@ -962,14 +1058,51 @@ export default function UploadTransportPlanningCSV({ isDarkMode = false }) {
                                                                 <td className="p-2.5 text-center border-r border-slate-100">
                                                                     {row.sumber_harga === "TARIF MASTER" && <span className="text-emerald-700 font-black">✓ MASTER TARIF</span>}
                                                                     {row.sumber_harga === "HARGA CSV" && <span className="text-amber-600 font-bold">⚠ HARGA CSV</span>}
+                                                                    {row.sumber_harga === "MANUAL EDIT" && <span className="text-sky-700 font-black">✎ MANUAL EDIT</span>}
                                                                     {row.sumber_harga === "TIDAK ADA" && <span className="text-rose-600 font-bold">✗ TIDAK ADA</span>}
                                                                 </td>
+
+                                                                {/* KOLOM HARGA FINAL (RP) */}
                                                                 <td className="p-2.5 text-right font-mono font-black text-slate-900 border-r border-slate-100">
-                                                                    Rp {Number(row.harga_final || 0).toLocaleString("id-ID")}
+                                                                    {isEditing ? (
+                                                                        <input
+                                                                            type="number"
+                                                                            min="0"
+                                                                            value={editRow.harga_final ?? 0}
+                                                                            onChange={(e) => setEditRow({ ...editRow, harga_final: e.target.value })}
+                                                                            onKeyDown={(e) => {
+                                                                                if (e.key === "Enter") handleSaveEdit(idx);
+                                                                                if (e.key === "Escape") handleCancelEdit();
+                                                                            }}
+                                                                            autoFocus
+                                                                            className="w-28 p-1.5 text-right border-2 border-sky-500 rounded-lg bg-white font-mono font-bold text-xs outline-none"
+                                                                        />
+                                                                    ) : (
+                                                                        `Rp ${Number(row.harga_final || 0).toLocaleString("id-ID")}`
+                                                                    )}
                                                                 </td>
+
+                                                                {/* KOLOM BIAYA PACKING */}
                                                                 <td className="p-2.5 text-right font-mono text-slate-700 border-r border-slate-100">
-                                                                    {row.biaya_packing > 0 ? `Rp ${row.biaya_packing.toLocaleString("id-ID")}` : "-"}
+                                                                    {isEditing ? (
+                                                                        <input
+                                                                            type="number"
+                                                                            min="0"
+                                                                            value={editRow.biaya_packing ?? 0}
+                                                                            onChange={(e) => setEditRow({ ...editRow, biaya_packing: e.target.value })}
+                                                                            onKeyDown={(e) => {
+                                                                                if (e.key === "Enter") handleSaveEdit(idx);
+                                                                                if (e.key === "Escape") handleCancelEdit();
+                                                                            }}
+                                                                            className="w-28 p-1.5 text-right border-2 border-sky-500 rounded-lg bg-white font-mono font-bold text-xs outline-none"
+                                                                        />
+                                                                    ) : (
+                                                                        Number(row.biaya_packing || 0) > 0
+                                                                            ? `Rp ${Number(row.biaya_packing).toLocaleString("id-ID")}`
+                                                                            : "-"
+                                                                    )}
                                                                 </td>
+
                                                                 <td className="p-2.5 text-center border-r border-slate-100">
                                                                     {row.is_duplicate ? (
                                                                         <div className="bg-amber-100 text-amber-800 font-black px-2 py-0.5 rounded text-[10px]">
