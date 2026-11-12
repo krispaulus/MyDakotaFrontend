@@ -81,42 +81,110 @@ const BttBarcodePrintPage = () => {
         fetchKoliData(1, 0);
     };
 
+    // =========================================================================
+    // 🖨️ CETAK BERSIH VIA POPUP WINDOW (BEBAS SCROLLBAR & MENCETAK SEMUA HALAMAN)
+    // =========================================================================
+    const handlePrintLabels = () => {
+        const printArea = document.getElementById('barcode-print-area');
+        if (!printArea) {
+            window.print();
+            return;
+        }
+
+        const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+            .map((el) => el.outerHTML)
+            .join('\n');
+
+        const printWindow = window.open('', '_blank', 'width=900,height=700');
+        if (!printWindow) {
+            alert('Pop-up browser terblokir! Mohon izinkan pop-up untuk mencetak label.');
+            return;
+        }
+
+        const isZebra = printMode === 'ZEBRA';
+
+        printWindow.document.open();
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Cetak Label Barcode Koli - ${bttId}</title>
+                ${styles}
+                <style>
+                    @page {
+                        size: ${isZebra ? '80mm 50mm' : 'A4 portrait'};
+                        margin: ${isZebra ? '0mm' : '5mm'};
+                    }
+                    * {
+                        box-sizing: border-box;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    html, body {
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        background: #ffffff !important;
+                        height: auto !important;
+                        min-height: 0 !important;
+                        max-height: none !important;
+                        overflow: visible !important;
+                    }
+                    .print-sheet {
+                        box-shadow: none !important;
+                        border: none !important;
+                        padding: 0 !important;
+                        margin: ${isZebra ? '0' : '0 auto'} !important;
+                        width: ${isZebra ? '100%' : '793px'} !important;
+                    }
+                    .label-card {
+                        border-color: transparent !important;
+                        page-break-inside: avoid !important;
+                        break-inside: avoid !important;
+                    }
+                    ${isZebra ? `
+                    .zebra-sheet {
+                        display: block !important;
+                        width: 100% !important;
+                    }
+                    .zebra-label-item {
+                        width: 100% !important;
+                        height: 49mm !important;
+                        margin: 0 !important;
+                        padding: 2mm 3mm !important;
+                        border: none !important;
+                        page-break-after: always !important;
+                        break-after: page !important;
+                    }
+                    .zebra-label-item:last-child {
+                        page-break-after: auto !important;
+                        break-after: auto !important;
+                    }
+                    ` : ''}
+                </style>
+            </head>
+            <body>
+                ${printArea.innerHTML}
+                <script>
+                    window.onload = function() {
+                        setTimeout(function() {
+                            window.print();
+                            window.close();
+                        }, 350);
+                    };
+                </script>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+    };
+
     if (loading) {
         return <div className="p-10 text-center font-bold text-slate-600">Memuat label barcode koli {bttId}...</div>;
     }
 
     return (
         <div className="min-h-screen bg-slate-100 p-4 font-serif text-slate-900">
-            <style>{`
-        @media print {
-          @page {
-            size: ${printMode === 'ZEBRA' ? '80mm 50mm' : 'A4 portrait'};
-            margin: ${printMode === 'ZEBRA' ? '1mm' : '5mm'};
-          }
-          body {
-            background: white !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-          }
-          .no-print { display: none !important; }
-          .print-sheet {
-            box-shadow: none !important;
-            border: none !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            width: 100% !important;
-          }
-          .label-card {
-            border-color: transparent !important;
-            page-break-inside: avoid;
-            break-inside: avoid;
-          }
-        }
-      `}</style>
-
-            {/* PANEL PENGATURAN CETAK (KANAN ATAS SEPERTI ASP LAWAS) */}
+            {/* PANEL PENGATURAN CETAK */}
             <div className="no-print max-w-[820px] mx-auto mb-5 bg-white border border-slate-300 rounded-2xl shadow-md p-4 font-sans text-xs">
                 <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200">
                     <div>
@@ -140,7 +208,7 @@ const BttBarcodePrintPage = () => {
 
                         <button
                             type="button"
-                            onClick={() => window.print()}
+                            onClick={handlePrintLabels}
                             className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow flex items-center gap-1.5 cursor-pointer"
                         >
                             <Printer size={15} /> CETAK LABEL
@@ -205,136 +273,138 @@ const BttBarcodePrintPage = () => {
                 </div>
             </div>
 
-            {/* AREA KERTAS CETAK */}
-            {printMode === 'A4' ? (
-                /* LAYOUT A4 (3 KOLOM PERSIS GAMBAR 3 ATAS & mkt_t_print_label_koli.asp) */
-                <div className="print-sheet bg-white mx-auto shadow-lg border border-slate-200 p-2 grid grid-cols-3 gap-2" style={{ width: '793px' }}>
-                    {/* Slot Kosong (Spacer) */}
-                    {Array.from({ length: emptySlots }).map((_, idx) => (
-                        <div key={`empty-${idx}`} className="label-card border border-dashed border-slate-300 rounded flex items-center justify-center text-slate-300 text-xs font-sans" style={{ height: '254px' }}>
-                            [ Ruang Kosong #{idx + 1} ]
-                        </div>
-                    ))}
-
-                    {/* Kartu Label Koli */}
-                    {items.map((koli) => (
-                        <div
-                            key={koli.koli_id}
-                            className="label-card border border-dashed border-slate-300 p-2 text-center flex flex-col justify-between bg-white"
-                            style={{ height: '254px' }}
-                        >
-                            <div className="pt-2">
-                                <p className="text-[11px] leading-tight">Asal: {koli.agen_asal}</p>
-                                <p className="text-[11px] font-mono leading-tight">{koli.koli_id}</p>
+            {/* AREA KERTAS CETAK (DIAMBIL OLEH handlePrintLabels) */}
+            <div id="barcode-print-area">
+                {printMode === 'A4' ? (
+                    /* LAYOUT A4 (3 KOLOM) */
+                    <div className="print-sheet bg-white mx-auto shadow-lg border border-slate-200 p-2 grid grid-cols-3 gap-2" style={{ width: '793px' }}>
+                        {/* Slot Kosong (Spacer) */}
+                        {Array.from({ length: emptySlots }).map((_, idx) => (
+                            <div key={`empty-${idx}`} className="label-card border border-dashed border-slate-300 rounded flex items-center justify-center text-slate-300 text-xs font-sans" style={{ height: '254px' }}>
+                                [ Ruang Kosong #{idx + 1} ]
                             </div>
+                        ))}
 
-                            <div className="flex justify-center my-0.5">
-                                <Barcode value={koli.koli_id} format="CODE128" width={1.25} height={42} displayValue={false} margin={0} />
-                            </div>
-
-                            <div>
-                                <p className="text-[11px] uppercase leading-tight">TUJUAN {koli.agen_tujuan}</p>
-                                <p className="text-[15px] font-bold leading-tight mt-0.5">BTT : {koli.bttt_id}</p>
-                                <p className="text-[12px] leading-tight mt-0.5">
-                                    Penerima : <b className="uppercase">{koli.tujuan_nama}</b>
-                                </p>
-                            </div>
-
-                            <div className="grid grid-cols-12 items-center pt-1">
-                                <div className="col-span-3 flex justify-center">
-                                    <div className="border-2 border-black p-1 inline-flex flex-col items-center">
-                                        <div className="flex gap-0.5">
-                                            <ArrowUp size={13} strokeWidth={3} />
-                                            <ArrowUp size={13} strokeWidth={3} />
-                                        </div>
-                                        <div className="w-6 h-[2px] bg-black mt-0.5" />
-                                    </div>
+                        {/* Kartu Label Koli */}
+                        {items.map((koli) => (
+                            <div
+                                key={koli.koli_id}
+                                className="label-card border border-dashed border-slate-300 p-2 text-center flex flex-col justify-between bg-white"
+                                style={{ height: '254px' }}
+                            >
+                                <div className="pt-2">
+                                    <p className="text-[11px] leading-tight">Asal: {koli.agen_asal}</p>
+                                    <p className="text-[11px] font-mono leading-tight">{koli.koli_id}</p>
                                 </div>
 
-                                <div className="col-span-4 flex justify-center">
-                                    <QRCodeSVG value={koli.koli_id} size={58} level="M" />
+                                <div className="flex justify-center my-0.5">
+                                    <Barcode value={koli.koli_id} format="CODE128" width={1.25} height={42} displayValue={false} margin={0} />
                                 </div>
 
-                                <div className="col-span-5 text-left pl-1">
-                                    <p className="text-[14px] font-bold leading-none mb-1.5">
-                                        {koli.urutan} / {koli.total_koli} Koli
+                                <div>
+                                    <p className="text-[11px] uppercase leading-tight">TUJUAN {koli.agen_tujuan}</p>
+                                    <p className="text-[15px] font-bold leading-tight mt-0.5">BTT : {koli.bttt_id}</p>
+                                    <p className="text-[12px] leading-tight mt-0.5">
+                                        Penerima : <b className="uppercase">{koli.tujuan_nama}</b>
                                     </p>
-                                    <img
-                                        src="/src/assets/new_logo 2.png"
-                                        alt="Dakota"
-                                        className="h-3.5 object-contain"
-                                        onError={(e) => { e.target.style.display = 'none'; }}
-                                    />
-                                    <p className="text-[7.5px] leading-tight">www.dakotacargo.co.id</p>
                                 </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            ) : (
-                /* LAYOUT ZEBRA THERMAL (PERSIS GAMBAR 3 BAWAH & mkt_t_print_label_koli_zebra.asp) */
-                <div className="print-sheet mx-auto space-y-3" style={{ width: '300px' }}>
-                    {items.map((koli) => (
-                        <div
-                            key={koli.koli_id}
-                            className="label-card bg-white border border-slate-300 p-2 text-slate-900 flex flex-col justify-between"
-                            style={{ width: '280px', height: '185px' }}
-                        >
-                            <div className="text-center text-[10px] font-bold uppercase leading-none">
-                                ASAL {koli.agen_asal}
-                            </div>
 
-                            <div className="grid grid-cols-12 items-center my-0.5">
-                                <div className="col-span-4 text-center leading-none">
-                                    <div className="text-[22px] font-black">{koli.urutan}/</div>
-                                    <div className="text-[10px] font-bold">{koli.total_koli}</div>
-                                    <div className="text-[9px]">Koli</div>
-                                </div>
-                                <div className="col-span-8 text-right">
-                                    <div className="text-[11px] font-mono font-bold leading-none mb-0.5">{koli.koli_id}</div>
-                                    <div className="flex justify-end">
-                                        <Barcode value={koli.koli_id} format="CODE128" width={1.05} height={32} displayValue={false} margin={0} />
-                                    </div>
-                                    <div className="text-[8.5px] font-bold mt-0.5">
-                                        {koli.server_id} | Kota : {koli.tujuan_kota}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-12 items-center gap-1 pt-0.5">
-                                <div className="col-span-5 flex justify-center">
-                                    <QRCodeSVG value={koli.koli_id} size={66} level="M" />
-                                </div>
-                                <div className="col-span-7 text-left leading-tight">
-                                    <div className="text-[8px]">Tujuan :</div>
-                                    <div className="text-[10.5px] font-black uppercase truncate">{koli.agen_tujuan}</div>
-                                    <div className="text-[8px]">To :</div>
-                                    <div className="text-[9px] font-bold uppercase line-clamp-1">{koli.tujuan_nama}</div>
-
-                                    <div className="flex items-center justify-between mt-1">
-                                        <div>
-                                            <img
-                                                src="/src/assets/new_logo 2.png"
-                                                alt="Dakota"
-                                                className="h-3 object-contain"
-                                                onError={(e) => { e.target.style.display = 'none'; }}
-                                            />
-                                            <div className="text-[7px]">www.dakotacargo.co.id</div>
-                                        </div>
-                                        <div className="border border-black p-0.5 inline-flex flex-col items-center">
-                                            <div className="flex">
-                                                <ArrowUp size={10} strokeWidth={3} />
-                                                <ArrowUp size={10} strokeWidth={3} />
+                                <div className="grid grid-cols-12 items-center pt-1">
+                                    <div className="col-span-3 flex justify-center">
+                                        <div className="border-2 border-black p-1 inline-flex flex-col items-center">
+                                            <div className="flex gap-0.5">
+                                                <ArrowUp size={13} strokeWidth={3} />
+                                                <ArrowUp size={13} strokeWidth={3} />
                                             </div>
-                                            <div className="w-4 h-[1.5px] bg-black" />
+                                            <div className="w-6 h-[2px] bg-black mt-0.5" />
+                                        </div>
+                                    </div>
+
+                                    <div className="col-span-4 flex justify-center">
+                                        <QRCodeSVG value={koli.koli_id} size={58} level="M" />
+                                    </div>
+
+                                    <div className="col-span-5 text-left pl-1">
+                                        <p className="text-[14px] font-bold leading-none mb-1.5">
+                                            {koli.urutan} / {koli.total_koli} Koli
+                                        </p>
+                                        <img
+                                            src="/src/assets/new_logo 2.png"
+                                            alt="Dakota"
+                                            className="h-3.5 object-contain"
+                                            onError={(e) => { e.target.style.display = 'none'; }}
+                                        />
+                                        <p className="text-[7.5px] leading-tight">www.dakotacargo.co.id</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    /* LAYOUT ZEBRA / HONEYWELL THERMAL */
+                    <div className="print-sheet zebra-sheet mx-auto space-y-3" style={{ width: '300px' }}>
+                        {items.map((koli) => (
+                            <div
+                                key={koli.koli_id}
+                                className="label-card zebra-label-item bg-white border border-slate-300 p-2 text-slate-900 flex flex-col justify-between"
+                                style={{ width: '280px', height: '185px' }}
+                            >
+                                <div className="text-center text-[10px] font-bold uppercase leading-none">
+                                    ASAL {koli.agen_asal}
+                                </div>
+
+                                <div className="grid grid-cols-12 items-center my-0.5">
+                                    <div className="col-span-4 text-center leading-none">
+                                        <div className="text-[22px] font-black">{koli.urutan}/</div>
+                                        <div className="text-[10px] font-bold">{koli.total_koli}</div>
+                                        <div className="text-[9px]">Koli</div>
+                                    </div>
+                                    <div className="col-span-8 text-right">
+                                        <div className="text-[11px] font-mono font-bold leading-none mb-0.5">{koli.koli_id}</div>
+                                        <div className="flex justify-end">
+                                            <Barcode value={koli.koli_id} format="CODE128" width={1.05} height={32} displayValue={false} margin={0} />
+                                        </div>
+                                        <div className="text-[8.5px] font-bold mt-0.5">
+                                            {koli.server_id} | Kota : {koli.tujuan_kota}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-12 items-center gap-1 pt-0.5">
+                                    <div className="col-span-5 flex justify-center">
+                                        <QRCodeSVG value={koli.koli_id} size={66} level="M" />
+                                    </div>
+                                    <div className="col-span-7 text-left leading-tight">
+                                        <div className="text-[8px]">Tujuan :</div>
+                                        <div className="text-[10.5px] font-black uppercase truncate">{koli.agen_tujuan}</div>
+                                        <div className="text-[8px]">To :</div>
+                                        <div className="text-[9px] font-bold uppercase line-clamp-1">{koli.tujuan_nama}</div>
+
+                                        <div className="flex items-center justify-between mt-1">
+                                            <div>
+                                                <img
+                                                    src="/src/assets/new_logo 2.png"
+                                                    alt="Dakota"
+                                                    className="h-3 object-contain"
+                                                    onError={(e) => { e.target.style.display = 'none'; }}
+                                                />
+                                                <div className="text-[7px]">www.dakotacargo.co.id</div>
+                                            </div>
+                                            <div className="border border-black p-0.5 inline-flex flex-col items-center">
+                                                <div className="flex">
+                                                    <ArrowUp size={10} strokeWidth={3} />
+                                                    <ArrowUp size={10} strokeWidth={3} />
+                                                </div>
+                                                <div className="w-4 h-[1.5px] bg-black" />
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
-                </div>
-            )}
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
