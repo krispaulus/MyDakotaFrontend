@@ -813,6 +813,16 @@ const Invoice = () => {
                 return;
             }
 
+            // Ambil daftar ID BTT baru yang belum ada di persistedSelectedBtts
+            const newlyAddedIds = newInvoiceForm.selected_btts.filter(id =>
+                !persistedSelectedBtts.some(b => String(b.bttt_id).trim() === String(id).trim())
+            );
+
+            // Ambil objek lengkap BTT baru dari tabel bawah agar langsung tampil di tabel atas
+            const newlyAddedObjects = unbilledBTTList.filter(b =>
+                newlyAddedIds.some(id => String(id).trim() === String(b.bttt_id).trim())
+            );
+
             try {
                 const res = await api.post(`/piutang/invoice/update?pt_id=${ptId}`, {
                     artih_id: currentInvId,
@@ -821,9 +831,7 @@ const Invoice = () => {
                     artih_fktpajak: newInvoiceForm.artih_fktpajak,
                     artih_keterangan: newInvoiceForm.artih_keterangan,
                     remove_btt_list: removedBttIds,
-                    add_btt_list: newInvoiceForm.selected_btts.filter(id =>
-                        !persistedSelectedBtts.some(b => String(b.bttt_id).trim() === String(id).trim())
-                    )
+                    add_btt_list: newlyAddedIds
                 }, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
@@ -836,10 +844,15 @@ const Invoice = () => {
                     showConfirmButton: false
                 });
 
+                // 🌟 Update tabel atas (BTT YANG SUDAH DIPILIH) secara langsung!
+                if (newlyAddedObjects.length > 0) {
+                    setPersistedSelectedBtts(prev => [...prev, ...newlyAddedObjects]);
+                }
+
                 setRemovedBttIds([]);
                 fetchInvoiceList();
 
-                // Muat ulang daftar unbilled BTT
+                // Muat ulang daftar unbilled BTT di tabel bawah
                 loadUnbilledBTTByDate(
                     newInvoiceForm.artih_custid,
                     bttStartDate,
@@ -1188,9 +1201,6 @@ const Invoice = () => {
     // =========================================================================
     const handlePrintDocument = async (invoiceItem, docType = 'FAKTUR') => {
         const item = invoiceItem || activeInvoice;
-        const tglKwitansiIndo = formatTanggalIndonesia(header.artih_tanggal);
-        const tglJatuhTempoIndo = formatTanggalIndonesia(header.artih_tgltempo || header.artih_jatuhtempo || header.artih_tanggal);
-        const tglCetakIndo = formatTanggalIndonesia(header.artih_tanggal);
 
         if (docType === 'JURNAL' || docType === 'VOUCHER') {
             const rawNo = String(postedJournalId || item?.artih_journalid || '').trim();
