@@ -1014,15 +1014,16 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
     });
 
     // 🚚 Auto-fill Berat Volume saat Jenis Carter dipilih
+    const MIN_BERAT_CARTER = {
+        'BUILD UP': 16000,
+        'COLT DIESEL': 4000,
+        'FUSO': 7000,
+        'FREEZER BOX': 4000,
+        'TRONTON': 11000,
+        'WING BOX': 16000
+    };
+
     useEffect(() => {
-        const MIN_BERAT_CARTER = {
-            'BUILD UP': 16000,
-            'COLT DIESEL': 4000,
-            'FUSO': 7000,
-            'FREEZER BOX': 4000,
-            'TRONTON': 11000,
-            'WING BOX': 16000
-        };
         if (formData.bttt_pilihcarter && MIN_BERAT_CARTER[formData.bttt_pilihcarter]) {
             const beratDefaultCarter = MIN_BERAT_CARTER[formData.bttt_pilihcarter];
             setFormData(prev => ({

@@ -66,80 +66,11 @@ const BttPrintPage = () => {
   const teksKiriman = (bttData.bttt_isikiriman || '').toUpperCase();
   // const isDangerousGoods = teksKiriman.includes('CHEMICAL');
 
+  // 🌟 1. Keterangan Atas: Berasal dari mapping storagecode (Default: DO Asli/Copy Kembali Jatiasih)
+  const keteranganAtas = bttData.bttt_ket || bttData.ket_do_kembali || bttData.storage_code_ket || '';
 
-  // 🌟 HELPER MAPPING STORAGECODE (SESUAI MASTER DO KEMBALI MERCK)
-  const mapStorageCodeToDokumenKembali = (rawStorageCode) => {
-    const sc = String(rawStorageCode || '').trim().toUpperCase().replace(/\s+/g, ' ');
-    if (!sc || sc === '-') return '';
-
-    const copyCodes = new Set([
-      'Y ONS',
-      'E-INVOICE',
-      'Y',
-      'Y /PO',
-      'YES',
-      '0',
-      'YES ONS',
-      'Y COA',
-      'COA / Y',
-    ]);
-
-    const asliCodes = new Set([
-      'N ONS',
-      'N',
-      'NO',
-      'NO COA/PO',
-      'NO COA ASN',
-      'N COA',
-      'NO COA',
-      'COA/NO',
-      'ASN/COA/NO',
-      'N PO',
-      'NO ONS',
-      'NO /CARD /COA',
-      'NO COA SDS',
-      'COA NO',
-      'YTFC',
-      'NO PO',
-      'NO COA PO',
-      'COA PO NO',
-      'PO NO',
-      'N COA PO',
-    ]);
-
-    if (copyCodes.has(sc)) return 'DO Copy Kembali Jatiasih';
-    if (asliCodes.has(sc)) return 'DO Asli Kembali Jatiasih';
-
-    // Fallback pola umum jika ada variasi spasi/tanda baca baru
-    if (sc === '0' || sc.startsWith('Y ') || sc.startsWith('Y/') || sc.startsWith('YES') || sc.includes('E-INVOICE') || sc.endsWith('/ Y')) {
-      return 'DO Copy Kembali Jatiasih';
-    }
-    if (sc.startsWith('N') || sc.includes('COA') || sc.includes('ASN') || sc.includes('PO')) {
-      return 'DO Asli Kembali Jatiasih';
-    }
-    return '';
-  };
-
-  // 🌟 1. Keterangan Atas: Berasal dari inputan keterangan di CSV / input manual BTT
-  const rawKetDb = (bttData.keterangan_csv || bttData.bttt_ket || '').trim();
-  const cleanKetManual = rawKetDb
-    .replace(/\[B\.PACKING:.*?\]/gi, '')
-    .replace(/^.*?\(\d+\s*KOLI\)\s*-\s*CABANG:\s*[^\s-]+\s*(?:-\s*CARTER:\s*[^\n]+)?\s*/i, '')
-    .trim();
-
-  const keteranganAtas = hasilMappingStorage
-    ? (bttData.keterangan_csv || cleanKetManual || '-')
-    : (cleanKetManual || rawKetDb || '-');
-
-  // 🌟 2. Keterangan Bawah (Lampiran Keterangan):
-  // Prioritas hasil mapping storagecode CSV; jika tidak ada mapping (input manual), ambil dari keterangan yang diinput user
-  const hasilMappingStorage =
-    (bttData.ket_do_kembali || '').trim() ||
-    mapStorageCodeToDokumenKembali(bttData.storagecode || bttData.bttt_storagecode);
-
-  const keteranganBawah = hasilMappingStorage || cleanKetManual || rawKetDb || '-';
-
-
+  // 🌟 2. Keterangan Bawah: Berasal dari teks kolom keterangan di CSV
+  const keteranganBawah = bttData.lampiran_keterangan || bttData.keterangan_csv || bttData.bttt_lampiran_ket || bttData.bttt_ket || '';
 
   // 🌟 3. Biaya Packing: Dari kolom packing file CSV
   const biayaPacking = parseFloat(bttData.bttt_biayapacking || bttData.biaya_packing || 0);

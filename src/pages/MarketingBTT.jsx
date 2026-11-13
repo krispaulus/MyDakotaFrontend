@@ -91,9 +91,8 @@ const MarketingBTT = () => {
             bttt_tujuankota: item.tujuan_kota || item.bttt_tujuankota || "",
             bttt_tujuankodepos: item.tujuan_kodepos || item.bttt_tujuankodepos || "",
             bttt_tujuanpropinsi: item.tujuan_propinsi || item.bttt_tujuanpropinsi || "",
-            storagecode: item.storagecode || item.bttt_storagecode || '',
-            ket_do_kembali: item.ket_do_kembali || '',
-            lampiran_keterangan: item.ket_do_kembali || '',
+            ket_do_kembali: item.ket_do_kembali || item.keterangan || item.bttt_ket || '',
+            lampiran_keterangan: item.keterangan || item.bttt_ket || '',
             bttt_biayapacking: parseFloat(item.biaya_packing || item.bttt_biayapacking || 0),
             estimasihari: item.estimasihari || item.lead_time || 2
         };
@@ -335,7 +334,7 @@ const MarketingBTT = () => {
             window.removeEventListener('storage', handleAgenChange);
             window.removeEventListener('agen_changed', handleAgenChange);
         };
-    }, []);
+    }, [filterAgenId]);
 
     const handleApplyFilter = () => {
         fetchBTT(filterAgenId, {
