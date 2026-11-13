@@ -2333,6 +2333,724 @@ const Invoice = () => {
     };
 
     // =========================================================================
+    // 🖨️ 1. PRINT BTT ALL (TAMPILAN MODERN BTT 3 RANGKAP IDENTIK BttPrintPage)
+    // =========================================================================
+    const handlePrintAllBTT = async (invoiceItem) => {
+        const item = invoiceItem || activeInvoice;
+        if (!item || !item.artih_id) {
+            Swal.fire('Peringatan', 'Data invoice tidak valid.', 'warning');
+            return;
+        }
+
+        const printWin = window.open('', '_blank', 'width=1050,height=920,scrollbars=yes');
+        if (!printWin) {
+            Swal.fire('Popup Diblokir', 'Izinkan popup browser untuk mencetak BTT.', 'warning');
+            return;
+        }
+        printWin.document.write(`<html><head><title>Memuat BTT...</title></head><body style="font-family:sans-serif;text-align:center;padding-top:60px;"><h3>Sedang memuat seluruh BTT untuk Invoice ${item.artih_id}...</h3></body></html>`);
+
+        try {
+            const token = localStorage.getItem('token');
+            const ptId = localStorage.getItem('pt_id') || 'C';
+            const res = await api.get(`/piutang/invoice/detail?id=${encodeURIComponent(item.artih_id)}&pt_id=${ptId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            const header = res.data?.data?.header || res.data?.header || item;
+            const btts = res.data?.data?.btt_list || res.data?.btt_list || [];
+
+            if (btts.length === 0) {
+                printWin.close();
+                Swal.fire('Info', 'Tidak ditemukan daftar BTT pada invoice ini.', 'info');
+                return;
+            }
+
+            const resolveWilayah = (kotaRaw, alamatRaw) => {
+                const full = `${alamatRaw || ''} ${kotaRaw || ''}`.toUpperCase();
+                const provs = [
+                    'DKI JAKARTA', 'JAWA BARAT', 'BANTEN', 'JAWA TENGAH', 'DI YOGYAKARTA', 'YOGYAKARTA', 'JAWA TIMUR',
+                    'ACEH', 'SUMATERA UTARA', 'SUMATERA BARAT', 'RIAU', 'KEPULAUAN RIAU', 'JAMBI', 'SUMATERA SELATAN',
+                    'BENGKULU', 'LAMPUNG', 'KEPULAUAN BANGKA BELITUNG', 'BALI', 'NUSA TENGGARA BARAT', 'NUSA TENGGARA TIMUR',
+                    'KALIMANTAN BARAT', 'KALIMANTAN TENGAH', 'KALIMANTAN SELATAN', 'KALIMANTAN TIMUR', 'KALIMANTAN UTARA',
+                    'SULAWESI UTARA', 'SULAWESI TENGAH', 'SULAWESI SELATAN', 'SULAWESI TENGGARA', 'GORONTALO', 'SULAWESI BARAT',
+                    'MALUKU', 'MALUKU UTARA', 'PAPUA', 'PAPUA BARAT'
+                ];
+                const hit = provs.find(p => full.includes(p));
+                if (hit) return hit;
+                const k = (kotaRaw || '').toUpperCase();
+                if (/BEKASI|BOGOR|DEPOK|BANDUNG|CIMAHI|CIKARANG|KARAWANG|PURWAKARTA|SUBANG|SUKABUMI|CIANJUR|GARUT|TASIKMALAYA|CIREBON/.test(k)) return 'JAWA BARAT';
+                if (/JAKARTA/.test(k)) return 'DKI JAKARTA';
+                if (/TANGERANG|SERANG|CILEGON/.test(k)) return 'BANTEN';
+                if (/SEMARANG|SOLO|SURAKARTA|MAGELANG|PEKALONGAN|TEGAL|SALATIGA|BANYUMAS|PURWOKERTO|CILACAP|KUDUS|JEPARA|PATI|KLATEN|SUKOHARJO/.test(k)) return 'JAWA TENGAH';
+                if (/SURABAYA|SIDOARJO|GRESIK|MALANG|PASURUAN|PROBOLINGGO|MOJOKERTO|JOMBANG|KEDIRI|BLITAR|MADIUN|JEMBER|BANYUWANGI/.test(k)) return 'JAWA TIMUR';
+                return '-';
+            };
+
+            const tipeLembaran = [
+                { label: 'UNTUK PENGIRIM', kasta: 'Lembar 1 dari 3', isHarga: true, isStempel: false },
+                { label: 'KEMBALI KE CAB. PENGIRIM', kasta: 'Lembar 2 dari 3', isHarga: false, isStempel: true },
+                { label: 'UNTUK ARSIP', kasta: 'Lembar 3 dari 3', isHarga: false, isStempel: false }
+            ];
+
+            const noInvoiceDisplay = formatNomorInvoiceResmi(header.artih_id, header.artih_tanggal);
+
+            const allBttSheetsHtml = btts.map((b, bIdx) => {
+                const resiNo = String(b.bttt_id || '').trim();
+                const tglObj = b.bttt_tanggal ? new Date(b.bttt_tanggal) : new Date();
+                const validDate = !isNaN(tglObj.getTime()) ? tglObj : new Date();
+                const tglKirimStr = `${String(validDate.getDate()).padStart(2, '0')}/${String(validDate.getMonth() + 1).padStart(2, '0')}/${validDate.getFullYear()} ${String(validDate.getHours()).padStart(2, '0')}:${String(validDate.getMinutes()).padStart(2, '0')}:${String(validDate.getSeconds()).padStart(2, '0')}`;
+
+                const estDate = new Date(validDate);
+                estDate.setDate(estDate.getDate() + 2);
+                const estTerimaStr = estDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                const wajibKembaliStr = estDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+                const rawKet = String(b.bttt_ket || '').trim();
+                const matchBarangKoli = rawKet.match(/^([A-Z0-9\s/&-]+?)\s*\((\d+)\s*KOLI\)/i);
+
+                let isiKiriman = String(b.bttt_namabarang || '').trim();
+                if ((!isiKiriman || isiKiriman.toUpperCase() === 'OBAT' || isiKiriman.toUpperCase() === 'PRODUK FARMASI / KESEHATAN') && matchBarangKoli) {
+                    isiKiriman = matchBarangKoli[1].trim().toUpperCase();
+                }
+                if (!isiKiriman) isiKiriman = 'PRODUK FARMASI / KESEHATAN';
+
+                let jmlKoli = parseInt(b.bttt_jmlunit, 10) || 0;
+                if (jmlKoli <= 1 && matchBarangKoli) {
+                    jmlKoli = parseInt(matchBarangKoli[2], 10) || 1;
+                }
+                if (jmlKoli < 1) jmlKoli = 1;
+
+                const cleanKet = rawKet
+                    .replace(/\[B\.PACKING:.*?\]/gi, '')
+                    .replace(/^.*?\(\d+\s*KOLI\)\s*-\s*CABANG:\s*[^\s-]+(?:\s*-\s*CARTER:\s*[^\n]+)?\s*/i, '')
+                    .trim();
+
+                const isDangerousGoods = isiKiriman.toUpperCase().includes('CHEMICAL');
+                const layananText = b.bttt_paketyn === 'N' ? 'CARTER' : 'REGULER';
+                const pembayaranText = b.bttt_jenisharga === '0' ? 'TUNAI' : b.bttt_jenisharga === '2' ? 'KREDIT' : 'TAGIH TUJUAN';
+                const viaText = (b.bttt_via || 'DARAT').toUpperCase();
+                const tujuanWilayah = resolveWilayah(b.bttt_tujuankota, b.bttt_tujuanalamat);
+
+                const biayaKirim = Math.round(Number(b.bttt_harga || 0));
+                const biayaPenerus = Math.round(Number(b.bttt_biayapenerus || 0));
+                const biayaPacking = Math.round(Number(b.biaya_packing || 0));
+                const totalBiaya = biayaKirim + biayaPenerus + biayaPacking;
+                const marketingUser = (b.bttt_updateid || 'SUPERDLI').toUpperCase();
+
+                const lembarHtml = tipeLembaran.map((lembar, lIdx) => {
+                    const barcodeId = `bc_${bIdx}_${lIdx}`;
+                    const qrId = `qr_${bIdx}_${lIdx}`;
+
+                    return `
+                        <div class="btt-card">
+                            ${lIdx === 0 && isDangerousGoods ? `
+                                <div class="stamp-overlay">
+                                    <div class="stamp-dg">
+                                        <div style="font-size:26px; letter-spacing:3px; line-height:1;">DANGEROUS GOODS</div>
+                                        <div style="font-size:13px; letter-spacing:1.5px; margin-top:3px;">[ B3 - CHEMICALS HAZARDOUS ]</div>
+                                    </div>
+                                </div>
+                            ` : ''}
+
+                            ${lembar.isStempel ? `
+                                <div class="stamp-overlay">
+                                    <div class="stamp-return">
+                                        <div style="font-size:22px; letter-spacing:2.5px; line-height:1;">DOKUMEN WAJIB KEMBALI</div>
+                                        <div style="font-size:12px; letter-spacing:1px; margin-top:3px;">SEBELUM : ${wajibKembaliStr.toUpperCase()}</div>
+                                    </div>
+                                </div>
+                            ` : ''}
+
+                            <!-- HEADER -->
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:1.5px solid #1e293b; padding-bottom:4px;">
+                                <div style="display:flex; gap:10px; align-items:center; max-width:62%;">
+                                    <img src="${dakotaLogo}" alt="Logo" style="width:72px; height:auto; object-fit:contain;" />
+                                    <div>
+                                        <div style="font-size:11px; font-weight:900; color:#0f172a; line-height:1.1;">DAKOTA LOGISTIK INDONESIA (DLI)</div>
+                                        <div style="font-size:9px; font-weight:800; color:#1e293b;">${(b.bttt_asalagennama || 'DLI PUSAT').toUpperCase()}</div>
+                                        <div style="font-size:7.5px; color:#475569;">Jl. Wibawa Mukti II No. 8 Jatiasih, Bekasi</div>
+                                        <div style="font-size:7.5px; color:#475569;">BEKASI KOTA - Telp: (021) 8603278 / (021) 86608589</div>
+                                    </div>
+                                </div>
+                                <div style="text-align:right;">
+                                    <div style="font-family:monospace; font-size:7px; font-weight:bold; color:#64748b;">[ NOMOR RESI PENGIRIMAN ]</div>
+                                    <svg id="${barcodeId}" class="btt-bc" data-val="${resiNo}" style="height:22px;"></svg>
+                                    <div style="font-family:monospace; font-weight:900; font-size:11px; letter-spacing:1.5px; color:#0f172a;">${resiNo}</div>
+                                </div>
+                            </div>
+
+                            <!-- TRACKING BAR 5 KOLOM -->
+                            <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:6px; background:#f8fafc; padding:4px 6px; border:1px solid #e2e8f0; border-radius:6px; font-size:7.5px; font-weight:bold;">
+                                <div><span style="color:#94a3b8; display:block; font-size:6.5px;">TGL KIRIM :</span><span style="font-family:monospace; color:#0f172a; font-weight:900;">${tglKirimStr}</span></div>
+                                <div><span style="color:#94a3b8; display:block; font-size:6.5px;">EST. TGL TERIMA :</span><span style="color:#4338ca; font-weight:900;">${estTerimaStr}</span></div>
+                                <div><span style="color:#94a3b8; display:block; font-size:6.5px;">CAB. PENGIRIM :</span><span style="color:#0f172a; font-weight:800;">${(b.bttt_asalagennama || 'DLI PUSAT').toUpperCase()}</span></div>
+                                <div><span style="color:#94a3b8; display:block; font-size:6.5px;">CAB. PENERIMA :</span><span style="color:#0f172a; font-weight:800;">${(b.bttt_tujuankota || '-').toUpperCase()}</span></div>
+                                <div><span style="color:#94a3b8; display:block; font-size:6.5px;">TUJUAN WILAYAH :</span><span style="color:#b45309; font-weight:900;">${tujuanWilayah}</span></div>
+                            </div>
+
+                            <!-- STATUS MANIFEST -->
+                            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:4px; background:#fff; padding:4px 6px; border:1px solid #e2e8f0; border-radius:6px; font-size:7.5px; font-weight:bold; color:#475569;">
+                                <div>
+                                    Layanan: <span style="color:#4f46e5; font-weight:900;">${layananText}</span><br/>
+                                    Pembayaran: <span style="color:#059669; font-weight:900;">${pembayaranText}</span>
+                                </div>
+                                <div>
+                                    Kiriman: <span style="color:#0f172a; font-weight:900; text-transform:uppercase;">${isiKiriman}</span><br/>
+                                    Via: <span style="color:#d97706; font-weight:900;">${viaText}</span>
+                                </div>
+                                <div style="text-align:right;">
+                                    ${lembar.kasta}<br/>
+                                    <span style="color:#7e22ce; font-family:monospace; font-size:7px; font-weight:900; background:#faf5ff; padding:1px 5px; border-radius:4px; border:1px solid #e9d5ff;">${lembar.label}</span>
+                                </div>
+                            </div>
+
+                            <!-- PENGIRIM & PENERIMA -->
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                                <div style="padding:4px 6px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px;">
+                                    <div style="font-weight:900; color:#dc2626; font-size:7px;">[ PENGIRIM ]</div>
+                                    <div style="font-weight:900; color:#0f172a; font-size:8.5px;">${(b.bttt_asalname || header.cust_name || '-').toUpperCase()}</div>
+                                    <div style="font-family:monospace; color:#334155; font-weight:bold; font-size:7px;">${b.bttt_asaltelp || '-'}</div>
+                                    <div style="color:#64748b; font-size:7px; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${b.bttt_asalalamat || '-'}</div>
+                                </div>
+                                <div style="padding:4px 6px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px;">
+                                    <div style="font-weight:900; color:#2563eb; font-size:7px;">[ PENERIMA ]</div>
+                                    <div style="font-weight:900; color:#0f172a; font-size:8.5px;">
+                                        ${(b.bttt_tujuannama || '-').toUpperCase()}
+                                        ${b.bttt_up && b.bttt_up !== '-' ? `<span style="color:#334155; font-weight:bold; font-size:7.5px;"> (UP: ${b.bttt_up})</span>` : ''}
+                                    </div>
+                                    <div style="font-family:monospace; color:#334155; font-weight:bold; font-size:7px;">${b.bttt_tujuantelp || '-'}</div>
+                                    <div style="color:#64748b; font-size:7px; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${b.bttt_tujuanalamat || '-'}</div>
+                                </div>
+                            </div>
+
+                            <!-- TABEL FISIK & RINCIAN BIAYA / TANDA TERIMA -->
+                            <div style="display:grid; grid-template-columns:7fr 5fr; gap:8px; align-items:start;">
+                                <div>
+                                    <table style="width:100%; text-align:center; border-collapse:collapse; border:1px solid #cbd5e1; font-size:7.5px;">
+                                        <thead>
+                                            <tr style="background:#f1f5f9; font-weight:bold; color:#475569;">
+                                                <th style="padding:2px; border:1px solid #cbd5e1;">Jumlah Koli</th>
+                                                <th style="padding:2px; border:1px solid #cbd5e1;">Berat Asli</th>
+                                                <th style="padding:2px; border:1px solid #cbd5e1;">Berat Volume</th>
+                                                <th style="padding:2px; border:1px solid #cbd5e1;">Volume Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr style="font-weight:900; color:#1e293b;">
+                                                <td style="padding:2px; border:1px solid #cbd5e1; background:#f8fafc;">${jmlKoli} Koli</td>
+                                                <td style="padding:2px; border:1px solid #cbd5e1;">${Number(b.bttt_berat || 0)} kg</td>
+                                                <td style="padding:2px; border:1px solid #cbd5e1;">${Number(b.bttt_beratvol || 0)} kg</td>
+                                                <td style="padding:2px; border:1px solid #cbd5e1;">${Number(b.bttt_ukuran || 0)} m³</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                    <div style="margin-top:3px; padding:3px 6px; border:1px solid #e2e8f0; border-radius:5px; background:#f8fafc; font-size:7px; color:#334155; line-height:1.25;">
+                                        <div><b>Isi Kiriman :</b> ${isiKiriman}</div>
+                                        <div><b>Keterangan :</b> ${cleanKet || '-'}</div>
+                                        <div><b>Jenis Harga :</b> BERAT</div>
+                                    </div>
+                                </div>
+
+                                ${lembar.isHarga ? `
+                                    <div style="background:#f8fafc; padding:5px 8px; border-radius:6px; border:1px solid #e2e8f0; font-size:7.5px; font-weight:bold; color:#475569;">
+                                        <div style="display:flex; justify-content:space-between;"><span>Biaya Kirim :</span><span style="font-family:monospace; color:#0f172a;">Rp ${biayaKirim.toLocaleString('id-ID')}</span></div>
+                                        <div style="display:flex; justify-content:space-between;"><span>Biaya Penerus :</span><span style="font-family:monospace; color:#0f172a;">Rp ${biayaPenerus.toLocaleString('id-ID')}</span></div>
+                                        <div style="display:flex; justify-content:space-between;"><span>Packing :</span><span style="font-family:monospace; color:#0f172a;">Rp ${biayaPacking.toLocaleString('id-ID')}</span></div>
+                                        <div style="display:flex; justify-content:space-between; font-weight:900; font-size:9px; color:#0f172a; margin-top:3px; padding-top:3px; border-top:1px dashed #cbd5e1;">
+                                            <span>Total Biaya :</span><span style="font-family:monospace; color:#4338ca;">Rp ${totalBiaya.toLocaleString('id-ID')}</span>
+                                        </div>
+                                    </div>
+                                ` : `
+                                    <div style="background:#f8fafc; padding:5px 8px; border-radius:6px; border:1px solid #cbd5e1; text-align:center; min-height:56px; display:flex; flex-direction:column; justify-content:space-between;">
+                                        <div style="font-weight:bold; color:#1e293b; font-size:7px;">DENGAN INI BARANG / PAKET KIRIMAN SUDAH DITERIMA DALAM KONDISI BAIK OLEH :</div>
+                                        <div style="font-size:6.5px; font-weight:bold; color:#64748b;">PARAF & NAMA JELAS PENERIMA</div>
+                                        <div style="border-bottom:1px dashed #94a3b8; width:120px; margin:12px auto 0 auto;"></div>
+                                        <div style="font-size:6.5px; color:#94a3b8;">[ ............................................. ]</div>
+                                    </div>
+                                `}
+                            </div>
+
+                            <!-- LAMPIRAN -->
+                            <div style="padding:3px 6px; border:1px dashed #cbd5e1; border-radius:5px; background:#f8fafc; font-size:7px; font-weight:bold; color:#334155;">
+                                <div><span style="color:#64748b;">Lampiran Surat Jalan :</span> <span style="font-family:monospace; color:#4338ca;">${b.bttt_nosuratjalan || '-'}</span></div>
+                                <div><span style="color:#64748b;">Lampiran Keterangan :</span> <span style="color:#0f172a; font-weight:800;">${cleanKet || '-'}</span> | <span style="color:#64748b;">Layanan:</span> <span style="color:#4338ca; font-weight:800;">${layananText}</span></div>
+                            </div>
+
+                            <!-- FOOTER SIGNATURE & QR -->
+                            <div style="display:flex; justify-content:space-between; align-items:flex-end; font-size:6.5px; font-weight:600; color:#94a3b8;">
+                                <div style="max-width:38%;">
+                                    <div>Pelacakan kiriman secara live: <span style="color:#2563eb; text-decoration:underline;">www.dakotacargo.co.id</span></div>
+                                    <div style="font-size:6px;">Terima kasih telah mempercayakan jasa layanan kami.</div>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:4px; border:1px solid #e2e8f0; padding:2px 4px; border-radius:4px; background:#fff;">
+                                    <div id="${qrId}" class="btt-qr" data-val="https://www.dakotacargo.co.id/tracking?id=${resiNo}"></div>
+                                    <span style="font-family:monospace; font-size:5.5px; color:#64748b; font-weight:bold; line-height:1.1;">SCAN<br/>TRACKING</span>
+                                </div>
+                                ${lembar.isHarga ? `
+                                    <div style="display:flex; gap:10px; text-align:center; font-weight:bold; color:#475569; font-size:7px;">
+                                        <div>MARKETING<div style="height:10px;"></div><div style="border-bottom:1px solid #cbd5e1; width:62px; font-family:monospace; font-size:6px; color:#4f46e5;">[${marketingUser}]</div></div>
+                                        <div>CUSTOMER<div style="height:10px;"></div><div style="border-bottom:1px solid #cbd5e1; width:62px;"></div></div>
+                                        <div>PENERIMA<div style="height:10px;"></div><div style="border-bottom:1px solid #cbd5e1; width:62px;"></div></div>
+                                    </div>
+                                ` : `
+                                    <div style="display:flex; gap:14px; text-align:center; font-weight:bold; color:#475569; font-size:6.5px;">
+                                        <div>PENGANTAR PAKET<div style="height:10px;"></div><div style="border-bottom:1px solid #cbd5e1; width:76px; font-size:5.5px; color:#94a3b8;">(Paraf & Nama Kurir)</div></div>
+                                        <div>CUSTOMER<div style="height:10px;"></div><div style="border-bottom:1px solid #cbd5e1; width:76px; font-size:5.5px; color:#94a3b8;">(Paraf & Nama Pengirim)</div></div>
+                                    </div>
+                                `}
+                            </div>
+                        </div>
+                        ${lIdx < 2 ? `<div class="cut-line"><span>✂️ GUNTING BATAS POTONGAN LEMBARAN RANGKAP</span></div>` : ''}
+                    `;
+                }).join('');
+
+                return `
+                    <div class="a4-sheet" style="${bIdx < btts.length - 1 ? 'page-break-after: always;' : ''}">
+                        ${lembarHtml}
+                    </div>
+                `;
+            }).join('');
+
+            printWin.document.open();
+            printWin.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>PRINT ALL BTT - ${noInvoiceDisplay}</title>
+                    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
+                    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
+                    <style>
+                        @page { size: A4 portrait; margin: 4mm 6mm; }
+                        * { box-sizing: border-box; }
+                        body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 8px; background: #fff; color: #0f172a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                        .no-print { max-width: 850px; margin: 0 auto 10px auto; padding: 10px 14px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
+                        .btn-print { padding: 7px 16px; background: #2563eb; color: #fff; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; font-size: 11px; }
+                        .btn-close { padding: 7px 14px; background: #e11d48; color: #fff; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; font-size: 11px; margin-left: 6px; }
+                        .a4-sheet { width: 100%; max-width: 850px; margin: 0 auto 14px auto; height: 286mm; display: flex; flex-direction: column; justify-content: space-between; }
+                        .btt-card { border: 1px solid #cbd5e1; border-radius: 12px; padding: 8px 10px; height: 91mm; position: relative; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; background: #fff; page-break-inside: avoid; }
+                        .cut-line { border-top: 1px dashed #94a3b8; position: relative; margin: 2px 0; text-align: center; }
+                        .cut-line span { position: relative; top: -6px; background: #fff; padding: 0 8px; font-family: monospace; font-size: 6.5px; color: #94a3b8; }
+                        .stamp-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 20; }
+                        .stamp-dg { transform: rotate(-16deg); border: 5px solid #d97706; border-radius: 14px; padding: 8px 28px; text-align: center; color: #d97706; font-family: monospace; font-weight: 900; opacity: 0.28; }
+                        .stamp-return { transform: rotate(-16deg); border: 4px solid #dc2626; border-radius: 14px; padding: 8px 24px; text-align: center; color: #dc2626; font-family: monospace; font-weight: 900; opacity: 0.28; }
+                        @media print { .no-print { display: none !important; } body { padding: 0; } .a4-sheet { margin: 0 auto; } }
+                    </style>
+                </head>
+                <body>
+                    <div class="no-print">
+                        <span style="font-weight:bold; color:#1e40af; font-size:12px;">Invoice: ${noInvoiceDisplay} 📄 Mode Cetak Semua BTT (${btts.length} Resi × 3 Rangkap)</span>
+                        <div>
+                            <button class="btn-print" onclick="window.print()">Cetak Semua Dokumen BTT</button>
+                            <button class="btn-close" onclick="window.close()">Tutup</button>
+                        </div>
+                    </div>
+
+                    ${allBttSheetsHtml}
+
+                    <script>
+                        window.onload = function() {
+                            if (window.JsBarcode) {
+                                document.querySelectorAll('.btt-bc').forEach(function(svg) {
+                                    var val = svg.getAttribute('data-val');
+                                    if (val) {
+                                        JsBarcode(svg, val, { format: "CODE128", width: 1.2, height: 20, displayValue: false, margin: 0 });
+                                    }
+                                });
+                            }
+                            if (window.QRCode) {
+                                document.querySelectorAll('.btt-qr').forEach(function(el) {
+                                    var val = el.getAttribute('data-val');
+                                    if (val) {
+                                        new QRCode(el, { text: val, width: 24, height: 24, correctLevel: QRCode.CorrectLevel.M });
+                                    }
+                                });
+                            }
+                        };
+                    <\/script>
+                </body>
+                </html>
+            `);
+            printWin.document.close();
+        } catch (err) {
+            printWin.close();
+            Swal.fire('Error', 'Gagal memuat seluruh BTT: ' + (err.message || err), 'error');
+        }
+    };
+
+    // =========================================================================
+    // 📥 2. PREVIEW DOWNLOAD FAKTUR (MODERN DESIGN: PRINT | ExpToXLS | PRINTallBTT)
+    // =========================================================================
+    const handlePreviewDownloadInvoice = async (invoiceItem) => {
+        const item = invoiceItem || activeInvoice;
+        if (!item || !item.artih_id) {
+            Swal.fire('Peringatan', 'Data invoice tidak valid.', 'warning');
+            return;
+        }
+
+        const previewWin = window.open('', '_blank', 'width=1320,height=880,scrollbars=yes');
+        if (!previewWin) {
+            Swal.fire('Popup Diblokir', 'Izinkan popup browser untuk membuka preview.', 'warning');
+            return;
+        }
+        previewWin.document.write(`<html><head><title>Memuat Preview...</title></head><body style="font-family:sans-serif;text-align:center;padding-top:60px;"><h3>Sedang menyiapkan Preview Faktur ${item.artih_id}...</h3></body></html>`);
+
+        try {
+            const token = localStorage.getItem('token');
+            const ptId = localStorage.getItem('pt_id') || 'C';
+            const res = await api.get(`/piutang/invoice/detail?id=${encodeURIComponent(item.artih_id)}&pt_id=${ptId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            const header = res.data?.data?.header || res.data?.header || item;
+            const btts = res.data?.data?.btt_list || res.data?.btt_list || [];
+
+            const noInvoiceResmi = formatNomorInvoiceResmi(header.artih_id, header.artih_tanggal);
+            const safeFileName = noInvoiceResmi.replace(/\//g, '_');
+            const kwitansiDisplayNo = formatNomorKwitansiResmi(header.artih_nokw, header.artih_id, header.artih_tanggal);
+            const tglCetakIndo = formatTanggalIndonesia(header.artih_tanggal);
+            const custName = (header.cust_name || header.artih_custname || '-').toUpperCase();
+            const custID = header.artih_custid || '-';
+            const custAlamat = [header.cust_alamat || header.cust_alamat1, header.cust_alamat2]
+                .map(v => String(v || '').trim())
+                .filter(v => v && v !== '-')
+                .join(', ') || 'KANTOR PUSAT OPERASIONAL';
+
+            let totalKoli = 0, totalBerat = 0, totalUkuran = 0, totalPacking = 0, totalPenerus = 0, totalBiayaKirim = 0, grandTotal = 0;
+
+            const rowsHtml = btts.map((b, idx) => {
+                const koli = Number(b.bttt_jmlunit || 1);
+                const berat = Number(b.bttt_berat || 0);
+                const ukuran = Number(b.bttt_ukuran || 0);
+                const packing = Number(b.biaya_packing || 0);
+                const penerus = Number(b.bttt_biayapenerus || 0);
+                const biayaKirim = Number(b.bttt_harga || 0);
+                const sub = Number(b.subtotal || (biayaKirim + penerus + packing));
+
+                const tglBttObj = b.bttt_tanggal ? new Date(b.bttt_tanggal) : null;
+                const tglBttStr = tglBttObj && !isNaN(tglBttObj.getTime())
+                    ? `${String(tglBttObj.getDate()).padStart(2, '0')}/${String(tglBttObj.getMonth() + 1).padStart(2, '0')}/${tglBttObj.getFullYear()}`
+                    : String(b.bttt_tanggal || '').substring(0, 10);
+
+                totalKoli += koli;
+                totalBerat += berat;
+                totalUkuran += ukuran;
+                totalPacking += packing;
+                totalPenerus += penerus;
+                totalBiayaKirim += biayaKirim;
+                grandTotal += sub;
+
+                return `
+                    <tr>
+                        <td style="text-align:center; color:#64748b;">${idx + 1}</td>
+                        <td style="font-family:monospace; color:#0284c7; font-weight:600;">${noInvoiceResmi}</td>
+                        <td style="font-weight:600;">${custName}</td>
+                        <td style="font-family:monospace; font-weight:700; color:#0f172a;">${b.bttt_id}</td>
+                        <td style="text-align:center; font-family:monospace;">${tglBttStr}</td>
+                        <td>${(b.bttt_tujuankota || '-').toUpperCase()}</td>
+                        <td>${(b.bttt_tujuannama || '-').toUpperCase()}</td>
+                        <td style="font-family:monospace; font-size:9px;">${b.bttt_nosuratjalan || '-'}</td>
+                        <td style="text-align:center;"><span class="badge-via">${(b.bttt_via || 'DARAT').toUpperCase()}</span></td>
+                        <td style="text-align:right; font-family:monospace;">${koli}</td>
+                        <td style="text-align:right; font-family:monospace;">${berat.toLocaleString('id-ID')}</td>
+                        <td style="text-align:right; font-family:monospace;">${ukuran}</td>
+                        <td style="text-align:right; font-family:monospace;">${packing.toLocaleString('id-ID')}</td>
+                        <td style="text-align:right; font-family:monospace;">${penerus.toLocaleString('id-ID')}</td>
+                        <td style="text-align:right; font-family:monospace;">${biayaKirim.toLocaleString('id-ID')}</td>
+                        <td style="text-align:right; font-family:monospace; font-weight:700; color:#0f172a;">${sub.toLocaleString('id-ID')}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            const textTerbilang = (terbilangIndonesia(Math.round(grandTotal)).trim() + ' RUPIAH').replace(/\s+/g, ' ');
+
+            window.__triggerPrintAllBTTFromPreview = () => handlePrintAllBTT(item);
+
+            previewWin.document.open();
+            previewWin.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>FAKTUR PENAGIHAN - ${noInvoiceResmi}</title>
+                    <style>
+                        @page { size: A4 landscape; margin: 8mm; }
+                        * { box-sizing: border-box; }
+                        body {
+                            font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+                            font-size: 11px;
+                            margin: 0;
+                            padding: 14px 18px;
+                            color: #1e293b;
+                            background: #f1f5f9;
+                            -webkit-print-color-adjust: exact;
+                            print-color-adjust: exact;
+                        }
+                        .sheet-container {
+                            max-width: 1240px;
+                            margin: 0 auto;
+                            background: #ffffff;
+                            border-radius: 14px;
+                            padding: 18px 22px;
+                            box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08);
+                            border: 1px solid #e2e8f0;
+                        }
+                        .toolbar-modern {
+                            max-width: 1240px;
+                            margin: 0 auto 12px auto;
+                            background: linear-gradient(135deg, #004b84 0%, #0369a1 100%);
+                            color: #ffffff;
+                            padding: 10px 16px;
+                            border-radius: 12px;
+                            display: flex;
+                            flex-wrap: wrap;
+                            justify-content: space-between;
+                            align-items: center;
+                            gap: 10px;
+                            box-shadow: 0 4px 12px rgba(0, 75, 132, 0.25);
+                        }
+                        .toolbar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+                        .btn-mod {
+                            border: none;
+                            padding: 7px 14px;
+                            border-radius: 8px;
+                            font-size: 11px;
+                            font-weight: 700;
+                            cursor: pointer;
+                            display: inline-flex;
+                            align-items: center;
+                            gap: 5px;
+                            letter-spacing: 0.3px;
+                            transition: all 0.15s ease;
+                        }
+                        .btn-mod:hover { transform: translateY(-1px); filter: brightness(1.05); }
+                        .btn-print { background: #16a34a; color: #fff; }
+                        .btn-xls { background: #f59e0b; color: #0f172a; }
+                        .btn-btt { background: #e11d48; color: #fff; }
+                        .btn-cancel { background: rgba(255,255,255,0.16); color: #fff; border: 1px solid rgba(255,255,255,0.35); }
+                        .valid-badge {
+                            font-size: 10.5px;
+                            background: rgba(255,255,255,0.14);
+                            padding: 5px 10px;
+                            border-radius: 8px;
+                            border: 1px solid rgba(255,255,255,0.22);
+                        }
+                        .info-grid {
+                            display: grid;
+                            grid-template-columns: 1.35fr 1fr;
+                            gap: 14px;
+                            margin: 12px 0;
+                        }
+                        .info-card {
+                            background: #f8fafc;
+                            border: 1px solid #e2e8f0;
+                            border-radius: 10px;
+                            padding: 10px 14px;
+                        }
+                        table.data-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+                        table.data-table th {
+                            background: #004b84;
+                            color: #ffffff;
+                            border: 1px solid #003b69;
+                            padding: 6px 4px;
+                            font-size: 9px;
+                            text-align: center;
+                            font-weight: 700;
+                            text-transform: uppercase;
+                            letter-spacing: 0.2px;
+                        }
+                        table.data-table td {
+                            border: 1px solid #cbd5e1;
+                            padding: 5px 5px;
+                            font-size: 9.5px;
+                        }
+                        table.data-table tbody tr:nth-child(even) { background: #f8fafc; }
+                        table.data-table tbody tr:hover { background: #eff6ff; }
+                        .badge-via {
+                            background: #e0f2fe;
+                            color: #0369a1;
+                            padding: 1.5px 5px;
+                            border-radius: 4px;
+                            font-size: 8.5px;
+                            font-weight: 700;
+                        }
+                        .terbilang-box {
+                            margin-top: 10px;
+                            background: #f0f9ff;
+                            border-left: 4px solid #0284c7;
+                            border-top: 1px solid #bae6fd;
+                            border-right: 1px solid #bae6fd;
+                            border-bottom: 1px solid #bae6fd;
+                            padding: 7px 12px;
+                            border-radius: 0 8px 8px 0;
+                            font-size: 10.5px;
+                        }
+                        .footer-grid {
+                            display: grid;
+                            grid-template-columns: 1.6fr 0.8fr;
+                            gap: 14px;
+                            margin-top: 12px;
+                        }
+                        .bank-card {
+                            background: #f8fafc;
+                            border: 1px solid #e2e8f0;
+                            border-radius: 10px;
+                            padding: 9px 14px;
+                            font-size: 10px;
+                            line-height: 1.45;
+                        }
+                        .sign-card {
+                            background: #f8fafc;
+                            border: 1px solid #e2e8f0;
+                            border-radius: 10px;
+                            padding: 9px 14px;
+                            text-align: center;
+                            font-size: 10px;
+                        }
+                        @media print {
+                            body { background: #fff; padding: 0; }
+                            .no-print { display: none !important; }
+                            .sheet-container { box-shadow: none; border: none; padding: 0; max-width: 100%; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <!-- TOOLBAR KONTROL MODERN -->
+                    <div class="no-print toolbar-modern">
+                        <div>
+                            <div style="font-size:12.5px; font-weight:800; letter-spacing:0.3px;">PREVIEW FAKTUR PENAGIHAN — ${noInvoiceResmi}</div>
+                            <div style="font-size:10px; opacity:0.85; margin-top:2px;">Dokumen ini sah/valid apabila dicetak melalui tombol Print</div>
+                        </div>
+                        <div class="toolbar-actions">
+                            <button class="btn-mod btn-print" onclick="window.print()">🖨️ PRINT</button>
+                            <button class="btn-mod btn-xls" onclick="exportTableToExcel()">📊 ExpToXLS</button>
+                            <button class="btn-mod btn-btt" onclick="if(window.opener && window.opener.__triggerPrintAllBTTFromPreview){ window.opener.__triggerPrintAllBTTFromPreview(); }">📑 PRINTallBTT</button>
+                            <button class="btn-mod btn-cancel" onclick="window.close()">✕ BATAL</button>
+                        </div>
+                    </div>
+
+                    <div class="sheet-container">
+                        <!-- HEADER KOP SURAT -->
+                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2.5px solid #004b84; padding-bottom:10px;">
+                            <div style="display:flex; align-items:center; gap:12px;">
+                                <img src="${dakotaLogo}" alt="Logo Dakota" style="height:44px; object-fit:contain;" />
+                                <div>
+                                    <div style="font-size:15px; font-weight:900; color:#004b84; letter-spacing:0.3px;">PT. DAKOTA LOGISTIK INDONESIA</div>
+                                    <div style="font-size:10px; color:#64748b; margin-top:2px;">Jl. Wibawa Mukti II No. 8 Jatiasih, Bekasi • www.dakotacargo.co.id • cc@dakotacargo.co.id</div>
+                                </div>
+                            </div>
+                            <div style="text-align:right;">
+                                <div style="display:inline-block; background:#e0f2fe; color:#004b84; font-weight:900; font-size:15px; padding:4px 12px; border-radius:8px; letter-spacing:0.6px; border:1px solid #bae6fd;">
+                                    FAKTUR PENAGIHAN
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- KARTU INFO PELANGGAN & NOMOR DOKUMEN -->
+                        <div class="info-grid">
+                            <div class="info-card">
+                                <div style="font-size:9px; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.4px;">Tagihan Kepada (Pelanggan) :</div>
+                                <div style="font-size:13px; font-weight:900; color:#0f172a; margin-top:2px;">${custName}</div>
+                                <div style="font-size:10px; color:#475569; margin-top:2px;">${custAlamat}</div>
+                                <div style="margin-top:4px; font-family:monospace; font-size:10px; color:#0284c7; font-weight:700;">ID Pelanggan: ${custID}</div>
+                            </div>
+                            <div class="info-card">
+                                <table style="width:100%; border-collapse:collapse; font-size:10.5px;">
+                                    <tr><td style="color:#64748b; padding:2px 0; width:38%;">Tanggal Cetak</td><td style="width:4%;">:</td><td style="font-weight:700; color:#0f172a;">${tglCetakIndo}</td></tr>
+                                    <tr><td style="color:#64748b; padding:2px 0;">No. Faktur</td><td>:</td><td style="font-family:monospace; font-weight:800; color:#0284c7;">${noInvoiceResmi}</td></tr>
+                                    <tr><td style="color:#64748b; padding:2px 0;">No. Kwitansi</td><td>:</td><td style="font-family:monospace; font-weight:800; color:#059669;">${kwitansiDisplayNo}</td></tr>
+                                    <tr><td style="color:#64748b; padding:2px 0;">Total Resi BTT</td><td>:</td><td style="font-weight:700; color:#0f172a;">${btts.length} Resi</td></tr>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- TABEL RINCIAN BTT -->
+                        <table id="tblFaktur" class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>NO</th>
+                                    <th>NO. INVOICE</th>
+                                    <th>NAMA CUSTOMER</th>
+                                    <th>NO. BTT</th>
+                                    <th>TANGGAL BTT</th>
+                                    <th>KOTA TUJUAN</th>
+                                    <th>PENERIMA</th>
+                                    <th>NO. SURAT JALAN</th>
+                                    <th>SERVICE</th>
+                                    <th>KOLI</th>
+                                    <th>BERAT</th>
+                                    <th>UKURAN</th>
+                                    <th>BIAYA PACKING</th>
+                                    <th>BIAYA PENERUS</th>
+                                    <th>BIAYA KIRIM</th>
+                                    <th>TOTAL BIAYA</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rowsHtml || '<tr><td colspan="16" style="text-align:center; padding:12px; color:#64748b;">Tidak ada rincian BTT</td></tr>'}
+                            </tbody>
+                            <tfoot>
+                                <tr style="background:#e2e8f0; font-weight:800; color:#0f172a;">
+                                    <td colspan="9" style="text-align:right; padding:6px 8px; color:#004b84;">JUMLAH TOTAL :</td>
+                                    <td style="text-align:right; font-family:monospace;">${totalKoli}</td>
+                                    <td style="text-align:right; font-family:monospace;">${totalBerat.toLocaleString('id-ID')}</td>
+                                    <td style="text-align:right; font-family:monospace;">${totalUkuran}</td>
+                                    <td style="text-align:right; font-family:monospace;">${totalPacking.toLocaleString('id-ID')}</td>
+                                    <td style="text-align:right; font-family:monospace;">${totalPenerus.toLocaleString('id-ID')}</td>
+                                    <td style="text-align:right; font-family:monospace;">${totalBiayaKirim.toLocaleString('id-ID')}</td>
+                                    <td style="text-align:right; font-family:monospace; color:#b91c1c; font-size:10.5px;">Rp ${grandTotal.toLocaleString('id-ID')}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+
+                        <!-- TERBILANG -->
+                        <div class="terbilang-box">
+                            <span style="color:#0369a1; font-weight:700;">Terbilang :</span>
+                            <span style="font-weight:800; font-style:italic; color:#0f172a; margin-left:4px;">${textTerbilang}</span>
+                        </div>
+
+                        <!-- FOOTER REKENING & OTORISASI -->
+                        <div class="footer-grid">
+                            <div class="bank-card">
+                                <div style="font-weight:800; color:#004b84; margin-bottom:3px;">Harap Pembayaran Giro/Cek atau Transfer ke Rekening :</div>
+                                <div style="font-weight:800; color:#0f172a;">PT. DAKOTA LOGISTIK INDONESIA</div>
+                                <div style="color:#334155;">Bank Central Asia (BCA) — KCU Kalimalang</div>
+                                <div style="font-family:monospace; font-weight:900; color:#0284c7; font-size:11.5px; margin-top:2px;">No. Rekening : 2303937226</div>
+                                <div style="color:#64748b; font-size:9.5px; margin-top:2px;">Bukti Transfer harap di-fax ke no : (021) 82401076 atau email ke marketing.pusat@dakotacargo.co.id</div>
+                            </div>
+                            <div class="sign-card">
+                                <div style="color:#475569; font-weight:600;">Bekasi, ${tglCetakIndo}</div>
+                                <div style="font-weight:800; color:#0f172a; margin-top:1px;">Dibuat oleh,</div>
+                                <div style="height:44px;"></div>
+                                <div style="font-weight:900; text-decoration:underline; color:#0f172a; letter-spacing:0.3px;">${(header.artih_updateid || 'STAFF').toUpperCase()}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <script>
+                        function exportTableToExcel() {
+                            var tbl = document.getElementById('tblFaktur').outerHTML;
+                            var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body>' + tbl + '</body></html>';
+                            var blob = new Blob(['\\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+                            var url = URL.createObjectURL(blob);
+                            var a = document.createElement('a');
+                            a.href = url;
+                            a.download = 'Faktur_${safeFileName}.xls';
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                        }
+                    <\/script>
+                </body>
+                </html>
+            `);
+            previewWin.document.close();
+        } catch (err) {
+            previewWin.close();
+            Swal.fire('Error', 'Gagal membuka preview faktur: ' + (err.message || err), 'error');
+        }
+    };
+
+    // =========================================================================
     // DEFINISI KOLOM GRID DASHBOARD
     // =========================================================================
     const columns = [
@@ -2457,16 +3175,24 @@ const Invoice = () => {
                                 >
                                     <CheckSquare size={12} className="text-emerald-600" /> Summary Billing
                                 </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => { setActivePrintMenuId(null); handlePrintAllBTT(item); }}
+                                    className="w-full px-3 py-1.5 text-rose-700 hover:bg-rose-50 hover:text-rose-800 text-left cursor-pointer flex items-center gap-1.5"
+                                >
+                                    <Printer size={12} className="text-rose-600" /> Print BTT All
+                                </button>
                             </div>
                         )}
                     </div>
 
-                    {/* 2. UNDUH RTF */}
+                    {/* 2. PREVIEW DOWNLOAD FAKTUR (PRINT | ExpToXLS | PRINTallBTT) */}
                     <button
                         type="button"
-                        onClick={() => handleDownloadRTF(item)}
+                        onClick={() => handlePreviewDownloadInvoice(item)}
                         className="p-1.5 text-amber-600 hover:bg-amber-50 border border-amber-200 rounded-lg transition cursor-pointer shadow-2xs"
-                        title="Unduh Tanda Terima Tagihan (.rtf)"
+                        title="Preview & Download Faktur (Print / Export XLS / Print All BTT)"
                     >
                         <Download size={13} />
                     </button>
