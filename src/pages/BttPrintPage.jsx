@@ -60,17 +60,17 @@ const BttPrintPage = () => {
 
   const usernameMarketing = bttData.username || localStorage.getItem('user_nama') || localStorage.getItem('username') || 'SUPERDLI';
   const layananText = bttData.bttt_layanan_nama || (bttData.bttt_paketyn === 'Y' ? 'REGULER' : 'CARTER');
-  const keteranganFinal = bttData.bttt_ket || 'DO Asli Kembali Jatiasih';
+  const keteranganFinal = bttData.bttt_ket || '';
 
   // 🌟 Validasi: Deteksi apakah isi kiriman mengandung kata 'CHEMICALS' / 'CHEMICAL'
   const teksKiriman = (bttData.bttt_isikiriman || '').toUpperCase();
   // const isDangerousGoods = teksKiriman.includes('CHEMICAL');
 
   // 🌟 1. Keterangan Atas: Berasal dari mapping storagecode (Default: DO Asli/Copy Kembali Jatiasih)
-  const keteranganAtas = bttData.ket_do_kembali || bttData.storage_code_ket || bttData.bttt_ket || 'DO Asli Kembali Jatiasih';
+  const keteranganAtas = bttData.ket_do_kembali || bttData.storage_code_ket || bttData.bttt_ket || '';
 
   // 🌟 2. Keterangan Bawah: Berasal dari teks kolom keterangan di CSV
-  const keteranganBawah = bttData.lampiran_keterangan || bttData.keterangan_csv || bttData.bttt_lampiran_ket || bttData.bttt_ket || 'DO COPY KEMBALI JATIASIH';
+  const keteranganBawah = bttData.lampiran_keterangan || bttData.keterangan_csv || bttData.bttt_lampiran_ket || bttData.bttt_ket || '';
 
   // 🌟 3. Biaya Packing: Dari kolom packing file CSV
   const biayaPacking = parseFloat(bttData.bttt_biayapacking || bttData.biaya_packing || 0);
