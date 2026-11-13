@@ -335,7 +335,7 @@ const MarketingBTT = () => {
             window.removeEventListener('storage', handleAgenChange);
             window.removeEventListener('agen_changed', handleAgenChange);
         };
-    }, [filterAgenId]);
+    }, []);
 
     const handleApplyFilter = () => {
         fetchBTT(filterAgenId, {
