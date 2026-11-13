@@ -121,11 +121,15 @@ const BttPrintPage = () => {
   };
 
   // 🌟 1. Keterangan Atas: Berasal dari inputan keterangan di CSV / input manual BTT
-  const keteranganAtas = (
-    bttData.keterangan_csv ||
-    bttData.bttt_ket ||
-    ''
-  ).trim();
+  const rawKetDb = (bttData.keterangan_csv || bttData.bttt_ket || '').trim();
+  const cleanKetManual = rawKetDb
+    .replace(/\[B\.PACKING:.*?\]/gi, '')
+    .replace(/^.*?\(\d+\s*KOLI\)\s*-\s*CABANG:\s*[^\s-]+\s*(?:-\s*CARTER:\s*[^\n]+)?\s*/i, '')
+    .trim();
+
+  const keteranganAtas = hasilMappingStorage
+    ? (bttData.keterangan_csv || cleanKetManual || '-')
+    : (cleanKetManual || rawKetDb || '-');
 
   // 🌟 2. Keterangan Bawah (Lampiran Keterangan):
   // Prioritas hasil mapping storagecode CSV; jika tidak ada mapping (input manual), ambil dari keterangan yang diinput user
@@ -133,7 +137,7 @@ const BttPrintPage = () => {
     (bttData.ket_do_kembali || '').trim() ||
     mapStorageCodeToDokumenKembali(bttData.storagecode || bttData.bttt_storagecode);
 
-  const keteranganBawah = hasilMappingStorage || keteranganAtas;
+  const keteranganBawah = hasilMappingStorage || cleanKetManual || rawKetDb || '-';
 
 
 
