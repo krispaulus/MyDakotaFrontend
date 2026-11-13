@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Barcode from 'react-barcode';
 import { QRCodeSVG } from 'qrcode.react';
+import dakotaLogo from '../assets/logo.png';
 
 const BttPrintPage = () => {
   const [bttData, setBttData] = useState(null);
@@ -63,7 +64,7 @@ const BttPrintPage = () => {
 
   // 🌟 Validasi: Deteksi apakah isi kiriman mengandung kata 'CHEMICALS' / 'CHEMICAL'
   const teksKiriman = (bttData.bttt_isikiriman || '').toUpperCase();
-  const isDangerousGoods = teksKiriman.includes('CHEMICAL');
+  // const isDangerousGoods = teksKiriman.includes('CHEMICAL');
 
   // 🌟 1. Keterangan Atas: Berasal dari mapping storagecode (Default: DO Asli/Copy Kembali Jatiasih)
   const keteranganAtas = bttData.ket_do_kembali || bttData.storage_code_ket || bttData.bttt_ket || 'DO Asli Kembali Jatiasih';
@@ -74,6 +75,59 @@ const BttPrintPage = () => {
   // 🌟 3. Biaya Packing: Dari kolom packing file CSV
   const biayaPacking = parseFloat(bttData.bttt_biayapacking || bttData.biaya_packing || 0);
 
+  // 🌟 1. EKSTRAK ISI KIRIMAN & JUMLAH KOLI DARI KETERANGAN JIKA MASIH DEFAULT
+  const rawKetAll = `${bttData.lampiran_keterangan || ''} ${bttData.bttt_ket || ''}`.trim();
+  const matchKetBarangKoli = rawKetAll.match(/^([A-Z0-9\s/&-]+?)\s*\((\d+)\s*KOLI\)/i);
+
+  let isiKirimanFinal = (bttData.bttt_isikiriman || '').trim();
+  if ((!isiKirimanFinal || isiKirimanFinal.toUpperCase() === 'PRODUK FARMASI / KESEHATAN') && matchKetBarangKoli) {
+    isiKirimanFinal = matchKetBarangKoli[1].trim().toUpperCase();
+  }
+  if (!isiKirimanFinal) isiKirimanFinal = 'PRODUK FARMASI / KESEHATAN';
+
+  let jumlahKoliFinal = parseInt(bttData.bttt_jmlkoli, 10) || 0;
+  if (jumlahKoliFinal <= 1 && matchKetBarangKoli) {
+    const parsedKoliFromKet = parseInt(matchKetBarangKoli[2], 10);
+    if (parsedKoliFromKet > 0) jumlahKoliFinal = parsedKoliFromKet;
+  }
+  if (jumlahKoliFinal < 1) jumlahKoliFinal = 1;
+
+  // 🌟 2. MAPPING TUJUAN WILAYAH (PROVINSI) DARI DB / ALAMAT / KOTA PENERIMA
+  const resolveTujuanWilayah = () => {
+    const propDb = (bttData.bttt_tujuanpropinsi || '').trim().toUpperCase();
+    if (propDb && propDb !== '-') return propDb;
+
+    const fullDestText = `${bttData.bttt_tujuanalamat || ''} ${bttData.bttt_tujuankota || ''}`.toUpperCase();
+    const daftarProvinsi = [
+      'DKI JAKARTA', 'JAWA BARAT', 'BANTEN', 'JAWA TENGAH', 'DI YOGYAKARTA', 'YOGYAKARTA', 'JAWA TIMUR',
+      'ACEH', 'SUMATERA UTARA', 'SUMATERA BARAT', 'RIAU', 'KEPULAUAN RIAU', 'JAMBI', 'SUMATERA SELATAN',
+      'BENGKULU', 'LAMPUNG', 'KEPULAUAN BANGKA BELITUNG', 'BALI', 'NUSA TENGGARA BARAT', 'NUSA TENGGARA TIMUR',
+      'KALIMANTAN BARAT', 'KALIMANTAN TENGAH', 'KALIMANTAN SELATAN', 'KALIMANTAN TIMUR', 'KALIMANTAN UTARA',
+      'SULAWESI UTARA', 'SULAWESI TENGAH', 'SULAWESI SELATAN', 'SULAWESI TENGGARA', 'GORONTALO', 'SULAWESI BARAT',
+      'MALUKU', 'MALUKU UTARA', 'PAPUA', 'PAPUA BARAT'
+    ];
+    const foundProv = daftarProvinsi.find((p) => fullDestText.includes(p));
+    if (foundProv) return foundProv;
+
+    const kota = (bttData.bttt_tujuankota || '').toUpperCase();
+    if (/BEKASI|BOGOR|DEPOK|BANDUNG|CIMAHI|CIKARANG|KARAWANG|PURWAKARTA|SUBANG|SUKABUMI|CIANJUR|GARUT|TASIKMALAYA|CIAMIS|BANJAR|KUNINGAN|CIREBON|MAJALENGKA|SUMEDANG|INDRAMAYU/.test(kota)) {
+      return 'JAWA BARAT';
+    }
+    if (/JAKARTA/.test(kota)) return 'DKI JAKARTA';
+    if (/TANGERANG|SERANG|CILEGON|LEBAK|PANDEGLANG/.test(kota)) return 'BANTEN';
+    if (/SEMARANG|SOLO|SURAKARTA|MAGELANG|PEKALONGAN|TEGAL|SALATIGA|BANYUMAS|PURWOKERTO|CILACAP|KUDUS|JEPARA|PATI|KLATEN|SUKOHARJO|BOYOLALI|SRAGEN|WONOGIRI|KARANGANYAR|KEBUMEN|PURWOREJO|WONOSOBO|TEMANGGUNG|KENDAL|BATANG|PEMALANG|BREBES/.test(kota)) {
+      return 'JAWA TENGAH';
+    }
+    if (/YOGYAKARTA|SLEMAN|BANTUL|GUNUNGKIDUL|KULON PROGO/.test(kota)) return 'DI YOGYAKARTA';
+    if (/SURABAYA|SIDOARJO|GRESIK|MALANG|BATU|PASURUAN|PROBOLINGGO|MOJOKERTO|JOMBANG|KEDIRI|BLITAR|TULUNGAGUNG|NGANJUK|MADIUN|NGAWI|MAGETAN|PONOROGO|PACITAN|BOJONEGORO|TUBAN|LAMONGAN|JEMBER|BANYUWANGI|BONDOWOSO|SITUBONDO|LUMAJANG|BANGKALAN|SAMPANG|PAMEKASAN|SUMENEP/.test(kota)) {
+      return 'JAWA TIMUR';
+    }
+    return '-';
+  };
+  const tujuanWilayahFinal = resolveTujuanWilayah();
+
+  // 🌟 Validasi: Deteksi apakah isi kiriman mengandung kata 'CHEMICALS' / 'CHEMICAL'
+  const isDangerousGoods = isiKirimanFinal.toUpperCase().includes('CHEMICAL');
   const tipeLembaran = [
     { label: "Untuk Pengirim", kasta: "Lembar 1 dari 3", isHarga: true, isStempel: false },
     { label: "Kembali Ke Cab. Pengirim", kasta: "Lembar 2 dari 3", isHarga: false, isStempel: true },
@@ -179,10 +233,9 @@ const BttPrintPage = () => {
               <div className="flex justify-between items-start border-b border-slate-800 pb-1.5">
                 <div className="flex gap-2.5 items-center max-w-[62%]">
                   <img
-                    src="/src/assets/new_logo 2.png"
+                    src={dakotaLogo}
                     alt="Dakota Cargo Logo"
                     className="w-24 h-auto object-contain shrink-0"
-                    onError={(e) => { e.target.style.display = 'none'; }}
                   />
                   <div className="text-left">
                     <span className="text-[11.5px] font-black block text-slate-900 tracking-tight uppercase leading-none mb-0.5">
@@ -224,11 +277,11 @@ const BttPrintPage = () => {
                 </div>
                 <div>
                   <span className="text-gray-400 block font-normal uppercase text-[7px]">CAB. PENERIMA :</span>
-                  <span className="text-slate-900 font-extrabold uppercase">{bttData.bttt_tujuankota || 'GRESIK'}</span>
+                  <span className="text-slate-900 font-extrabold uppercase">{bttData.bttt_tujuankota || ''}</span>
                 </div>
                 <div>
                   <span className="text-gray-400 block font-normal uppercase text-[7px]">TUJUAN WILAYAH :</span>
-                  <span className="text-amber-700 font-black uppercase">{bttData.bttt_tujuanpropinsi || 'JAWA TIMUR'}</span>
+                  <span className="text-amber-700 font-black uppercase">{tujuanWilayahFinal}</span>
                 </div>
               </div>
 
@@ -239,7 +292,7 @@ const BttPrintPage = () => {
                   Pembayaran: <span className="text-emerald-600 font-black">{bttData.bttt_jenisharga === '0' ? 'TUNAI' : bttData.bttt_jenisharga === '2' ? 'KREDIT' : 'TAGIH TUJUAN'}</span>
                 </div>
                 <div className="col-span-4">
-                  Kiriman: <span className="uppercase text-slate-900 font-black">{bttData.bttt_isikiriman || 'PRODUK FARMASI / KESEHATAN'}</span><br />
+                  Kiriman: <span className="uppercase text-slate-900 font-black">{isiKirimanFinal}</span><br />
                   Via: <span className="text-amber-600 font-black">DARAT</span>
                 </div>
                 <div className="col-span-4 text-right">
@@ -254,26 +307,26 @@ const BttPrintPage = () => {
               <div className="grid grid-cols-2 gap-3 text-left">
                 <div className="p-1.5 bg-slate-50/50 border border-slate-200 rounded-lg space-y-0.5">
                   <div className="font-black text-red-600 text-[7.5px] uppercase">[ PENGIRIM ]</div>
-                  <div className="font-black text-slate-900 text-[9.5px] leading-tight">{bttData.bttt_asalname || 'PT. MERCK CHEMICALS AND LIFE SCIENCES'}</div>
-                  <div className="font-mono text-slate-700 font-bold text-[7.5px]">{bttData.bttt_asaltelp || '021-8400081'}</div>
+                  <div className="font-black text-slate-900 text-[9.5px] leading-tight">{bttData.bttt_asalname || ''}</div>
+                  <div className="font-mono text-slate-700 font-bold text-[7.5px]">{bttData.bttt_asaltelp || ''}</div>
                   <div className="text-slate-500 uppercase font-medium text-[7.5px] leading-tight truncate">
-                    {bttData.bttt_asalalamat || 'JL. T.B SIMATUPANG NO 8 PASAR REBO JAKARTA TIMUR - DKI JAKARTA'}
+                    {bttData.bttt_asalalamat || ''}
                   </div>
                 </div>
 
                 <div className="p-1.5 bg-slate-50/50 border border-slate-200 rounded-lg space-y-0.5">
                   <div className="font-black text-blue-600 text-[7.5px] uppercase">[ PENERIMA ]</div>
                   <div className="font-black text-slate-900 text-[9.5px] leading-tight">
-                    {bttData.bttt_tujuannama || 'PT. FREEPORT INDONESIA'}
+                    {bttData.bttt_tujuannama || ''}
                     {bttData.bttt_up_penerima && (
                       <span className="text-slate-700 font-bold ml-1 text-[8.5px]">
                         (UP: {bttData.bttt_up_penerima})
                       </span>
                     )}
                   </div>
-                  <div className="font-mono text-slate-700 font-bold text-[7.5px]">{bttData.bttt_tujuantelp || '0812-6882-8286'}</div>
+                  <div className="font-mono text-slate-700 font-bold text-[7.5px]">{bttData.bttt_tujuantelp || ''}</div>
                   <div className="text-slate-500 uppercase font-medium text-[7.5px] leading-tight line-clamp-1">
-                    {bttData.bttt_tujuanalamat || 'SMELTER WAREHOUSEGRESIKMANYAR KM.11-GRESIK'}
+                    {bttData.bttt_tujuanalamat || ''}
                   </div>
                 </div>
               </div>
@@ -294,7 +347,7 @@ const BttPrintPage = () => {
                     </thead>
                     <tbody>
                       <tr className="font-black text-slate-800">
-                        <td className="p-1 border-r border-gray-300 bg-slate-50/50">{bttData.bttt_jmlkoli || 1} Koli</td>
+                        <td className="p-1 border-r border-gray-300 bg-slate-50/50">{jumlahKoliFinal} Koli</td>
                         <td className="p-1 border-r border-gray-300">{bttData.bttt_berat || 0} kg</td>
                         <td className="p-1 border-r border-gray-300">{bttData.bttt_beratvol || 0} kg</td>
                         <td className="p-1">{bttData.bttt_ukuran || 0} m³</td>
@@ -304,7 +357,7 @@ const BttPrintPage = () => {
 
                   {/* KOTAK RINCIAN DETAIL (ISI KIRIMAN, KETERANGAN, JENIS HARGA) */}
                   <div className="p-1.5 border border-slate-200 rounded bg-slate-50/50 text-[7.5px] font-semibold text-slate-700 leading-tight space-y-0.5">
-                    <div><b>Isi Kiriman :</b> {bttData.bttt_isikiriman || 'CHEMICALS / FARMASI'}</div>
+                    <div><b>Isi Kiriman :</b> {isiKirimanFinal}</div>
                     <div><b>Keterangan :</b> {keteranganAtas}</div>
                     <div><b>Jenis Harga :</b> {bttData.bttt_jeniskiriman || 'BERAT'}</div>
                   </div>
@@ -353,7 +406,7 @@ const BttPrintPage = () => {
               <div className="p-1 border border-dashed border-slate-300 rounded bg-slate-50/70 text-[7.5px] font-bold text-slate-700 text-left space-y-0.5">
                 <div>
                   <span className="text-slate-500">Lampiran Surat Jalan :</span>{' '}
-                  <span className="font-mono text-indigo-700">{bttData.bttt_nosuratjalan || '6370458301'}</span>
+                  <span className="font-mono text-indigo-700">{bttData.bttt_nosuratjalan || ''}</span>
                 </div>
                 <div>
                   <span className="text-slate-500">Lampiran Keterangan :</span>{' '}
