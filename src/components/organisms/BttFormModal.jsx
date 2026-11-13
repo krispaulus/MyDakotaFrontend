@@ -2013,14 +2013,24 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                                     <option value="1">TAGIH TUJUAN (COD)</option>
                                 </select>
                             </div>
-
                             <div>
-                                <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">BIAYA KIRIM :</label>
+                                <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1">
+                                    BIAYA KIRIM : <span className="text-[10px] text-sky-600 font-normal">(Bisa Edit Manual)</span>
+                                </label>
                                 <input
-                                    type="text"
-                                    readOnly
-                                    className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg font-bold text-slate-700 cursor-not-allowed outline-none"
-                                    value={`Rp ${(formData.bttt_harga || 0).toLocaleString('id-ID')}`}
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    name="bttt_harga"
+                                    value={formData.bttt_harga ?? 0}
+                                    onChange={(e) => {
+                                        const val = e.target.value === '' ? 0 : parseFloat(e.target.value) || 0;
+                                        setFormData(prev => ({
+                                            ...prev,
+                                            bttt_harga: val
+                                        }));
+                                    }}
+                                    className="w-full p-2 bg-white border border-sky-400 rounded-lg font-mono font-black text-slate-900 outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100"
                                 />
                             </div>
 
@@ -2059,9 +2069,8 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                         {/* Perhitungan Total & Tombol Kalkulasi */}
                         <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-slate-100">
                             <div>
-                                <span className="text-[11px] font-bold text-slate-500 uppercase block">TOTAL BIAYA KESELURUHAN :</span>
                                 <span className="text-xl font-black text-emerald-600">
-                                    Rp {(formData.bttt_harga + (parseFloat(formData.bttt_biayapenerus) || 0) + (parseFloat(formData.bttt_biayapacking) || 0)).toLocaleString('id-ID')}
+                                    Rp {((parseFloat(formData.bttt_harga) || 0) + (parseFloat(formData.bttt_biayapenerus) || 0) + (parseFloat(formData.bttt_biayapacking) || 0)).toLocaleString('id-ID')}
                                 </span>
                             </div>
 
@@ -2237,17 +2246,12 @@ const OrderPackingModal = ({ isOpen, onClose, parentData, onSavePacking }) => {
                                 <input type="text" readOnly className="w-full mt-1.5 p-3 bg-gray-50 border border-gray-200 rounded-xl text-slate-600 font-black text-center cursor-not-allowed outline-none" value={parentData.bttt_beratvol} />
                             </div>
                             <div>
-                                <label className="block font-bold text-slate-600 text-[11px] uppercase mb-1">
-                                    Kubikasi (m³) :
-                                </label>
+                                <label className="font-bold text-slate-500 uppercase">KUBIKASI (M³) :</label>
                                 <input
-                                    type="number"
-                                    step="any"
-                                    name="bttt_ukuran"
-                                    value={formData.bttt_ukuran !== undefined && formData.bttt_ukuran !== null ? formData.bttt_ukuran : ''}
-                                    onChange={handleChange}
-                                    className="w-full p-2 bg-white border border-slate-300 rounded-lg font-bold text-center text-slate-800 outline-none focus:border-sky-500"
-                                    placeholder="0.000"
+                                    type="text"
+                                    readOnly
+                                    className="w-full mt-1.5 p-3 bg-gray-50 border border-gray-200 rounded-xl text-slate-600 font-black text-center cursor-not-allowed outline-none"
+                                    value={parentData.bttt_ukuran || 0}
                                 />
                             </div>
                         </div>
