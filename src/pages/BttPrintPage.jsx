@@ -67,7 +67,7 @@ const BttPrintPage = () => {
   // const isDangerousGoods = teksKiriman.includes('CHEMICAL');
 
   // 🌟 1. Keterangan Atas: Berasal dari mapping storagecode (Default: DO Asli/Copy Kembali Jatiasih)
-  const keteranganAtas = bttData.ket_do_kembali || bttData.storage_code_ket || bttData.bttt_ket || '';
+  const keteranganAtas = bttData.bttt_ket || bttData.ket_do_kembali || bttData.storage_code_ket || '';
 
   // 🌟 2. Keterangan Bawah: Berasal dari teks kolom keterangan di CSV
   const keteranganBawah = bttData.lampiran_keterangan || bttData.keterangan_csv || bttData.bttt_lampiran_ket || bttData.bttt_ket || '';
