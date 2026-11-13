@@ -3,6 +3,7 @@ import api from '../api/axios';
 import { Search, Truck, DollarSign, Trash2, CheckCircle2, Plus, Info, X } from 'lucide-react';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import Swal from 'sweetalert2';
+import TarifCsvUploadModal from '../components/organisms/TarifCsvUploadModal';
 
 export default function TarifCarter() {
     const [indexData, setResultIndex] = useState([]);
@@ -223,6 +224,7 @@ export default function TarifCarter() {
                 <button onClick={fetchIndex} className="py-2.5 bg-emerald-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 h-[42px]">
                     <Search size={14} /> REFRESH
                 </button>
+                <TarifCsvUploadModal onSuccess="{fetchIndex}" tarifType="CARTER" />
             </div>
 
             {/* KUNCI SAKTI SUDAH DIPASANG DI ONADD BRAY! */}

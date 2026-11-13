@@ -14,6 +14,7 @@ import EditMasterHargaCargo from './EditMasterHargaCargo';
 import EditMasterHargaCharter from './EditMasterHargaCharter';
 import EditMasterHargaMultidrop from './EditMasterHargaMultidrop';
 import ModalUploadTarifCSV from './ModalUploadTarifCSV';
+import TarifCsvUploadModal from '../components/organisms/TarifCsvUploadModal';
 
 const MasterTarifCustomer = () => {
     const { isDarkMode } = useDarkMode();
@@ -599,6 +600,7 @@ const MasterTarifCustomer = () => {
                             </button>
                         </div>
                     </div>
+                    <TarifCsvUploadModal onSuccess="{fetchData}" tarifType="CUSTOMER" />
                 </form>
             )}
 

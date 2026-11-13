@@ -3,6 +3,7 @@ import api from '../api/axios';
 import { Route, Search, Plus, MapPin, DollarSign, Fuel, Info, Trash2, Edit3 } from 'lucide-react';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import Swal from 'sweetalert2';
+import TarifCsvUploadModal from '../components/organisms/TarifCsvUploadModal';
 
 export default function MasterTrayek() {
     const [trayekList, setTrayekList] = useState([]);
@@ -104,6 +105,7 @@ export default function MasterTrayek() {
                     <Search size={14} /> REFRESH
                 </button>
             </div>
+            <TarifCsvUploadModal onSuccess="{fetchData}" tarifType="JENIS_KENDARAAN" />
 
             <DataTableTemplate
                 title="Daftar Master Trayek Distribusi" columns={columnsTrayek} data={trayekList} loading={loading} isDarkMode={false}

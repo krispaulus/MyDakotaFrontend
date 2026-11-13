@@ -3,6 +3,7 @@ import api from '../api/axios';
 import DataTableTemplate from '../components/organisms/DataTableTemplate'; // Jalur Relatif Lapis Baja Anti-Vite Error bray
 import Swal from 'sweetalert2';
 import { Truck, ShieldAlert, Wrench, Search, Calendar, Map, CheckCircle, AlertTriangle, AlertCircle, Plus, Edit, Trash2, X as XIcon } from 'lucide-react';
+import TarifCsvUploadModal from '../components/organisms/TarifCsvUploadModal';
 
 const MasterKendaraan = () => {
     const isDarkMode = false;

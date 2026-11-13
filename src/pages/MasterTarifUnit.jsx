@@ -5,6 +5,7 @@ import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from "../context/DarkModeContext";
 import Swal from 'sweetalert2';
 import { MENU_LIST } from '../constants/menuList';
+import TarifCsvUploadModal from '../components/organisms/TarifCsvUploadModal';
 
 
 const MasterTarifUnit = () => {
@@ -31,14 +32,14 @@ const MasterTarifUnit = () => {
 
     const columns = [
         { header: 'KATEGORI', accessor: 'nama_kategori' },
-        { 
-            header: 'JENIS UNIT', 
+        {
+            header: 'JENIS UNIT',
             accessor: 'jenis',
             render: (item) => <span className="font-bold text-slate-700">{item.jenis}</span>
         },
         { header: 'SATUAN', accessor: 'satuan' },
-        { 
-            header: 'HARGA UNIT', 
+        {
+            header: 'HARGA UNIT',
             accessor: 'harga',
             render: (item) => (
                 <span className="text-indigo-600 font-bold">
@@ -47,23 +48,23 @@ const MasterTarifUnit = () => {
                 </span>
             )
         },
-        { 
-            header: 'KETERANGAN', 
+        {
+            header: 'KETERANGAN',
             accessor: 'keterangan',
             render: (item) => <span className="text-xs text-slate-400">{item.keterangan || '-'}</span>
         },
     ];
 
     return (
-        <DataTableTemplate 
+        <DataTableTemplate
             title="MASTER TARIF UNIT"
             columns={columns}
             data={data}
             loading={loading}
             isDarkMode={isDarkMode}
-            onAdd={() => {}}
-            onEdit={() => {}}
-            onDelete={() => {}}
+            onAdd={() => { }}
+            onEdit={() => { }}
+            onDelete={() => { }}
         />
     );
 };

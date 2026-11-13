@@ -5,6 +5,7 @@ import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from "../context/DarkModeContext";
 import Swal from 'sweetalert2';
 import { MENU_LIST } from '../constants/menuList';
+import TarifCsvUploadModal from '../components/organisms/TarifCsvUploadModal';
 
 
 const MasterTarifReguler = () => {
@@ -33,33 +34,34 @@ const MasterTarifReguler = () => {
         { header: 'Generated ID', accessor: 'generated_id' },
         { header: 'Asal Kota', accessor: 'asal_kota' },
         { header: 'Tujuan (Kec)', accessor: 'tujuan_kecamatan' },
-        { 
-            header: 'Min (KG)', 
+        {
+            header: 'Min (KG)',
             accessor: 'minimal_kg',
             render: (item) => <span className="font-bold text-indigo-600">{item.minimal_kg} KG</span>
         },
-        { 
-            header: 'Harga Pokok', 
+        {
+            header: 'Harga Pokok',
             accessor: 'harga_pokok',
-            render: (item) => `Rp ${item.harga_pokok.toLocaleString()}` 
+            render: (item) => `Rp ${item.harga_pokok.toLocaleString()}`
         },
-        { 
-            header: 'Estimasi', 
+        {
+            header: 'Estimasi',
             accessor: 'estimasi_hari',
             render: (item) => <span className="bg-green-100 text-green-600 px-2 py-1 rounded text-xs font-bold">{item.estimasi_hari} Hari</span>
         },
     ];
 
     return (
-        <DataTableTemplate 
+        // <TarifCsvUploadModal onSuccess="{fetchData}" tarifType="PAKET_UMUM"/>
+        <DataTableTemplate
             title="TARIF PAKET UMUM (REGULER)"
             columns={columns}
             data={data}
             loading={loading}
             isDarkMode={isDarkMode}
-            onAdd={() => {}}
-            onEdit={() => {}}
-            onDelete={() => {}}
+            onAdd={() => { }}
+            onEdit={() => { }}
+            onDelete={() => { }}
         />
     );
 };

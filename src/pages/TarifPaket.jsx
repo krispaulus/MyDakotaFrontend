@@ -4,6 +4,7 @@ import { Package, Search, Plus, Trash2, Edit3, Layers, Eye, RefreshCw, X } from 
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from "../context/DarkModeContext";
 import Swal from 'sweetalert2';
+import TarifCsvUploadModal from '../components/organisms/TarifCsvUploadModal';
 
 const TarifPaket = () => {
     const { isDarkMode } = useDarkMode();
@@ -360,6 +361,8 @@ const TarifPaket = () => {
                     </button>
                 </div>
             </div>
+            <TarifCsvUploadModal onSuccess="{fetchData}" tarifType="PAKET" />
+
 
             {/* TABEL DATA TEMPLATE */}
             <DataTableTemplate
