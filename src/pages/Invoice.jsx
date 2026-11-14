@@ -596,7 +596,7 @@ const Invoice = () => {
             let noFakturPajakDisplay = String(item.artih_fktpajak || '').trim();
             if (!noFakturPajakDisplay || noFakturPajakDisplay === '010.' || noFakturPajakDisplay === '010' || noFakturPajakDisplay === '-') {
                 // Ambil nomor faktur pajak lengkap yang tersimpan pada invoice atau fallback format resmi
-                noFakturPajakDisplay = item.faktur_pajak_lengkap || item.artih_fktpajak_full || (item.artih_fktpajak && item.artih_fktpajak.length > 5 ? item.artih_fktpajak : '050.026.00.459258139');
+                noFakturPajakDisplay = item.faktur_pajak_lengkap || item.artih_fktpajak_full || (item.artih_fktpajak && item.artih_fktpajak.length > 5 ? item.artih_fktpajak : '-');
             }
 
             // 🌟 1. HARGA JUAL / NILAI JUAL / DPP (Persis Kwitansi Penagihan)
@@ -1271,10 +1271,10 @@ const Invoice = () => {
 
             const printWindow = window.open('', '_blank', 'width=1150,height=850,scrollbars=yes');
             if (!printWindow) {
-                Swal.fire('Popup Diblokir', 'Silakan klik tanda pop-up diblokir di sudut kanan atas browser Anda.', 'warning');
+                Swal.fire('Popup Diblokir', 'Izinkan popup browser untuk mencetak dokumen ini.', 'warning');
                 return;
             }
-            printWindow.document.write(`<html><head><title>Memuat Voucher...</title></head><body style="font-family:sans-serif;text-align:center;padding-top:50px;"><h3>Sedang memuat Voucher Memorial ${noJurnal}...</h3></body></html>`);
+            printWindow.document.write(`<html><head><title>Memuat Dokumen...</title></head><body style="font-family:sans-serif;text-align:center;padding-top:60px;"><h3>Sedang memuat dokumen cetak...</h3></body></html>`);
 
             try {
                 const token = localStorage.getItem('token');
@@ -1391,6 +1391,13 @@ const Invoice = () => {
             return;
         }
 
+        const printWindow = window.open('', '_blank', 'width=1150,height=850,scrollbars=yes');
+        if (!printWindow) {
+            Swal.fire('Popup Diblokir', 'Izinkan popup browser untuk mencetak dokumen ini.', 'warning');
+            return;
+        }
+        printWindow.document.write(`<html><head><title>Memuat Dokumen...</title></head><body style="font-family:sans-serif;text-align:center;padding-top:60px;"><h3>Sedang memuat dokumen cetak...</h3></body></html>`);
+
         try {
             const token = localStorage.getItem('token');
             const ptId = localStorage.getItem('pt_id') || 'C';
@@ -1441,13 +1448,7 @@ const Invoice = () => {
 
             let noFakturPajak = String(header.artih_fktpajak || '').trim();
             if (!noFakturPajak || noFakturPajak === '010.' || noFakturPajak === '010') {
-                noFakturPajak = '010.026.00.340034701';
-            }
-
-            const printWindow = window.open('', '_blank', 'width=1150,height=850,scrollbars=yes');
-            if (!printWindow) {
-                Swal.fire('Popup Diblokir', 'Izinkan popup browser untuk mencetak dokumen ini.', 'warning');
-                return;
+                noFakturPajak = '-';
             }
 
             // 1. KWITANSI TIPE 1
@@ -1459,7 +1460,7 @@ const Invoice = () => {
                 let totalBerat = 0;
 
                 const kwitansiRowsHtml = btts.map((b, idx) => {
-                    const biayaKirim = Number(b.bttt_harga || 0);
+                    const biayaKirim = Number(b.bttt_harga || 0) + Number(b.bttt_biayapenerus || 0);
                     const diskon = Number(b.bttt_disc || 0);
                     const asuransi = Number(b.biaya_asuransi || 0);
                     const packing = Number(b.biaya_packing || 0);
@@ -2300,6 +2301,7 @@ const Invoice = () => {
             `);
             printWindow.document.close();
         } catch (err) {
+            printWindow.close();
             console.error("Detail Error Print:", err);
             Swal.fire('Error', 'Gagal memuat dokumen cetak faktur: ' + (err.message || err), 'error');
         }
@@ -2698,16 +2700,16 @@ const Invoice = () => {
     const handlePreviewDownloadInvoice = async (invoiceItem) => {
         const item = invoiceItem || activeInvoice;
         if (!item || !item.artih_id) {
-            Swal.fire('Peringatan', 'Data invoice tidak valid.', 'warning');
+            Swal.fire('Peringatan', 'Data invoice tidak valid untuk dicetak.', 'warning');
             return;
         }
 
-        const previewWin = window.open('', '_blank', 'width=1320,height=880,scrollbars=yes');
-        if (!previewWin) {
-            Swal.fire('Popup Diblokir', 'Izinkan popup browser untuk membuka preview.', 'warning');
+        const printWindow = window.open('', '_blank', 'width=1150,height=850,scrollbars=yes');
+        if (!printWindow) {
+            Swal.fire('Popup Diblokir', 'Izinkan popup browser untuk mencetak dokumen ini.', 'warning');
             return;
         }
-        previewWin.document.write(`<html><head><title>Memuat Preview...</title></head><body style="font-family:sans-serif;text-align:center;padding-top:60px;"><h3>Sedang menyiapkan Preview Faktur ${item.artih_id}...</h3></body></html>`);
+        printWindow.document.write(`<html><head><title>Memuat Dokumen...</title></head><body style="font-family:sans-serif;text-align:center;padding-top:60px;"><h3>Sedang memuat dokumen cetak...</h3></body></html>`);
 
         try {
             const token = localStorage.getItem('token');
