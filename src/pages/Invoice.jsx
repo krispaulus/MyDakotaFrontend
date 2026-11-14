@@ -2383,6 +2383,11 @@ const Invoice = () => {
                 if (/TANGERANG|SERANG|CILEGON/.test(k)) return 'BANTEN';
                 if (/SEMARANG|SOLO|SURAKARTA|MAGELANG|PEKALONGAN|TEGAL|SALATIGA|BANYUMAS|PURWOKERTO|CILACAP|KUDUS|JEPARA|PATI|KLATEN|SUKOHARJO/.test(k)) return 'JAWA TENGAH';
                 if (/SURABAYA|SIDOARJO|GRESIK|MALANG|PASURUAN|PROBOLINGGO|MOJOKERTO|JOMBANG|KEDIRI|BLITAR|MADIUN|JEMBER|BANYUWANGI/.test(k)) return 'JAWA TIMUR';
+                if (/MEDAN|BINJAI|DELI SERDANG|PEMATANGSIANTAR|TEBING TINGGI/.test(k)) return 'SUMATERA UTARA';
+                if (/PADANG|BUKITTINGGI|PAYAKUMBUH/.test(k)) return 'SUMATERA BARAT';
+                if (/PALEMBANG|PEKANBARU|BATAM|BANDAR LAMPUNG/.test(k)) return 'SUMATERA';
+                if (/DENPASAR|BADUNG|GIANYAR/.test(k)) return 'BALI';
+                if (/MAKASSAR|BALIKPAPAN|SAMARINDA|BANJARMASIN|PONTIANAK/.test(k)) return 'KALIMANTAN / SULAWESI';
                 return '-';
             };
 
@@ -2431,6 +2436,15 @@ const Invoice = () => {
                 const pembayaranText = kodeBayar === '0' ? 'TUNAI' : kodeBayar === '2' ? 'KREDIT' : '';
                 const viaText = (b.bttt_via || '').toUpperCase();
                 const tujuanWilayah = resolveWilayah(b.bttt_tujuankota, b.bttt_tujuanalamat);
+
+                const alamatPenerima = [
+                    b.bttt_tujuanalamat || '',
+                    [
+                        b.bttt_tujuankelurahan ? `KEL. ${b.bttt_tujuankelurahan}` : '',
+                        b.bttt_tujuankecamatan ? `KEC. ${b.bttt_tujuankecamatan}` : ''
+                    ].filter(Boolean).join(', '),
+                    [b.bttt_tujuankota, b.bttt_tujuankodepos && b.bttt_tujuankodepos !== '-' ? b.bttt_tujuankodepos : ''].filter(Boolean).join(' ')
+                ].filter(Boolean).join('<br/>');
 
                 const biayaKirim = Math.round(Number(b.bttt_harga || 0));
                 const biayaPenerus = Math.round(Number(b.bttt_biayapenerus || 0));
@@ -2520,7 +2534,7 @@ const Invoice = () => {
                                         ${b.bttt_up && b.bttt_up !== '-' ? `<span style="color:#334155; font-weight:bold; font-size:7.5px;"> (UP: ${b.bttt_up})</span>` : ''}
                                     </div>
                                     <div style="font-family:monospace; color:#334155; font-weight:bold; font-size:7px;">${b.bttt_tujuantelp || '-'}</div>
-                                    <div style="color:#64748b; font-size:7px; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${b.bttt_tujuanalamat || '-'}</div>
+                                    <div style="color:#475569; font-size:7px; text-transform:uppercase; line-height:1.25;">${alamatPenerima || '-'}</div>
                                 </div>
                             </div>
 
