@@ -302,8 +302,16 @@ const BttPrintPage = () => {
               {/* 3. BARIS STATUS MANIFEST */}
               <div className="grid grid-cols-12 gap-1 bg-white p-1 border border-slate-200 rounded-md font-bold text-slate-600 text-left text-[8px]">
                 <div className="col-span-4">
-                  Layanan: <span className="text-indigo-600 font-black">{layananText}</span><br />
-                  Pembayaran: <span className="text-emerald-600 font-black">{bttData.bttt_jenisharga === '0' ? 'TUNAI' : bttData.bttt_jenisharga === '2' ? 'KREDIT' : 'TAGIH TUJUAN'}</span>
+                  {(() => {
+                    const kodeBayar = String(bttData.bttt_pembayaran || bttData.bttt_jenisharga || '0').trim();
+                    const labelBayar = kodeBayar === '0' ? 'TUNAI' : kodeBayar === '2' ? 'KREDIT' : 'TAGIH TUJUAN';
+                    return (
+                      <>
+                        Layanan: <span className="text-indigo-600 font-black">{layananText}</span><br />
+                        Pembayaran: <span className="text-emerald-600 font-black">{labelBayar}</span>
+                      </>
+                    );
+                  })()}
                 </div>
                 <div className="col-span-4">
                   Kiriman: <span className="uppercase text-slate-900 font-black">{isiKirimanFinal}</span><br />
