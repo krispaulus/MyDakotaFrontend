@@ -1483,7 +1483,7 @@ const Invoice = () => {
                             <td style="border: 1px solid #94a3b8; padding: 4px; font-weight: 500;">${b.bttt_tujuannama || '-'}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center;">${b.bttt_nosuratjalan || '-'}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center; font-size: 8.5px; color: #0f172a;">${viaTransport}</td>
-                            <td style="border: 1px solid #94a3b8; padding: 4px; color: #475569;">${b.bttt_namabarang || '-'}</td>
+                            <td style="border: 1px solid #94a3b8; padding: 4px; color: #475569;">${rawKet}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px; text-align: right; font-family: monospace;">${berat.toLocaleString('id-ID')}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px; text-align: right; font-family: monospace; font-weight: normal;">${biayaKirim.toLocaleString('id-ID')}</td>
                         </tr>
@@ -1598,42 +1598,42 @@ const Invoice = () => {
                             </tr>
                         </table>
 
-                        <!-- TABEL RESI BTT MENYATU DENGAN FOOTER -->
-                        <table style="width: 100%; border: 1px solid #94a3b8; border-collapse: collapse;">
-                            <thead>
-                                <tr>
-                                    <th style="width: 3%;">NO URUT</th>
-                                    <th style="width: 13%;">NO RESI PENGIRIMAN</th>
-                                    <th style="width: 10%;">TANGGAL KIRIM</th>
-                                    <th style="width: 9%;">KOTA TUJUAN</th>
-                                    <th style="width: 6%;">KODEPOS</th>
-                                    <th style="width: 16%;">PENERIMA</th>
-                                    <th style="width: 11%;">NO SURAT JALAN / POD</th>
-                                    <th style="width: 5%;">VIA</th>
-                                    <th style="width: 14%;">KETERANGAN</th>
-                                    <th style="width: 5%;">BERAT</th>
-                                    <th style="width: 8%;">BIAYA KIRIM</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${kwitansiRowsHtml || '<tr><td colspan="11" style="text-align: center; padding: 8px;">Tidak ada rincian resi</td></tr>'}
-                            </tbody>
+                            <!-- TABEL RESI BTT MENYATU DENGAN FOOTER -->
+                            <table style="width: 100%; border: 1px solid #94a3b8; border-collapse: collapse;">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 3%;">NO URUT</th>
+                                        <th style="width: 13%;">NO RESI PENGIRIMAN</th>
+                                        <th style="width: 10%;">TANGGAL KIRIM</th>
+                                        <th style="width: 9%;">KOTA TUJUAN</th>
+                                        <th style="width: 6%;">KODEPOS</th>
+                                        <th style="width: 16%;">PENERIMA</th>
+                                        <th style="width: 11%;">NO SURAT JALAN / POD</th>
+                                        <th style="width: 5%;">VIA</th>
+                                        <th style="width: 14%;">KETERANGAN</th>
+                                        <th style="width: 5%;">BERAT</th>
+                                        <th style="width: 8%;">BIAYA KIRIM</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${kwitansiRowsHtml || '<tr><td colspan="11" style="text-align: center; padding: 8px;">Tidak ada rincian resi</td></tr>'}
+                                </tbody>
+                            </table>
                             
-                            <!-- FOOTER REKAPITULASI BIAYA & TANDA TANGAN -->
-                            <tfoot>
+                            <!-- FOOTER REKAPITULASI BIAYA & TANDA TANGAN (HANYA MUNCUL DI HALAMAN TERAKHIR) -->
+                            <table style="width: 100%; border: 1px solid #94a3b8; border-top: none; border-collapse: collapse; page-break-inside: avoid; break-inside: avoid;">
                                 <tr style="background: #ffffff;">
-                                    <td colspan="4" style="border: 1px solid #94a3b8; padding: 8px; vertical-align: top;">
+                                    <td style="width: 35%; border: 1px solid #94a3b8; padding: 8px; vertical-align: top;">
                                         <div style="font-weight: bold; color: #004b84; margin-bottom: 2px; font-size: 10px;">Transfer ke :</div>
                                         <div style="font-weight: bold; color: #0f172a;">DAKOTA LOGISTIK INDONESIA PT</div>
-                                        <div style="color: #334155;" font-weight: bold; >BANK CENTRAL ASIA (BCA)</div>
-                                        <div style="color: #334155;" font-weight: bold; >KCU KALIMALANG</div>
+                                        <div style="color: #334155; font-weight: bold;">BANK CENTRAL ASIA (BCA)</div>
+                                        <div style="color: #334155; font-weight: bold;">KCU KALIMALANG</div>
                                         <div style="font-weight: bold; font-family: monospace; color: #0284c7; font-size: 11px; margin-top: 3px;">
                                             NO REKENING : 2303937226
                                         </div>
                                     </td>
                                     
-                                    <!-- 🌟 1. NAMA DITURUNKAN SEJAJAR DENGAN BARIS TOTAL TAGIHAN -->
-                                    <td colspan="4" style="border: 1px solid #94a3b8; padding: 0; vertical-align: top;">
+                                    <td style="width: 38%; border: 1px solid #94a3b8; padding: 0; vertical-align: top;">
                                         <table style="width: 100%; height: 100%; min-height: 148px; border-collapse: collapse; border: none;">
                                             <tr>
                                                 <td style="text-align: center; vertical-align: top; padding-top: 8px; font-weight: bold; color: #0f172a; height: 20px;">
@@ -1650,7 +1650,7 @@ const Invoice = () => {
                                         </table>
                                     </td>
                                     
-                                    <td colspan="3" style="border: 1px solid #94a3b8; padding: 0; vertical-align: top;">
+                                    <td style="width: 27%; border: 1px solid #94a3b8; padding: 0; vertical-align: top;">
                                         <table style="width: 100%; border-collapse: collapse; font-size: 9.5px;">
                                             <tr>
                                                 <td style="padding: 2.5px 5px; font-weight: bold; border-bottom: 1px solid #e2e8f0; color: #334155;">JUMLAH</td>
@@ -1687,8 +1687,7 @@ const Invoice = () => {
                                         </table>
                                     </td>
                                 </tr>
-                            </tfoot>
-                        </table>
+                            </table>
                     </body>
                     </html>
                 `);
