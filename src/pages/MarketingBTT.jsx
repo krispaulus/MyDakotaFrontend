@@ -75,7 +75,7 @@ const MarketingBTT = () => {
             bttt_biayapacking: parseFloat(item.biaya_packing || item.biayapacking || item.bttt_biayapacking) || 0,
             bttt_paketyn: item.jenis_layanan === 'REGULER' || item.paketyn === 'Y' || item.bttt_paketyn === 'Y' ? 'Y' : 'N',
             bttt_layanan_nama: item.jenis_layanan || item.layanan || (item.bttt_paketyn === 'N' ? 'CARTER' : 'REGULER'),
-            bttt_jenisharga: item.metode_pembayaran === 'TUNAI' ? '0' : item.metode_pembayaran === 'KREDIT' ? '2' : '1',
+            bttt_jenisharga: item.bttt_jenisharga ? String(item.bttt_jenisharga).trim() : (item.metode_pembayaran === 'TUNAI' ? '0' : item.metode_pembayaran === 'KREDIT' ? '2' : '2'),
             bttt_jeniskiriman: item.jenis_kiriman || item.bttt_jeniskiriman || 'BERAT',
             bttt_asalname: item.asal_name || item.bttt_asalname || "",
             bttt_asaltelp: item.asal_telp || item.bttt_asaltelp || "",

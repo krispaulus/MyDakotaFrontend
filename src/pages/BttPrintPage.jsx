@@ -67,7 +67,13 @@ const BttPrintPage = () => {
   const hasilMappingDO = (bttData.ket_do_kembali || '').trim();
 
   const usernameMarketing = bttData.username || localStorage.getItem('user_nama') || localStorage.getItem('username') || 'SUPERDLI';
-  const layananText = bttData.bttt_layanan_nama || (bttData.bttt_paketyn === 'Y' ? 'REGULER' : 'CARTER');
+  const isCharter =
+    (bttData.bttt_charterjnskend || '').trim() !== '' ||
+    /CARTER|CHARTER/i.test(`${bttData.bttt_ket || ''} ${bttData.lampiran_keterangan || ''}`);
+
+  const layananText = isCharter
+    ? 'CHARTER'
+    : (bttData.bttt_layanan_nama || (bttData.bttt_paketyn === 'Y' ? 'REGULER' : 'EKONOMIS'));
   const keteranganFinal = bttData.bttt_ket || '';
 
   // 🌟 Validasi: Deteksi apakah isi kiriman mengandung kata 'CHEMICALS' / 'CHEMICAL'
@@ -333,8 +339,17 @@ const BttPrintPage = () => {
                     )}
                   </div>
                   <div className="font-mono text-slate-700 font-bold text-[7.5px]">{bttData.bttt_tujuantelp || ''}</div>
-                  <div className="text-slate-500 uppercase font-medium text-[7.5px] leading-tight line-clamp-1">
-                    {bttData.bttt_tujuanalamat || ''}
+                  <div className="text-slate-600 uppercase font-medium text-[7.5px] leading-tight">
+                    <div>{bttData.bttt_tujuanalamat || ''}</div>
+                    <div>
+                      {[
+                        bttData.bttt_tujuankelurahan ? `Kel. ${bttData.bttt_tujuankelurahan}` : '',
+                        bttData.bttt_tujuankecamatan ? `Kec. ${bttData.bttt_tujuankecamatan}` : ''
+                      ].filter(Boolean).join(', ')}
+                    </div>
+                    <div>
+                      {[bttData.bttt_tujuankota, bttData.bttt_tujuankodepos].filter(Boolean).join(' ')}
+                    </div>
                   </div>
                 </div>
               </div>
