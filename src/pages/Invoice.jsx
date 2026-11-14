@@ -1466,6 +1466,7 @@ const Invoice = () => {
                     const berat = Number(b.bttt_berat || 0);
                     const kodepos = b.bttt_tujuankodepos || b.bttt_kodepos || b.kodepos || '-';
                     const viaTransport = (b.bttt_via || b.bttt_angkutankode || b.via || '').toUpperCase();
+                    const rawKet = String(b.bttt_ket || '').trim();
 
                     totalBiayaKirim += biayaKirim;
                     totalDiskon += diskon;
