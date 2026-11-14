@@ -484,7 +484,7 @@ const Invoice = () => {
                     <td style="border: 1px solid #333; padding: 4px; text-align: center;">${String(item.artih_tanggal || '').substring(0, 10)}</td>
                     <td style="border: 1px solid #333; padding: 4px;">${item.tujuan || item.artih_tujuan || '-'}</td>
                     <td style="border: 1px solid #333; padding: 4px;">${item.penerima || item.artih_penerima || '-'}</td>
-                    <td style="border: 1px solid #333; padding: 4px; text-align: center;">DARAT</td>
+                    <td style="border: 1px solid #333; padding: 4px; text-align: center;">${(item.bttt_via || '-').toUpperCase()}</td>
                     <td style="border: 1px solid #333; padding: 4px; text-align: center;">${koli}</td>
                     <td style="border: 1px solid #333; padding: 4px; text-align: right;">${berat.toLocaleString('id-ID')}</td>
                     <td style="border: 1px solid #333; padding: 4px; text-align: right;">0</td>
@@ -1465,7 +1465,7 @@ const Invoice = () => {
                     const packing = Number(b.biaya_packing || 0);
                     const berat = Number(b.bttt_berat || 0);
                     const kodepos = b.bttt_tujuankodepos || b.bttt_kodepos || b.kodepos || '-';
-                    const viaTransport = (b.bttt_via || b.bttt_angkutankode || b.via || 'DARAT').toUpperCase();
+                    const viaTransport = (b.bttt_via || b.bttt_angkutankode || b.via || '').toUpperCase();
 
                     totalBiayaKirim += biayaKirim;
                     totalDiskon += diskon;
@@ -1867,7 +1867,7 @@ const Invoice = () => {
                             <td style="border: 1px solid #cbd5e1; padding: 5px 4px; font-weight: 500;">${b.bttt_tujuannama || '-'}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center;">${b.bttt_nosuratjalan || '-'}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center;">-</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center;">DARAT</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center;">${(b.bttt_via || '-').toUpperCase()}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center; font-family: monospace;">${koli}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 5px 4px; text-align: right; font-family: monospace;">${berat.toLocaleString('id-ID')}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 5px 4px; text-align: right; font-family: monospace;">0</td>
@@ -2213,7 +2213,7 @@ const Invoice = () => {
                         <td style="border: 1px solid #333; padding: 4px; text-align: center;">${String(b.bttt_tanggal).substring(0, 10)}</td>
                         <td style="border: 1px solid #333; padding: 4px;">${b.bttt_tujuankota || '-'}</td>
                         <td style="border: 1px solid #333; padding: 4px;">${b.bttt_tujuannama || '-'}</td>
-                        <td style="border: 1px solid #333; padding: 4px; text-align: center;">DARAT</td>
+                        <td style="border: 1px solid #333; padding: 4px; text-align: center;">${(b.bttt_via || '-').toUpperCase()}</td>
                         <td style="border: 1px solid #333; padding: 4px; text-align: right;">${Number(b.bttt_jmlunit || 1)}</td>
                         <td style="border: 1px solid #333; padding: 4px; text-align: right;">${Number(b.bttt_berat || 0).toLocaleString('id-ID')}</td>
                         <td style="border: 1px solid #333; padding: 4px; text-align: right;">${Number(b.bttt_ukuran || 0)}</td>
@@ -2427,8 +2427,9 @@ const Invoice = () => {
 
                 const isDangerousGoods = isiKiriman.toUpperCase().includes('CHEMICAL');
                 const layananText = b.bttt_paketyn === 'N' ? 'CARTER' : 'REGULER';
-                const pembayaranText = b.bttt_jenisharga === '0' ? 'TUNAI' : b.bttt_jenisharga === '2' ? 'KREDIT' : 'TAGIH TUJUAN';
-                const viaText = (b.bttt_via || 'DARAT').toUpperCase();
+                const kodeBayar = String(b.bttt_pembayaran || b.bttt_jenisharga || '0').trim();
+                const pembayaranText = kodeBayar === '0' ? 'TUNAI' : kodeBayar === '2' ? 'KREDIT' : '';
+                const viaText = (b.bttt_via || '').toUpperCase();
                 const tujuanWilayah = resolveWilayah(b.bttt_tujuankota, b.bttt_tujuanalamat);
 
                 const biayaKirim = Math.round(Number(b.bttt_harga || 0));
@@ -2749,7 +2750,7 @@ const Invoice = () => {
                         <td>${(b.bttt_tujuankota || '-').toUpperCase()}</td>
                         <td>${(b.bttt_tujuannama || '-').toUpperCase()}</td>
                         <td style="font-family:monospace; font-size:9px;">${b.bttt_nosuratjalan || '-'}</td>
-                        <td style="text-align:center;"><span class="badge-via">${(b.bttt_via || 'DARAT').toUpperCase()}</span></td>
+                        <td style="text-align:center;"><span class="badge-via">${(b.bttt_via || '').toUpperCase()}</span></td>
                         <td style="text-align:right; font-family:monospace;">${koli}</td>
                         <td style="text-align:right; font-family:monospace;">${berat.toLocaleString('id-ID')}</td>
                         <td style="text-align:right; font-family:monospace;">${ukuran}</td>

@@ -83,6 +83,8 @@ const MarketingBTT = () => {
             bttt_asalalamat: item.asal_alamat || item.bttt_asalalamat || "",
             bttt_asalkota: item.asal_kota || item.bttt_asalkota || "",
             bttt_inisial_asal: "DLI PUSAT",
+            bttt_servid: item.bttt_servid || "",
+            bttt_via: item.bttt_via || "",
             bttt_tujuannama: item.tujuan_nama || item.bttt_tujuannama || "",
             bttt_up_penerima: item.bttt_up_penerima || item.up || item.bttt_up || "",
             bttt_tujuantelp: item.tujuan_telp || item.bttt_tujuantelp || "",

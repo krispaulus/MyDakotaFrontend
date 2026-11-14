@@ -315,7 +315,7 @@ const BttPrintPage = () => {
                 </div>
                 <div className="col-span-4">
                   Kiriman: <span className="uppercase text-slate-900 font-black">{isiKirimanFinal}</span><br />
-                  Via: <span className="text-amber-600 font-black">DARAT</span>
+                  Via: <span className="text-amber-600 font-black">{(bttData.bttt_via || '-').toUpperCase()}</span>
                 </div>
                 <div className="col-span-4 text-right">
                   {item.kasta}<br />
