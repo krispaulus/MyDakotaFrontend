@@ -1469,15 +1469,6 @@ const Invoice = () => {
                     const viaTransport = (b.bttt_via || b.bttt_angkutankode || b.via || '').toUpperCase();
                     const rawKet = String(b.bttt_ket || '').trim();
 
-                    const sumRincianBTT = totalBiayaKirim - totalDiskon + totalAsuransi + totalPacking;
-                    const dbDPP = Number(header.artih_dpp || 0);
-                    const nilaiJual = dbDPP > 0 ? dbDPP : sumRincianBTT;
-                    const selisihLainnya = Math.max(0, nilaiJual - sumRincianBTT);
-                    const packingDanLainDisplay = totalPacking + selisihLainnya;
-                    const dpp = nilaiJual;
-                    const ppn = Number(header.artih_ppn || 0) > 0 ? Number(header.artih_ppn) : (dpp * 0.011);
-                    const totalTagihan = Number(header.artih_total || (nilaiJual + ppn));
-
                     totalBiayaKirim += biayaKirim;
                     totalDiskon += diskon;
                     totalAsuransi += asuransi;
@@ -1501,7 +1492,14 @@ const Invoice = () => {
                     `;
                 }).join('');
 
-
+                const sumRincianBTT = totalBiayaKirim - totalDiskon + totalAsuransi + totalPacking;
+                const dbDPP = Number(header.artih_dpp || 0);
+                const nilaiJual = dbDPP > 0 ? dbDPP : sumRincianBTT;
+                const selisihLainnya = Math.max(0, nilaiJual - sumRincianBTT);
+                const packingDanLainDisplay = totalPacking + selisihLainnya;
+                const dpp = nilaiJual;
+                const ppn = Number(header.artih_ppn || 0) > 0 ? Number(header.artih_ppn) : (dpp * 0.011);
+                const totalTagihan = Number(header.artih_total || (nilaiJual + ppn));
 
                 // const nilaiJual = totalBiayaKirim - totalDiskon + totalAsuransi + totalPacking;
                 // const dpp = nilaiJual;
@@ -2715,12 +2713,12 @@ const Invoice = () => {
             return;
         }
 
-        const printWindow = window.open('', '_blank', 'width=1150,height=850,scrollbars=yes');
-        if (!printWindow) {
-            Swal.fire('Popup Diblokir', 'Izinkan popup browser untuk mencetak dokumen ini.', 'warning');
+        const previewWin = window.open('', '_blank', 'width=1320,height=880,scrollbars=yes');
+        if (!previewWin) {
+            Swal.fire('Popup Diblokir', 'Izinkan popup browser untuk membuka preview.', 'warning');
             return;
         }
-        printWindow.document.write(`<html><head><title>Memuat Dokumen...</title></head><body style="font-family:sans-serif;text-align:center;padding-top:60px;"><h3>Sedang memuat dokumen cetak...</h3></body></html>`);
+        previewWin.document.write(`<html><head><title>Memuat Preview...</title></head><body style="font-family:sans-serif;text-align:center;padding-top:60px;"><h3>Sedang menyiapkan Preview Faktur ${item.artih_id}...</h3></body></html>`);
 
         try {
             const token = localStorage.getItem('token');
