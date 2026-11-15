@@ -1469,6 +1469,15 @@ const Invoice = () => {
                     const viaTransport = (b.bttt_via || b.bttt_angkutankode || b.via || '').toUpperCase();
                     const rawKet = String(b.bttt_ket || '').trim();
 
+                    const sumRincianBTT = totalBiayaKirim - totalDiskon + totalAsuransi + totalPacking;
+                    const dbDPP = Number(header.artih_dpp || 0);
+                    const nilaiJual = dbDPP > 0 ? dbDPP : sumRincianBTT;
+                    const selisihLainnya = Math.max(0, nilaiJual - sumRincianBTT);
+                    const packingDanLainDisplay = totalPacking + selisihLainnya;
+                    const dpp = nilaiJual;
+                    const ppn = Number(header.artih_ppn || 0) > 0 ? Number(header.artih_ppn) : (dpp * 0.011);
+                    const totalTagihan = Number(header.artih_total || (nilaiJual + ppn));
+
                     totalBiayaKirim += biayaKirim;
                     totalDiskon += diskon;
                     totalAsuransi += asuransi;
@@ -1492,10 +1501,12 @@ const Invoice = () => {
                     `;
                 }).join('');
 
-                const nilaiJual = totalBiayaKirim - totalDiskon + totalAsuransi + totalPacking;
-                const dpp = nilaiJual;
-                const ppn = dpp * 0.011;
-                const totalTagihan = Number(header.artih_total || (nilaiJual + ppn));
+
+
+                // const nilaiJual = totalBiayaKirim - totalDiskon + totalAsuransi + totalPacking;
+                // const dpp = nilaiJual;
+                // const ppn = dpp * 0.011;
+                // const totalTagihan = Number(header.artih_total || (nilaiJual + ppn));
 
                 // 🌟 2. VALIDASI MERCK: HANYA TAMPILKAN BARIS NOMOR PO JIKA CUSTOMER ADALAH MERCK
                 const customerFullName = `${header.cust_name || ''} ${header.artih_custname || ''} ${header.CustName || ''}`.toUpperCase();
@@ -1668,7 +1679,7 @@ const Invoice = () => {
                                             </tr>
                                             <tr>
                                                 <td style="padding: 1.5px 5px; border-bottom: 1px solid #e2e8f0; color: #64748b;">(+) PACKING/BM/LAIN</td>
-                                                <td style="padding: 1.5px 5px; text-align: right; font-family: monospace; border-bottom: 1px solid #e2e8f0;">${totalPacking.toLocaleString('id-ID')}.00</td>
+                                                <td style="padding: 1.5px 5px; text-align: right; font-family: monospace; border-bottom: 1px solid #e2e8f0;">${packingDanLainDisplay.toLocaleString('id-ID')}.00</td>
                                             </tr>
                                             <tr style="background: #f8fafc;">
                                                 <td style="padding: 2.5px 5px; font-weight: bold; border-bottom: 1px solid #e2e8f0; color: #0f172a;">NILAI JUAL</td>
