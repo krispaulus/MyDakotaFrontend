@@ -5,6 +5,7 @@ import { useDarkMode } from '../context/DarkModeContext';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { X, Receipt, Filter, RefreshCw, RotateCcw } from 'lucide-react';
 import Swal from 'sweetalert2';
+import { exportDataToExcel, exportDataToCSV } from '../utils/exportTableHelper';
 
 const DaftarPemasukanPengeluaran = () => {
     const { isDarkMode } = useDarkMode();
@@ -428,6 +429,36 @@ const DaftarPemasukanPengeluaran = () => {
         </div>
     ) : null;
 
+    const handleExportExcel = () => {
+        const exportColumns = [
+            { header: 'NO', key: 'no', align: 'center' },
+            { header: 'KODE', key: 'item_id' },
+            { header: 'KATEGORI', key: 'cat_name' },
+            { header: 'NAMA ITEM', key: 'item_name' },
+            {
+                header: 'STATUS',
+                accessor: (row) => (row.item_status === 'A' ? 'AKTIVA TETAP' : 'LAIN-LAIN'),
+                align: 'center'
+            },
+            { header: 'NO. ACC UTAMA', key: 'item_own_caid' },
+            { header: 'NO. ACC DEP', key: 'item_dep_caid' },
+            { header: 'NO. ACC KAS', key: 'item_cash_caid' },
+            {
+                header: 'AKTIF',
+                accessor: (row) => (row.item_aktif_yn === 'Y' ? 'YA' : 'TIDAK'),
+                align: 'center'
+            }
+        ];
+
+        exportDataToExcel({
+            filename: 'Daftar_Pemasukan_Pengeluaran.xls',
+            sheetName: 'Pemasukan Pengeluaran',
+            title: 'DAFTAR PEMASUKAN DAN PENGELUARAN',
+            columns: exportColumns,
+            data: data
+        });
+    };
+
     return (
         <div className="space-y-4">
             {/* 🌟 PANEL FILTER KONDISIONAL */}
@@ -527,6 +558,7 @@ const DaftarPemasukanPengeluaran = () => {
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 onFilter={() => setShowFilter(prev => !prev)}
+                onExport={handleExportExcel}
             />
 
             {modalElement && ReactDOM.createPortal(modalElement, document.body)}

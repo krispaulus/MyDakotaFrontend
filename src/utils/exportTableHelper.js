@@ -4,6 +4,8 @@
  * Bisa dipanggil di Preview 2 Transport Planning, Kimia Farma, maupun modul lainnya.
  */
 
+import Swal from 'sweetalert2';
+
 // Helper pembersih format angka & teks
 const cleanValue = (val) => {
     if (val === null || val === undefined) return '';
@@ -21,7 +23,16 @@ export const exportDataToCSV = ({
     delimiter = ';'
 }) => {
     if (!data || data.length === 0) {
-        alert('Tidak ada data yang dapat diekspor.');
+        Swal.fire({
+            title: 'DATA KOSONG',
+            text: 'Tidak ada data yang dapat diekspor.',
+            icon: 'warning',
+            confirmButtonColor: '#0284c7',
+            didOpen: () => {
+                const container = document.querySelector('.swal2-container');
+                if (container) container.style.zIndex = '9999999';
+            }
+        });
         return;
     }
 
@@ -56,6 +67,18 @@ export const exportDataToCSV = ({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+
+    Swal.fire({
+        title: 'BERHASIL!',
+        text: 'File CSV berhasil diunduh.',
+        icon: 'success',
+        timer: 1800,
+        showConfirmButton: false,
+        didOpen: () => {
+            const container = document.querySelector('.swal2-container');
+            if (container) container.style.zIndex = '9999999';
+        }
+    });
 };
 
 /**
@@ -72,7 +95,16 @@ export const exportDataToExcel = ({
     data = []
 }) => {
     if (!data || data.length === 0) {
-        alert('Tidak ada data yang dapat diekspor.');
+        Swal.fire({
+            title: 'DATA KOSONG',
+            text: 'Tidak ada data yang dapat diekspor.',
+            icon: 'warning',
+            confirmButtonColor: '#0284c7',
+            didOpen: () => {
+                const container = document.querySelector('.swal2-container');
+                if (container) container.style.zIndex = '9999999';
+            }
+        });
         return;
     }
 
@@ -148,4 +180,16 @@ export const exportDataToExcel = ({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+
+    Swal.fire({
+        title: 'BERHASIL!',
+        text: 'File Excel berhasil diunduh.',
+        icon: 'success',
+        timer: 1800,
+        showConfirmButton: false,
+        didOpen: () => {
+            const container = document.querySelector('.swal2-container');
+            if (container) container.style.zIndex = '9999999';
+        }
+    });
 };

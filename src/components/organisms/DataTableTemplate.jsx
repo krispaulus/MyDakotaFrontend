@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Filter, Search, Edit, Trash2, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import { Plus, Filter, Search, Edit, Trash2, ChevronLeft, ChevronRight, FileText, FileSpreadsheet } from 'lucide-react';
 
 const DataTableTemplate = ({
     title,
@@ -15,6 +15,7 @@ const DataTableTemplate = ({
     loading,
     isDarkMode,
     actionMode,
+    onExport,
     isAddDisabled = false,
     hideAddButton = false,
     hideActionColumn = false
@@ -70,13 +71,13 @@ const DataTableTemplate = ({
         <div className={`p-8 min-h-screen transition-all duration-300 ${theme.bg} ${theme.text} font-['Inter']`}>
             {/* HEADER: Button & Filter di Atas */}
             <div className="flex justify-between items-center mb-6">
-                <div className="flex gap-4">
+                <div className="flex flex-wrap items-center gap-3">
                     {!hideAddButton && (
                         <button
                             type="button"
                             disabled={isAddDisabled}
                             onClick={!isAddDisabled ? onAdd : undefined}
-                            className={`flex items-center gap-2 px-5 py-2 rounded-lg font-semibold transition-all shadow-sm ${isAddDisabled
+                            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold transition-all shadow-sm ${isAddDisabled
                                 ? 'bg-slate-300 text-slate-500 border border-slate-300 cursor-not-allowed opacity-75 shadow-none select-none'
                                 : 'bg-[#2563eb] hover:bg-blue-700 text-white cursor-pointer'
                                 }`}
@@ -84,17 +85,31 @@ const DataTableTemplate = ({
                             <Plus size={18} /> {title === 'USER MANAGEMENT' ? 'Add User' : `Tambah ${title}`}
                         </button>
                     )}
+
                     <button
                         type="button"
                         onClick={onFilter || onToggleFilter}
                         className={`px-6 py-2.5 rounded-lg flex items-center gap-2 font-semibold shadow-sm transition-all cursor-pointer border ${isFilterOpen
-                                ? 'bg-blue-50 border-blue-300 text-blue-600 ring-2 ring-blue-100'
-                                : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                            ? 'bg-blue-50 border-blue-300 text-blue-600 ring-2 ring-blue-100'
+                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
                             }`}
                     >
                         <Filter size={18} className={isFilterOpen ? 'text-blue-600' : 'text-gray-500'} />
                         <span>Filter</span>
                     </button>
+
+                    {/* 🌟 TOMBOL EXPORT EXCEL */}
+                    {onExport && (
+                        <button
+                            type="button"
+                            onClick={onExport}
+                            disabled={!data || data.length === 0}
+                            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-semibold rounded-lg flex items-center gap-2 shadow-sm transition-all cursor-pointer"
+                        >
+                            <FileSpreadsheet size={18} />
+                            <span>Export Excel</span>
+                        </button>
+                    )}
                 </div>
             </div>
 

@@ -5,6 +5,8 @@ import { useDarkMode } from '../context/DarkModeContext';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { X, BookOpen, Filter, RefreshCw, RotateCcw } from 'lucide-react';
 import Swal from 'sweetalert2';
+import { exportDataToExcel, exportDataToCSV } from '../utils/exportTableHelper';
+import { FileSpreadsheet } from 'lucide-react'; // tambahkan icon excel jika mau
 
 const DaftarKodePerkiraan = () => {
     const { isDarkMode } = useDarkMode();
@@ -446,6 +448,40 @@ const DaftarKodePerkiraan = () => {
         </div>
     ) : null;
 
+    const handleExportExcel = () => {
+        const exportColumns = [
+            { header: 'NO', key: 'no', align: 'center' },
+            { header: 'KODE AKUN', key: 'ca_id' },
+            { header: 'KETERANGAN / NAMA AKUN', key: 'ca_name' },
+            { header: 'KODE UP AKUN', key: 'ca_up_id' },
+            {
+                header: 'JENIS',
+                accessor: (row) => (row.ca_jenis === 'H' ? 'HEADER' : 'DETAIL'),
+                align: 'center'
+            },
+            {
+                header: 'TIPE',
+                accessor: (row) => (row.ca_type === 'D' ? 'DEBET' : 'KREDIT'),
+                align: 'center'
+            },
+            { header: 'GOLONGAN', key: 'golongan_jadi' },
+            { header: 'KELOMPOK', key: 'ca_kelompok', align: 'center' },
+            {
+                header: 'AKTIF',
+                accessor: (row) => (row.ca_aktif_yn === 'Y' ? 'YA' : 'TIDAK'),
+                align: 'center'
+            }
+        ];
+
+        exportDataToExcel({
+            filename: 'Daftar_Kode_Perkiraan_COA.xls',
+            sheetName: 'Kode Perkiraan',
+            title: 'DAFTAR KODE PERKIRAAN (CHART OF ACCOUNTS)',
+            columns: exportColumns,
+            data: data
+        });
+    };
+
     return (
         <div className="space-y-4">
             {/* 🌟 PANEL FILTER KONDISIONAL */}
@@ -559,6 +595,7 @@ const DaftarKodePerkiraan = () => {
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 onFilter={() => setShowFilter(prev => !prev)}
+                onExport={handleExportExcel}
             />
 
             {modalElement && ReactDOM.createPortal(modalElement, document.body)}
