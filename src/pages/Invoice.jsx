@@ -566,7 +566,7 @@ const Invoice = () => {
                             <td style="border:1px solid #333; padding:6px; text-align:right;">${totalPacking.toLocaleString('id-ID')}</td>
                             <td style="border:1px solid #333; padding:6px; text-align:right;">${totalPenerus.toLocaleString('id-ID')}</td>
                             <td style="border:1px solid #333; padding:6px; text-align:right;">${totalBiayaKirim.toLocaleString('id-ID')}</td>
-                            <td style="border:1px solid #333; padding:6px; text-align:right; font-weight:900; color:#b91c1c;">Rp ${grandTotal.toLocaleString('id-ID')}</td>
+                            <td style="border:1px solid #333; padding:6px; text-align:right; font-weight:900; color:#b91c1c;">${grandTotal.toLocaleString('id-ID')}</td>
                         </tr>
                     </tfoot>
                 </table>
@@ -2195,7 +2195,7 @@ const Invoice = () => {
                                     <td style="border:1px solid #94a3b8; padding:5px; text-align:right; font-family:monospace;">${totalVolume}</td>
                                     <td style="border:1px solid #94a3b8; padding:5px; text-align:right; font-family:monospace;">${totalBerat.toLocaleString('id-ID')}</td>
                                     <td colspan="4" style="border:1px solid #94a3b8; text-align:center;">-</td>
-                                    <td style="border:1px solid #94a3b8; padding:5px; text-align:right; font-family:monospace; color:#b91c1c; font-size:10.5px;">Rp ${totalTagihan.toLocaleString('id-ID')}</td>
+                                    <td style="border:1px solid #94a3b8; padding:5px; text-align:right; font-family:monospace; color:#b91c1c; font-size:10.5px;">${totalTagihan.toLocaleString('id-ID')}</td>
                                     <td style="border:1px solid #94a3b8;"></td>
                                 </tr>
                             </tfoot>
@@ -2312,7 +2312,7 @@ const Invoice = () => {
                                 <td style="border:1px solid #333; padding:5px; text-align:right;">${totalPacking.toLocaleString('id-ID')}</td>
                                 <td style="border:1px solid #333; padding:5px; text-align:right;">${totalBiayaPenerus.toLocaleString('id-ID')}</td>
                                 <td style="border:1px solid #333; padding:5px; text-align:right;">${totalBiayaKirim.toLocaleString('id-ID')}</td>
-                                <td style="border:1px solid #333; padding:5px; text-align:right; font-weight:900; color:#b91c1c;">Rp ${grandTotal.toLocaleString('id-ID')}</td>
+                                <td style="border:1px solid #333; padding:5px; text-align:right; font-weight:900; color:#b91c1c;">${grandTotal.toLocaleString('id-ID')}</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -3033,7 +3033,7 @@ const Invoice = () => {
                                     <td style="text-align:right; font-family:monospace;">${totalPacking.toLocaleString('id-ID')}</td>
                                     <td style="text-align:right; font-family:monospace;">${totalPenerus.toLocaleString('id-ID')}</td>
                                     <td style="text-align:right; font-family:monospace;">${totalBiayaKirim.toLocaleString('id-ID')}</td>
-                                    <td style="text-align:right; font-family:monospace; color:#b91c1c; font-size:10.5px;">Rp ${grandTotal.toLocaleString('id-ID')}</td>
+                                    <td style="text-align:right; font-family:monospace; color:#b91c1c; font-size:10.5px;">${grandTotal.toLocaleString('id-ID')}</td>
                                 </tr>
                             </tfoot>
                         </table>
