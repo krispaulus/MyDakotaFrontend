@@ -66,6 +66,9 @@ const BttPrintPage = () => {
 
   const hasilMappingDO = (bttData.ket_do_kembali || '').trim();
 
+  const isTeksMappingDO = /^(DO\s+(ASLI|COPY)|FAKTUR\s+PAJAK|SURAT\s+JALAN)/i.test(cleanKet);
+  const keteranganAtas = isTeksMappingDO ? '' : cleanKet;
+
   const usernameMarketing = bttData.username || localStorage.getItem('user_nama') || localStorage.getItem('username') || 'SUPERDLI';
   const isCharter =
     (bttData.bttt_charterjnskend || '').trim() !== '' ||
@@ -80,11 +83,10 @@ const BttPrintPage = () => {
   const teksKiriman = (bttData.bttt_isikiriman || '').toUpperCase();
   // const isDangerousGoods = teksKiriman.includes('CHEMICAL');
 
-  // 🌟 1. Keterangan Atas: Berasal dari mapping storagecode (Default: DO Asli/Copy Kembali Jatiasih)
-  const keteranganAtas = cleanKet || rawKetDb || '-';
 
-  // 🌟 2. Keterangan Bawah: Berasal dari teks kolom keterangan di CSV
-  const keteranganBawah = hasilMappingDO || '';
+
+  // 🌟 2. Lampiran Keterangan Bawah: Hasil mapping DO kembali (misal: "DO Asli Kembali Jatiasih")
+  const keteranganBawah = hasilMappingDO || (isTeksMappingDO ? cleanKet : '') || '-';
 
   // 🌟 3. Biaya Packing: Dari kolom packing file CSV
   const biayaPacking = parseFloat(bttData.bttt_biayapacking || bttData.biaya_packing || 0);
@@ -195,10 +197,10 @@ const BttPrintPage = () => {
       </div>
 
       {/* CONTAINER A4 */}
-      <div className="w-full max-w-[850px] mx-auto flex flex-col justify-between bg-white" style={{ height: '286mm' }}>
+      <div className="w-full max-w-[850px] mx-auto flex flex-col justify-between bg-white" style={{ height: '288mm' }}>
         {tipeLembaran.map((item, index) => (
           <React.Fragment key={index}>
-            <div className="invoice-box border border-slate-300 p-2.5 bg-white rounded-xl relative flex flex-col justify-between overflow-hidden" style={{ height: '91mm' }}>
+            <div className="invoice-box border border-slate-300 p-2.5 bg-white rounded-xl relative flex flex-col justify-between overflow-hidden" style={{ height: '93mm' }}>
 
               {/* 🌟 1. STEMPEL DANGEROUS GOODS (KHUSUS LEMBAR 1 JIKA ISI KIRIMAN CHEMICALS) */}
               {index === 0 && isDangerousGoods && (
@@ -356,26 +358,22 @@ const BttPrintPage = () => {
 
                 <div className="p-1.5 bg-slate-50/50 border border-slate-200 rounded-lg space-y-0.5">
                   <div className="font-black text-blue-600 text-[7.5px] uppercase">[ PENERIMA ]</div>
-                  <div className="font-black text-slate-900 text-[9.5px] leading-tight">
+                  <div className="font-black text-slate-900 text-[9.5px] leading-tight truncate">
                     {bttData.bttt_tujuannama || ''}
-                    {bttData.bttt_up_penerima && (
-                      <span className="text-slate-700 font-bold ml-1 text-[8.5px]">
+                    {bttData.bttt_up_penerima && bttData.bttt_up_penerima !== '-' && (
+                      <span className="text-slate-700 font-bold ml-1 text-[8px]">
                         (UP: {bttData.bttt_up_penerima})
                       </span>
                     )}
                   </div>
                   <div className="font-mono text-slate-700 font-bold text-[7.5px]">{bttData.bttt_tujuantelp || ''}</div>
-                  <div className="text-slate-600 uppercase font-medium text-[7.5px] leading-tight">
-                    <div>{bttData.bttt_tujuanalamat || ''}</div>
-                    <div>
-                      {[
-                        bttData.bttt_tujuankelurahan ? `Kel. ${bttData.bttt_tujuankelurahan}` : '',
-                        bttData.bttt_tujuankecamatan ? `Kec. ${bttData.bttt_tujuankecamatan}` : ''
-                      ].filter(Boolean).join(', ')}
-                    </div>
-                    <div>
-                      {[bttData.bttt_tujuankota, bttData.bttt_tujuankodepos].filter(Boolean).join(' ')}
-                    </div>
+                  <div className="text-slate-600 uppercase font-medium text-[7.5px] leading-tight line-clamp-2">
+                    {[
+                      bttData.bttt_tujuanalamat,
+                      bttData.bttt_tujuankelurahan ? `KEL. ${bttData.bttt_tujuankelurahan}` : '',
+                      bttData.bttt_tujuankecamatan ? `KEC. ${bttData.bttt_tujuankecamatan}` : '',
+                      [bttData.bttt_tujuankota, bttData.bttt_tujuankodepos].filter(Boolean).join(' ')
+                    ].filter(Boolean).join(', ')}
                   </div>
                 </div>
               </div>
@@ -452,7 +450,7 @@ const BttPrintPage = () => {
               </div>
 
               {/* 🌟 6. BARIS LAMPIRAN SESUAI PERMINTAAN (GAMBAR 5 & 6) */}
-              <div className="p-1 border border-dashed border-slate-300 rounded bg-slate-50/70 text-[7.5px] font-bold text-slate-700 text-left space-y-0.5">
+              <div className="px-1.5 py-0.5 border border-dashed border-slate-300 rounded bg-slate-50/70 text-[7.5px] font-bold text-slate-700 text-left space-y-0.5">
                 <div>
                   <span className="text-slate-500">Lampiran Surat Jalan :</span>{' '}
                   <span className="font-mono text-indigo-700">{bttData.bttt_nosuratjalan || ''}</span>
