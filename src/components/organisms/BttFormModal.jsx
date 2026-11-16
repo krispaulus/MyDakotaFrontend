@@ -246,7 +246,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
         }
 
         // 🛑 HANYA generate ID otomatis jika form memang sedang dalam mode UMUM murni dan belum punya ID
-        if ((namaPelanggan === "" || namaPelanggan.toUpperCase() === "UMUM") && formData.bttt_asalname === 'UMUM' && !formData.bttt_asalcustid) {
+        if (!isEditMode && (namaPelanggan === "" || namaPelanggan.toUpperCase() === "UMUM") && formData.bttt_asalname === 'UMUM' && !formData.bttt_asalcustid) {
             const token = localStorage.getItem('token');
             const kodeAgenAktif = localStorage.getItem('active_agen_id') || 'JKT';
 
@@ -266,7 +266,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                 .catch(err => console.warn("Gagal inisialisasi default retail ID:", err));
         }
 
-        if (keywordCustomer && keywordCustomer.length >= 1) {
+        if (keywordCustomer && keywordCustomer.length >= 2) {
             const token = localStorage.getItem('token');
             const activeAgen = localStorage.getItem('active_agen_id') || '';
             const roleAkses = localStorage.getItem('role_akses') === 'S' ? 'SUPERADMIN' : 'USER';
@@ -1174,17 +1174,23 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                                                                 const fixEmail = cust.cust_email || cust.CustEmail || "";
 
                                                                 setKeywordCustomer(fixName);
-                                                                setFormData(prev => ({
-                                                                    ...prev,
-                                                                    bttt_asalname: fixName.toUpperCase(),
-                                                                    bttt_asalcustid: cust.cust_id,
-                                                                    bttt_asalalamat: fixAlamat.toUpperCase(),
-                                                                    bttt_asalkota: fixKota.toUpperCase(),
-                                                                    bttt_asaltelp: fixTelp,
-                                                                    bttt_asaltelp2: fixTelp2,
-                                                                    bttt_asalemail: fixEmail,
-                                                                    bttt_up: fixName.toUpperCase()
-                                                                }));
+                                                                setFormData(prev => {
+                                                                    const pengirimSaatIni = (prev.bttt_asalname || '').trim();
+                                                                    const keepPengirim = pengirimSaatIni !== '' && pengirimSaatIni.toUpperCase() !== 'UMUM';
+                                                                    const namaPengirimFinal = keepPengirim ? pengirimSaatIni : fixName.toUpperCase();
+
+                                                                    return {
+                                                                        ...prev,
+                                                                        bttt_asalname: namaPengirimFinal,
+                                                                        bttt_asalcustid: cust.cust_id,
+                                                                        bttt_asalalamat: fixAlamat ? fixAlamat.toUpperCase() : prev.bttt_asalalamat,
+                                                                        bttt_asalkota: fixKota ? fixKota.toUpperCase() : prev.bttt_asalkota,
+                                                                        bttt_asaltelp: fixTelp || prev.bttt_asaltelp,
+                                                                        bttt_asaltelp2: fixTelp2 || prev.bttt_asaltelp2,
+                                                                        bttt_asalemail: fixEmail || prev.bttt_asalemail,
+                                                                        bttt_up: namaPengirimFinal
+                                                                    };
+                                                                });
                                                             }
                                                             setRekomendasiCustomer([]);
                                                         }}
