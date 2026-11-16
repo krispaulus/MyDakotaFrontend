@@ -159,14 +159,23 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                 }
             }
 
-            const namaPengirim = initialData.bttt_asalname || initialData.asal_name || 'PT. MERCK CHEMICALS AND LIFE SCIENCES';
-            const idPengirim = initialData.bttt_asalcustid || initialData.asal_custid || '0010000073';
+            // 🌟 Pisahkan CUSTOMER (Pemilik Akun Tagihan) vs NAMA PENGIRIM (Client/Lokasi Pickup)
+            const namaCustomer = initialData.customer_nama || initialData.bttt_asalname || initialData.asal_name || 'UMUM';
+            const namaPengirim = initialData.bttt_asalname || initialData.asal_name || namaCustomer;
+            const idCustomer = String(initialData.bttt_asalcustid || initialData.asal_custid || '').trim();
 
             // 🌟 Deteksi apakah transaksi ini CARTER atau PAKET
             const isCarter = (initialData.layanan_id === 'C' || initialData.bttt_layananid === 'C' || initialData.bttt_paketyn === 'N' || (initialData.bttt_charterjnskend && initialData.bttt_charterjnskend !== '-'));
             const jenisKendaraanCarter = initialData.bttt_charterjnskend || initialData.kode_kendaraan || '';
 
-            setKeywordCustomer(namaPengirim);
+            // 🌟 Metode pembayaran prioritas dari bttt_pembayaran ('2' = KREDIT, '0' = TUNAI, '1' = COD)
+            const kodePembayaran = String(
+                initialData.bttt_pembayaran !== undefined && initialData.bttt_pembayaran !== null && initialData.bttt_pembayaran !== ''
+                    ? initialData.bttt_pembayaran
+                    : (initialData.metode_pembayaran === 'KREDIT' ? '2' : initialData.metode_pembayaran === 'TUNAI' ? '0' : '1')
+            ).trim();
+
+            setKeywordCustomer(namaCustomer);
             setIsCustomerSelected(true);
 
             setFormData({
@@ -178,10 +187,10 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                 bttt_dliexpryn: initialData.bttt_dliexpryn || 'N',
                 bttt_promoid: initialData.bttt_promoid || '',
 
-                // 🌟 PENGIRIM 
-                bttt_asalcustid: idPengirim,
+                // 🌟 PENGIRIM & CUSTOMER
+                bttt_asalcustid: idCustomer,
                 bttt_asalname: namaPengirim,
-                bttt_up: initialData.bttt_up_pengirim || initialData.pic_pengirim || namaPengirim,
+                bttt_up: namaPengirim,
                 bttt_asalalamat: initialData.bttt_asalalamat || initialData.asal_alamat || '',
                 bttt_asalkota: initialData.bttt_asalkota || initialData.asal_kota || '',
                 bttt_asaltelp: initialData.bttt_asaltelp || initialData.asal_telp || '',
@@ -189,7 +198,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                 bttt_asalemail: initialData.bttt_asalemail || '',
                 bttt_asalagenid: initialData.bttt_asalagenid || initialData.asal_agen_id || '1',
 
-                // 🌟 PENERIMA 
+                // 🌟 PENERIMA & AGEN TUJUAN
                 bttt_tujuannama: initialData.bttt_tujuannama || initialData.tujuan_nama || '',
                 bttt_up_penerima: initialData.bttt_up_penerima || initialData.bttt_up || initialData.up || '',
                 bttt_tujuanalamat: initialData.bttt_tujuanalamat || initialData.tujuan_alamat || '',
@@ -203,15 +212,15 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                 bttt_tujuantelp3: initialData.bttt_tujuantelp3 || '',
                 bttt_tujuanpropinsi: initialData.bttt_tujuanpropinsi || initialData.tujuan_propinsi || '',
                 bttt_tujuanpulau: initialData.bttt_tujuanpulau || initialData.tujuan_propinsi || '',
-                bttt_tujuanagenid: initialData.bttt_tujuanagenid || initialData.tujuan_agen_id || '',
-                bttt_kodecabangagen: initialData.bttt_kodecabangagen || '',
+                bttt_tujuanagenid: initialData.tujuan_agen_nama || initialData.bttt_tujuanagenid || initialData.tujuan_agen_id || '',
+                bttt_kodecabangagen: initialData.bttt_tujuanagenid || initialData.tujuan_agen_id || initialData.bttt_kodecabangagen || '',
 
-                // 🌟 Layanan & Muatan (Sesuai Kolom R CSV: R = Paket, C = Carter)
+                // 🌟 Layanan & Muatan
                 bttt_paketyn: isCarter ? 'N' : 'Y',
                 bttt_pilihcarter: isCarter ? (jenisKendaraanCarter || 'BUILD UP') : '',
-                bttt_jenisharga: initialData.bttt_jenisharga || (initialData.metode_pembayaran === 'KREDIT' ? '2' : initialData.metode_pembayaran === 'TUNAI' ? '0' : '1'),
+                bttt_jenisharga: kodePembayaran,
                 bttt_jeniskiriman: 'BERAT',
-                bttt_isikiriman: initialData.bttt_namabarang || initialData.nama_barang || initialData.bttt_isikiriman || 'PRODUK FARMASI / KESEHATAN',
+                bttt_isikiriman: initialData.bttt_namabarang || initialData.nama_barang || initialData.bttt_isikiriman || '',
                 bttt_jmlkoli: parseInt(initialData.bttt_jmlunit || initialData.jumlah_koli) || 1,
                 bttt_berat: parseFloat(initialData.bttt_berat || initialData.berat) || 1,
                 bttt_beratvol: parseFloat(initialData.bttt_beratvol || initialData.berat_volume) || 0,
@@ -225,6 +234,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
             });
         }
     }, [isOpen, initialData, isEditMode]);
+
 
     // Live search Pelanggan
     useEffect(() => {
@@ -1135,11 +1145,10 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                                         <input
                                             type="text"
                                             className="w-full p-2 border border-slate-300 rounded-lg font-bold uppercase text-slate-800 bg-white outline-none focus:border-sky-500"
-                                            value={keywordCustomer || formData.bttt_asalname}
+                                            value={keywordCustomer}
                                             onChange={(e) => {
                                                 const val = e.target.value;
                                                 setKeywordCustomer(val);
-                                                setFormData(prev => ({ ...prev, bttt_asalname: val }));
                                             }}
                                             placeholder="Cari Pelanggan..."
                                         />
@@ -1206,9 +1215,10 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                                         type="text"
                                         className={`w-full p-2 border rounded-lg font-bold uppercase text-slate-800 ${formErrors.bttt_up ? 'border-rose-500 bg-rose-50/50' : 'border-slate-300'
                                             }`}
-                                        value={formData.bttt_up || ""}
+                                        value={formData.bttt_asalname || formData.bttt_up || ""}
                                         onChange={(e) => {
-                                            setFormData(prev => ({ ...prev, bttt_up: e.target.value }));
+                                            const val = e.target.value.toUpperCase();
+                                            setFormData(prev => ({ ...prev, bttt_asalname: val, bttt_up: val }));
                                             if (formErrors.bttt_up) setFormErrors(prev => ({ ...prev, bttt_up: false }));
                                         }}
                                     />
