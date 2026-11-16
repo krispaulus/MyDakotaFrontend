@@ -500,6 +500,7 @@ const Invoice = () => {
         const headerKwitansiNo = data[0]?.artih_nokw || '-';
         const headerCustomer = data.length === 1 ? (data[0]?.cust_name || data[0]?.artih_custname) : 'SEMUA CUSTOMER (TERFILTER)';
 
+        printWindow.document.open();
         printWindow.document.write(`
             <!DOCTYPE html>
             <html>
@@ -1634,25 +1635,25 @@ const Invoice = () => {
                             <!-- FOOTER REKAPITULASI BIAYA & TANDA TANGAN (HANYA MUNCUL DI HALAMAN TERAKHIR) -->
                             <table style="width: 100%; border: 1px solid #94a3b8; border-top: none; border-collapse: collapse; page-break-inside: avoid; break-inside: avoid;">
                                 <tr style="background: #ffffff;">
-                                    <td style="width: 35%; border: 1px solid #94a3b8; padding: 8px; vertical-align: top;">
-                                        <div style="font-weight: bold; color: #004b84; margin-bottom: 2px; font-size: 10px;">Transfer ke :</div>
-                                        <div style="font-weight: bold; color: #0f172a;">DAKOTA LOGISTIK INDONESIA PT</div>
-                                        <div style="color: #334155; font-weight: bold;">BANK CENTRAL ASIA (BCA)</div>
-                                        <div style="color: #334155; font-weight: bold;">KCU KALIMALANG</div>
-                                        <div style="font-weight: bold; font-family: monospace; color: #0284c7; font-size: 11px; margin-top: 3px;">
+                                    <td style="width: 35%; border: 1px solid #94a3b8; padding: 8px; vertical-align: top; font-size: 9.5px; line-height: 1.4;">
+                                        <div style="font-weight: bold; color: #004b84; margin-bottom: 3px; font-size: 9.5px;">Transfer ke :</div>
+                                        <div style="font-weight: bold; color: #0f172a; font-size: 10px;">DAKOTA LOGISTIK INDONESIA PT</div>
+                                        <div style="color: #334155; font-weight: bold; font-size: 9.5px;">BANK CENTRAL ASIA (BCA)</div>
+                                        <div style="color: #334155; font-weight: bold; font-size: 9.5px;">KCU KALIMALANG</div>
+                                        <div style="font-weight: bold; font-family: monospace; color: #0284c7; font-size: 10.5px; margin-top: 4px;">
                                             NO REKENING : 2303937226
                                         </div>
                                     </td>
                                     
-                                    <td style="width: 38%; border: 1px solid #94a3b8; padding: 0; vertical-align: top;">
-                                        <table style="width: 100%; height: 100%; min-height: 148px; border-collapse: collapse; border: none;">
+                                    <td style="width: 38%; border: 1px solid #94a3b8; padding: 0; vertical-align: top; font-size: 10px;">
+                                        <table style="width: 100%; height: 100%; min-height: 140px; border-collapse: collapse; border: none;">
                                             <tr>
-                                                <td style="text-align: center; vertical-align: top; padding-top: 8px; font-weight: bold; color: #0f172a; height: 20px;">
+                                                <td style="text-align: center; vertical-align: top; padding-top: 8px; font-weight: bold; color: #0f172a; font-size: 10px; height: 20px;">
                                                     PT. DAKOTA LOGISTIK INDONESIA
                                                 </td>
                                             </tr>
                                             <tr>
-                                                <td style="text-align: center; vertical-align: bottom; padding-bottom: 6px;">
+                                                <td style="text-align: center; vertical-align: bottom; padding-bottom: 8px;">
                                                     <div style="font-weight: bold; text-decoration: underline; color: #0f172a; font-size: 10px; text-transform: uppercase;">
                                                         ${pejabatAccounting}
                                                     </div>
