@@ -145,6 +145,7 @@ function formatNomorInvoiceResmi(rawId, rawDate, fallbackAgenId = '') {
 const Invoice = () => {
     const { isDarkMode } = useDarkMode();
     const now = new Date();
+    const threeDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 3).toISOString().split('T')[0];
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
     const today = now.toISOString().split('T')[0];
 
@@ -215,7 +216,8 @@ const Invoice = () => {
         (!currentActiveAgen.id && !currentActiveAgen.nama);
 
     // Filter Utama Dashboard
-    const [startDate, setStartDate] = useState(firstDay);
+    // const [startDate, setStartDate] = useState(firstDay);
+    const [startDate, setStartDate] = useState(threeDaysAgo);
     const [endDate, setEndDate] = useState(today);
     const [bypassTanggal, setBypassTanggal] = useState(false);
     const [selectedCabang, setSelectedCabang] = useState(isHoldingUser ? '' : currentActiveAgen.id);
@@ -348,13 +350,10 @@ const Invoice = () => {
     const fetchOptions = async () => {
         try {
             const token = localStorage.getItem('token');
-            const [resCabang, resCust] = await Promise.all([
-                api.get('/gl/agen-ca?stt=', { headers: { Authorization: `Bearer ${token}` } }),
-                api.get('/gl/customers?limit=10000', { headers: { Authorization: `Bearer ${token}` } })
-                    .catch(() => api.get('/customer?aktif=Y', { headers: { Authorization: `Bearer ${token}` } }))
-            ]);
+            const resCabang = await api.get('/gl/agen-ca?stt=', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             setCabangList(resCabang.data?.data || []);
-            setCustList(resCust.data?.data || resCust.data || []);
         } catch (err) {
             console.error("Gagal load opsi filter:", err);
         }
@@ -365,7 +364,9 @@ const Invoice = () => {
         try {
             const token = localStorage.getItem('token');
             const ptId = localStorage.getItem('pt_id') || 'C';
-            let url = `/piutang/invoice?pt_id=${ptId}&bypass_tanggal=${bypassTanggal}`;
+            const limitRows = (searchInvoice || searchKwitansi || searchBTT || searchCustomer) ? 500 : 200;
+            let url = `/piutang/invoice?pt_id=${ptId}&bypass_tanggal=${bypassTanggal}&limit=${limitRows}`;
+            //       let url = `/piutang/invoice?pt_id=${ptId}&bypass_tanggal=${bypassTanggal}`;
 
             if (!bypassTanggal) {
                 url += `&start_date=${startDate}&end_date=${endDate}`;
@@ -1275,7 +1276,9 @@ const Invoice = () => {
                 Swal.fire('Popup Diblokir', 'Izinkan popup browser untuk mencetak dokumen ini.', 'warning');
                 return;
             }
+            printWindow.document.open();
             printWindow.document.write(`<html><head><title>Memuat Dokumen...</title></head><body style="font-family:sans-serif;text-align:center;padding-top:60px;"><h3>Sedang memuat dokumen cetak...</h3></body></html>`);
+            printWindow.document.close();
 
             try {
                 const token = localStorage.getItem('token');
@@ -1666,35 +1669,35 @@ const Invoice = () => {
                                         <table style="width: 100%; border-collapse: collapse; font-size: 9.5px;">
                                             <tr>
                                                 <td style="padding: 2.5px 5px; font-weight: bold; border-bottom: 1px solid #e2e8f0; color: #334155;">JUMLAH</td>
-                                                <td style="padding: 2.5px 5px; text-align: right; font-family: monospace; font-weight: bold; border-bottom: 1px solid #e2e8f0;">${totalBiayaKirim.toLocaleString('id-ID')}.00</td>
+                                                <td style="padding: 2.5px 5px; text-align: right;  font-weight: bold; border-bottom: 1px solid #e2e8f0;">${totalBiayaKirim.toLocaleString('id-ID')}.00</td>
                                             </tr>
                                             <tr>
                                                 <td style="padding: 1.5px 5px; border-bottom: 1px solid #e2e8f0; color: #64748b;">(-) DISKON</td>
-                                                <td style="padding: 1.5px 5px; text-align: right; font-family: monospace; border-bottom: 1px solid #e2e8f0;">0.00</td>
+                                                <td style="padding: 1.5px 5px; text-align: right;  border-bottom: 1px solid #e2e8f0;">0.00</td>
                                             </tr>
                                             <tr>
                                                 <td style="padding: 1.5px 5px; border-bottom: 1px solid #e2e8f0; color: #64748b;">(+) ASURANSI/LOLO</td>
-                                                <td style="padding: 1.5px 5px; text-align: right; font-family: monospace; border-bottom: 1px solid #e2e8f0;">0.00</td>
+                                                <td style="padding: 1.5px 5px; text-align: right;  border-bottom: 1px solid #e2e8f0;">0.00</td>
                                             </tr>
                                             <tr>
                                                 <td style="padding: 1.5px 5px; border-bottom: 1px solid #e2e8f0; color: #64748b;">(+) PACKING/BM/LAIN</td>
-                                                <td style="padding: 1.5px 5px; text-align: right; font-family: monospace; border-bottom: 1px solid #e2e8f0;">${packingDanLainDisplay.toLocaleString('id-ID')}.00</td>
+                                                <td style="padding: 1.5px 5px; text-align: right;  border-bottom: 1px solid #e2e8f0;">${packingDanLainDisplay.toLocaleString('id-ID')}.00</td>
                                             </tr>
                                             <tr style="background: #f8fafc;">
                                                 <td style="padding: 2.5px 5px; font-weight: bold; border-bottom: 1px solid #e2e8f0; color: #0f172a;">NILAI JUAL</td>
-                                                <td style="padding: 2.5px 5px; text-align: right; font-family: monospace; font-weight: bold; border-bottom: 1px solid #e2e8f0;">${nilaiJual.toLocaleString('id-ID')}.00</td>
+                                                <td style="padding: 2.5px 5px; text-align: right;  font-weight: bold; border-bottom: 1px solid #e2e8f0;">${nilaiJual.toLocaleString('id-ID')}.00</td>
                                             </tr>
                                             <tr>
                                                 <td style="padding: 1.5px 5px; border-bottom: 1px solid #e2e8f0; color: #64748b;">DPP</td>
-                                                <td style="padding: 1.5px 5px; text-align: right; font-family: monospace; border-bottom: 1px solid #e2e8f0;">${dpp.toLocaleString('id-ID')}.00</td>
+                                                <td style="padding: 1.5px 5px; text-align: right;  border-bottom: 1px solid #e2e8f0;">${dpp.toLocaleString('id-ID')}.00</td>
                                             </tr>
                                             <tr>
                                                 <td style="padding: 1.5px 5px; border-bottom: 1px solid #e2e8f0; color: #64748b;">PPN 1.1%</td>
-                                                <td style="padding: 1.5px 5px; text-align: right; font-family: monospace; border-bottom: 1px solid #e2e8f0;">${ppn.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                                <td style="padding: 1.5px 5px; text-align: right;  border-bottom: 1px solid #e2e8f0;">${ppn.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                             </tr>
                                             <tr style="background: #f1f5f9; font-weight: bold;">
                                                 <td style="padding: 3.5px 5px; color: #004b84; font-size: 10px;">TOTAL TAGIHAN</td>
-                                                <td style="padding: 3.5px 5px; text-align: right; font-family: monospace; font-weight: 900; font-size: 11px; color: #b91c1c;">Rp ${totalTagihan.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                                <td style="padding: 3.5px 5px; text-align: right;  font-weight: 900; font-size: 11px; color: #b91c1c;">${totalTagihan.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                             </tr>
                                         </table>
                                     </td>
