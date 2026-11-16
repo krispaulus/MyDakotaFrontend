@@ -329,7 +329,25 @@ const BttPrintPage = () => {
               <div className="grid grid-cols-2 gap-3 text-left">
                 <div className="p-1.5 bg-slate-50/50 border border-slate-200 rounded-lg space-y-0.5">
                   <div className="font-black text-red-600 text-[7.5px] uppercase">[ PENGIRIM ]</div>
-                  <div className="font-black text-slate-900 text-[9.5px] leading-tight">{bttData.bttt_asalname || ''}</div>
+                  <div className="font-black text-slate-900 text-[9.5px] leading-tight">
+                    {(() => {
+                      if (bttData.pengirim_cetak && bttData.pengirim_cetak.trim() !== '') {
+                        return bttData.pengirim_cetak;
+                      }
+                      const namaPengirim = (bttData.bttt_asalname || bttData.asal_name || '').trim();
+                      const namaCustomer = (bttData.customer_nama || '').trim();
+
+                      if (
+                        namaCustomer &&
+                        namaCustomer.toUpperCase() !== 'UMUM' &&
+                        namaPengirim &&
+                        namaPengirim.toUpperCase() !== namaCustomer.toUpperCase()
+                      ) {
+                        return `${namaPengirim} (${namaCustomer})`;
+                      }
+                      return namaPengirim || namaCustomer || '';
+                    })()}
+                  </div>
                   <div className="font-mono text-slate-700 font-bold text-[7.5px]">{bttData.bttt_asaltelp || ''}</div>
                   <div className="text-slate-500 uppercase font-medium text-[7.5px] leading-tight truncate">
                     {bttData.bttt_asalalamat || ''}

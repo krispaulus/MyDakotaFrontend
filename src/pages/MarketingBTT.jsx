@@ -63,6 +63,10 @@ const MarketingBTT = () => {
         const payloadFormatPrint = {
             pt_nama: item.pt_nama || ptNamaFix || "DAKOTA LOGISTIK INDONESIA (DLI)",
             bttt_tanggal: item.tanggal || item.bttt_tanggal,
+
+            customer_nama: item.customer_nama || "",
+            pengirim_cetak: item.pengirim_cetak || "",
+
             bttt_nosuratjalan: item.no_surat_jalan || item.nosuratjalan || item.bttt_nosuratjalan || "",
             bttt_ket: item.keterangan || item.ket || item.bttt_ket || "",
             bttt_isikiriman: item.nama_barang || item.isikiriman || item.bttt_isikiriman || "",
