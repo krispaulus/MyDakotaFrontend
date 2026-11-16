@@ -659,6 +659,7 @@ const Invoice = () => {
             `;
         }).join('');
 
+        printWindow.document.open();
         printWindow.document.write(`
             <!DOCTYPE html>
             <html>
@@ -1400,7 +1401,9 @@ const Invoice = () => {
             Swal.fire('Popup Diblokir', 'Izinkan popup browser untuk mencetak dokumen ini.', 'warning');
             return;
         }
+        printWindow.document.open();
         printWindow.document.write(`<html><head><title>Memuat Dokumen...</title></head><body style="font-family:sans-serif;text-align:center;padding-top:60px;"><h3>Sedang memuat dokumen cetak...</h3></body></html>`);
+        printWindow.document.close();
 
         try {
             const token = localStorage.getItem('token');
@@ -1722,6 +1725,7 @@ const Invoice = () => {
                 const grandTotal = Number(header.artih_total || (nilaiJual + ppn));
                 const textTerbilang = (terbilangIndonesia(Math.round(grandTotal)).trim() + ' RUPIAH').replace(/\s+/g, ' ');
 
+                printWindow.document.open();
                 printWindow.document.write(`
                     <!DOCTYPE html>
                     <html>
@@ -1900,6 +1904,7 @@ const Invoice = () => {
                 const grandTotal = Number(header.artih_total || (subtotalNilaiJual + ppn));
                 const textTerbilang = (terbilangIndonesia(Math.round(grandTotal)).trim() + ' RUPIAH').replace(/\s+/g, ' ');
 
+                printWindow.document.open();
                 printWindow.document.write(`
                     <!DOCTYPE html>
                     <html>
@@ -2118,6 +2123,7 @@ const Invoice = () => {
                     `;
                 }).join('');
 
+                printWindow.document.open();
                 printWindow.document.write(`
                     <!DOCTYPE html>
                     <html>
@@ -2241,6 +2247,7 @@ const Invoice = () => {
 
             const titleHeader = 'FAKTUR PENAGIHAN';
 
+            printWindow.document.open();
             printWindow.document.write(`
                 <!DOCTYPE html>
                 <html>
