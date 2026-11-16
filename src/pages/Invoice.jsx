@@ -477,7 +477,7 @@ const Invoice = () => {
             grandTotal += total;
 
             return `
-                <tr style="font-family: monospace; font-size: 10px;">
+                <tr style=" font-size: 10px;">
                     <td style="border: 1px solid #333; padding: 4px; text-align: center;">${idx + 1}</td>
                     <td style="border: 1px solid #333; padding: 4px;">${item.artih_id}</td>
                     <td style="border: 1px solid #333; padding: 4px;">${item.cust_name || item.artih_custname || '-'}</td>
@@ -633,7 +633,7 @@ const Invoice = () => {
 
 
             return `
-                <tr style="font-size: 10px; font-family: monospace;">
+                <tr style="font-size: 10px; ">
                     <td style="border:1px solid #444; padding:3px; text-align:center;">${idx + 1}</td>
                     <td style="border:1px solid #444; padding:3px; text-align:center; font-weight:bold; color:#0f172a;">${noFakturPajakDisplay}</td>
                     <td style="border:1px solid #444; padding:3px; font-weight:bold; color:#004b84;">${noKwitansiDisplay}</td>
@@ -1485,16 +1485,16 @@ const Invoice = () => {
                     return `
                         <tr style="font-size: 9.5px; font-family: Arial, sans-serif;">
                             <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center;">${idx + 1}</td>
-                            <td style="border: 1px solid #94a3b8; padding: 4px; font-family: monospace; font-weight: bold; color: #0284c7;">${b.bttt_id}</td>
+                            <td style="border: 1px solid #94a3b8; padding: 4px;  font-weight: bold; color: #0284c7;">${b.bttt_id}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center;">${formatTanggalIndonesia(b.bttt_tanggal)}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px;">${b.bttt_tujuankota || '-'}</td>
-                            <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center; font-family: monospace;">${kodepos}</td>
+                            <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center; ">${kodepos}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px; font-weight: 500;">${b.bttt_tujuannama || '-'}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center;">${b.bttt_nosuratjalan || '-'}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center; font-size: 8.5px; color: #0f172a;">${viaTransport}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px; color: #475569;">${rawKet}</td>
-                            <td style="border: 1px solid #94a3b8; padding: 4px; text-align: right; font-family: monospace;">${berat.toLocaleString('id-ID')}</td>
-                            <td style="border: 1px solid #94a3b8; padding: 4px; text-align: right; font-family: monospace; font-weight: normal;">${biayaKirim.toLocaleString('id-ID')}</td>
+                            <td style="border: 1px solid #94a3b8; padding: 4px; text-align: right; ">${berat.toLocaleString('id-ID')}</td>
+                            <td style="border: 1px solid #94a3b8; padding: 4px; text-align: right;  font-weight: normal;">${biayaKirim.toLocaleString('id-ID')}</td>
                         </tr>
                     `;
                 }).join('');
@@ -1583,17 +1583,17 @@ const Invoice = () => {
                                         <tr>
                                             <td style="padding: 1.5px 0; color: #475569;">Nomor Kwitansi</td>
                                             <td style="padding: 1.5px 0;">:</td>
-                                            <td style="padding: 1.5px 0; font-family: monospace;  color: #004b84;">${kwitansiDisplayNo || '-'}</td>
+                                            <td style="padding: 1.5px 0;   color: #004b84;">${kwitansiDisplayNo || '-'}</td>
                                         </tr>
                                         <tr>
                                             <td style="padding: 1.5px 0; color: #475569;">Nomor Invoice</td>
                                             <td style="padding: 1.5px 0;">:</td>
-                                            <td style="padding: 1.5px 0;  font-family: monospace; color: #0284c7;">${noInvoiceResmi}</td>
+                                            <td style="padding: 1.5px 0;   color: #0284c7;">${noInvoiceResmi}</td>
                                         </tr>
                                         <tr>
                                             <td style="padding: 1.5px 0; color: #475569;">Nomor Faktur Pajak</td>
                                             <td style="padding: 1.5px 0;">:</td>
-                                            <td style="padding: 1.5px 0; font-family: monospace;  color: #0f172a;">${noFakturPajak}</td>
+                                            <td style="padding: 1.5px 0;   color: #0f172a;">${noFakturPajak}</td>
                                         </tr>
                                         <tr>
                                             <td style="color:#334155; padding: 4px 0;">Tanggal Jatuh Tempo</td>
@@ -1646,7 +1646,7 @@ const Invoice = () => {
                                         <div style="font-weight: bold; color: #0f172a; font-size: 10px;">DAKOTA LOGISTIK INDONESIA PT</div>
                                         <div style="color: #334155; font-weight: bold; font-size: 9.5px;">BANK CENTRAL ASIA (BCA)</div>
                                         <div style="color: #334155; font-weight: bold; font-size: 9.5px;">KCU KALIMALANG</div>
-                                        <div style="font-weight: bold; font-family: monospace; color: #0284c7; font-size: 10.5px; margin-top: 4px;">
+                                        <div style="font-weight: bold; color: #0284c7; font-size: 10.5px; margin-top: 4px;">
                                             NO REKENING : 2303937226
                                         </div>
                                     </td>
@@ -1763,7 +1763,7 @@ const Invoice = () => {
                                 <tr>
                                     <td style="width: 20%; color:#334155; padding: 4px 0;">Nomor Kwitansi</td>
                                     <td style="width: 3%; text-align: center;">:</td>
-                                    <td style="width: 77%; font-family: monospace; font-weight: bold; font-size: 12.5px; color:#004b84;">
+                                    <td style="width: 77%;  font-weight: bold; font-size: 12.5px; color:#004b84;">
                                         ${kwitansiDisplayNo || '-'}
                                     </td>
                                 </tr>
@@ -1787,7 +1787,7 @@ const Invoice = () => {
                                     <td style="padding-top: 6px; color:#1e293b;">
                                         <div style="font-weight: 800; color:#0f172a;">BIAYA PENGIRIMAN BARANG</div>
                                         <div style="color: #475569; font-size: 11px; margin-top: 2px;">
-                                            Sesuai Faktur Penagihan : <span style="font-family: monospace; font-weight: bold; color:#0284c7;">${noInvoiceResmi}</span>
+                                            Sesuai Faktur Penagihan : <span style=" font-weight: bold; color:#0284c7;">${noInvoiceResmi}</span>
                                         </div>
                                     </td>
                                     <tr>
@@ -1810,7 +1810,7 @@ const Invoice = () => {
                             <div style="margin-top: 20px; display: flex; align-items: center;">
                                 <div style="border: 2px solid #004b84; background: #f0fdf4; border-radius: 8px; padding: 10px 20px; min-width: 250px;">
                                     <div style="font-size: 9.5px; color:#15803d; font-weight: 800; text-transform: uppercase; margin-bottom: 2px;">JUMLAH TAGIHAN :</div>
-                                    <div style="font-family: monospace; font-size: 23px; font-weight: 900; color: #0f172a; letter-spacing: 0.5px;">
+                                    <div style=" font-size: 23px; font-weight: 900; color: #0f172a; letter-spacing: 0.5px;">
                                         Rp ${grandTotal.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </div>
                                 </div>
@@ -1821,7 +1821,7 @@ const Invoice = () => {
                                 <div style="font-weight:bold; color:#004b84; margin-bottom: 2px;">Pembayaran Transfer ke:</div>
                                 <div style="font-weight:bold; color:#0f172a;">DAKOTA LOGISTIK INDONESIA PT</div>
                                 <div style="color:#334155;">BANK CENTRAL ASIA (BCA) - KCU KALIMALANG</div>
-                                <div style="font-weight:900; font-family: monospace; color:#0284c7; font-size: 11.5px; margin-top: 2px;">
+                                <div style="font-weight:900;  color:#0284c7; font-size: 11.5px; margin-top: 2px;">
                                     NO REKENING : 2303937226
                                 </div>
                             </div>
@@ -1878,7 +1878,7 @@ const Invoice = () => {
                     return `
                         <tr style="font-size: 9.5px; font-family: Arial, sans-serif;">
                             <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center;">${idx + 1}</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 5px 4px; font-family: monospace; font-weight: bold; color: #0284c7;">${b.bttt_id}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 4px;  font-weight: bold; color: #0284c7;">${b.bttt_id}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center;">${String(b.bttt_tanggal || '').substring(0, 10)}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 5px 4px; text-align: center;">DKI JAKARTA</td>
                             <td style="border: 1px solid #cbd5e1; padding: 5px 4px;">${b.bttt_tujuankota || '-'}</td>
@@ -1886,13 +1886,13 @@ const Invoice = () => {
                             <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center;">${b.bttt_nosuratjalan || '-'}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center;">-</td>
                             <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center;">${(b.bttt_via || '-').toUpperCase()}</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center; font-family: monospace;">${koli}</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 5px 4px; text-align: right; font-family: monospace;">${berat.toLocaleString('id-ID')}</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 5px 4px; text-align: right; font-family: monospace;">0</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 5px 4px; text-align: right; font-family: monospace;">${beratVol}</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center; font-family: monospace;">-</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center; font-family: monospace;">-</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 5px 4px; text-align: right; font-family: monospace; font-weight: 600;">${biayaKirimBersih.toLocaleString('id-ID')}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center; ">${koli}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 4px; text-align: right; ">${berat.toLocaleString('id-ID')}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 4px; text-align: right; ">0</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 4px; text-align: right; ">${beratVol}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center; ">-</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center; ">-</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 5px 4px; text-align: right;  font-weight: 600;">${biayaKirimBersih.toLocaleString('id-ID')}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 5px 4px; font-size: 8.5px; color: #475569;">${b.bttt_namabarang || '-'}</td>
                         </tr>
                     `;
@@ -1958,12 +1958,12 @@ const Invoice = () => {
                                     <tr>
                                         <td style="padding: 1px 0; color:#475569;">Nomor Invoice</td>
                                         <td style="padding: 1px 0;">:</td>
-                                        <td style="padding: 1px 0; font-weight: 800; font-family: monospace; color:#0284c7;">${noInvoiceResmi}</td>
+                                        <td style="padding: 1px 0; font-weight: 800;  color:#0284c7;">${noInvoiceResmi}</td>
                                     </tr>
                                     <tr>
                                         <td style="padding: 1px 0; color:#475569;">Nomor Faktur Pajak</td>
                                         <td style="padding: 1px 0;">:</td>
-                                        <td style="padding: 1px 0; font-family: monospace; font-weight: 600;">${noFakturPajak}</td>
+                                        <td style="padding: 1px 0;  font-weight: 600;">${noFakturPajak}</td>
                                     </tr>
                                     <tr>
                                         <td style="color:#334155; padding: 4px 0;">Tanggal Jatuh Tempo</td>
@@ -2020,31 +2020,31 @@ const Invoice = () => {
                                         <span style="color:#64748b;">Terbilang: </span> <span style="font-weight:bold; font-style:italic; color:#0f172a;">${textTerbilang}</span>
                                     </td>
                                     <td colspan="3" style="border: 1px solid #94a3b8; padding: 3px 6px; font-size: 9.5px; color:#64748b; border-bottom: 1px solid #cbd5e1;">Diskon</td>
-                                    <td style="border: 1px solid #94a3b8; padding: 3px 6px; text-align: right; font-family: monospace; font-size: 9.5px; border-bottom: 1px solid #cbd5e1;">${totalDiskon.toLocaleString('id-ID')}.00</td>
+                                    <td style="border: 1px solid #94a3b8; padding: 3px 6px; text-align: right;  font-size: 9.5px; border-bottom: 1px solid #cbd5e1;">${totalDiskon.toLocaleString('id-ID')}.00</td>
                                 </tr>
                                 <tr>
                                     <td colspan="3" style="border: 1px solid #94a3b8; padding: 3px 6px; font-weight: bold; font-size: 9.5px; color:#334155; border-bottom: 1px solid #cbd5e1;">JUMLAH BIAYA KIRIM</td>
-                                    <td style="border: 1px solid #94a3b8; padding: 3px 6px; text-align: right; font-family: monospace; font-weight: bold; font-size: 9.5px; border-bottom: 1px solid #cbd5e1;">${totalBiayaKirim.toLocaleString('id-ID')}.00</td>
+                                    <td style="border: 1px solid #94a3b8; padding: 3px 6px; text-align: right;  font-weight: bold; font-size: 9.5px; border-bottom: 1px solid #cbd5e1;">${totalBiayaKirim.toLocaleString('id-ID')}.00</td>
                                 </tr>
                                 <tr>
                                     <td colspan="3" style="border: 1px solid #94a3b8; padding: 3px 6px; font-size: 9.5px; color:#64748b; border-bottom: 1px solid #cbd5e1;">Ditambah Packing</td>
-                                    <td style="border: 1px solid #94a3b8; padding: 3px 6px; text-align: right; font-family: monospace; font-size: 9.5px; border-bottom: 1px solid #cbd5e1;">${totalPacking.toLocaleString('id-ID')}.00</td>
+                                    <td style="border: 1px solid #94a3b8; padding: 3px 6px; text-align: right;  font-size: 9.5px; border-bottom: 1px solid #cbd5e1;">${totalPacking.toLocaleString('id-ID')}.00</td>
                                 </tr>
                                 <tr style="background:#f8fafc;">
                                     <td colspan="3" style="border: 1px solid #94a3b8; padding: 3px 6px; font-weight: bold; font-size: 9.5px; color:#0f172a; border-bottom: 1px solid #cbd5e1;">NILAI JUAL</td>
-                                    <td style="border: 1px solid #94a3b8; padding: 3px 6px; text-align: right; font-family: monospace; font-weight: bold; border-bottom: 1px solid #cbd5e1;">${subtotalNilaiJual.toLocaleString('id-ID')}.00</td>
+                                    <td style="border: 1px solid #94a3b8; padding: 3px 6px; text-align: right;  font-weight: bold; border-bottom: 1px solid #cbd5e1;">${subtotalNilaiJual.toLocaleString('id-ID')}.00</td>
                                 </tr>
                                 <tr>
                                     <td colspan="3" style="border: 1px solid #94a3b8; padding: 3px 6px; font-size: 9.5px; color:#64748b; border-bottom: 1px solid #cbd5e1;">DPP</td>
-                                    <td style="border: 1px solid #94a3b8; padding: 3px 6px; text-align: right; font-family: monospace; border-bottom: 1px solid #cbd5e1;">${dpp.toLocaleString('id-ID')}.00</td>
+                                    <td style="border: 1px solid #94a3b8; padding: 3px 6px; text-align: right;  border-bottom: 1px solid #cbd5e1;">${dpp.toLocaleString('id-ID')}.00</td>
                                 </tr>
                                 <tr>
                                     <td colspan="3" style="border: 1px solid #94a3b8; padding: 3px 6px; font-size: 9.5px; color:#64748b; border-bottom: 1px solid #cbd5e1;">PPN 1.1%</td>
-                                    <td style="border: 1px solid #94a3b8; padding: 3px 6px; text-align: right; font-family: monospace; border-bottom: 1px solid #cbd5e1;">${ppn.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                    <td style="border: 1px solid #94a3b8; padding: 3px 6px; text-align: right;  border-bottom: 1px solid #cbd5e1;">${ppn.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                 </tr>
                                 <tr style="background:#f1f5f9; font-weight: bold;">
                                     <td colspan="3" style="border: 1px solid #94a3b8; padding: 4px 6px; color:#004b84; font-size: 10px;">TOTAL TAGIHAN</td>
-                                    <td style="border: 1px solid #94a3b8; padding: 4px 6px; text-align: right; font-family: monospace; font-weight: 900; font-size: 11px; color:#b91c1c;">Rp ${grandTotal.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                    <td style="border: 1px solid #94a3b8; padding: 4px 6px; text-align: right;  font-weight: 900; font-size: 11px; color:#b91c1c;">${grandTotal.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -2104,20 +2104,20 @@ const Invoice = () => {
                         <tr style="font-size: 9px; font-family: Arial, sans-serif;">
                             <td style="border: 1px solid #cbd5e1; padding: 4px 2px; text-align: center;">${idx + 1}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 4px 3px; text-align: center;">${String(header.artih_tanggal || '').substring(0, 10)}</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 4px 4px; font-family: monospace; font-weight: bold; color: #0284c7;">${noInvoiceResmi}</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 4px 4px; font-family: monospace;">${kwitansiDisplayNo || '-'}</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 4px 4px; font-family: monospace; font-weight: bold; color: #0f172a;">${b.bttt_id}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 4px;  font-weight: bold; color: #0284c7;">${noInvoiceResmi}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 4px; ">${kwitansiDisplayNo || '-'}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 4px;  font-weight: bold; color: #0f172a;">${b.bttt_id}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 4px 3px; text-align: center;">${tglKirim}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 4px 3px;">${b.bttt_asalname || header.cust_name || '-'}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 4px 3px; text-align: center;">${b.no_skb || b.bttt_nosuratjalan || '-'}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 4px 2px; text-align: center;">LAND REGULER</td>
                             <td style="border: 1px solid #cbd5e1; padding: 4px 3px;">${b.bttt_tujuannama || b.bttt_tujuankota || '-'}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 4px 2px; text-align: center;">REGULER</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 4px 2px; text-align: center; font-family: monospace;">${koli}</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 4px 3px; text-align: right; font-family: monospace;">${volume}</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 4px 3px; text-align: right; font-family: monospace;">${berat.toLocaleString('id-ID')}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 2px; text-align: center; ">${koli}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 3px; text-align: right; ">${volume}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 3px; text-align: right; ">${berat.toLocaleString('id-ID')}</td>
                             <td colspan="4" style="border: 1px solid #cbd5e1; text-align: center;">-</td>
-                            <td style="border: 1px solid #cbd5e1; padding: 4px 4px; text-align: right; font-family: monospace; font-weight: bold; color: #0f172a;">${harga.toLocaleString('id-ID')}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 4px 4px; text-align: right;  font-weight: bold; color: #0f172a;">${harga.toLocaleString('id-ID')}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 4px 3px; font-size: 8.5px; color: #475569;">${b.bttt_namabarang || '-'}</td>
                         </tr>
                     `;
@@ -2225,7 +2225,7 @@ const Invoice = () => {
                 grandTotal += sub;
 
                 return `
-                    <tr style="font-family: monospace; font-size: 10px;">
+                    <tr style=" font-size: 10px;">
                         <td style="border: 1px solid #333; padding: 4px; text-align: center;">${idx + 1}</td>
                         <td style="border: 1px solid #333; padding: 4px;">${header.artih_id || '-'}</td>
                         <td style="border: 1px solid #333; padding: 4px;">${header.cust_name || header.artih_custname || '-'}</td>
@@ -2339,7 +2339,7 @@ const Invoice = () => {
             Nomor Kwitansi: ${item.artih_nokw || '-'}\\par
             Pelanggan     : ${item.cust_name || item.artih_custname}\\par
             Tanggal       : ${String(item.artih_tanggal || '').substring(0, 10)}\\par
-            Total Tagihan : Rp ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par\\par
+            Total Tagihan : ${Number(item.artih_total || 0).toLocaleString('id-ID')}\\par\\par
             \\pard\\qc ( Lembar Asli Untuk Pembawa Tagihan )\\par
             }`;
 
@@ -2666,10 +2666,10 @@ const Invoice = () => {
                         .a4-sheet { width: 100%; max-width: 850px; margin: 0 auto 14px auto; height: 286mm; display: flex; flex-direction: column; justify-content: space-between; }
                         .btt-card { border: 1px solid #cbd5e1; border-radius: 12px; padding: 8px 10px; height: 91mm; position: relative; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; background: #fff; page-break-inside: avoid; }
                         .cut-line { border-top: 1px dashed #94a3b8; position: relative; margin: 2px 0; text-align: center; }
-                        .cut-line span { position: relative; top: -6px; background: #fff; padding: 0 8px; font-family: monospace; font-size: 6.5px; color: #94a3b8; }
+                        .cut-line span { position: relative; top: -6px; background: #fff; padding: 0 8px;  font-size: 6.5px; color: #94a3b8; }
                         .stamp-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 20; }
-                        .stamp-dg { transform: rotate(-16deg); border: 5px solid #d97706; border-radius: 14px; padding: 8px 28px; text-align: center; color: #d97706; font-family: monospace; font-weight: 900; opacity: 0.28; }
-                        .stamp-return { transform: rotate(-16deg); border: 4px solid #dc2626; border-radius: 14px; padding: 8px 24px; text-align: center; color: #dc2626; font-family: monospace; font-weight: 900; opacity: 0.28; }
+                        .stamp-dg { transform: rotate(-16deg); border: 5px solid #d97706; border-radius: 14px; padding: 8px 28px; text-align: center; color: #d97706;  font-weight: 900; opacity: 0.28; }
+                        .stamp-return { transform: rotate(-16deg); border: 4px solid #dc2626; border-radius: 14px; padding: 8px 24px; text-align: center; color: #dc2626;  font-weight: 900; opacity: 0.28; }
                         @media print { .no-print { display: none !important; } body { padding: 0; } .a4-sheet { margin: 0 auto; } }
                     </style>
                 </head>
