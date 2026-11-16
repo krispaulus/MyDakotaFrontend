@@ -161,6 +161,8 @@ const UploadKimiaFarmaCSV = () => {
 
     // 🟢 2. AKSI PROSES SIMPAN / PRINT SIMPAN & CETAK BTT RESMI (GAMBAR 2)
     const handleEksekusiSimpan = async (autoPrint = false) => {
+        if (loadingUpload) return; // Cegah double-click
+
         if (!selectedCustomer.id) {
             Swal.fire('Peringatan', 'Silakan pilih Customer Principal terlebih dahulu!', 'warning');
             return;
@@ -170,6 +172,19 @@ const UploadKimiaFarmaCSV = () => {
             Swal.fire('Peringatan', 'Silakan pilih file CSV yang ingin diunggah!', 'warning');
             return;
         }
+
+        const confirm = await Swal.fire({
+            title: 'Konfirmasi Upload CSV',
+            html: `Upload <b>${fullRowsData.length} baris</b> pesanan dari file <b>${selectedFile.name}</b> untuk <b>${selectedCustomer.name}</b>?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#004b84',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Ya, Proses Upload',
+            cancelButtonText: 'Batal'
+        });
+
+        if (!confirm.isConfirmed) return;
 
         const formData = new FormData();
         formData.append('file', selectedFile);
