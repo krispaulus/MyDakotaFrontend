@@ -1517,6 +1517,7 @@ const Invoice = () => {
                 const customerFullName = `${header.cust_name || ''} ${header.artih_custname || ''} ${header.CustName || ''}`.toUpperCase();
                 const isCustomerMerck = customerFullName.includes('MERCK');
 
+                printWindow.document.open();
                 printWindow.document.write(`
                     <!DOCTYPE html>
                     <html>
@@ -1732,8 +1733,8 @@ const Invoice = () => {
                     <head>
                         <title>KWITANSI - ${kwitansiDisplayNo || noInvoiceResmi}</title>
                         <style>
-                            @page { size: A4 landscape; margin: 10mm 15mm; }
-                            body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; color: #1e293b; margin: 0; padding: 10px 15px; }
+                            @page { size: A4 portrait; margin: 12mm 14mm; }
+                            body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; color: #1e293b; margin: 0; padding: 10px 12px; }
                             .no-print { margin-bottom: 15px; text-align: right; }
                             .btn-print { padding: 7px 18px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; color: white; margin: 0 4px; font-size: 11px; text-transform: uppercase; }
                             @media print { .no-print { display: none !important; } }
