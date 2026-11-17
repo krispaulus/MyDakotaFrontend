@@ -859,25 +859,52 @@ const Invoice = () => {
         const token = localStorage.getItem('token');
         const ptId = localStorage.getItem('pt_id') || 'C';
 
+        // Helper muat ulang detail resmi invoice yang baru disimpan/diupdate agar tabel atas 100% sinkron dengan DB
+        const syncSavedInvoiceFromDB = async (invId, fallbackChosen = []) => {
+            try {
+                const detailRes = await api.get(`/piutang/invoice/detail?id=${encodeURIComponent(invId)}&pt_id=${ptId}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const hdr = detailRes.data?.data?.header || detailRes.data?.header;
+                const btts = detailRes.data?.data?.btt_list || detailRes.data?.btt_list || [];
+
+                if (hdr) {
+                    setActiveInvoice(hdr);
+                    setSavedInvoiceId(hdr.artih_id || invId);
+                    if (hdr.artih_nokw) {
+                        setSavedKwitansiNo(String(hdr.artih_nokw).trim().replace(/\/OTA\//g, '/001/'));
+                    }
+                }
+                if (btts.length > 0) {
+                    setPersistedSelectedBtts(btts);
+                    setNewInvoiceForm(prev => ({
+                        ...prev,
+                        selected_btts: btts.map(b => String(b.bttt_id).trim())
+                    }));
+                } else if (fallbackChosen.length > 0) {
+                    setPersistedSelectedBtts(fallbackChosen);
+                }
+            } catch (syncErr) {
+                console.warn("Gagal sync detail invoice setelah simpan:", syncErr);
+                if (fallbackChosen.length > 0) {
+                    setPersistedSelectedBtts(fallbackChosen);
+                }
+            }
+        };
+
         // 🌟 1. MODE EDIT: Jika sedang mengedit invoice yang sudah tersimpan
         if (savedInvoiceId || activeInvoice?.artih_id) {
             const currentInvId = savedInvoiceId || activeInvoice?.artih_id;
 
-            // Validasi: Jangan biarkan invoice kosong tanpa BTT
-            if (persistedSelectedBtts.length === 0 && newInvoiceForm.selected_btts.length === 0) {
-                Swal.fire('Peringatan', 'Invoice harus memiliki minimal satu nomor resi BTT!', 'warning');
-                return;
-            }
-
-            // Ambil daftar ID BTT baru yang belum ada di persistedSelectedBtts
             const newlyAddedIds = newInvoiceForm.selected_btts.filter(id =>
                 !persistedSelectedBtts.some(b => String(b.bttt_id).trim() === String(id).trim())
             );
 
-            // Ambil objek lengkap BTT baru dari tabel bawah agar langsung tampil di tabel atas
-            const newlyAddedObjects = unbilledBTTList.filter(b =>
-                newlyAddedIds.some(id => String(id).trim() === String(b.bttt_id).trim())
-            );
+            const remainingCount = persistedSelectedBtts.length - removedBttIds.length + newlyAddedIds.length;
+            if (remainingCount <= 0) {
+                Swal.fire('Peringatan', 'Invoice harus memiliki minimal satu nomor resi BTT!', 'warning');
+                return;
+            }
 
             try {
                 const res = await api.post(`/piutang/invoice/update?pt_id=${ptId}`, {
@@ -900,15 +927,10 @@ const Invoice = () => {
                     showConfirmButton: false
                 });
 
-                // 🌟 Update tabel atas (BTT YANG SUDAH DIPILIH) secara langsung!
-                if (newlyAddedObjects.length > 0) {
-                    setPersistedSelectedBtts(prev => [...prev, ...newlyAddedObjects]);
-                }
-
                 setRemovedBttIds([]);
+                await syncSavedInvoiceFromDB(currentInvId);
                 fetchInvoiceList();
 
-                // Muat ulang daftar unbilled BTT di tabel bawah
                 loadUnbilledBTTByDate(
                     newInvoiceForm.artih_custid,
                     bttStartDate,
@@ -925,12 +947,13 @@ const Invoice = () => {
         }
 
         // 🌟 2. MODE BUAT BARU: Jika pembuatan invoice baru dari awal
+        const cleanSelectedIds = [...new Set(newInvoiceForm.selected_btts.map(id => String(id).trim()).filter(Boolean))];
         const currentChosen = unbilledBTTList.filter(b => {
             const cleanId = String(b.bttt_id || '').trim();
-            return newInvoiceForm.selected_btts.some(id => String(id).trim() === cleanId);
+            return cleanSelectedIds.includes(cleanId);
         });
 
-        if (newInvoiceForm.selected_btts.length === 0 && persistedSelectedBtts.length === 0) {
+        if (cleanSelectedIds.length === 0) {
             Swal.fire('Peringatan', 'Pilih minimal satu nomor resi BTT untuk difakturkan!', 'warning');
             return;
         }
@@ -951,7 +974,7 @@ const Invoice = () => {
                 artih_jenis: newInvoiceForm.artih_jenis,
                 artih_fktpajak: newInvoiceForm.artih_fktpajak || '010.',
                 artih_keterangan: newInvoiceForm.artih_keterangan,
-                btt_list: newInvoiceForm.selected_btts,
+                btt_list: cleanSelectedIds,
                 format_meta: {
                     corp: 'DLI',
                     agen: agenKode,
@@ -965,8 +988,8 @@ const Invoice = () => {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            const newInvoiceId = res.data?.invoice_id || res.data?.id;
-            const newNoKW = res.data?.nokw || res.data?.artih_nokw;
+            const newInvoiceId = res.data?.invoice_id || res.data?.id || res.data?.data?.artih_id;
+            const newNoKW = res.data?.no_kw || res.data?.nokw || res.data?.artih_nokw;
 
             Swal.fire({
                 title: 'BERHASIL DISIMPAN!',
@@ -976,10 +999,15 @@ const Invoice = () => {
                 showConfirmButton: false
             });
 
-            setSavedInvoiceId(newInvoiceId);
+            if (newInvoiceId) setSavedInvoiceId(newInvoiceId);
             if (newNoKW) setSavedKwitansiNo(newNoKW);
             setPersistedSelectedBtts(currentChosen);
             setRemovedBttIds([]);
+
+            // Tarik ulang detail resmi dari DB agar tabel atas langsung menampilkan resi yang tersimpan
+            if (newInvoiceId) {
+                await syncSavedInvoiceFromDB(newInvoiceId, currentChosen);
+            }
 
             fetchInvoiceList();
             loadUnbilledBTTByDate(

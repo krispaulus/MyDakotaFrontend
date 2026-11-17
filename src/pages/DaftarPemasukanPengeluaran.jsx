@@ -241,25 +241,61 @@ const DaftarPemasukanPengeluaran = () => {
 
     // Definisi Kolom Tabel
     const columns = [
-        { header: 'Kode', accessor: 'item_id', render: (item) => <span className="font-mono font-bold text-sky-600">{item.item_id}</span> },
-        { header: 'Kategori', accessor: 'cat_name', render: (item) => <span className="font-bold text-slate-700">{item.cat_name || '-'}</span> },
-        { header: 'Nama Item', accessor: 'item_name', render: (item) => <span className="font-bold uppercase text-slate-800">{item.item_name}</span> },
+        {
+            header: 'Kode',
+            accessor: 'item_id',
+            render: (item) => <span className="font-mono font-bold text-sky-600">{item.item_id || item.Item_ID}</span>
+        },
+        {
+            header: 'Kategori',
+            accessor: 'cat_name',
+            render: (item) => <span className="font-bold text-slate-700">{item.cat_name || item.Cat_Name || '-'}</span>
+        },
+        {
+            header: 'Nama Item',
+            accessor: 'item_name',
+            render: (item) => <span className="font-bold uppercase text-slate-800">{item.item_name || item.Item_Name}</span>
+        },
         {
             header: 'Status',
             accessor: 'item_status',
-            render: (item) => item.item_status === 'A' ? (
+            render: (item) => (item.item_status || item.Item_Status) === 'A' ? (
                 <span className="bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full text-xs font-bold">AKTIVA TETAP</span>
             ) : (
                 <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full text-xs font-bold">LAIN-LAIN</span>
             )
         },
-        { header: 'No. Acc Utama', accessor: 'item_own_caid', render: (item) => <span className="font-mono font-bold text-slate-900">{item.item_own_caid || '-'}</span> },
-        { header: 'No. Acc Dep', accessor: 'item_dep_caid', render: (item) => <span className="font-mono font-slate-600">{item.item_dep_caid || '-'}</span> },
-        { header: 'No. Acc Kas', accessor: 'item_cash_caid', render: (item) => <span className="font-mono font-slate-600">{item.item_cash_caid || '-'}</span> },
+        {
+            header: 'No. Acc Utama',
+            accessor: 'item_own_caid',
+            render: (item) => (
+                <span className="font-mono font-bold text-slate-900">
+                    {item.item_own_caid || item.item_owncaid || item.Item_ownCAID || '-'}
+                </span>
+            )
+        },
+        {
+            header: 'No. Acc Dep',
+            accessor: 'item_dep_caid',
+            render: (item) => (
+                <span className="font-mono font-slate-600">
+                    {item.item_dep_caid || item.item_depcaid || item.Item_depCAID || '-'}
+                </span>
+            )
+        },
+        {
+            header: 'No. Acc Kas',
+            accessor: 'item_cash_caid',
+            render: (item) => (
+                <span className="font-mono font-slate-600">
+                    {item.item_cash_caid || item.item_cashcaid || item.Item_cashCAID || '-'}
+                </span>
+            )
+        },
         {
             header: 'Aktif',
             accessor: 'item_aktif_yn',
-            render: (item) => item.item_aktif_yn === 'Y' ? (
+            render: (item) => (item.item_aktif_yn || item.item_aktifyn || item.Item_AktifYN) === 'Y' ? (
                 <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md text-[11px] font-bold">YA</span>
             ) : (
                 <span className="bg-rose-100 text-rose-700 px-2 py-0.5 rounded-md text-[11px] font-bold">TIDAK</span>
