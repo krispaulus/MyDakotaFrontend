@@ -416,13 +416,15 @@ const Invoice = () => {
     // MODAL BUAT INVOICE BARU (LANGKAH 1)
     // =========================================================================
     const handleAdd = () => {
-        // 🎯 1. KOSONGKAN STATE JURNAL AGAR TIDAK TERBAWA DARI INVOICE SEBELUMNYA
         setPostedJournalId('');
-
         setActiveInvoice(null);
         setSavedInvoiceId(null);
         setSavedKwitansiNo(null);
         setPersistedSelectedBtts([]);
+        setUnbilledBTTList([]);
+        setSearchCustQuery('');
+        setRemovedBttIds([]);
+        setBttBypassTanggal(false);
 
         setNewInvoiceForm({
             artih_tanggal: today,
@@ -437,11 +439,9 @@ const Invoice = () => {
             selected_btts: []
         });
 
-        setIsAddModalOpen(true);
         setAddStep(1);
-        setRemovedBttIds([]);
+        setIsAddModalOpen(true);
     };
-
     // =========================================================================
     // 🖨️ CETAK SUMMARY REKAP FAKTUR
     // =========================================================================
@@ -750,22 +750,22 @@ const Invoice = () => {
     const loadUnbilledBTTByDate = async (custId, start, end, bypass, displayType, custNameParam, jenisParam) => {
         if (!custId) return;
         setLoadingUnbilled(true);
+        setUnbilledBTTList([]); // Kosongkan daftar lama agar tidak pernah nyampur
         try {
             const token = localStorage.getItem('token');
             const ptId = localStorage.getItem('pt_id') || 'C';
-
             const activeName = custNameParam || newInvoiceForm.artih_custname || '';
             const activeJenis = jenisParam || newInvoiceForm.artih_jenis || 'K';
 
             let url = `/piutang/invoice/unbilled-btt?pt_id=${ptId}&cust_id=${encodeURIComponent(custId)}&cust_name=${encodeURIComponent(activeName)}&jenis=${activeJenis}&display_type=${displayType || 'KREDIT'}`;
-
             url += `&bypass_tanggal=${bypass}`;
             if (!bypass && start && end) {
                 url += `&start_date=${start}&end_date=${end}`;
             }
 
             const res = await api.get(url, { headers: { Authorization: `Bearer ${token}` } });
-            setUnbilledBTTList(res.data?.data || []);
+            const rawList = res.data?.data || [];
+            setUnbilledBTTList(rawList);
         } catch (err) {
             console.error("Gagal load unbilled BTT:", err);
             setUnbilledBTTList([]);
@@ -947,7 +947,13 @@ const Invoice = () => {
         }
 
         // 🌟 2. MODE BUAT BARU: Jika pembuatan invoice baru dari awal
-        const cleanSelectedIds = [...new Set(newInvoiceForm.selected_btts.map(id => String(id).trim()).filter(Boolean))];
+        const validUnbilledSet = new Set(unbilledBTTList.map(b => String(b.bttt_id || '').trim()));
+        const cleanSelectedIds = [...new Set(
+            newInvoiceForm.selected_btts
+                .map(id => String(id).trim())
+                .filter(id => id && validUnbilledSet.has(id))
+        )];
+
         const currentChosen = unbilledBTTList.filter(b => {
             const cleanId = String(b.bttt_id || '').trim();
             return cleanSelectedIds.includes(cleanId);
@@ -4465,27 +4471,7 @@ const Invoice = () => {
                 isAddDisabled={false}
                 hideAddButton={false}
                 onFilter={() => setShowFilter(prev => !prev)}
-                onAdd={() => {
-                    const currentAgen = getActiveAgen();
-                    setSavedInvoiceId(null);
-                    setSavedKwitansiNo(null);
-                    setPersistedSelectedBtts([]); // <-- Tambahkan reset ini
-                    setNewInvoiceForm({
-                        artih_tanggal: today,
-                        artih_custid: '',
-                        artih_custname: '',
-                        artih_agenid: currentAgen.id,
-                        artih_agenname: currentAgen.nama,
-                        artih_jenis: 'K',
-                        artih_fktpajak: '010.',
-                        artih_keterangan: '',
-                        selected_btts: []
-                    });
-                    setAddStep(1);
-                    setUnbilledBTTList([]);
-                    setBttBypassTanggal(true);
-                    setIsAddModalOpen(true);
-                }}
+                onAdd={handleAdd}
             />
 
             {addModalElement && ReactDOM.createPortal(addModalElement, modalRoot)}
