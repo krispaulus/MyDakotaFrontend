@@ -99,6 +99,30 @@ const KasMasukKeluar = () => {
     const [selectedBank, setSelectedBank] = useState(null);
     const [showBankDropdown, setShowBankDropdown] = useState(false);
 
+    // State Sumber Dana E-TOLL (sesuai gl_t_cashbank_e.asp)
+    const [etollSearch, setEtollSearch] = useState('');
+    const [etollOptions, setEtollOptions] = useState([]);
+    const [selectedEtoll, setSelectedEtoll] = useState(null);
+    const [showEtollDropdown, setShowEtollDropdown] = useState(false);
+
+    // State Realisasi BPLK (sesuai gl_t_cashbank_e_t_r.asp)
+    const [realisasiData, setRealisasiData] = useState(null);
+    const [loadingRealisasi, setLoadingRealisasi] = useState(false);
+    const [tglPostingKomisi, setTglPostingKomisi] = useState(today);
+    const [tglPostingRealisasi, setTglPostingRealisasi] = useState(today);
+    const [komisiBaruList, setKomisiBaruList] = useState([]);
+    const [komisiForm, setKomisiForm] = useState({
+        no: '',
+        noBTT: '',
+        layanan: '',
+        beratBTT: '',
+        tarif: '',
+        biayaKirim: '',
+        asalKota: '',
+        tujuanKota: '',
+        komisi: ''
+    });
+
     // 🌟 STATE ALUR LENGKAP BPLK
     const [bplkStep, setBplkStep] = useState(1); // 1 = Input ST, 2 = Detail BPLK & Riwayat Kas
     const [bplkData, setBplkData] = useState(null);
@@ -470,24 +494,26 @@ const KasMasukKeluar = () => {
         setSelectedBank(null);
         setBankSearch('');
         setShowBankDropdown(false);
+        setSelectedEtoll(null);
+        setEtollSearch('');
+        setShowEtollDropdown(false);
         setIsPostingModalOpen(true);
     };
 
-    const handleSearchBank = async (query = '') => {
-        setBankSearch(query);
-        setShowBankDropdown(true);
+    const handleSearchEtoll = async (query = '') => {
+        setEtollSearch(query);
+        setShowEtollDropdown(true);
         try {
             const token = localStorage.getItem('token');
             const ptId = localStorage.getItem('pt_id') || localStorage.getItem('selected_pt') || 'C';
-
-            const res = await api.get(`/gl/bank-data?search=${encodeURIComponent(query)}&pt_id=${encodeURIComponent(ptId)}`, {
+            const res = await api.get(`/gl/etoll-data?q=toll&search=${encodeURIComponent(query)}&pt_id=${encodeURIComponent(ptId)}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const resultData = res.data?.data || [];
-            setBankOptions(Array.isArray(resultData) ? resultData : []);
+            setEtollOptions(Array.isArray(resultData) ? resultData : []);
         } catch (err) {
-            console.error("Gagal memuat bank dari database:", err);
-            setBankOptions([]);
+            console.error("Gagal memuat E-TOLL:", err);
+            setEtollOptions([]);
         }
     };
 
@@ -495,7 +521,12 @@ const KasMasukKeluar = () => {
         if (!selectedItemForPosting) return;
 
         if (sumberDana === 'bank' && !selectedBank) {
-            Swal.fire({ title: 'Peringatan', text: 'Pilih bank terlebih dahulu!', icon: 'warning' });
+            Swal.fire({ title: 'Peringatan', text: 'Silakan pilih bank dari dropdown terlebih dahulu!', icon: 'warning', didOpen: () => { const c = document.querySelector('.swal2-container'); if (c) c.style.zIndex = '9999999'; } });
+            return;
+        }
+
+        if (sumberDana === 'etoll' && !selectedEtoll) {
+            Swal.fire({ title: 'Peringatan', text: 'Silakan pilih E-TOLL dari dropdown terlebih dahulu!', icon: 'warning', didOpen: () => { const c = document.querySelector('.swal2-container'); if (c) c.style.zIndex = '9999999'; } });
             return;
         }
 
@@ -505,7 +536,9 @@ const KasMasukKeluar = () => {
                 cb_id: selectedItemForPosting.cb_id,
                 sumber_dana: sumberDana,
                 bank_code: selectedBank?.code || '',
-                bank_name: selectedBank?.name || ''
+                bank_name: selectedBank?.name || '',
+                etoll_code: selectedEtoll?.code || '',
+                etoll_name: selectedEtoll?.name || ''
             };
 
             const res = await api.post('/gl/cashbank/post', payload, {
@@ -515,7 +548,8 @@ const KasMasukKeluar = () => {
             Swal.fire({
                 title: 'POSTING BERHASIL!',
                 text: res.data?.message || `Transaksi Kas ${selectedItemForPosting.cb_id} berhasil diposting.`,
-                icon: 'success'
+                icon: 'success',
+                didOpen: () => { const c = document.querySelector('.swal2-container'); if (c) c.style.zIndex = '9999999'; }
             });
 
             setIsPostingModalOpen(false);
@@ -525,10 +559,181 @@ const KasMasukKeluar = () => {
             Swal.fire({
                 title: 'GAGAL POSTING!',
                 text: err.response?.data?.message || 'Terjadi kesalahan saat posting transaksi.',
-                icon: 'error'
+                icon: 'error',
+                didOpen: () => { const c = document.querySelector('.swal2-container'); if (c) c.style.zIndex = '9999999'; }
             });
         }
     };
+
+    const handleOpenRealisasiBPLK = async () => {
+        if (!bplkData?.sjh_id) return;
+        setLoadingRealisasi(true);
+        try {
+            const token = localStorage.getItem('token');
+            const ptId = localStorage.getItem('pt_id') || 'C';
+            const res = await api.get(`/gl/cashbank/bplk/realisasi?st=${encodeURIComponent(bplkData.sjh_id)}&pt_id=${ptId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setRealisasiData(res.data?.data);
+            setKomisiBaruList([]);
+            setTglPostingKomisi(today);
+            setTglPostingRealisasi(today);
+            setBplkStep(3);
+        } catch (err) {
+            Swal.fire({
+                title: 'Gagal!',
+                text: err.response?.data?.message || 'Template uang muka belum dibuat atau gagal memuat data realisasi.',
+                icon: 'error',
+                didOpen: () => { const c = document.querySelector('.swal2-container'); if (c) c.style.zIndex = '9999999'; }
+            });
+        } finally {
+            setLoadingRealisasi(false);
+        }
+    };
+
+    // Otomatisasi Form Komisi (Carter = Biaya Kirim * 0.03 | Regular = Berat * Tarif)
+    const handleKomisiFormChange = (field, value) => {
+        setKomisiForm((prev) => {
+            const updated = { ...prev, [field]: value };
+
+            if (field === 'layanan') {
+                if (value === 'Carter') {
+                    updated.beratBTT = 0;
+                    updated.asalKota = '-';
+                    updated.tujuanKota = '-';
+                    updated.tarif = 0.03;
+                    updated.biayaKirim = '';
+                    updated.komisi = '';
+                } else if (value === 'Regular') {
+                    updated.biayaKirim = 0;
+                    updated.beratBTT = '';
+                    updated.tarif = '';
+                    updated.asalKota = '';
+                    updated.tujuanKota = '';
+                    updated.komisi = '';
+                }
+            }
+
+            if (updated.layanan === 'Carter') {
+                const bk = parseFloat(updated.biayaKirim) || 0;
+                const trf = parseFloat(updated.tarif) || 0.03;
+                updated.komisi = (bk * trf).toFixed(2);
+            } else if (updated.layanan === 'Regular') {
+                const brt = parseFloat(updated.beratBTT) || 0;
+                const trf = parseFloat(updated.tarif) || 0;
+                updated.komisi = (brt * trf).toFixed(2);
+            }
+
+            return updated;
+        });
+    };
+
+    const handleTambahKomisiSementara = () => {
+        const { no, noBTT, layanan, beratBTT, tarif, biayaKirim, asalKota, tujuanKota, komisi } = komisiForm;
+        if (!no.trim() || !noBTT.trim() || !layanan || isNaN(parseFloat(beratBTT)) || isNaN(parseFloat(tarif)) || isNaN(parseFloat(biayaKirim)) || !asalKota.trim() || !tujuanKota.trim() || isNaN(parseFloat(komisi))) {
+            Swal.fire({ title: 'Peringatan', text: 'Mohon lengkapi semua field komisi dengan benar!', icon: 'warning', didOpen: () => { const c = document.querySelector('.swal2-container'); if (c) c.style.zIndex = '9999999'; } });
+            return;
+        }
+
+        setKomisiBaruList((prev) => [
+            ...prev,
+            {
+                no: no.trim(),
+                noBTT: noBTT.trim(),
+                layanan,
+                beratBTT: parseFloat(beratBTT),
+                tarif: parseFloat(tarif),
+                biayaKirim: parseFloat(biayaKirim),
+                asalKota: asalKota.trim().toUpperCase(),
+                tujuanKota: tujuanKota.trim().toUpperCase(),
+                komisi: parseFloat(komisi)
+            }
+        ]);
+
+        setKomisiForm({ no: '', noBTT: '', layanan: '', beratBTT: '', tarif: '', biayaKirim: '', asalKota: '', tujuanKota: '', komisi: '' });
+    };
+
+    const handleSimpanKomisiDB = async () => {
+        if (komisiBaruList.length === 0) {
+            Swal.fire({ title: 'Info', text: 'Tidak ada data komisi tambahan untuk disimpan!', icon: 'info', didOpen: () => { const c = document.querySelector('.swal2-container'); if (c) c.style.zIndex = '9999999'; } });
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            await api.post('/gl/cashbank/bplk/simpan-komisi', {
+                sjId: bplkData.sjh_id,
+                komisiData: komisiBaruList
+            }, { headers: { Authorization: `Bearer ${token}` } });
+
+            Swal.fire({ title: 'BERHASIL!', text: 'Data komisi tambahan berhasil disimpan ke database.', icon: 'success', didOpen: () => { const c = document.querySelector('.swal2-container'); if (c) c.style.zIndex = '9999999'; } });
+            handleOpenRealisasiBPLK();
+        } catch (err) {
+            Swal.fire({ title: 'GAGAL!', text: err.response?.data?.message || 'Gagal menyimpan komisi.', icon: 'error', didOpen: () => { const c = document.querySelector('.swal2-container'); if (c) c.style.zIndex = '9999999'; } });
+        }
+    };
+
+    const handlePostingKomisiBPLK = async (totalKomisiGabungan) => {
+        if (!tglPostingKomisi || tglPostingKomisi > today) {
+            Swal.fire({ title: 'Peringatan', text: 'Tanggal posting komisi harus kurang dari atau sama dengan hari ini!', icon: 'warning', didOpen: () => { const c = document.querySelector('.swal2-container'); if (c) c.style.zIndex = '9999999'; } });
+            return;
+        }
+        try {
+            const token = localStorage.getItem('token');
+            await api.post('/gl/cashbank/bplk/posting-komisi', {
+                sjId: bplkData.sjh_id,
+                totalKomisi: totalKomisiGabungan,
+                tanggalPosting: tglPostingKomisi
+            }, { headers: { Authorization: `Bearer ${token}` } });
+
+            Swal.fire({ title: 'BERHASIL!', text: 'Komisi BPLK berhasil diposting.', icon: 'success', didOpen: () => { const c = document.querySelector('.swal2-container'); if (c) c.style.zIndex = '9999999'; } });
+            handleOpenRealisasiBPLK();
+        } catch (err) {
+            Swal.fire({ title: 'GAGAL!', text: err.response?.data?.message || 'Gagal posting komisi.', icon: 'error', didOpen: () => { const c = document.querySelector('.swal2-container'); if (c) c.style.zIndex = '9999999'; } });
+        }
+    };
+
+    const handleUnpostingKomisiBPLK = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            await api.post('/gl/cashbank/bplk/unposting-komisi', { sjId: bplkData.sjh_id }, { headers: { Authorization: `Bearer ${token}` } });
+            Swal.fire({ title: 'BERHASIL!', text: 'Unposting komisi berhasil.', icon: 'success', didOpen: () => { const c = document.querySelector('.swal2-container'); if (c) c.style.zIndex = '9999999'; } });
+            handleOpenRealisasiBPLK();
+        } catch (err) {
+            Swal.fire({ title: 'GAGAL!', text: err.response?.data?.message || 'Gagal unposting komisi.', icon: 'error', didOpen: () => { const c = document.querySelector('.swal2-container'); if (c) c.style.zIndex = '9999999'; } });
+        }
+    };
+
+    const handlePostingRealisasiBPLK = async () => {
+        if (!tglPostingRealisasi || tglPostingRealisasi > today) {
+            Swal.fire({ title: 'Peringatan', text: 'Tanggal posting realisasi harus kurang dari atau sama dengan hari ini!', icon: 'warning', didOpen: () => { const c = document.querySelector('.swal2-container'); if (c) c.style.zIndex = '9999999'; } });
+            return;
+        }
+        try {
+            const token = localStorage.getItem('token');
+            await api.post('/gl/cashbank/bplk/posting-realisasi', {
+                sjId: bplkData.sjh_id,
+                tanggalPosting: tglPostingRealisasi
+            }, { headers: { Authorization: `Bearer ${token}` } });
+
+            Swal.fire({ title: 'BERHASIL!', text: 'Realisasi BPLK berhasil diposting.', icon: 'success', didOpen: () => { const c = document.querySelector('.swal2-container'); if (c) c.style.zIndex = '9999999'; } });
+            handleOpenRealisasiBPLK();
+        } catch (err) {
+            Swal.fire({ title: 'GAGAL!', text: err.response?.data?.message || 'Gagal posting realisasi.', icon: 'error', didOpen: () => { const c = document.querySelector('.swal2-container'); if (c) c.style.zIndex = '9999999'; } });
+        }
+    };
+
+    const handleUnpostingRealisasiBPLK = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            await api.post('/gl/cashbank/bplk/unposting-realisasi', { sjId: bplkData.sjh_id }, { headers: { Authorization: `Bearer ${token}` } });
+            Swal.fire({ title: 'BERHASIL!', text: 'Unposting realisasi berhasil.', icon: 'success', didOpen: () => { const c = document.querySelector('.swal2-container'); if (c) c.style.zIndex = '9999999'; } });
+            handleOpenRealisasiBPLK();
+        } catch (err) {
+            Swal.fire({ title: 'GAGAL!', text: err.response?.data?.message || 'Gagal unposting realisasi.', icon: 'error', didOpen: () => { const c = document.querySelector('.swal2-container'); if (c) c.style.zIndex = '9999999'; } });
+        }
+    };
+
 
     const handleUnposting = async (cb_id) => {
         Swal.fire({
@@ -942,29 +1147,43 @@ const KasMasukKeluar = () => {
 
                         <div className="flex items-center justify-between pt-6 border-t border-slate-100">
                             <div className="flex items-center gap-3">
-                                <button
-                                    type="button"
-                                    onClick={handleSaveForm}
-                                    className="px-8 py-2.5 bg-amber-400 hover:bg-amber-500 text-slate-900 font-black rounded-lg transition shadow-md uppercase cursor-pointer"
-                                >
-                                    SIMPAN
-                                </button>
+                                {formData.cb_postyn?.trim() !== 'Y' && (
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveForm}
+                                        className="px-8 py-2.5 bg-amber-400 hover:bg-amber-500 text-slate-900 font-black rounded-lg transition shadow-md uppercase cursor-pointer"
+                                    >
+                                        SIMPAN
+                                    </button>
+                                )}
 
-                                <button
-                                    type="button"
-                                    disabled={!formData.cb_id || formData.cb_id === 'AUTO GENERATE' || formData.cb_postyn === 'Y'}
-                                    onClick={(e) => {
-                                        e.currentTarget.blur();
-                                        openPostingModal(formData);
-                                    }}
-                                    className={`px-8 py-2.5 font-bold rounded-lg transition uppercase ${!formData.cb_id || formData.cb_id === 'AUTO GENERATE' || formData.cb_postyn === 'Y'
-                                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300'
-                                        : 'bg-sky-600 hover:bg-sky-700 text-white shadow-md cursor-pointer'
-                                        }`}
-                                    title={!formData.cb_id ? 'Klik SIMPAN terlebih dahulu untuk memunculkan tombol posting' : ''}
-                                >
-                                    POSTING
-                                </button>
+                                {formData.cb_postyn?.trim() === 'Y' ? (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.currentTarget.blur();
+                                            handleUnposting(formData.cb_id);
+                                        }}
+                                        className="px-8 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg transition shadow-md uppercase cursor-pointer"
+                                    >
+                                        UNPOSTING
+                                    </button>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        disabled={!formData.cb_id || formData.cb_id === 'AUTO GENERATE'}
+                                        onClick={(e) => {
+                                            e.currentTarget.blur();
+                                            openPostingModal(formData);
+                                        }}
+                                        className={`px-8 py-2.5 font-bold rounded-lg transition uppercase ${!formData.cb_id || formData.cb_id === 'AUTO GENERATE'
+                                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300'
+                                            : 'bg-sky-600 hover:bg-sky-700 text-white shadow-md cursor-pointer'
+                                            }`}
+                                    >
+                                        POSTING
+                                    </button>
+                                )}
 
                                 <button
                                     type="button"
@@ -998,7 +1217,7 @@ const KasMasukKeluar = () => {
 
     const postingModalElement = isPostingModalOpen ? (
         <div className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs transition-opacity" style={{ zIndex: 999999 }}>
-            <div className="w-full max-w-md rounded-2xl shadow-2xl bg-white text-slate-800 p-6 space-y-4">
+            <div className="w-full max-w-md rounded-2xl shadow-2xl bg-white text-slate-800 p-6 space-y-4 max-h-[90vh] overflow-y-auto">
                 <div className="text-center space-y-1 border-b border-slate-100 pb-3">
                     <h3 className="text-base font-black text-slate-800 uppercase tracking-wide">Konfirmasi Posting</h3>
                     <p className="text-xs text-slate-500 font-medium">Pilih Sumber Dana:</p>
@@ -1011,11 +1230,23 @@ const KasMasukKeluar = () => {
                         { id: 'bca_fleet', label: 'BCA FLEET', val: 'bca fleet' },
                     ].map((opt) => (
                         <label key={opt.id} className={`flex items-center gap-3 p-3 rounded-xl border transition cursor-pointer ${sumberDana === opt.val ? 'border-sky-500 bg-sky-50/50 text-sky-900 shadow-xs' : 'border-slate-200 hover:bg-slate-50'}`}>
-                            <input type="radio" name="sumberDana" value={opt.val} checked={sumberDana === opt.val} onChange={(e) => { setSumberDana(e.target.value); setSelectedBank(null); }} className="w-4 h-4 text-sky-600" />
+                            <input
+                                type="radio"
+                                name="sumberDana"
+                                value={opt.val}
+                                checked={sumberDana === opt.val}
+                                onChange={(e) => {
+                                    setSumberDana(e.target.value);
+                                    setSelectedBank(null);
+                                    setSelectedEtoll(null);
+                                }}
+                                className="w-4 h-4 text-sky-600"
+                            />
                             <span>{opt.label}</span>
                         </label>
                     ))}
 
+                    {/* OPSI BANK */}
                     <div className={`p-3 rounded-xl border transition ${sumberDana === 'bank' ? 'border-sky-500 bg-sky-50/50' : 'border-slate-200'}`}>
                         <label className="flex items-center gap-3 cursor-pointer">
                             <input
@@ -1026,6 +1257,7 @@ const KasMasukKeluar = () => {
                                 onChange={() => {
                                     setSumberDana('bank');
                                     setSelectedBank(null);
+                                    setSelectedEtoll(null);
                                     setBankSearch('');
                                     handleSearchBank('');
                                 }}
@@ -1037,7 +1269,7 @@ const KasMasukKeluar = () => {
                         {selectedBank && (
                             <div className="text-xs text-sky-600 font-bold italic mt-2 ml-7 bg-white p-2 rounded-lg border border-sky-200 flex items-center justify-between shadow-xs">
                                 <span>✓ {selectedBank.name} ({selectedBank.code})</span>
-                                <span className="text-[10px] text-slate-400 font-normal">Klik kolom pencarian untuk mengganti</span>
+                                <span className="text-[10px] text-slate-400 font-normal">Klik pencarian untuk ganti</span>
                             </div>
                         )}
 
@@ -1071,6 +1303,69 @@ const KasMasukKeluar = () => {
                                             ))
                                         ) : (
                                             <div className="p-3 text-center text-slate-400 font-medium">Bank tidak ditemukan di database</div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* OPSI E-TOLL */}
+                    <div className={`p-3 rounded-xl border transition ${sumberDana === 'etoll' ? 'border-sky-500 bg-sky-50/50' : 'border-slate-200'}`}>
+                        <label className="flex items-center gap-3 cursor-pointer">
+                            <input
+                                type="radio"
+                                name="sumberDana"
+                                value="etoll"
+                                checked={sumberDana === 'etoll'}
+                                onChange={() => {
+                                    setSumberDana('etoll');
+                                    setSelectedBank(null);
+                                    setSelectedEtoll(null);
+                                    setEtollSearch('');
+                                    handleSearchEtoll('');
+                                }}
+                                className="w-4 h-4 text-sky-600 cursor-pointer"
+                            />
+                            <span className="font-bold text-slate-800">E-TOLL</span>
+                        </label>
+
+                        {selectedEtoll && (
+                            <div className="text-xs text-sky-600 font-bold italic mt-2 ml-7 bg-white p-2 rounded-lg border border-sky-200 flex items-center justify-between shadow-xs">
+                                <span>✓ {selectedEtoll.name} ({selectedEtoll.code})</span>
+                                <span className="text-[10px] text-slate-400 font-normal">Klik pencarian untuk ganti</span>
+                            </div>
+                        )}
+
+                        {sumberDana === 'etoll' && (
+                            <div className="mt-3 ml-7 space-y-2 relative">
+                                <input
+                                    type="text"
+                                    placeholder="Cari E-TOLL di database..."
+                                    value={etollSearch}
+                                    onChange={(e) => handleSearchEtoll(e.target.value)}
+                                    onFocus={() => handleSearchEtoll(etollSearch)}
+                                    className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 outline-none focus:border-sky-500 bg-white font-medium text-slate-800 shadow-inner"
+                                />
+                                {showEtollDropdown && (
+                                    <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-2xl divide-y divide-slate-100 text-xs mt-1 z-50">
+                                        {etollOptions.length > 0 ? (
+                                            etollOptions.map((et, idx) => (
+                                                <div
+                                                    key={idx}
+                                                    onClick={() => {
+                                                        setSelectedEtoll(et);
+                                                        setShowEtollDropdown(false);
+                                                        setEtollSearch('');
+                                                    }}
+                                                    className="p-2.5 hover:bg-sky-100 cursor-pointer transition flex flex-col text-slate-700"
+                                                >
+                                                    <span className="font-bold text-slate-800">{et.name}</span>
+                                                    <span className="text-[10px] text-slate-400 font-mono">Kode: {et.code}</span>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="p-3 text-center text-slate-400 font-medium">Data E-TOLL tidak ditemukan</div>
                                         )}
                                     </div>
                                 )}
@@ -1365,13 +1660,15 @@ const KasMasukKeluar = () => {
                                         onClick={handleOpenPencairanUangMuka}
                                         className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-lg uppercase transition shadow cursor-pointer text-xs flex items-center gap-1.5"
                                     >
-                                        Uang Muka
+                                        {(bplkData.daftar_kas_keluar || []).length > 0 ? 'Tambah Kekurangan Uang Muka' : 'Uang Muka'}
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => Swal.fire('Info', 'Fitur Realisasi BPLK akan dibuka pada proses berikutnya.', 'info')}
-                                        className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-lg uppercase transition shadow cursor-pointer text-xs"
+                                        disabled={loadingRealisasi}
+                                        onClick={handleOpenRealisasiBPLK}
+                                        className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-lg uppercase transition shadow cursor-pointer text-xs flex items-center gap-1.5"
                                     >
+                                        {loadingRealisasi && <RefreshCw size={13} className="animate-spin" />}
                                         Realisasi
                                     </button>
                                 </div>
@@ -1449,6 +1746,206 @@ const KasMasukKeluar = () => {
                             </div>
                         </div>
                     )}
+
+                    {/* TAHAP 3: REALISASI BPLK & KOMISI SUPIR (SESUAI gl_t_cashbank_e_t_r.asp) */}
+                    {bplkStep === 3 && realisasiData && (() => {
+                        const dbKomisiList = realisasiData.komisi_list || [];
+                        const totalKomisiDB = dbKomisiList.reduce((sum, item) => sum + Number(item.komisi || 0), 0);
+                        const totalKomisiBaru = komisiBaruList.reduce((sum, item) => sum + Number(item.komisi || 0), 0);
+                        const totalKomisiGabungan = totalKomisiDB + totalKomisiBaru;
+                        const totalRealisasi = (realisasiData.rincian_realisasi || []).reduce((sum, item) => sum + Number(item.nominal || 0), 0);
+
+                        return (
+                            <div className="space-y-6">
+                                {/* Header Navigasi Tahap 3 */}
+                                <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200">
+                                    <div>
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase block">REALISASI SURAT TUGAS</span>
+                                        <span className="font-mono font-black text-sm text-slate-800">{bplkData.sjh_id}</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setBplkStep(2)}
+                                        className="px-4 py-2 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer"
+                                    >
+                                        <ArrowLeft size={14} /> Kembali ke BPLK
+                                    </button>
+                                </div>
+
+                                {/* 1. TABEL UANG MUKA */}
+                                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                                    <div className="bg-[#004b84] text-white px-4 py-2 font-bold uppercase text-xs">UANG MUKA</div>
+                                    <table className="w-full text-xs">
+                                        <thead className="bg-slate-100 text-slate-700 font-bold border-b">
+                                            <tr>
+                                                <th className="p-2.5 text-left">Nama Biaya</th>
+                                                <th className="p-2.5 text-right w-40">Nominal</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {(realisasiData.uang_muka || []).map((um, idx) => (
+                                                <tr key={idx}>
+                                                    <td className="p-2.5">{um.item_name}</td>
+                                                    <td className="p-2.5 text-right font-mono font-bold">Rp {Number(um.nominal || 0).toLocaleString('id-ID')}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                        <tfoot className="bg-slate-50 font-black border-t">
+                                            <tr>
+                                                <td className="p-2.5 text-right">TOTAL UANG MUKA</td>
+                                                <td className="p-2.5 text-right font-mono text-emerald-700">
+                                                    Rp {(realisasiData.uang_muka || []).reduce((s, u) => s + Number(u.nominal || 0), 0).toLocaleString('id-ID')}
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+
+                                {/* 2. TABEL KOMISI & FORM TAMBAH KOMISI */}
+                                <div className="border border-slate-200 rounded-xl overflow-hidden space-y-4 p-4 bg-white">
+                                    <div className="font-black text-slate-800 uppercase text-xs border-b pb-2">TABEL KOMISI SUPIR</div>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-xs border-collapse border border-slate-200">
+                                            <thead className="bg-[#004b84] text-white font-bold text-[11px]">
+                                                <tr>
+                                                    <th className="p-2 border">No</th>
+                                                    <th className="p-2 border">No BTT</th>
+                                                    <th className="p-2 border">Layanan</th>
+                                                    <th className="p-2 border text-right">Biaya Kirim</th>
+                                                    <th className="p-2 border text-right">Tarif</th>
+                                                    <th className="p-2 border">Asal</th>
+                                                    <th className="p-2 border">Tujuan</th>
+                                                    <th className="p-2 border text-right">Berat (Kg)</th>
+                                                    <th className="p-2 border text-right">Komisi</th>
+                                                    <th className="p-2 border text-center">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {dbKomisiList.map((k, idx) => (
+                                                    <tr key={`db-${idx}`} className="bg-emerald-50/40">
+                                                        <td className="p-2 border text-center font-mono">{k.no}</td>
+                                                        <td className="p-2 border text-center font-mono">{k.noBTT}</td>
+                                                        <td className="p-2 border">{k.layanan}</td>
+                                                        <td className="p-2 border text-right font-mono">{Number(k.biayaKirim || 0).toLocaleString('id-ID')}</td>
+                                                        <td className="p-2 border text-right font-mono">{Number(k.tarif || 0).toLocaleString('id-ID')}</td>
+                                                        <td className="p-2 border">{k.asalKota}</td>
+                                                        <td className="p-2 border">{k.tujuanKota}</td>
+                                                        <td className="p-2 border text-right font-mono">{Number(k.beratBTT || 0).toLocaleString('id-ID')}</td>
+                                                        <td className="p-2 border text-right font-mono font-bold">Rp {Number(k.komisi || 0).toLocaleString('id-ID')}</td>
+                                                        <td className="p-2 border text-center"><span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[10px] font-bold">Tersimpan</span></td>
+                                                    </tr>
+                                                ))}
+                                                {komisiBaruList.map((k, idx) => (
+                                                    <tr key={`new-${idx}`} className="bg-amber-50/60">
+                                                        <td className="p-2 border text-center font-mono">{k.no}</td>
+                                                        <td className="p-2 border text-center font-mono">{k.noBTT}</td>
+                                                        <td className="p-2 border">{k.layanan}</td>
+                                                        <td className="p-2 border text-right font-mono">{Number(k.biayaKirim || 0).toLocaleString('id-ID')}</td>
+                                                        <td className="p-2 border text-right font-mono">{Number(k.tarif || 0).toLocaleString('id-ID')}</td>
+                                                        <td className="p-2 border">{k.asalKota}</td>
+                                                        <td className="p-2 border">{k.tujuanKota}</td>
+                                                        <td className="p-2 border text-right font-mono">{Number(k.beratBTT || 0).toLocaleString('id-ID')}</td>
+                                                        <td className="p-2 border text-right font-mono font-bold">Rp {Number(k.komisi || 0).toLocaleString('id-ID')}</td>
+                                                        <td className="p-2 border text-center">
+                                                            <button type="button" onClick={() => setKomisiBaruList(prev => prev.filter((_, i) => i !== idx))} className="text-rose-600 hover:underline font-bold text-[10px] cursor-pointer">Hapus</button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                            <tfoot className="bg-slate-100 font-black">
+                                                <tr>
+                                                    <td colSpan={8} className="p-2 border text-right">TOTAL KOMISI</td>
+                                                    <td className="p-2 border text-right font-mono text-emerald-700">Rp {totalKomisiGabungan.toLocaleString('id-ID')}</td>
+                                                    <td className="p-2 border"></td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+
+                                    {/* Form Tambah Komisi Baru */}
+                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                                        <div className="font-bold text-slate-700">Tambah Data Komisi Baru</div>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                            <input type="text" placeholder="No Loper / SP / SPPAD" value={komisiForm.no} onChange={(e) => handleKomisiFormChange('no', e.target.value)} className="p-2 border rounded-lg bg-white" />
+                                            <input type="text" placeholder="No BTT" value={komisiForm.noBTT} onChange={(e) => handleKomisiFormChange('noBTT', e.target.value)} className="p-2 border rounded-lg bg-white" />
+                                            <select value={komisiForm.layanan} onChange={(e) => handleKomisiFormChange('layanan', e.target.value)} className="p-2 border rounded-lg bg-white font-bold">
+                                                <option value="">-- Pilih Layanan --</option>
+                                                <option value="Regular">Regular</option>
+                                                <option value="Carter">Carter</option>
+                                            </select>
+                                            <input type="number" step="0.01" placeholder="Berat BTT (Kg)" readOnly={komisiForm.layanan === 'Carter'} value={komisiForm.beratBTT} onChange={(e) => handleKomisiFormChange('beratBTT', e.target.value)} className="p-2 border rounded-lg bg-white" />
+                                            <input type="number" step="0.01" placeholder="Tarif" readOnly={komisiForm.layanan === 'Carter'} value={komisiForm.tarif} onChange={(e) => handleKomisiFormChange('tarif', e.target.value)} className="p-2 border rounded-lg bg-white" />
+                                            <input type="number" step="0.01" placeholder="Biaya Kirim" readOnly={komisiForm.layanan === 'Regular'} value={komisiForm.biayaKirim} onChange={(e) => handleKomisiFormChange('biayaKirim', e.target.value)} className="p-2 border rounded-lg bg-white" />
+                                            <input type="text" placeholder="Asal Kota" readOnly={komisiForm.layanan === 'Carter'} value={komisiForm.asalKota} onChange={(e) => handleKomisiFormChange('asalKota', e.target.value)} className="p-2 border rounded-lg bg-white" />
+                                            <input type="text" placeholder="Tujuan Kota" readOnly={komisiForm.layanan === 'Carter'} value={komisiForm.tujuanKota} onChange={(e) => handleKomisiFormChange('tujuanKota', e.target.value)} className="p-2 border rounded-lg bg-white" />
+                                            <input type="number" placeholder="Komisi (Otomatis)" readOnly value={komisiForm.komisi} className="p-2 border rounded-lg bg-slate-100 font-mono font-bold text-emerald-700" />
+                                        </div>
+                                        <div className="flex flex-wrap gap-2 justify-end">
+                                            <button type="button" onClick={handleTambahKomisiSementara} className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-lg cursor-pointer">+ Tambah ke Tabel</button>
+                                            {komisiBaruList.length > 0 && (
+                                                <button type="button" onClick={handleSimpanKomisiDB} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg cursor-pointer">Simpan Komisi ke DB</button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* 3. SECTION POSTING & UNPOSTING KOMISI & REALISASI */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Posting Komisi */}
+                                    <div className="p-4 border border-slate-200 rounded-xl bg-slate-50 space-y-3">
+                                        <div className="font-black text-slate-800 uppercase">Posting Komisi</div>
+                                        {realisasiData.posting_komisi === 'Y' ? (
+                                            <div className="space-y-2">
+                                                <p className="text-xs text-slate-600">No Jurnal Komisi: <b className="font-mono text-sky-700">{realisasiData.no_jurnal_komisi || '-'}</b></p>
+                                                <button type="button" onClick={handleUnpostingKomisiBPLK} className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg cursor-pointer">Unposting Komisi</button>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                <div className="flex items-center gap-2">
+                                                    <label className="font-bold">Tgl Posting:</label>
+                                                    <input type="date" max={today} value={tglPostingKomisi} onChange={(e) => setTglPostingKomisi(e.target.value)} className="p-1.5 border rounded-lg bg-white font-mono" />
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    disabled={totalKomisiGabungan <= 0}
+                                                    onClick={() => handlePostingKomisiBPLK(totalKomisiGabungan)}
+                                                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-bold rounded-lg cursor-pointer"
+                                                >
+                                                    Posting Komisi
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Posting Realisasi */}
+                                    <div className="p-4 border border-slate-200 rounded-xl bg-slate-50 space-y-3">
+                                        <div className="font-black text-slate-800 uppercase">Posting Realisasi</div>
+                                        {realisasiData.posting_realisasi === 'Y' ? (
+                                            <div className="space-y-2">
+                                                <p className="text-xs text-slate-600">No Jurnal Realisasi: <b className="font-mono text-sky-700">{realisasiData.no_jurnal_realisasi || '-'}</b></p>
+                                                <button type="button" onClick={handleUnpostingRealisasiBPLK} className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg cursor-pointer">Unposting Realisasi</button>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                <div className="flex items-center gap-2">
+                                                    <label className="font-bold">Tgl Posting:</label>
+                                                    <input type="date" max={today} value={tglPostingRealisasi} onChange={(e) => setTglPostingRealisasi(e.target.value)} className="p-1.5 border rounded-lg bg-white font-mono" />
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    disabled={totalRealisasi <= 0}
+                                                    onClick={handlePostingRealisasiBPLK}
+                                                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-bold rounded-lg cursor-pointer"
+                                                >
+                                                    Posting Realisasi
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })()}
                 </div>
             </div>
 
