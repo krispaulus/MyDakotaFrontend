@@ -900,12 +900,6 @@ const Invoice = () => {
                 !persistedSelectedBtts.some(b => String(b.bttt_id).trim() === String(id).trim())
             );
 
-            const remainingCount = persistedSelectedBtts.length - removedBttIds.length + newlyAddedIds.length;
-            if (remainingCount <= 0) {
-                Swal.fire('Peringatan', 'Invoice harus memiliki minimal satu nomor resi BTT!', 'warning');
-                return;
-            }
-
             try {
                 const res = await api.post(`/piutang/invoice/update?pt_id=${ptId}`, {
                     artih_id: currentInvId,
@@ -928,6 +922,7 @@ const Invoice = () => {
                 });
 
                 setRemovedBttIds([]);
+                setPersistedSelectedBtts([]); // Kosongkan dulu sebelum sync agar jika 0 resi, tabel atas langsung bersih
                 await syncSavedInvoiceFromDB(currentInvId);
                 fetchInvoiceList();
 
@@ -958,11 +953,6 @@ const Invoice = () => {
             const cleanId = String(b.bttt_id || '').trim();
             return cleanSelectedIds.includes(cleanId);
         });
-
-        if (cleanSelectedIds.length === 0) {
-            Swal.fire('Peringatan', 'Pilih minimal satu nomor resi BTT untuk difakturkan!', 'warning');
-            return;
-        }
 
         try {
             const dateObj = new Date(newInvoiceForm.artih_tanggal);
