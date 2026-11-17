@@ -438,10 +438,31 @@ const KasMasukKeluar = () => {
     };
 
     const handleSaveForm = async () => {
-        const totalNominal = rincianList.reduce((acc, curr) => acc + Number(curr.subtotal), 0);
+        if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+        }
+
+        let finalRincian = [...rincianList];
+        if (showTambahRincian && detailForm.item_id && Number(detailForm.harga_satuan) > 0) {
+            const subtotal = Number(detailForm.quantity || 1) * Number(detailForm.harga_satuan);
+            finalRincian.push({ ...detailForm, subtotal });
+            setRincianList(finalRincian);
+            setDetailForm({ nama_biaya: '', item_id: '', keterangan: '', quantity: 1, harga_satuan: 0 });
+            setShowTambahRincian(false);
+        }
+
+        const totalNominal = finalRincian.reduce((acc, curr) => acc + Number(curr.subtotal), 0);
 
         if (totalNominal <= 0) {
-            Swal.fire({ title: 'Gagal Simpan', text: 'Tambahkan minimal 1 rincian kas dengan nominal!', icon: 'warning' });
+            Swal.fire({
+                title: 'Gagal Simpan',
+                text: 'Tambahkan minimal 1 rincian kas dengan nominal!',
+                icon: 'warning',
+                didOpen: () => {
+                    const container = document.querySelector('.swal2-container');
+                    if (container) container.style.zIndex = '9999999';
+                }
+            });
             return;
         }
 
@@ -458,7 +479,7 @@ const KasMasukKeluar = () => {
                 ...formData,
                 cb_ket: keteranganFinal,
                 nominal: totalNominal,
-                details: rincianList.map(r => ({
+                details: finalRincian.map(r => ({
                     item_id: r.item_id,
                     keterangan: r.keterangan || r.nama_biaya,
                     quantity: Number(r.quantity),
@@ -469,13 +490,17 @@ const KasMasukKeluar = () => {
             const res = await api.post(endpoint, payload, { headers: { Authorization: `Bearer ${token}` } });
 
             const savedNoTrans = res.data?.cb_id || res.data?.no_trans || formData.cb_id;
-            setFormData(prev => ({ ...prev, cb_id: savedNoTrans }));
+            setFormData(prev => ({ ...prev, cb_id: savedNoTrans, cb_postyn: prev.cb_postyn || 'N' }));
             setIsEditMode(true);
 
             Swal.fire({
                 title: 'BERHASIL DISIMPAN!',
                 text: `Transaksi ${savedNoTrans} berhasil disimpan. Sekarang Anda dapat memposting transaksi ini.`,
-                icon: 'success'
+                icon: 'success',
+                didOpen: () => {
+                    const container = document.querySelector('.swal2-container');
+                    if (container) container.style.zIndex = '9999999';
+                }
             });
 
             fetchCashBankData();
@@ -483,7 +508,11 @@ const KasMasukKeluar = () => {
             Swal.fire({
                 title: 'GAGAL!',
                 text: err.response?.data?.message || 'Gagal menyimpan transaksi.',
-                icon: 'error'
+                icon: 'error',
+                didOpen: () => {
+                    const container = document.querySelector('.swal2-container');
+                    if (container) container.style.zIndex = '9999999';
+                }
             });
         }
     };
@@ -1150,7 +1179,10 @@ const KasMasukKeluar = () => {
                                 {formData.cb_postyn?.trim() !== 'Y' && (
                                     <button
                                         type="button"
-                                        onClick={handleSaveForm}
+                                        onClick={(e) => {
+                                            e.currentTarget.blur(); // <-- Lepas fokus sebelum Swal.fire muncul
+                                            handleSaveForm();
+                                        }}
                                         className="px-8 py-2.5 bg-amber-400 hover:bg-amber-500 text-slate-900 font-black rounded-lg transition shadow-md uppercase cursor-pointer"
                                     >
                                         SIMPAN
