@@ -4,7 +4,7 @@ import api from '../api/axios';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
 import {
-    Filter, Printer, X, ArrowLeft, Search, Trash2,
+    Filter, Printer, X, ArrowLeft, Search, Trash2, Edit,
     RotateCcw, RefreshCw, Plus, FileSpreadsheet, FileCheck, ScanLine
 } from 'lucide-react';
 import Swal from 'sweetalert2';
@@ -783,6 +783,10 @@ const KasMasukKeluar = () => {
 
 
     const handleUnposting = async (cb_id) => {
+        if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+        }
+
         Swal.fire({
             title: 'Batalkan Posting?',
             text: `Yakin ingin unposting transaksi kas ${cb_id}?`,
@@ -791,7 +795,11 @@ const KasMasukKeluar = () => {
             confirmButtonColor: '#e11d48',
             cancelButtonColor: '#64748b',
             confirmButtonText: 'Ya, Unposting!',
-            cancelButtonText: 'Batal'
+            cancelButtonText: 'Batal',
+            didOpen: () => {
+                const container = document.querySelector('.swal2-container');
+                if (container) container.style.zIndex = '9999999';
+            }
         }).then(async (result) => {
             if (result.isConfirmed) {
                 try {
@@ -802,23 +810,31 @@ const KasMasukKeluar = () => {
 
                     Swal.fire({
                         title: 'BERHASIL UNPOSTING!',
-                        text: `Transaksi Kas ${cb_id} kembali ke status Unposted.`,
-                        icon: 'success'
+                        text: `Transaksi Kas ${cb_id} kembali ke status Unposted. Sekarang data dapat diedit.`,
+                        icon: 'success',
+                        didOpen: () => {
+                            const container = document.querySelector('.swal2-container');
+                            if (container) container.style.zIndex = '9999999';
+                        }
                     });
 
-                    if (isModalOpen) setIsModalOpen(false);
+                    // Ubah state modal edit langsung ke UNPOSTED agar bisa langsung diedit tanpa tutup modal
+                    setFormData(prev => ({ ...prev, cb_postyn: 'N', cb_nojurnal: '-' }));
                     fetchCashBankData();
                 } catch (err) {
                     Swal.fire({
                         title: 'GAGAL!',
                         text: err.response?.data?.message || 'Gagal unposting.',
-                        icon: 'error'
+                        icon: 'error',
+                        didOpen: () => {
+                            const container = document.querySelector('.swal2-container');
+                            if (container) container.style.zIndex = '9999999';
+                        }
                     });
                 }
             }
         });
     };
-
     const handlePrint = async (item) => {
         try {
             const token = localStorage.getItem('token');
@@ -1028,18 +1044,7 @@ const KasMasukKeluar = () => {
             accessor: 'total_amount',
             render: (item) => <span className="font-mono font-bold text-emerald-600">Rp {(item.total_amount || 0).toLocaleString('id-ID')}</span>
         },
-        {
-            header: 'PRINT',
-            accessor: 'print_action',
-            render: (item) => (
-                <button
-                    onClick={() => handlePrint(item)}
-                    className="px-2.5 py-1 bg-sky-50 text-sky-600 border border-sky-200 rounded-lg hover:bg-sky-100 transition cursor-pointer flex items-center gap-1 mx-auto font-bold text-[10px]"
-                >
-                    <Printer size={12} /> Print
-                </button>
-            )
-        }
+
     ];
 
     const modalElement = isModalOpen ? (
@@ -1129,9 +1134,39 @@ const KasMasukKeluar = () => {
                             <div><span className="text-slate-400 font-bold block mb-1">PEMBUAT :</span><span className="font-bold text-slate-800">{formData.cb_pembuat}</span></div>
                             <div><span className="text-slate-400 font-bold block mb-1">TANGGAL :</span><span className="font-mono font-bold text-slate-800">{formatDate(formData.cb_tanggal)}</span></div>
                             <div><span className="text-slate-400 font-bold block mb-1">TYPE :</span><span className="font-bold text-slate-800">{formData.cb_tipe === 'T' ? 'Terima Kas' : 'Keluar Kas'}</span></div>
-                            <div className="col-span-2 md:col-span-4"><span className="text-slate-400 font-bold block mb-1">KETERANGAN :</span><span className="font-medium text-slate-700">{formData.cb_ket}</span></div>
+
+                            <div className="col-span-2 md:col-span-4">
+                                <span className="text-slate-400 font-bold block mb-1">KETERANGAN :</span>
+                                {formData.cb_postyn?.trim() !== 'Y' ? (
+                                    <input
+                                        type="text"
+                                        value={formData.cb_ket}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (val.includes(',')) {
+                                                Swal.fire({
+                                                    title: 'Peringatan',
+                                                    text: 'Tidak boleh menggunakan karakter koma (,) dalam keterangan',
+                                                    icon: 'warning',
+                                                    didOpen: () => {
+                                                        const c = document.querySelector('.swal2-container');
+                                                        if (c) c.style.zIndex = '9999999';
+                                                    }
+                                                });
+                                                setFormData({ ...formData, cb_ket: val.replace(/,/g, '') });
+                                            } else {
+                                                setFormData({ ...formData, cb_ket: val });
+                                            }
+                                        }}
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-bold text-slate-800 outline-none focus:border-sky-500"
+                                    />
+                                ) : (
+                                    <span className="font-medium text-slate-700">{formData.cb_ket}</span>
+                                )}
+                            </div>
                         </div>
 
+                        {/* Tabel Rincian Kas */}
                         {rincianList.length > 0 && (
                             <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
                                 <table className="w-full text-left">
@@ -1142,7 +1177,7 @@ const KasMasukKeluar = () => {
                                             <th className="p-2.5 text-center">QTY</th>
                                             <th className="p-2.5 text-right">HARGA SATUAN</th>
                                             <th className="p-2.5 text-right">SUBTOTAL</th>
-                                            <th className="p-2.5 text-center">AKSI</th>
+                                            {formData.cb_postyn?.trim() !== 'Y' && <th className="p-2.5 text-center">AKSI</th>}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -1153,9 +1188,36 @@ const KasMasukKeluar = () => {
                                                 <td className="p-2.5 text-center font-bold">{item.quantity}</td>
                                                 <td className="p-2.5 text-right font-mono font-bold">Rp {Number(item.harga_satuan).toLocaleString('id-ID')}</td>
                                                 <td className="p-2.5 text-right font-mono font-bold text-emerald-600">Rp {Number(item.subtotal).toLocaleString('id-ID')}</td>
-                                                <td className="p-2.5 text-center">
-                                                    <button type="button" onClick={() => handleDeleteRincian(idx)} className="text-rose-600 hover:text-rose-800 p-1 cursor-pointer"><Trash2 size={14} /></button>
-                                                </td>
+                                                {formData.cb_postyn?.trim() !== 'Y' && (
+                                                    <td className="p-2.5 text-center flex items-center justify-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            title="Edit Rincian"
+                                                            onClick={() => {
+                                                                setDetailForm({
+                                                                    nama_biaya: item.nama_biaya,
+                                                                    item_id: item.item_id,
+                                                                    keterangan: item.keterangan || item.nama_biaya,
+                                                                    quantity: item.quantity,
+                                                                    harga_satuan: item.harga_satuan
+                                                                });
+                                                                handleDeleteRincian(idx);
+                                                                setShowTambahRincian(true);
+                                                            }}
+                                                            className="text-sky-600 hover:text-sky-800 p-1 cursor-pointer"
+                                                        >
+                                                            <Edit size={14} />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            title="Hapus Rincian"
+                                                            onClick={() => handleDeleteRincian(idx)}
+                                                            className="text-rose-600 hover:text-rose-800 p-1 cursor-pointer"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </td>
+                                                )}
                                             </tr>
                                         ))}
                                     </tbody>
@@ -1165,78 +1227,81 @@ const KasMasukKeluar = () => {
                                             <td className="p-2.5 text-right font-mono text-emerald-700 text-sm">
                                                 Rp {rincianList.reduce((acc, curr) => acc + Number(curr.subtotal), 0).toLocaleString('id-ID')}
                                             </td>
-                                            <td></td>
+                                            {formData.cb_postyn?.trim() !== 'Y' && <td></td>}
                                         </tr>
                                     </tfoot>
                                 </table>
                             </div>
                         )}
+                        {/* Form Tambah Rincian hanya muncul jika status belum posting (cb_postyn !== 'Y') */}
+                        {formData.cb_postyn?.trim() !== 'Y' && (
+                            <div className="border border-sky-200 bg-sky-50/40 p-5 rounded-2xl space-y-4">
+                                <label className="flex items-center gap-2 font-bold text-slate-800 cursor-pointer">
+                                    <input type="radio" checked={showTambahRincian} onChange={() => setShowTambahRincian(true)} className="w-4 h-4 text-sky-600" />
+                                    TAMBAH : Rincian Kas.
+                                </label>
 
-                        <div className="border border-sky-200 bg-sky-50/40 p-5 rounded-2xl space-y-4">
-                            <label className="flex items-center gap-2 font-bold text-slate-800 cursor-pointer">
-                                <input type="radio" checked={showTambahRincian} onChange={() => setShowTambahRincian(true)} className="w-4 h-4 text-sky-600" />
-                                TAMBAH : Rincian Kas.
-                            </label>
-
-                            {showTambahRincian && (
-                                <div className="space-y-4 pt-3 border-t border-sky-200">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative">
-                                        <div className="relative">
-                                            <label className="font-bold text-slate-700 block mb-1.5">NAMA BIAYA :</label>
+                                {showTambahRincian && (
+                                    <div className="space-y-4 pt-3 border-t border-sky-200">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative">
                                             <div className="relative">
-                                                <input type="text" placeholder="Ketik nama biaya..." value={detailForm.nama_biaya} onChange={(e) => handleSearchBiaya(e.target.value)} onFocus={() => { if (detailForm.nama_biaya) handleSearchBiaya(detailForm.nama_biaya); }} className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg bg-cyan-50 font-bold text-slate-800 outline-none focus:border-sky-500" />
-                                                <Search size={14} className="absolute right-3 top-3.5 text-slate-400" />
-                                            </div>
-
-                                            {showDropdown && itemList.length > 0 && (
-                                                <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-y-auto divide-y divide-slate-100 max-h-56 z-50">
-                                                    {itemList.map((item, idx) => (
-                                                        <div key={idx} onClick={() => handleSelectItem(item)} className="p-3 hover:bg-sky-50 cursor-pointer flex items-center justify-between text-xs">
-                                                            <span className="font-bold text-slate-800">{item.item_name}</span>
-                                                            <span className="font-mono text-sky-600 font-semibold bg-sky-50 px-2 py-0.5 rounded border border-sky-100">{item.item_id}</span>
-                                                        </div>
-                                                    ))}
+                                                <label className="font-bold text-slate-700 block mb-1.5">NAMA BIAYA :</label>
+                                                <div className="relative">
+                                                    <input type="text" placeholder="Ketik nama biaya..." value={detailForm.nama_biaya} onChange={(e) => handleSearchBiaya(e.target.value)} onFocus={() => { if (detailForm.nama_biaya) handleSearchBiaya(detailForm.nama_biaya); }} className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg bg-cyan-50 font-bold text-slate-800 outline-none focus:border-sky-500" />
+                                                    <Search size={14} className="absolute right-3 top-3.5 text-slate-400" />
                                                 </div>
-                                            )}
-                                        </div>
 
-                                        <div>
-                                            <label className="font-bold text-slate-700 block mb-1.5">KODE :</label>
-                                            <input type="text" disabled value={detailForm.item_id} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg bg-slate-100 font-mono font-bold text-slate-700" />
-                                        </div>
-
-                                        <div>
-                                            <label className="font-bold text-slate-700 block mb-1.5">KETERANGAN :</label>
-                                            <input type="text" value={detailForm.keterangan} onChange={(e) => setDetailForm({ ...detailForm, keterangan: e.target.value })} className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg bg-white font-medium text-slate-800 outline-none focus:border-sky-500" />
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div>
-                                                <label className="font-bold text-slate-700 block mb-1.5">QUANTITY :</label>
-                                                <input type="number" min="1" value={detailForm.quantity} onChange={(e) => setDetailForm({ ...detailForm, quantity: e.target.value })} className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg bg-white font-mono font-bold text-slate-800 outline-none focus:border-sky-500" />
+                                                {showDropdown && itemList.length > 0 && (
+                                                    <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-y-auto divide-y divide-slate-100 max-h-56 z-50">
+                                                        {itemList.map((item, idx) => (
+                                                            <div key={idx} onClick={() => handleSelectItem(item)} className="p-3 hover:bg-sky-50 cursor-pointer flex items-center justify-between text-xs">
+                                                                <span className="font-bold text-slate-800">{item.item_name}</span>
+                                                                <span className="font-mono text-sky-600 font-semibold bg-sky-50 px-2 py-0.5 rounded border border-sky-100">{item.item_id}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
+
                                             <div>
-                                                <label className="font-bold text-slate-700 block mb-1.5">HARGA SATUAN :</label>
-                                                <input type="number" value={detailForm.harga_satuan} onChange={(e) => setDetailForm({ ...detailForm, harga_satuan: e.target.value })} className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg bg-cyan-50 font-mono font-bold text-emerald-700 outline-none focus:border-sky-500" />
+                                                <label className="font-bold text-slate-700 block mb-1.5">KODE :</label>
+                                                <input type="text" disabled value={detailForm.item_id} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg bg-slate-100 font-mono font-bold text-slate-700" />
+                                            </div>
+
+                                            <div>
+                                                <label className="font-bold text-slate-700 block mb-1.5">KETERANGAN :</label>
+                                                <input type="text" value={detailForm.keterangan} onChange={(e) => setDetailForm({ ...detailForm, keterangan: e.target.value })} className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg bg-white font-medium text-slate-800 outline-none focus:border-sky-500" />
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="font-bold text-slate-700 block mb-1.5">QUANTITY :</label>
+                                                    <input type="number" min="1" value={detailForm.quantity} onChange={(e) => setDetailForm({ ...detailForm, quantity: e.target.value })} className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg bg-white font-mono font-bold text-slate-800 outline-none focus:border-sky-500" />
+                                                </div>
+                                                <div>
+                                                    <label className="font-bold text-slate-700 block mb-1.5">HARGA SATUAN :</label>
+                                                    <input type="number" value={detailForm.harga_satuan} onChange={(e) => setDetailForm({ ...detailForm, harga_satuan: e.target.value })} className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg bg-cyan-50 font-mono font-bold text-emerald-700 outline-none focus:border-sky-500" />
+                                                </div>
+                                            </div>
+
+                                            <div className="md:col-span-2 pt-1">
+                                                <span className="font-bold text-slate-500">TERBILANG : </span>
+                                                <span className="font-bold text-rose-600 uppercase italic">
+                                                    {angkaTerbilang(Number(detailForm.quantity) * Number(detailForm.harga_satuan)) || '-'}
+                                                </span>
                                             </div>
                                         </div>
 
-                                        <div className="md:col-span-2 pt-1">
-                                            <span className="font-bold text-slate-500">TERBILANG : </span>
-                                            <span className="font-bold text-rose-600 uppercase italic">
-                                                {angkaTerbilang(Number(detailForm.quantity) * Number(detailForm.harga_satuan)) || '-'}
-                                            </span>
+                                        <div className="flex justify-end gap-2 pt-2">
+                                            <button type="button" onClick={() => setShowTambahRincian(false)} className="px-4 py-2 border border-slate-300 text-slate-600 font-bold rounded-lg hover:bg-slate-100 transition">Batal</button>
+                                            <button type="button" onClick={handleAddRincian} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-sm transition">+ Tambahkan Rincian</button>
                                         </div>
                                     </div>
+                                )}
+                            </div>
+                        )}
 
-                                    <div className="flex justify-end gap-2 pt-2">
-                                        <button type="button" onClick={() => setShowTambahRincian(false)} className="px-4 py-2 border border-slate-300 text-slate-600 font-bold rounded-lg hover:bg-slate-100 transition">Batal</button>
-                                        <button type="button" onClick={handleAddRincian} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-sm transition">+ Tambahkan Rincian</button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
+                        {/* ... Footer tombol SIMPAN / POSTING / UNPOSTING / CETAK / KELUAR ... */}
                         <div className="flex items-center justify-between pt-6 border-t border-slate-100">
                             <div className="flex items-center gap-3">
                                 {formData.cb_postyn?.trim() !== 'Y' && (
@@ -1532,30 +1597,13 @@ const KasMasukKeluar = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {/* BARIS ATAS: Menggunakan keterangan dari rincian (details[0]) */}
-                        <tr className="border-b border-slate-300">
-                            <td className="p-2 border-r border-slate-400">{printData.lawanCode}</td>
-                            <td className="p-2 text-center border-r border-slate-400">1</td>
-                            <td className="p-2 border-r border-slate-400 font-bold uppercase">
-                                {printData.details[0]?.nama
-                                    ? `${printData.details[0].nama} : ${printData.details[0].keterangan}`
-                                    : (printData.details[0]?.keterangan || printData.keterangan)}
-                            </td>
-                            <td className="p-2 text-right border-r border-slate-400">
-                                {printData.tipe === 'T' ? Number(printData.total).toLocaleString('id-ID', { minimumFractionDigits: 2 }) : '0.00'}
-                            </td>
-                            <td className="p-2 text-right">
-                                {printData.tipe === 'K' ? Number(printData.total).toLocaleString('id-ID', { minimumFractionDigits: 2 }) : '0.00'}
-                            </td>
-                        </tr>
-
-                        {/* BARIS BAWAH: Menggunakan nama lawan transaksi / Bank BRI (printData.lawanName) */}
+                        {/* BARIS ATAS: DEBET (RINCIAN BIAYA / ITEM) */}
                         {printData.details.map((d, i) => (
                             <tr key={i} className="border-b border-slate-300">
                                 <td className="p-2 border-r border-slate-400">{d.code}</td>
                                 <td className="p-2 text-center border-r border-slate-400">1</td>
                                 <td className="p-2 border-r border-slate-400 font-bold uppercase">
-                                    {printData.lawanName ? `${printData.lawanName} : ${printData.keterangan}` : printData.keterangan}
+                                    {d.nama ? `${d.nama} : ${d.keterangan}` : d.keterangan}
                                 </td>
                                 <td className="p-2 text-right border-r border-slate-400">
                                     {printData.tipe === 'K' ? Number(d.nominal).toLocaleString('id-ID', { minimumFractionDigits: 2 }) : '0.00'}
@@ -1565,6 +1613,21 @@ const KasMasukKeluar = () => {
                                 </td>
                             </tr>
                         ))}
+
+                        {/* BARIS BAWAH: KREDIT (AKUN BANK / SUMBER DANA) */}
+                        <tr className="border-b border-slate-300">
+                            <td className="p-2 border-r border-slate-400">{printData.lawanCode}</td>
+                            <td className="p-2 text-center border-r border-slate-400">1</td>
+                            <td className="p-2 border-r border-slate-400 font-bold uppercase">
+                                {printData.lawanName ? `${printData.lawanName} : ${printData.keterangan}` : printData.keterangan}
+                            </td>
+                            <td className="p-2 text-right border-r border-slate-400">
+                                {printData.tipe === 'T' ? Number(printData.total).toLocaleString('id-ID', { minimumFractionDigits: 2 }) : '0.00'}
+                            </td>
+                            <td className="p-2 text-right">
+                                {printData.tipe === 'K' ? Number(printData.total).toLocaleString('id-ID', { minimumFractionDigits: 2 }) : '0.00'}
+                            </td>
+                        </tr>
                     </tbody>
                     <tfoot>
                         <tr className="bg-slate-100 font-bold border-t-2 border-slate-500">
@@ -2399,7 +2462,6 @@ const KasMasukKeluar = () => {
                     </div>
                 </form>
             )}
-
             {/* DataTableTemplate */}
             <DataTableTemplate
                 title="PENCATATAN CASH - BANK"
@@ -2411,6 +2473,16 @@ const KasMasukKeluar = () => {
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 onFilter={() => setShowFilter(prev => !prev)}
+                renderExtraActions={(item) => (
+                    <button
+                        type="button"
+                        onClick={() => handlePrint(item)}
+                        className="p-1.5 rounded-lg border border-sky-200 bg-sky-50/70 text-sky-600 hover:bg-sky-100 transition cursor-pointer"
+                        title="Print Voucher Kas"
+                    >
+                        <Printer size={15} />
+                    </button>
+                )}
             />
 
             {modalElement && ReactDOM.createPortal(modalElement, document.body)}
