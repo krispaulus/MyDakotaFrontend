@@ -400,10 +400,10 @@ const KasMasukKeluar = () => {
 
         try {
             const token = localStorage.getItem('token');
-            const res = await api.get(`/gl/cashbank/detail/${encodeURIComponent(item.cb_id)}`, {
+            const res = await api.get(`/gl/cashbank/detail?cb_id=${encodeURIComponent(item.cb_id)}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            const details = res.data?.details || [];
+            const details = res.data?.details || res.data?.data || [];
             if (details.length > 0) {
                 setRincianList(details.map(d => ({
                     nama_biaya: d.item_name || d.cbd_ket,
@@ -527,6 +527,24 @@ const KasMasukKeluar = () => {
         setEtollSearch('');
         setShowEtollDropdown(false);
         setIsPostingModalOpen(true);
+    };
+
+    const handleSearchBank = async (query = '') => {
+        setBankSearch(query);
+        setShowBankDropdown(true);
+        try {
+            const token = localStorage.getItem('token');
+            const ptId = localStorage.getItem('pt_id') || localStorage.getItem('selected_pt') || 'C';
+
+            const res = await api.get(`/gl/bank-data?search=${encodeURIComponent(query)}&pt_id=${encodeURIComponent(ptId)}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const resultData = res.data?.data || [];
+            setBankOptions(Array.isArray(resultData) ? resultData : []);
+        } catch (err) {
+            console.error("Gagal memuat bank dari database:", err);
+            setBankOptions([]);
+        }
     };
 
     const handleSearchEtoll = async (query = '') => {
@@ -807,7 +825,7 @@ const KasMasukKeluar = () => {
             const ptId = localStorage.getItem('pt_id') || localStorage.getItem('selected_pt') || 'C';
 
             let details = [];
-            let lawanName = '-';
+            let lawanName = '';
             let lawanCode = '-';
             let totalAmount = Number(item.total_amount || item.cb_total || 0);
 
@@ -818,24 +836,69 @@ const KasMasukKeluar = () => {
 
                 const jDetails = jRes.data?.details || [];
 
+                // Helper ambil nama akun dari master COA jika ca_name dari detail jurnal kosong/'-'
+                const fetchNamaAkunCOA = async (accCode) => {
+                    if (!accCode || accCode === '-') return '';
+                    const cleanCode = String(accCode).trim();
+                    try {
+                        // 1. Cari di seluruh daftar COA
+                        const coaRes = await api.get(`/gl/kode-perkiraan?limit=1000`, {
+                            headers: { Authorization: `Bearer ${token}` }
+                        });
+                        const foundCoa = (coaRes.data?.data || []).find(
+                            c => String(c.ca_id).trim() === cleanCode
+                        );
+                        if (foundCoa?.ca_name) return foundCoa.ca_name;
+
+                        // 2. Fallback cari di master Bank (/gl/bank-data)
+                        const bankRes = await api.get(`/gl/bank-data?search=${encodeURIComponent(cleanCode)}&pt_id=${encodeURIComponent(ptId)}`, {
+                            headers: { Authorization: `Bearer ${token}` }
+                        });
+                        const foundBank = (bankRes.data?.data || []).find(
+                            b => String(b.code).trim() === cleanCode
+                        );
+                        return foundBank?.name || '';
+
+                        // 3. Fallback cari di master Item Kas (/gl/cashbank/items)
+                        const itemRes = await api.get(`/gl/cashbank/items?q=${encodeURIComponent(cleanCode)}`, {
+                            headers: { Authorization: `Bearer ${token}` }
+                        });
+                        const foundItem = (itemRes.data?.data || []).find(
+                            it => String(it.item_id).trim() === cleanCode
+                        );
+                        return foundItem?.item_name || '';
+                    } catch {
+                        return '';
+                    }
+                };
+
                 const lawanRow = item.cb_tipe === 'K'
                     ? jDetails.find(d => Number(d.tjurd_kredit) > 0)
                     : jDetails.find(d => Number(d.tjurd_debet) > 0);
 
                 if (lawanRow) {
-                    lawanName = lawanRow.ca_name || '-';
                     lawanCode = lawanRow.tjurd_acccode || '-';
+                    lawanName = (lawanRow.ca_name && lawanRow.ca_name !== '-')
+                        ? lawanRow.ca_name
+                        : await fetchNamaAkunCOA(lawanCode);
                 }
 
                 const detailRows = item.cb_tipe === 'K'
                     ? jDetails.filter(d => Number(d.tjurd_debet) > 0)
                     : jDetails.filter(d => Number(d.tjurd_kredit) > 0);
 
-                details = detailRows.map(d => ({
-                    code: d.tjurd_acccode,
-                    nama: d.ca_name,
-                    keterangan: d.tjurd_keterangan,
-                    nominal: Number(item.cb_tipe === 'K' ? d.tjurd_debet : d.tjurd_kredit) || 0
+                details = await Promise.all(detailRows.map(async (d) => {
+                    const accCode = d.tjurd_acccode || '-';
+                    const namaAkun = (d.ca_name && d.ca_name !== '-')
+                        ? d.ca_name
+                        : await fetchNamaAkunCOA(accCode);
+
+                    return {
+                        code: accCode,
+                        nama: namaAkun,
+                        keterangan: d.tjurd_keterangan || item.cb_ket || '',
+                        nominal: Number(item.cb_tipe === 'K' ? d.tjurd_debet : d.tjurd_kredit) || 0
+                    };
                 }));
 
                 if (details.length > 0) {
@@ -846,8 +909,8 @@ const KasMasukKeluar = () => {
                 if (rawDetails.length > 0) {
                     details = rawDetails.map(d => ({
                         code: d.cbd_itemid || d.item_id || '-',
-                        nama: d.item_name || d.cbd_ket || item.cb_ket || '-',
-                        keterangan: d.cbd_ket || item.cb_ket || '-',
+                        nama: d.item_name || '',
+                        keterangan: d.cbd_ket || item.cb_ket || '',
                         nominal: Number(d.cbd_total || (d.cbd_quantity * d.cbd_hargasatuan) || 0)
                     }));
                     totalAmount = details.reduce((sum, d) => sum + Number(d.nominal), 0);
@@ -1419,7 +1482,7 @@ const KasMasukKeluar = () => {
     ) : null;
 
     const printModalElement = isPrintOpen && printData ? (
-        <div className="fixed inset-0 z-50 bg-white overflow-y-auto p-8 print:p-0">
+        <div className="fixed inset-0 z-[999999] bg-white overflow-y-auto p-8 print:p-0">
             <div className="max-w-4xl mx-auto flex justify-between items-center mb-6 pb-4 border-b print:hidden">
                 <button onClick={() => setIsPrintOpen(false)} className="px-4 py-2 text-sm bg-slate-200 hover:bg-slate-300 rounded-lg font-bold">
                     ← Tutup
@@ -1469,25 +1532,37 @@ const KasMasukKeluar = () => {
                         </tr>
                     </thead>
                     <tbody>
+                        {/* BARIS ATAS: Menggunakan keterangan dari rincian (details[0]) */}
                         <tr className="border-b border-slate-300">
                             <td className="p-2 border-r border-slate-400">{printData.lawanCode}</td>
                             <td className="p-2 text-center border-r border-slate-400">1</td>
                             <td className="p-2 border-r border-slate-400 font-bold uppercase">
-                                {printData.lawanName} : {printData.keterangan}
+                                {printData.details[0]?.nama
+                                    ? `${printData.details[0].nama} : ${printData.details[0].keterangan}`
+                                    : (printData.details[0]?.keterangan || printData.keterangan)}
                             </td>
-                            <td className="p-2 text-right border-r border-slate-400">{printData.tipe === 'T' ? Number(printData.total).toLocaleString('id-ID', { minimumFractionDigits: 2 }) : '0.00'}</td>
-                            <td className="p-2 text-right">{printData.tipe === 'K' ? Number(printData.total).toLocaleString('id-ID', { minimumFractionDigits: 2 }) : '0.00'}</td>
+                            <td className="p-2 text-right border-r border-slate-400">
+                                {printData.tipe === 'T' ? Number(printData.total).toLocaleString('id-ID', { minimumFractionDigits: 2 }) : '0.00'}
+                            </td>
+                            <td className="p-2 text-right">
+                                {printData.tipe === 'K' ? Number(printData.total).toLocaleString('id-ID', { minimumFractionDigits: 2 }) : '0.00'}
+                            </td>
                         </tr>
 
+                        {/* BARIS BAWAH: Menggunakan nama lawan transaksi / Bank BRI (printData.lawanName) */}
                         {printData.details.map((d, i) => (
                             <tr key={i} className="border-b border-slate-300">
                                 <td className="p-2 border-r border-slate-400">{d.code}</td>
                                 <td className="p-2 text-center border-r border-slate-400">1</td>
                                 <td className="p-2 border-r border-slate-400 font-bold uppercase">
-                                    {d.nama} : {d.keterangan}
+                                    {printData.lawanName ? `${printData.lawanName} : ${printData.keterangan}` : printData.keterangan}
                                 </td>
-                                <td className="p-2 text-right border-r border-slate-400">{printData.tipe === 'K' ? Number(d.nominal).toLocaleString('id-ID', { minimumFractionDigits: 2 }) : '0.00'}</td>
-                                <td className="p-2 text-right">{printData.tipe === 'T' ? Number(d.nominal).toLocaleString('id-ID', { minimumFractionDigits: 2 }) : '0.00'}</td>
+                                <td className="p-2 text-right border-r border-slate-400">
+                                    {printData.tipe === 'K' ? Number(d.nominal).toLocaleString('id-ID', { minimumFractionDigits: 2 }) : '0.00'}
+                                </td>
+                                <td className="p-2 text-right">
+                                    {printData.tipe === 'T' ? Number(d.nominal).toLocaleString('id-ID', { minimumFractionDigits: 2 }) : '0.00'}
+                                </td>
                             </tr>
                         ))}
                     </tbody>
