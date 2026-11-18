@@ -1487,11 +1487,13 @@ const Invoice = () => {
                 let totalBiayaKirim = 0;
                 let totalDiskon = 0;
                 let totalAsuransi = 0;
+                let totalPenerus = 0;
                 let totalPacking = 0;
                 let totalBerat = 0;
 
                 const kwitansiRowsHtml = btts.map((b, idx) => {
-                    const biayaKirim = Number(b.bttt_harga || 0) + Number(b.bttt_biayapenerus || 0);
+                    const biayaKirim = Number(b.bttt_harga || 0);
+                    const penerus = Number(b.bttt_biayapenerus || 0);
                     const diskon = Number(b.bttt_disc || 0);
                     const asuransi = Number(b.biaya_asuransi || 0);
                     const packing = Number(b.biaya_packing || 0);
@@ -1501,6 +1503,7 @@ const Invoice = () => {
                     const rawKet = String(b.bttt_ket || '').trim();
 
                     totalBiayaKirim += biayaKirim;
+                    totalPenerus += penerus;
                     totalDiskon += diskon;
                     totalAsuransi += asuransi;
                     totalPacking += packing;
@@ -1509,28 +1512,26 @@ const Invoice = () => {
                     return `
                         <tr style="font-size: 9.5px; font-family: Arial, sans-serif;">
                             <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center;">${idx + 1}</td>
-                            <td style="border: 1px solid #94a3b8; padding: 4px;  font-weight: bold; color: #0284c7;">${b.bttt_id}</td>
+                            <td style="border: 1px solid #94a3b8; padding: 4px; font-weight: bold; color: #0284c7;">${b.bttt_id}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center;">${formatTanggalIndonesia(b.bttt_tanggal)}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px;">${b.bttt_tujuankota || '-'}</td>
-                            <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center; ">${kodepos}</td>
+                            <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center;">${kodepos}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px; font-weight: 500;">${b.bttt_tujuannama || '-'}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center;">${b.bttt_nosuratjalan || '-'}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center; font-size: 8.5px; color: #0f172a;">${viaTransport}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px; color: #475569;">${rawKet}</td>
-                            <td style="border: 1px solid #94a3b8; padding: 4px; text-align: right; ">${berat.toLocaleString('id-ID')}</td>
-                            <td style="border: 1px solid #94a3b8; padding: 4px; text-align: right;  font-weight: normal;">${biayaKirim.toLocaleString('id-ID')}</td>
+                            <td style="border: 1px solid #94a3b8; padding: 4px; text-align: right;">${berat.toLocaleString('id-ID')}</td>
+                            <td style="border: 1px solid #94a3b8; padding: 4px; text-align: right; font-weight: normal;">${biayaKirim.toLocaleString('id-ID')}</td>
                         </tr>
                     `;
                 }).join('');
 
-                const sumRincianBTT = totalBiayaKirim - totalDiskon + totalAsuransi + totalPacking;
-                const dbDPP = Number(header.artih_dpp || 0);
-                const nilaiJual = dbDPP > 0 ? dbDPP : sumRincianBTT;
-                const selisihLainnya = Math.max(0, nilaiJual - sumRincianBTT);
-                const packingDanLainDisplay = totalPacking + selisihLainnya;
+                // Rumus paten: Nilai Jual = Jumlah - Diskon + Asuransi + Packing/BM/Lain
+                const packingDanLainDisplay = totalPenerus + totalPacking;
+                const nilaiJual = totalBiayaKirim - totalDiskon + totalAsuransi + packingDanLainDisplay;
                 const dpp = nilaiJual;
-                const ppn = Number(header.artih_ppn || 0) > 0 ? Number(header.artih_ppn) : (dpp * 0.011);
-                const totalTagihan = Number(header.artih_total || (nilaiJual + ppn));
+                const ppn = Math.round(dpp * 0.011 * 100) / 100;
+                const totalTagihan = nilaiJual + ppn;
 
                 // const nilaiJual = totalBiayaKirim - totalDiskon + totalAsuransi + totalPacking;
                 // const dpp = nilaiJual;
