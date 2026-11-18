@@ -35,6 +35,10 @@ const KasMasukKeluar = () => {
     const [cabangList, setCabangList] = useState([]);
     const [loading, setLoading] = useState(false);
 
+    // Helper dinamis mengambil PT aktif dari session/localStorage tanpa hardcode 'C'
+    const getActivePtId = () => localStorage.getItem('pt_id') || localStorage.getItem('selected_pt') || '';
+    const getDefaultAgenId = () => localStorage.getItem('agen_id') || localStorage.getItem('server_id') || (cabangList[0]?.agen_id || cabangList[0]?.AgenID || '');
+
     const [isCashFlowOpen, setIsCashFlowOpen] = useState(false);
     const [cashFlowData, setCashFlowData] = useState(null);
     const [loadingCashFlow, setLoadingCashFlow] = useState(false);
@@ -66,10 +70,10 @@ const KasMasukKeluar = () => {
 
     const [formData, setFormData] = useState({
         cb_id: '',
-        cb_nourut: '0001',
+        cb_nourut: '',
         cb_tanggal: today,
         cb_tipe: 'K',
-        cb_transagenid: '1',
+        cb_transagenid: '',
         cb_pembuat: localStorage.getItem('username') || 'staff',
         cb_ket: '',
         cb_notrans_um_sebelumnya: '',
@@ -163,7 +167,7 @@ const KasMasukKeluar = () => {
         setLoadingBPLK(true);
         try {
             const token = localStorage.getItem('token');
-            const ptId = localStorage.getItem('pt_id') || 'C';
+            const ptId = getActivePtId();
             const res = await api.get(`/gl/cashbank/bplk/detail?st=${encodeURIComponent(cleanST)}&pt_id=${ptId}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -215,7 +219,7 @@ const KasMasukKeluar = () => {
 
         try {
             const token = localStorage.getItem('token');
-            const ptId = localStorage.getItem('pt_id') || 'C';
+            const ptId = getActivePtId();
 
             const payload = {
                 sjh_id: bplkData.sjh_id,
@@ -245,20 +249,23 @@ const KasMasukKeluar = () => {
 
     //end
 
-    const fetchCashBankData = async () => {
+    const fetchCashBankData = async (forceFilter = isFilterActive) => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
             let queryParams = `/gl/cashbank?limit=500`;
 
-            if (isFilterActive) {
-                if (startDate && endDate) queryParams += `&start_date=${startDate}&end_date=${endDate}`;
-                if (selectedCabang) queryParams += `&cabang_nama=${selectedCabang}`;
-                if (selectedTipe) queryParams += `&tipe=${selectedTipe}`;
-                if (searchNoTrans) queryParams += `&no_trans=${searchNoTrans}`;
-                if (searchNoJurnal) queryParams += `&no_jurnal=${searchNoJurnal}`;
-                if (selectedAktif) queryParams += `&aktif_yn=${selectedAktif}`;
-                if (selectedPosting) queryParams += `&posting_yn=${selectedPosting}`;
+            if (forceFilter) {
+                // Jika mencari No. Transaksi spesifik, jangan dikunci tanggal hari ini saja
+                if (!searchNoTrans.trim() && startDate && endDate) {
+                    queryParams += `&start_date=${startDate}&end_date=${endDate}`;
+                }
+                if (selectedCabang) queryParams += `&cabang_nama=${encodeURIComponent(selectedCabang)}`;
+                if (selectedTipe) queryParams += `&tipe=${encodeURIComponent(selectedTipe)}`;
+                if (searchNoTrans.trim()) queryParams += `&no_trans=${encodeURIComponent(searchNoTrans.trim())}`;
+                if (searchNoJurnal.trim()) queryParams += `&no_jurnal=${encodeURIComponent(searchNoJurnal.trim())}`;
+                if (selectedAktif) queryParams += `&aktif_yn=${encodeURIComponent(selectedAktif)}`;
+                if (selectedPosting) queryParams += `&posting_yn=${encodeURIComponent(selectedPosting)}`;
             }
 
             const res = await api.get(queryParams, { headers: { Authorization: `Bearer ${token}` } });
@@ -362,11 +369,11 @@ const KasMasukKeluar = () => {
 
         setFormData({
             cb_id: '',
-            cb_nourut: '0001',
+            cb_nourut: '',
             cb_tanggal: today,
             cb_tipe: defaultTipe,
-            cb_transagenid: '1',
-            cb_pembuat: localStorage.getItem('username') || 'staff',
+            cb_transagenid: String(getDefaultAgenId()),
+            cb_pembuat: localStorage.getItem('username') || '',
             cb_ket: defaultKet,
             cb_notrans_um_sebelumnya: '',
             cb_postyn: 'N',
@@ -387,11 +394,11 @@ const KasMasukKeluar = () => {
         setStep(3);
         setFormData({
             cb_id: item.cb_id,
-            cb_nourut: '0001',
+            cb_nourut: item.cb_nourut || '',
             cb_tanggal: item.cb_tanggal || today,
             cb_tipe: item.cb_tipe || 'K',
-            cb_transagenid: '1',
-            cb_pembuat: localStorage.getItem('username') || 'staff',
+            cb_transagenid: String(item.cb_transagenid || item.cb_agenid || getDefaultAgenId()),
+            cb_pembuat: item.cb_pembuat || localStorage.getItem('username') || '',
             cb_ket: item.cb_ket !== '-' ? item.cb_ket : '',
             cb_notrans_um_sebelumnya: '',
             cb_postyn: item.cb_postyn || 'N',
@@ -404,34 +411,26 @@ const KasMasukKeluar = () => {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const details = res.data?.details || res.data?.data || [];
-            if (details.length > 0) {
-                setRincianList(details.map(d => ({
-                    nama_biaya: d.item_name || d.cbd_ket,
-                    item_id: d.cbd_itemid,
-                    keterangan: d.cbd_ket,
-                    quantity: d.cbd_quantity,
-                    harga_satuan: d.cbd_hargasatuan,
-                    subtotal: d.cbd_quantity * d.cbd_hargasatuan
-                })));
-            } else {
-                setRincianList([{
-                    nama_biaya: item.cb_ket,
-                    item_id: '084000000007',
-                    keterangan: item.cb_ket,
-                    quantity: 1,
-                    harga_satuan: item.total_amount || 0,
-                    subtotal: item.total_amount || 0
-                }]);
-            }
+            setRincianList(details.map(d => ({
+                nama_biaya: d.item_name || d.cbd_ket,
+                item_id: d.cbd_itemid,
+                keterangan: d.cbd_ket || d.item_name,
+                quantity: d.cbd_quantity,
+                harga_satuan: d.cbd_hargasatuan,
+                subtotal: d.cbd_quantity * d.cbd_hargasatuan
+            })));
         } catch (err) {
-            setRincianList([{
-                nama_biaya: item.cb_ket,
-                item_id: '084000000007',
-                keterangan: item.cb_ket,
-                quantity: 1,
-                harga_satuan: item.total_amount || 0,
-                subtotal: item.total_amount || 0
-            }]);
+            console.error("Gagal mengambil rincian kas:", err);
+            setRincianList([]);
+            Swal.fire({
+                title: 'Gagal Memuat Rincian',
+                text: err.response?.data?.message || 'Tidak dapat memuat rincian item dari database.',
+                icon: 'error',
+                didOpen: () => {
+                    const container = document.querySelector('.swal2-container');
+                    if (container) container.style.zIndex = '9999999';
+                }
+            });
         }
 
         setIsModalOpen(true);
@@ -534,7 +533,7 @@ const KasMasukKeluar = () => {
         setShowBankDropdown(true);
         try {
             const token = localStorage.getItem('token');
-            const ptId = localStorage.getItem('pt_id') || localStorage.getItem('selected_pt') || 'C';
+            const ptId = getActivePtId();
 
             const res = await api.get(`/gl/bank-data?search=${encodeURIComponent(query)}&pt_id=${encodeURIComponent(ptId)}`, {
                 headers: { Authorization: `Bearer ${token}` }
@@ -552,7 +551,7 @@ const KasMasukKeluar = () => {
         setShowEtollDropdown(true);
         try {
             const token = localStorage.getItem('token');
-            const ptId = localStorage.getItem('pt_id') || localStorage.getItem('selected_pt') || 'C';
+            const ptId = getActivePtId();
             const res = await api.get(`/gl/etoll-data?q=toll&search=${encodeURIComponent(query)}&pt_id=${encodeURIComponent(ptId)}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -617,7 +616,7 @@ const KasMasukKeluar = () => {
         setLoadingRealisasi(true);
         try {
             const token = localStorage.getItem('token');
-            const ptId = localStorage.getItem('pt_id') || 'C';
+            const ptId = getActivePtId();
             const res = await api.get(`/gl/cashbank/bplk/realisasi?st=${encodeURIComponent(bplkData.sjh_id)}&pt_id=${ptId}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -835,65 +834,58 @@ const KasMasukKeluar = () => {
             }
         });
     };
+
+
     const handlePrint = async (item) => {
         try {
             const token = localStorage.getItem('token');
-            const ptId = localStorage.getItem('pt_id') || localStorage.getItem('selected_pt') || 'C';
+            const ptId = getActivePtId();
+            const ptQuery = ptId ? `?pt_id=${encodeURIComponent(ptId)}` : '';
 
             let details = [];
             let lawanName = '';
-            let lawanCode = '-';
+            let lawanCode = '';
+            let lawanAgenId = item.cb_agenid || item.cb_transagenid || '';
             let totalAmount = Number(item.total_amount || item.cb_total || 0);
 
+            const fetchNamaAkunCOA = async (accCode) => {
+                if (!accCode || accCode === '-') return '';
+                const cleanCode = String(accCode).trim();
+                try {
+                    const coaRes = await api.get(`/gl/kode-perkiraan?limit=1000`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    const foundCoa = (coaRes.data?.data || []).find(
+                        c => String(c.ca_id).trim() === cleanCode
+                    );
+                    if (foundCoa?.ca_name) return foundCoa.ca_name;
+
+                    const bankRes = await api.get(`/gl/bank-data?search=${encodeURIComponent(cleanCode)}${ptId ? `&pt_id=${encodeURIComponent(ptId)}` : ''}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    const foundBank = (bankRes.data?.data || []).find(
+                        b => String(b.code).trim() === cleanCode
+                    );
+                    return foundBank?.name || '';
+                } catch {
+                    return '';
+                }
+            };
+
             if (item.cb_nojurnal && item.cb_nojurnal !== '-' && item.cb_nojurnal !== '') {
-                const jRes = await api.get(`/gl/jurnal/detail/${encodeURIComponent(item.cb_nojurnal)}?pt_id=${encodeURIComponent(ptId)}`, {
+                const jRes = await api.get(`/gl/jurnal/detail/${encodeURIComponent(item.cb_nojurnal)}${ptQuery}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
 
                 const jDetails = jRes.data?.details || [];
-
-                // Helper ambil nama akun dari master COA jika ca_name dari detail jurnal kosong/'-'
-                const fetchNamaAkunCOA = async (accCode) => {
-                    if (!accCode || accCode === '-') return '';
-                    const cleanCode = String(accCode).trim();
-                    try {
-                        // 1. Cari di seluruh daftar COA
-                        const coaRes = await api.get(`/gl/kode-perkiraan?limit=1000`, {
-                            headers: { Authorization: `Bearer ${token}` }
-                        });
-                        const foundCoa = (coaRes.data?.data || []).find(
-                            c => String(c.ca_id).trim() === cleanCode
-                        );
-                        if (foundCoa?.ca_name) return foundCoa.ca_name;
-
-                        // 2. Fallback cari di master Bank (/gl/bank-data)
-                        const bankRes = await api.get(`/gl/bank-data?search=${encodeURIComponent(cleanCode)}&pt_id=${encodeURIComponent(ptId)}`, {
-                            headers: { Authorization: `Bearer ${token}` }
-                        });
-                        const foundBank = (bankRes.data?.data || []).find(
-                            b => String(b.code).trim() === cleanCode
-                        );
-                        return foundBank?.name || '';
-
-                        // 3. Fallback cari di master Item Kas (/gl/cashbank/items)
-                        const itemRes = await api.get(`/gl/cashbank/items?q=${encodeURIComponent(cleanCode)}`, {
-                            headers: { Authorization: `Bearer ${token}` }
-                        });
-                        const foundItem = (itemRes.data?.data || []).find(
-                            it => String(it.item_id).trim() === cleanCode
-                        );
-                        return foundItem?.item_name || '';
-                    } catch {
-                        return '';
-                    }
-                };
 
                 const lawanRow = item.cb_tipe === 'K'
                     ? jDetails.find(d => Number(d.tjurd_kredit) > 0)
                     : jDetails.find(d => Number(d.tjurd_debet) > 0);
 
                 if (lawanRow) {
-                    lawanCode = lawanRow.tjurd_acccode || '-';
+                    lawanCode = lawanRow.tjurd_acccode || '';
+                    lawanAgenId = lawanRow.tjurd_agenid || lawanAgenId;
                     lawanName = (lawanRow.ca_name && lawanRow.ca_name !== '-')
                         ? lawanRow.ca_name
                         : await fetchNamaAkunCOA(lawanCode);
@@ -904,15 +896,16 @@ const KasMasukKeluar = () => {
                     : jDetails.filter(d => Number(d.tjurd_kredit) > 0);
 
                 details = await Promise.all(detailRows.map(async (d) => {
-                    const accCode = d.tjurd_acccode || '-';
+                    const accCode = d.tjurd_acccode || '';
                     const namaAkun = (d.ca_name && d.ca_name !== '-')
                         ? d.ca_name
                         : await fetchNamaAkunCOA(accCode);
 
                     return {
                         code: accCode,
+                        agenId: d.tjurd_agenid || lawanAgenId,
                         nama: namaAkun,
-                        keterangan: d.tjurd_keterangan || item.cb_ket || '',
+                        keterangan: d.tjurd_keterangan || '',
                         nominal: Number(item.cb_tipe === 'K' ? d.tjurd_debet : d.tjurd_kredit) || 0
                     };
                 }));
@@ -921,19 +914,23 @@ const KasMasukKeluar = () => {
                     totalAmount = details.reduce((sum, d) => sum + Number(d.nominal), 0);
                 }
             } else {
-                const rawDetails = item.details || item.rincian || [];
+                const cbRes = await api.get(`/gl/cashbank/detail?cb_id=${encodeURIComponent(item.cb_id)}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const rawDetails = cbRes.data?.details || [];
                 if (rawDetails.length > 0) {
                     details = rawDetails.map(d => ({
-                        code: d.cbd_itemid || d.item_id || '-',
+                        code: d.item_owncaid || d.cbd_itemid,
+                        agenId: d.cbd_agenid || lawanAgenId,
                         nama: d.item_name || '',
-                        keterangan: d.cbd_ket || item.cb_ket || '',
-                        nominal: Number(d.cbd_total || (d.cbd_quantity * d.cbd_hargasatuan) || 0)
+                        keterangan: d.cbd_ket || d.item_name || '',
+                        nominal: Number(d.cbd_quantity * d.cbd_hargasatuan) || 0
                     }));
                     totalAmount = details.reduce((sum, d) => sum + Number(d.nominal), 0);
                 } else {
                     Swal.fire({
                         title: 'Data Belum Lengkap',
-                        text: 'Transaksi ini belum diposting dan tidak memiliki rincian biaya.',
+                        text: 'Transaksi ini belum diposting dan tidak memiliki rincian biaya di database.',
                         icon: 'warning',
                         didOpen: () => {
                             const container = document.querySelector('.swal2-container');
@@ -947,11 +944,12 @@ const KasMasukKeluar = () => {
             setPrintData({
                 noTrans: (item.cb_nojurnal && item.cb_nojurnal !== '-') ? item.cb_nojurnal : item.cb_id,
                 tanggal: formatDate(item.cb_tanggal),
-                keterangan: item.cb_ket || '-',
+                keterangan: item.cb_ket || '',
                 tipe: item.cb_tipe,
                 total: totalAmount,
                 lawanCode,
                 lawanName,
+                lawanAgenId,
                 details
             });
             setIsPrintOpen(true);
@@ -959,7 +957,7 @@ const KasMasukKeluar = () => {
             console.error("Gagal memuat voucher cetak:", err);
             Swal.fire({
                 title: 'GAGAL PRINT',
-                text: 'Tidak dapat memuat data rincian kas untuk dicetak.',
+                text: err.response?.data?.message || 'Tidak dapat memuat data rincian kas untuk dicetak.',
                 icon: 'error',
                 didOpen: () => {
                     const container = document.querySelector('.swal2-container');
@@ -1088,10 +1086,16 @@ const KasMasukKeluar = () => {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                             <div>
                                 <label className="font-bold text-slate-700 block mb-1.5">TRANSAKSI :</label>
-                                <select value={formData.cb_transagenid} onChange={(e) => setFormData({ ...formData, cb_transagenid: e.target.value })} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg bg-white font-bold text-slate-800 outline-none focus:border-indigo-600">
-                                    <option value="1">DLI PUSAT</option>
+                                <select
+                                    value={formData.cb_transagenid}
+                                    onChange={(e) => setFormData({ ...formData, cb_transagenid: e.target.value })}
+                                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg bg-white font-bold text-slate-800 outline-none focus:border-indigo-600"
+                                >
+                                    <option value="">-- Pilih Cabang / Transaksi --</option>
                                     {cabangList.map((cabang, idx) => (
-                                        <option key={idx} value={cabang.agen_id || cabang.AgenID}>{cabang.agen_nama || cabang.AgenNama}</option>
+                                        <option key={idx} value={String(cabang.agen_id || cabang.AgenID)}>
+                                            {cabang.agen_nama || cabang.AgenNama}
+                                        </option>
                                     ))}
                                 </select>
                             </div>
@@ -1601,9 +1605,9 @@ const KasMasukKeluar = () => {
                         {printData.details.map((d, i) => (
                             <tr key={i} className="border-b border-slate-300">
                                 <td className="p-2 border-r border-slate-400">{d.code}</td>
-                                <td className="p-2 text-center border-r border-slate-400">1</td>
+                                <td className="p-2 text-center border-r border-slate-400">{d.agenId || '-'}</td>
                                 <td className="p-2 border-r border-slate-400 font-bold uppercase">
-                                    {d.nama ? `${d.nama} : ${d.keterangan}` : d.keterangan}
+                                    {d.keterangan || d.nama || '-'}
                                 </td>
                                 <td className="p-2 text-right border-r border-slate-400">
                                     {printData.tipe === 'K' ? Number(d.nominal).toLocaleString('id-ID', { minimumFractionDigits: 2 }) : '0.00'}
@@ -1617,9 +1621,9 @@ const KasMasukKeluar = () => {
                         {/* BARIS BAWAH: KREDIT (AKUN BANK / SUMBER DANA) */}
                         <tr className="border-b border-slate-300">
                             <td className="p-2 border-r border-slate-400">{printData.lawanCode}</td>
-                            <td className="p-2 text-center border-r border-slate-400">1</td>
+                            <td className="p-2 text-center border-r border-slate-400">{printData.lawanAgenId || '-'}</td>
                             <td className="p-2 border-r border-slate-400 font-bold uppercase">
-                                {printData.lawanName ? `${printData.lawanName} : ${printData.keterangan}` : printData.keterangan}
+                                {printData.lawanName || printData.keterangan || '-'}
                             </td>
                             <td className="p-2 text-right border-r border-slate-400">
                                 {printData.tipe === 'T' ? Number(printData.total).toLocaleString('id-ID', { minimumFractionDigits: 2 }) : '0.00'}
@@ -1699,7 +1703,7 @@ const KasMasukKeluar = () => {
         setLoadingCashFlow(true);
         try {
             const token = localStorage.getItem('token');
-            const ptId = localStorage.getItem('pt_id') || 'C';
+            const ptId = getActivePtId();
 
             let url = `/gl/cashbank/laporan-cashflow?pt_id=${ptId}&start_date=${startDate}&end_date=${endDate}`;
             if (selectedCabang && selectedCabang !== '-- SEMUA CABANG --') {

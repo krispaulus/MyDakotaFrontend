@@ -366,8 +366,12 @@ const BttPrintPage = () => {
                       </span>
                     )}
                   </div>
-                  <div className="font-mono text-slate-700 font-bold text-[7.5px]">{bttData.bttt_tujuantelp || ''}</div>
-                  <div className="text-slate-600 uppercase font-medium text-[7.5px] leading-tight line-clamp-2">
+                  <div className="text-slate-900 uppercase font-bold text-[8.5px] leading-snug line-clamp-2">
+                    {bttData.bttt_tujuantelp && bttData.bttt_tujuantelp.trim() !== '-' && (
+                      <span className="font-mono font-black text-slate-950">
+                        {bttData.bttt_tujuantelp.trim()} |{' '}
+                      </span>
+                    )}
                     {[
                       bttData.bttt_tujuanalamat,
                       bttData.bttt_tujuankelurahan ? `KEL. ${bttData.bttt_tujuankelurahan}` : '',
