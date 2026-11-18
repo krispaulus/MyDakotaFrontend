@@ -57,8 +57,8 @@ import TarifHandlingPropinsi from './pages/TarifHandlingPropinsi';
 import TarifPaket from './pages/TarifPaket';
 import JenisKendaraanCarter from './pages/JenisKendaraanCarter';
 import MasterVendor from './pages/MasterVendor';
-import LaporanLSBP from './pages/LaporanLSBP';
-import LaporanLSBPV2 from './pages/LaporanLSBPV2';
+import LaporanLSPB from './pages/LaporanLSPB';
+import LaporanLSPBV2 from './pages/LaporanLSPBV2';
 import LaporanBarangTurun from './pages/LaporanBarangTurun';
 import LaporanBTTBelumKembali from './pages/LaporanBTTBelumKembali';
 import LaporanDataPenerimaCustomer from './pages/LaporanDataPenerimaCustomer';
@@ -611,8 +611,8 @@ function App() {
       <Route path="/operasional/surat-pengantar-turun" element={<MainLayout><SuratPengantarTurun /></MainLayout>} />
       <Route path="/operasional/hasil-loper" element={<MainLayout><HasilLoper menuName="HasilLoper" /></MainLayout>} />
 
-      <Route path="/operasional/laporan-lsbp" element={<MainLayout><LaporanLSBP menuName="LaporanLSBP" /></MainLayout>} />
-      <Route path="/operasional/laporan-lsbp-v2" element={<MainLayout><LaporanLSBPV2 menuName="LaporanLSBPV2" /></MainLayout>} />
+      <Route path="/operasional/laporan-lspb" element={<MainLayout><LaporanLSPB menuName="LaporanLSPB" /></MainLayout>} />
+      <Route path="/operasional/laporan-lspb-v2" element={<MainLayout><LaporanLSPBV2 menuName="LaporanLSPBV2" /></MainLayout>} />
       <Route path="/operasional/laporan-barang-turun" element={<MainLayout><LaporanBarangTurun menuName="LaporanBarangTurun" /></MainLayout>} />
       <Route path="/operasional/laporan-btt-belum-kembali" element={<MainLayout><LaporanBTTBelumKembali menuName="LaporanBTTBelumKembali" /></MainLayout>} />
       <Route path="/operasional/laporan-data-penerima-customer" element={<MainLayout><LaporanDataPenerimaCustomer menuName="LaporanDataPenerimaCustomer" /></MainLayout>} />
