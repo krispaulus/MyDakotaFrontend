@@ -67,7 +67,9 @@ const BttPrintPage = () => {
   const hasilMappingDO = (bttData.ket_do_kembali || '').trim();
 
   const isTeksMappingDO = /^(DO\s+(ASLI|COPY)|FAKTUR\s+PAJAK|SURAT\s+JALAN)/i.test(cleanKet);
-  const keteranganAtas = isTeksMappingDO ? '' : cleanKet;
+  const keteranganAtas =
+    (bttData.bttt_isikiriman || bttData.isi_kiriman || '').trim() ||
+    (isTeksMappingDO ? '' : cleanKet);
 
   const usernameMarketing = bttData.username || localStorage.getItem('user_nama') || localStorage.getItem('username') || 'SUPERDLI';
   const isCharter =
@@ -96,10 +98,10 @@ const BttPrintPage = () => {
   const matchKetBarangKoli = rawKetAll.match(/^([A-Z0-9\s/&-]+?)\s*\((\d+)\s*KOLI\)/i);
 
   let isiKirimanFinal = (bttData.bttt_isikiriman || '').trim();
-  if ((!isiKirimanFinal || isiKirimanFinal.toUpperCase() === 'PRODUK FARMASI / KESEHATAN') && matchKetBarangKoli) {
+  if (!isiKirimanFinal && matchKetBarangKoli) {
     isiKirimanFinal = matchKetBarangKoli[1].trim().toUpperCase();
   }
-  if (!isiKirimanFinal) isiKirimanFinal = 'PRODUK FARMASI / KESEHATAN';
+  if (!isiKirimanFinal) isiKirimanFinal = 'BARANG';
 
   let jumlahKoliFinal = parseInt(bttData.bttt_jmlkoli, 10) || 0;
   if (jumlahKoliFinal <= 1 && matchKetBarangKoli) {
@@ -143,7 +145,10 @@ const BttPrintPage = () => {
   const tujuanWilayahFinal = resolveTujuanWilayah();
 
   // 🌟 Validasi: Deteksi apakah isi kiriman mengandung kata 'CHEMICALS' / 'CHEMICAL'
-  const isDangerousGoods = isiKirimanFinal.toUpperCase().includes('CHEMICAL');
+  // const isDangerousGoods = isiKirimanFinal.toUpperCase().includes('CHEMICAL');
+  const isDangerousGoods =
+    isiKirimanFinal.toUpperCase().includes('CHEMICAL') ||
+    /\bDG\b|DANGEROUS/i.test(keteranganAtas);
   const tipeLembaran = [
     { label: "Untuk Pengirim", kasta: "Lembar 1 dari 3", isHarga: true, isStempel: false },
     { label: "Kembali Ke Cab. Pengirim", kasta: "Lembar 2 dari 3", isHarga: false, isStempel: true },

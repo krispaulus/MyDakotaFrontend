@@ -69,7 +69,9 @@ const MarketingBTT = () => {
 
             bttt_nosuratjalan: item.no_surat_jalan || item.nosuratjalan || item.bttt_nosuratjalan || "",
             bttt_ket: item.keterangan || item.ket || item.bttt_ket || "",
-            bttt_isikiriman: item.nama_barang || item.isikiriman || item.bttt_isikiriman || "",
+            bttt_isikiriman: item.isi_kiriman || item.bttt_isikiriman || "",
+            bttt_namabarang: item.nama_barang || item.bttt_namabarang || "",
+
             bttt_jmlkoli: parseInt(item.jumlah_koli || item.jmlkoli || item.bttt_jmlkoli) || 1,
             bttt_berat: parseFloat(item.berat || item.bttt_berat) || 1,
             bttt_beratvol: parseFloat(item.berat_volume || item.beratvol || item.bttt_beratvol) || 0,
@@ -99,6 +101,7 @@ const MarketingBTT = () => {
             bttt_tujuankodepos: item.tujuan_kodepos || item.bttt_tujuankodepos || "",
             bttt_tujuanpropinsi: item.tujuan_propinsi || item.bttt_tujuanpropinsi || "",
             ket_do_kembali: item.ket_do_kembali || item.keterangan || item.bttt_ket || '',
+
             lampiran_keterangan: item.keterangan || item.bttt_ket || '',
             bttt_biayapacking: parseFloat(item.biaya_packing || item.bttt_biayapacking || 0),
             estimasihari: item.estimasihari || item.lead_time || 2
