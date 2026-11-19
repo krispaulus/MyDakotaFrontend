@@ -142,6 +142,35 @@ function formatNomorInvoiceResmi(rawId, rawDate, fallbackAgenId = '') {
     return `${agen}${urut}/${mm}/${yyyy}/FP`;
 }
 
+const UnbilledBTTRow = React.memo(({ btt, isChecked, isAlreadyPosted, onToggle }) => {
+    const cleanId = String(btt.bttt_id || '').trim();
+    return (
+        <tr className={`transition-colors ${isChecked ? 'bg-emerald-50/70 font-semibold' : 'hover:bg-sky-50/50'}`}>
+            <td className="p-2 font-mono text-sky-700">{btt.bttt_id}</td>
+            <td className="p-2 font-mono text-slate-700">{String(btt.bttt_tanggal).split('T')[0]}</td>
+            <td className="p-2 text-slate-800">{btt.bttt_asalname}</td>
+            <td className="p-2 text-slate-700">{btt.bttt_namabarang || '-'}</td>
+            <td className="p-2 text-slate-700">{btt.bttt_tujuankota}</td>
+            <td className="p-2 text-center font-mono">{btt.bttt_berat}</td>
+            <td className="p-2 text-center font-mono">0</td>
+            <td className="p-2 text-right font-mono">{Number(btt.bttt_harga || 0).toLocaleString('id-ID')}</td>
+            <td className="p-2 text-right font-mono">{Number(btt.bttt_biayapenerus || 0).toLocaleString('id-ID')}</td>
+            <td className="p-2 text-right font-mono font-bold text-rose-600">
+                {Number(btt.subtotal || btt.bttt_harga || 0).toLocaleString('id-ID')}
+            </td>
+            <td className="p-2 text-center">
+                <input
+                    type="checkbox"
+                    disabled={isAlreadyPosted}
+                    checked={isChecked}
+                    onChange={() => onToggle(cleanId, isChecked)}
+                    className={`w-4 h-4 rounded ${isAlreadyPosted ? 'cursor-not-allowed opacity-40' : 'text-emerald-600 cursor-pointer accent-emerald-600'}`}
+                />
+            </td>
+        </tr>
+    );
+});
+
 const Invoice = () => {
     const { isDarkMode } = useDarkMode();
     const now = new Date();
@@ -154,6 +183,15 @@ const Invoice = () => {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [showFilter, setShowFilter] = useState(true);
+
+    const handleToggleSelectBTT = React.useCallback((cleanId, currentlyChecked) => {
+        setNewInvoiceForm(prev => ({
+            ...prev,
+            selected_btts: currentlyChecked
+                ? prev.selected_btts.filter(id => String(id).trim() !== cleanId)
+                : [...prev.selected_btts, cleanId]
+        }));
+    }, []);
 
     // Dropdown Cetak di Kolom Aksi
     const [activePrintMenuId, setActivePrintMenuId] = useState(null);
@@ -1502,6 +1540,14 @@ const Invoice = () => {
                     const viaTransport = (b.bttt_via || b.bttt_angkutankode || b.via || '').toUpperCase();
                     const rawKet = String(b.bttt_ket || '').trim();
 
+                    const suratJalanList = String(b.bttt_nosuratjalan || '')
+                        .split(',')
+                        .map(s => s.trim())
+                        .filter(Boolean);
+                    const suratJalanHtml = suratJalanList.length > 0
+                        ? suratJalanList.map(sj => `${sj},`).join('<br/>')
+                        : '-';
+
                     totalBiayaKirim += biayaKirim;
                     totalPenerus += penerus;
                     totalDiskon += diskon;
@@ -1517,7 +1563,7 @@ const Invoice = () => {
                             <td style="border: 1px solid #94a3b8; padding: 4px;">${b.bttt_tujuankota || '-'}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center;">${kodepos}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px; font-weight: 500;">${b.bttt_tujuannama || '-'}</td>
-                            <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center;">${b.bttt_nosuratjalan || '-'}</td>
+                            <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center; line-height: 1.3;">${suratJalanHtml}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center; font-size: 8.5px; color: #0f172a;">${viaTransport}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px; color: #475569;">${rawKet}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px; text-align: right;">${berat.toLocaleString('id-ID')}</td>
@@ -3619,13 +3665,23 @@ const Invoice = () => {
 
                 {/* LANGKAH 2: FORM LENGKAP IDENTIK DUA TABEL APLIKASI LAWAS */}
                 {addStep === 2 && (() => {
-                    // 1. Filter BTT yang sudah dipilih oleh user
-                    const selectedBTTObjects = savedInvoiceId && persistedSelectedBtts.length > 0
-                        ? persistedSelectedBtts
-                        : unbilledBTTList.filter(b => {
-                            const cleanBTTId = String(b.bttt_id || '').trim();
-                            return newInvoiceForm.selected_btts.some(id => String(id).trim() === cleanBTTId);
-                        });
+                    // 1. Filter BTT yang sudah dipilih oleh user (O(1) lookup dengan Set)
+                    const selectedIdSet = new Set(newInvoiceForm.selected_btts.map(id => String(id).trim()));
+
+                    const selectedBTTObjects = (() => {
+                        const persistedMap = new Map(
+                            persistedSelectedBtts.map(b => [String(b.bttt_id || '').trim(), b])
+                        );
+                        const unbilledMap = new Map(
+                            unbilledBTTList.map(b => [String(b.bttt_id || '').trim(), b])
+                        );
+                        return newInvoiceForm.selected_btts
+                            .map(id => {
+                                const clean = String(id).trim();
+                                return persistedMap.get(clean) || unbilledMap.get(clean);
+                            })
+                            .filter(Boolean);
+                    })();
 
                     const totBiayaKirim = selectedBTTObjects.reduce((sum, b) => sum + Number(b.bttt_harga || 0), 0);
                     const totPenerus = selectedBTTObjects.reduce((sum, b) => sum + Number(b.bttt_biayapenerus || 0), 0);
@@ -3733,7 +3789,6 @@ const Invoice = () => {
                                                     : 'bg-slate-50 border-slate-300 text-slate-400'
                                                     }`}
                                             />
-                                            {/* 🎯 PANGGIL MELALUI handlePrintDocument YANG SUDAH TERBUKTI BISA DIKLIK */}
                                             {(postedJournalId || activeInvoice?.artih_journalid) && (
                                                 <button
                                                     type="button"
@@ -3848,47 +3903,48 @@ const Invoice = () => {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100 font-medium">
-                                            {selectedBTTObjects.map((btt, idx) => (
-                                                <tr key={idx} className="hover:bg-emerald-50/50">
-                                                    <td className="p-2 font-mono font-bold text-sky-700">{btt.bttt_id}</td>
-                                                    <td className="p-2 font-mono text-slate-700">{String(btt.bttt_tanggal).split('T')[0]}</td>
-                                                    <td className="p-2 text-slate-800">{btt.bttt_asalname}</td>
-                                                    <td className="p-2 text-slate-700">{btt.bttt_tujuannama || '-'}</td>
-                                                    <td className="p-2 text-slate-700">{btt.bttt_namabarang || '-'}</td>
-                                                    <td className="p-2 text-slate-700">{btt.bttt_tujuankota}</td>
-                                                    <td className="p-2 text-center font-mono">{btt.bttt_berat}</td>
-                                                    <td className="p-2 text-center font-mono">0</td>
-                                                    <td className="p-2 text-right font-mono">{Number(btt.bttt_harga || 0).toLocaleString('id-ID')}</td>
-                                                    <td className="p-2 text-right font-mono">0.00</td>
-                                                    <td className="p-2 text-right font-mono">{Number(btt.bttt_biayapenerus || 0).toLocaleString('id-ID')}</td>
-                                                    <td className="p-2 text-right font-mono">{Number(btt.biaya_packing || 0).toLocaleString('id-ID')}</td>
-                                                    <td className="p-2 text-right font-mono font-bold text-emerald-700">
-                                                        {Number(btt.subtotal || btt.bttt_harga || 0).toLocaleString('id-ID')}
-                                                    </td>
-                                                    <td className="p-2 text-center">
-                                                        <button
-                                                            type="button"
-                                                            disabled={isAlreadyPosted}
-                                                            onClick={() => {
-                                                                const targetId = String(btt.bttt_id).trim();
-
-                                                                setNewInvoiceForm(prev => ({
-                                                                    ...prev,
-                                                                    selected_btts: prev.selected_btts.filter(id => id !== btt.bttt_id)
-                                                                }));
-                                                                setPersistedSelectedBtts(prev => prev.filter(b => String(b.bttt_id).trim() !== targetId));
-                                                                if (savedInvoiceId || activeInvoice?.artih_id) {
-                                                                    setRemovedBttIds(prev => [...new Set([...prev, targetId])]);
-                                                                }
-                                                            }}
-                                                            className={`p-1 ${isAlreadyPosted ? 'text-slate-300 cursor-not-allowed' : 'text-rose-600 hover:text-rose-800 cursor-pointer'}`}
-                                                            title={isAlreadyPosted ? 'Invoice sudah diposting' : 'Keluarkan dari invoice'}
-                                                        >
-                                                            <Trash2 size={13} />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
+                                            {selectedBTTObjects.map((btt) => {
+                                                const targetId = String(btt.bttt_id).trim();
+                                                return (
+                                                    <tr key={targetId} className="hover:bg-emerald-50/50">
+                                                        <td className="p-2 font-mono font-bold text-sky-700">{btt.bttt_id}</td>
+                                                        <td className="p-2 font-mono text-slate-700">{String(btt.bttt_tanggal).split('T')[0]}</td>
+                                                        <td className="p-2 text-slate-800">{btt.bttt_asalname}</td>
+                                                        <td className="p-2 text-slate-700">{btt.bttt_tujuannama || '-'}</td>
+                                                        <td className="p-2 text-slate-700">{btt.bttt_namabarang || '-'}</td>
+                                                        <td className="p-2 text-slate-700">{btt.bttt_tujuankota}</td>
+                                                        <td className="p-2 text-center font-mono">{btt.bttt_berat}</td>
+                                                        <td className="p-2 text-center font-mono">0</td>
+                                                        <td className="p-2 text-right font-mono">{Number(btt.bttt_harga || 0).toLocaleString('id-ID')}</td>
+                                                        <td className="p-2 text-right font-mono">0.00</td>
+                                                        <td className="p-2 text-right font-mono">{Number(btt.bttt_biayapenerus || 0).toLocaleString('id-ID')}</td>
+                                                        <td className="p-2 text-right font-mono">{Number(btt.biaya_packing || 0).toLocaleString('id-ID')}</td>
+                                                        <td className="p-2 text-right font-mono font-bold text-emerald-700">
+                                                            {Number(btt.subtotal || btt.bttt_harga || 0).toLocaleString('id-ID')}
+                                                        </td>
+                                                        <td className="p-2 text-center">
+                                                            <button
+                                                                type="button"
+                                                                disabled={isAlreadyPosted}
+                                                                onClick={() => {
+                                                                    setNewInvoiceForm(prev => ({
+                                                                        ...prev,
+                                                                        selected_btts: prev.selected_btts.filter(id => String(id).trim() !== targetId)
+                                                                    }));
+                                                                    setPersistedSelectedBtts(prev => prev.filter(b => String(b.bttt_id).trim() !== targetId));
+                                                                    if (savedInvoiceId || activeInvoice?.artih_id) {
+                                                                        setRemovedBttIds(prev => [...new Set([...prev, targetId])]);
+                                                                    }
+                                                                }}
+                                                                className={`p-1 ${isAlreadyPosted ? 'text-slate-300 cursor-not-allowed' : 'text-rose-600 hover:text-rose-800 cursor-pointer'}`}
+                                                                title={isAlreadyPosted ? 'Invoice sudah diposting' : 'Keluarkan dari invoice'}
+                                                            >
+                                                                <Trash2 size={13} />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
                                             {selectedBTTObjects.length === 0 && (
                                                 <tr>
                                                     <td colSpan={14} className="p-4 text-center text-slate-400 font-bold italic">
@@ -4070,7 +4126,7 @@ const Invoice = () => {
                                     </div>
                                 </div>
 
-                                {/* GRID TABLE DAFTAR RESI BTT UNBILLED */}
+                                {/* GRID TABLE DAFTAR RESI BTT UNBILLED (PAKAI UnbilledBTTRow YANG DI-MEMOIZE) */}
                                 <div className="border border-slate-300 rounded-lg max-h-56 overflow-y-auto bg-white shadow-inner">
                                     <table className="w-full text-left border-collapse text-[11px]">
                                         <thead className="bg-[#004b84] text-white uppercase font-bold sticky top-0 z-10 text-[10px]">
@@ -4090,44 +4146,16 @@ const Invoice = () => {
                                         </thead>
 
                                         <tbody className="divide-y divide-slate-100 font-medium">
-                                            {unbilledBTTList.map((btt, idx) => {
+                                            {unbilledBTTList.map((btt) => {
                                                 const cleanId = String(btt.bttt_id || '').trim();
-                                                const isChecked = newInvoiceForm.selected_btts.some(id => String(id).trim() === cleanId);
-
                                                 return (
-                                                    <tr
-                                                        key={idx}
-                                                        className={`transition-colors ${isChecked ? 'bg-emerald-50/70 font-semibold' : 'hover:bg-sky-50/50'}`}
-                                                    >
-                                                        <td className="p-2 font-mono text-sky-700">{btt.bttt_id}</td>
-                                                        <td className="p-2 font-mono text-slate-700">{String(btt.bttt_tanggal).split('T')[0]}</td>
-                                                        <td className="p-2 text-slate-800">{btt.bttt_asalname}</td>
-                                                        <td className="p-2 text-slate-700">{btt.bttt_namabarang || '-'}</td>
-                                                        <td className="p-2 text-slate-700">{btt.bttt_tujuankota}</td>
-                                                        <td className="p-2 text-center font-mono">{btt.bttt_berat}</td>
-                                                        <td className="p-2 text-center font-mono">0</td>
-                                                        <td className="p-2 text-right font-mono">{Number(btt.bttt_harga || 0).toLocaleString('id-ID')}</td>
-                                                        <td className="p-2 text-right font-mono">{Number(btt.bttt_biayapenerus || 0).toLocaleString('id-ID')}</td>
-                                                        <td className="p-2 text-right font-mono font-bold text-rose-600">
-                                                            {Number(btt.subtotal || btt.bttt_harga || 0).toLocaleString('id-ID')}
-                                                        </td>
-                                                        <td className="p-2 text-center">
-                                                            <input
-                                                                type="checkbox"
-                                                                disabled={isAlreadyPosted}
-                                                                checked={isChecked}
-                                                                onChange={() => {
-                                                                    setNewInvoiceForm(prev => ({
-                                                                        ...prev,
-                                                                        selected_btts: isChecked
-                                                                            ? prev.selected_btts.filter(id => String(id).trim() !== cleanId)
-                                                                            : [...prev.selected_btts, cleanId]
-                                                                    }));
-                                                                }}
-                                                                className={`w-4 h-4 rounded ${isAlreadyPosted ? 'cursor-not-allowed opacity-40' : 'text-emerald-600 cursor-pointer accent-emerald-600'}`}
-                                                            />
-                                                        </td>
-                                                    </tr>
+                                                    <UnbilledBTTRow
+                                                        key={cleanId}
+                                                        btt={btt}
+                                                        isChecked={selectedIdSet.has(cleanId)}
+                                                        isAlreadyPosted={isAlreadyPosted}
+                                                        onToggle={handleToggleSelectBTT}
+                                                    />
                                                 );
                                             })}
                                         </tbody>
@@ -4138,7 +4166,6 @@ const Invoice = () => {
                             {/* 5. FOOTER TOMBOL AKSI PALING BAWAH */}
                             <div className="flex justify-between items-center pt-3 border-t border-slate-200">
                                 <div className="flex items-center gap-2">
-                                    {/* 1. TOMBOL SIMPAN (TERKUNCI JIKA SUDAH DIPOSTING, AKTIF KEMBALI JIKA DI-UNPOSTING) */}
                                     <button
                                         type="button"
                                         disabled={isAlreadyPosted}
@@ -4152,7 +4179,6 @@ const Invoice = () => {
                                         SIMPAN
                                     </button>
 
-                                    {/* 2. TOMBOL TOGGLE: POSTING vs UNPOSTING */}
                                     {isAlreadyPosted ? (
                                         <button
                                             type="button"
@@ -4177,7 +4203,6 @@ const Invoice = () => {
                                         </button>
                                     )}
 
-                                    {/* 3. TOMBOL CETAK FAKTUR */}
                                     <button
                                         type="button"
                                         disabled={!savedInvoiceId && !activeInvoice?.artih_id}
