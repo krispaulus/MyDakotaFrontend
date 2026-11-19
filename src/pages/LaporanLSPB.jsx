@@ -474,14 +474,14 @@ const LaporanLSPB = () => {
                             <option value="DELIVERED">DELIVERED</option>
                         </select>
                     </div>
-                    <div className="col-span-3 flex items-end">
+                    {/* <div className="col-span-3 flex items-end">
                         <button
                             onClick={fetchReport}
                             className="w-full h-[42px] bg-indigo-900 hover:bg-indigo-950 text-white font-bold rounded-lg flex items-center justify-center gap-2 transition uppercase cursor-pointer active:scale-95"
                         >
                             <Search size={14} /> CARI / REFRESH
                         </button>
-                    </div>
+                    </div> */}
                 </div>
             </div>
 
