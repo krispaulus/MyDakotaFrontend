@@ -635,6 +635,33 @@ const Loper = () => {
         printWin.document.close();
     };
 
+    const handleDirectPrintFromRow = async (item) => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await api.get('/operasional/loper/detail', {
+                params: { loper_id: item.loper_eid },
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const hdr = res.data?.header || item;
+            const dets = res.data?.details || [];
+            setEditHeader({
+                loper_eid: hdr.loper_eid || item.loper_eid,
+                loper_tanggal: hdr.loper_tanggal ? hdr.loper_tanggal.slice(0, 10) : today,
+                loper_nomobil: hdr.loper_nomobil || item.loper_nomobil || '',
+                loper_nipsopir: hdr.loper_nipsopir !== '-' ? hdr.loper_nipsopir : '',
+                loper_keraniyn: hdr.loper_keraniyn === 'Y' ? 'Y' : 'N',
+                loper_nipkerani: hdr.loper_nipkerani !== '-' ? hdr.loper_nipkerani : '',
+                loper_otp: hdr.loper_otp || '-',
+                loper_loadhid: hdr.loper_loadhid || '-'
+            });
+            setEditDetails(dets);
+            // Panggil fungsi cetak dengan data terbaru
+            printLoperDocument(hdr, dets);
+        } catch {
+            Swal.fire('Gagal', 'Tidak dapat memuat data untuk cetak Surat Loper', 'error');
+        }
+    };
+
     const columns = [
         {
             header: 'NO. MANIFES LOPER',
@@ -679,10 +706,44 @@ const Loper = () => {
                     {i.loper_aktifyn === 'Y' ? 'AKTIF' : 'BATAL'}
                 </span>
             )
+        },
+
+        {
+            header: 'ACTION',
+            accessor: 'action',
+            render: (item) => (
+                <div className="flex items-center justify-center gap-1.5">
+                    <button
+                        type="button"
+                        onClick={() => handleOpenEdit(item)}
+                        title="Edit Manifes Loper"
+                        className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition cursor-pointer"
+                    >
+                        <Truck size={15} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleDirectPrintFromRow(item)}
+                        title="Cetak Surat Loper"
+                        className="p-1.5 text-sky-600 hover:bg-sky-50 rounded-lg transition cursor-pointer"
+                    >
+                        <Printer size={15} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleDeleteLoper(item)}
+                        title="Hapus Manifes Loper"
+                        className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                    >
+                        <Trash2 size={15} />
+                    </button>
+                </div>
+            )
         }
     ];
 
     const filteredList = loperList.filter(item => {
+        if (item.loper_aktifyn === 'N') return false;
         if (!globalSearch.trim()) return true;
         const q = globalSearch.toLowerCase();
         return (
@@ -727,8 +788,6 @@ const Loper = () => {
                 onSearchChange={e => setGlobalSearch(e.target.value)}
                 onAdd={handleOpenCreate}
                 onFilter={null}
-                onEdit={handleOpenEdit}
-                onDelete={handleDeleteLoper}
             />
 
             {/* ========================================================================= */}
