@@ -635,6 +635,177 @@ const Loper = () => {
         printWin.document.close();
     };
 
+    const printLoperDocument = (hdrData, detailsData) => {
+        const printWin = window.open('', '_blank', 'width=1300,height=800');
+        if (!printWin) return;
+
+        const adminName = localStorage.getItem('username') || 'ADMIN OPS';
+        const agenId = localStorage.getItem('active_agen_id') || '001';
+        const isPusat = agenId === '001' || agenId === '1';
+        const sopirObj = sopirList.find(s => s.kry_nip === hdrData.loper_nipsopir);
+        const keraniObj = sopirList.find(s => s.kry_nip === hdrData.loper_nipkerani);
+
+        const alamatWeightMap = {};
+        const alamatCountMap = {};
+        detailsData.forEach(d => {
+            const al = (d.alamat || '-').trim();
+            alamatWeightMap[al] = (alamatWeightMap[al] || 0) + Number(d.berat || 0);
+            alamatCountMap[al] = (alamatCountMap[al] || 0) + 1;
+        });
+
+        const hitungRateInsentif = (beratTotal) => {
+            let rate = 0;
+            if (beratTotal >= 1 && beratTotal <= 100) rate = 2500;
+            else if (beratTotal >= 101 && beratTotal <= 200) rate = 5000;
+            else if (beratTotal >= 201 && beratTotal <= 1000) rate = 10000;
+            else if (beratTotal > 1000) rate = 15000;
+            return isPusat ? rate : rate / 2;
+        };
+
+        let totalJml = 0;
+        let totalBerat = 0;
+        let totalVol = 0;
+        let totalUkuran = 0;
+        let totalHarga = 0;
+        let totalInsentif = 0;
+        let lastAlamat = null;
+
+        const rowsHtml = detailsData.map((d, i) => {
+            const jml = Number(d.jml_koli || 0);
+            const brt = Number(d.berat || 0);
+            const vol = Number(d.berat_vol || 0);
+            const ukr = Number(d.ukuran || 0);
+            const hrg = Number(d.harga || 0);
+
+            totalJml += jml;
+            totalBerat += brt;
+            totalVol += vol;
+            totalUkuran += ukr;
+            totalHarga += hrg;
+
+            const currentAlamat = (d.alamat || '-').trim();
+            let insentifCellHtml = '';
+            if (currentAlamat !== lastAlamat) {
+                const rowspan = alamatCountMap[currentAlamat] || 1;
+                const isValidUpdate = /^\d{10}$/.test(String(d.input_oleh || '').trim());
+                const nilaiInsentif = (d.status_bbl === 'Diterima' && isValidUpdate)
+                    ? hitungRateInsentif(alamatWeightMap[currentAlamat])
+                    : 0;
+                totalInsentif += nilaiInsentif;
+                insentifCellHtml = `<td rowspan="${rowspan}" style="text-align:right; font-weight:bold;">${nilaiInsentif > 0 ? nilaiInsentif.toLocaleString('id-ID') : ''}</td>`;
+                lastAlamat = currentAlamat;
+            }
+
+            const penerimaText = d.up_penerima && d.up_penerima !== '-'
+                ? `${d.penerima} [ ${d.up_penerima} ]`
+                : (d.penerima || '-');
+
+            return `
+                <tr style="background-color:${i % 2 === 1 ? '#f8fafc' : '#ffffff'};">
+                    <td style="text-align:center;">${i + 1}</td>
+                    <td style="font-family:monospace; font-weight:bold; white-space:nowrap;">${d.no_btt}</td>
+                    <td style="text-align:center; white-space:nowrap;">${d.tgl_btt || '-'}</td>
+                    <td>${d.alamat || '-'}</td>
+                    <td>${penerimaText}</td>
+                    <td>${d.kota || '-'}</td>
+                    <td>${d.keterangan || ''}</td>
+                    <td style="text-align:right;">${jml.toLocaleString('id-ID')}</td>
+                    <td style="text-align:right;">${brt.toLocaleString('id-ID')}</td>
+                    <td style="text-align:right;">${vol.toLocaleString('id-ID')}</td>
+                    <td style="text-align:right;">${ukr.toLocaleString('id-ID')}</td>
+                    <td style="text-align:right;">${hrg.toLocaleString('id-ID')}</td>
+                    <td style="text-align:center;">${d.status_bbl || ''}</td>
+                    <td style="text-align:center;">${d.jam_bbl || ''}</td>
+                    <td style="text-align:center; font-family:monospace;">${d.input_oleh || ''}</td>
+                    ${insentifCellHtml}
+                </tr>
+            `;
+        }).join('');
+
+        printWin.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Loper BTT - ${hdrData.loper_eid}</title>
+                <style>
+                    @page { size: A4 landscape; margin: 8mm; }
+                    body { font-family: Arial, sans-serif; font-size: 9px; color: #0f172a; margin: 0; padding: 10px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+                    th, td { border: 1px solid #94a3b8; padding: 3.5px 4px; vertical-align: middle; }
+                    th { background-color: #004b84 !important; color: #ffffff !important; font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.2px; }
+                </style>
+            </head>
+            <body onload="window.print()">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div>
+                        <strong style="font-size:12px; color:#004b84;">PT. DAKOTA LOGISTIK INDONESIA</strong><br/>
+                        <span style="font-size:9.5px; color:#475569;">Jl. Wibawa Mukti II No. 8 Jatiasih, Bekasi Kota</span>
+                    </div>
+                    <img src="${window.location.origin}${dliLogo}" style="height:36px;" onerror="this.style.display='none'"/>
+                </div>
+                <div style="text-align:center; margin-top:4px;">
+                    <h3 style="margin:0; font-size:13px; letter-spacing:1px;">LOPER BTT</h3>
+                    <div style="font-family:monospace; font-size:12px; font-weight:bold; margin-top:2px;">NOMOR LOPER: ${hdrData.loper_eid}</div>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-top:8px; font-size:9.5px; background:#f1f5f9; padding:6px 10px; border-radius:6px; border:1px solid #cbd5e1;">
+                    <div>
+                        <b>OTP Driver:</b> ${hdrData.loper_otp || '-'} &nbsp;|&nbsp;
+                        <b>Tanggal Loper:</b> ${hdrData.loper_tanggal} &nbsp;|&nbsp;
+                        <b>No. Mobil:</b> ${hdrData.loper_nomobil}
+                    </div>
+                    <div>
+                        <b>Sopir:</b> ${sopirObj?.kry_nama || hdrData.nama_sopir || '-'} (${hdrData.loper_nipsopir}) &nbsp;|&nbsp;
+                        <b>Kerani:</b> ${hdrData.loper_keraniyn === 'Y' ? `${keraniObj?.kry_nama || hdrData.nama_kerani || '-'} (${hdrData.loper_nipkerani})` : '-'}
+                    </div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:22px;">No</th>
+                            <th>No. BTT</th>
+                            <th>Tanggal</th>
+                            <th>Alamat</th>
+                            <th>Penerima</th>
+                            <th>Kota</th>
+                            <th>Keterangan</th>
+                            <th>Jml</th>
+                            <th>Berat</th>
+                            <th>Berat Volume</th>
+                            <th>Ukuran</th>
+                            <th>Harga</th>
+                            <th>STATUS</th>
+                            <th>JAM</th>
+                            <th>Diinput Oleh</th>
+                            <th>INSENTIF</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                    <tfoot>
+                        <tr style="font-weight:bold; background:#e2e8f0;">
+                            <td colspan="7" style="text-align:right; padding-right:8px;">Total</td>
+                            <td style="text-align:right;">${totalJml.toLocaleString('id-ID')}</td>
+                            <td style="text-align:right;">${totalBerat.toLocaleString('id-ID')}</td>
+                            <td style="text-align:right;">${totalVol.toLocaleString('id-ID')}</td>
+                            <td style="text-align:right;">${totalUkuran.toLocaleString('id-ID')}</td>
+                            <td style="text-align:right;">${totalHarga.toLocaleString('id-ID')}</td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td style="text-align:right;">${totalInsentif > 0 ? totalInsentif.toLocaleString('id-ID') : '0'}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+                <div style="display:flex; justify-content:space-around; text-align:center; margin-top:24px; font-size:9.5px;">
+                    <div>Mengetahui,<br/><br/><br/>( ____________________ )</div>
+                    <div>Pembuat,<br/><br/><br/>( ${adminName} )</div>
+                    <div>Sopir / Petugas,<br/><br/><br/>( ____________________ )</div>
+                </div>
+            </body>
+            </html>
+        `);
+        printWin.document.close();
+    };
+
     const handleDirectPrintFromRow = async (item) => {
         try {
             const token = localStorage.getItem('token');
