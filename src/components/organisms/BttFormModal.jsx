@@ -146,18 +146,9 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
         if (isOpen && initialData && isEditMode) {
             console.log("📥 [BttFormModal] Memuat Data Edit BTT:", initialData);
 
-            let formattedDate = todayStr;
-            const rawTgl = initialData.tanggal || initialData.bttt_tanggal;
-            if (rawTgl) {
-                try {
-                    const parsedDate = new Date(rawTgl);
-                    if (!isNaN(parsedDate.getTime())) {
-                        formattedDate = formatDateToYMD(parsedDate);
-                    }
-                } catch (e) {
-                    formattedDate = todayStr;
-                }
-            }
+            const formattedDate = initialData.bttt_tanggal
+                ? String(initialData.bttt_tanggal).substring(0, 10)
+                : (initialData.tanggal ? String(initialData.tanggal).substring(0, 10) : todayStr);
 
             // 🌟 Pisahkan CUSTOMER (Pemilik Akun Tagihan) vs NAMA PENGIRIM (Client/Lokasi Pickup)
             const namaCustomer = initialData.customer_nama || initialData.bttt_asalname || initialData.asal_name || 'UMUM';
@@ -1112,11 +1103,12 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                             <input
                                 type="date"
                                 name="bttt_tanggal"
+                                disabled={isEditMode}
                                 value={formData.bttt_tanggal}
                                 onChange={handleChange}
-                                min={minDate}
-                                max={maxDate}
-                                className="p-1.5 border border-slate-300 rounded-lg font-bold text-sky-800 bg-white outline-none focus:border-sky-500 text-xs shadow-2xs"
+                                min={isEditMode ? undefined : minDate}
+                                max={isEditMode ? undefined : maxDate}
+                                className={`p-1.5 border border-slate-300 rounded-lg font-bold outline-none text-xs shadow-2xs ${isEditMode ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'text-sky-800 bg-white focus:border-sky-500'}`}
                             />
                             {isLayananPaket ? (
                                 <span className="text-[11px] text-emerald-700 font-semibold italic">
@@ -1677,7 +1669,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                                         setFormData(prev => ({
                                             ...prev,
                                             bttt_nosuratjalan: val,
-                                            bttt_ket: val.trim() !== "" ? "SURAT JALAN KEMBALI" : prev.bttt_ket
+                                            bttt_ket: (!isEditMode && val.trim() !== "") ? "SURAT JALAN KEMBALI" : prev.bttt_ket
                                         }));
                                     }}
                                     placeholder="Masukkan nomor surat jalan..."
