@@ -21,6 +21,25 @@ const Loper = () => {
     const [filterNoLoper, setFilterNoLoper] = useState('');
     const [globalSearch, setGlobalSearch] = useState('');
 
+    // Filter tambahan agar sinkron dengan Cetak & Cetak Detail
+    const [filterNoMobil, setFilterNoMobil] = useState('');
+    const [filterSopir, setFilterSopir] = useState('');
+    const [filterKerani, setFilterKerani] = useState('');
+    const [filterNoBtt, setFilterNoBtt] = useState('');
+
+    // State Modal Tambah Loper Langsung dari BTT (opr_t_loper_a_BTT.asp)
+    const [isDirectBttOpen, setIsDirectBttOpen] = useState(false);
+    const [submittingDirect, setSubmittingDirect] = useState(false);
+    const [directForm, setDirectForm] = useState({
+        loper_tanggal: today,
+        loper_nomobil: '',
+        loper_nipsopir: '',
+        loper_keraniyn: 'N',
+        loper_nipkerani: ''
+    });
+    const [printingReport, setPrintingReport] = useState(false);
+
+
     // Master Data
     const [kendaraanList, setKendaraanList] = useState([]);
     const [sopirList, setSopirList] = useState([]);
@@ -979,6 +998,322 @@ const Loper = () => {
         );
     });
 
+    // 1. HANDLER TAMBAH LOPER LANGSUNG DARI BTT (opr_t_loper_a_BTT.asp)
+    const handleOpenDirectBtt = () => {
+        setDirectForm({
+            loper_tanggal: today,
+            loper_nomobil: '',
+            loper_nipsopir: '',
+            loper_keraniyn: 'N',
+            loper_nipkerani: ''
+        });
+        setIsDirectBttOpen(true);
+    };
+
+    const handleSubmitDirectBtt = async (e) => {
+        e.preventDefault();
+        if (!directForm.loper_nomobil || !directForm.loper_nipsopir) {
+            Swal.fire('Peringatan', 'Nomor Mobil dan Sopir/Pengemudi wajib dipilih!', 'warning');
+            return;
+        }
+        if (directForm.loper_keraniyn === 'Y' && !directForm.loper_nipkerani) {
+            Swal.fire('Peringatan', 'Nama Kerani wajib dipilih jika Kerani = Ya!', 'warning');
+            return;
+        }
+
+        setSubmittingDirect(true);
+        try {
+            const token = localStorage.getItem('token');
+            const agenId = localStorage.getItem('active_agen_id') || '001';
+            const res = await api.post('/operasional/loper/create-direct-btt', {
+                loper_agenid: agenId,
+                loper_tanggal: directForm.loper_tanggal,
+                loper_nomobil: directForm.loper_nomobil,
+                loper_nipsopir: directForm.loper_nipsopir,
+                loper_keraniyn: directForm.loper_keraniyn,
+                loper_nipkerani: directForm.loper_keraniyn === 'Y' ? directForm.loper_nipkerani : ''
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            const newLoperId = res.data?.loper_eid;
+            setIsDirectBttOpen(false);
+            fetchLoperData();
+
+            // Langsung buka modal Edit/Scan BTT untuk Nomor Loper yang baru dibuat (persis alur ASP)
+            if (newLoperId) {
+                await handleOpenEdit({ loper_eid: newLoperId });
+            }
+        } catch (err) {
+            Swal.fire('Gagal', err.response?.data?.message || 'Gagal membuat header Loper', 'error');
+        } finally {
+            setSubmittingDirect(false);
+        }
+    };
+
+    // 2. HANDLER CETAK REKAP LAPORAN LOPER (opr_t_laporan_loper.asp)
+    const handleCetakRekapLoper = async () => {
+        setPrintingReport(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await api.get('/operasional/loper/report-rekap', {
+                params: {
+                    tgla: filterTgla,
+                    tgle: filterTgle,
+                    no_loper: filterNoLoper,
+                    no_mobil: filterNoMobil,
+                    sopir: filterSopir,
+                    kerani: filterKerani,
+                    no_btt: filterNoBtt
+                },
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const rows = res.data?.data || [];
+            if (rows.length === 0) {
+                Swal.fire('Info', 'Tidak ada data Loper pada periode/filter ini untuk dicetak.', 'info');
+                return;
+            }
+
+            const printWin = window.open('', '_blank', 'width=1350,height=800');
+            if (!printWin) return;
+
+            const adminName = localStorage.getItem('username') || 'ADMIN OPS';
+            const cabangNama = localStorage.getItem('active_cabang_nama') || 'DLI PUSAT';
+
+            let tBtt = 0, tTerloper = 0, tGagal = 0, tBlm = 0;
+            let tKoliOk = 0, tBeratOk = 0, tVolOk = 0, tUkrOk = 0, tCodOk = 0;
+            let tKoliNo = 0, tBeratNo = 0, tVolNo = 0, tUkrNo = 0, tCodNo = 0;
+
+            const bodyHtml = rows.map((r, i) => {
+                tBtt += Number(r.jbtt || 0);
+                tTerloper += Number(r.jbtt_terloper || 0);
+                tGagal += Number(r.jbtt_gagal || 0);
+                tBlm += Number(r.jbtt_blm_input || 0);
+
+                tKoliOk += Number(r.koli_berhasil || 0);
+                tBeratOk += Number(r.berat_berhasil || 0);
+                tVolOk += Number(r.vol_berhasil || 0);
+                tUkrOk += Number(r.ukuran_berhasil || 0);
+                tCodOk += Number(r.cod_berhasil || 0);
+
+                tKoliNo += Number(r.koli_gagal || 0);
+                tBeratNo += Number(r.berat_gagal || 0);
+                tVolNo += Number(r.vol_gagal || 0);
+                tUkrNo += Number(r.ukuran_gagal || 0);
+                tCodNo += Number(r.cod_gagal || 0);
+
+                return `
+                    <tr style="background:${i % 2 === 1 ? '#f8fafc' : '#ffffff'};">
+                        <td style="font-family:monospace; font-weight:bold; white-space:nowrap;">${r.loper_eid}</td>
+                        <td style="text-align:center;">${r.loper_tanggal}</td>
+                        <td style="font-family:monospace; font-weight:bold;">${r.loper_nomobil}</td>
+                        <td>${r.nama_sopir} [ Nip : ${r.nip_sopir} ]</td>
+                        <td>${r.nama_kerani !== '-' ? `${r.nama_kerani} [ Nip : ${r.nip_kerani} ]` : '-'}</td>
+                        <td style="text-align:right; font-weight:bold;">${Number(r.jbtt).toLocaleString('id-ID')}</td>
+                        <td style="text-align:right; color:#059669; font-weight:bold;">${Number(r.jbtt_terloper).toLocaleString('id-ID')}</td>
+                        <td style="text-align:right; color:#e11d48; font-weight:bold;">${Number(r.jbtt_gagal).toLocaleString('id-ID')}</td>
+                        <td style="text-align:right; color:#d97706; font-weight:bold;">${Number(r.jbtt_blm_input).toLocaleString('id-ID')}</td>
+                        <td style="text-align:right;">${Number(r.koli_berhasil).toLocaleString('id-ID')}</td>
+                        <td style="text-align:right;">${Number(r.berat_berhasil).toLocaleString('id-ID')}</td>
+                        <td style="text-align:right;">${Number(r.vol_berhasil).toLocaleString('id-ID')}</td>
+                        <td style="text-align:right;">${Number(r.ukuran_berhasil).toLocaleString('id-ID')}</td>
+                        <td style="text-align:right;">${Number(r.cod_berhasil).toLocaleString('id-ID')}</td>
+                        <td style="text-align:right;">${Number(r.koli_gagal).toLocaleString('id-ID')}</td>
+                        <td style="text-align:right;">${Number(r.berat_gagal).toLocaleString('id-ID')}</td>
+                        <td style="text-align:right;">${Number(r.vol_gagal).toLocaleString('id-ID')}</td>
+                        <td style="text-align:right;">${Number(r.ukuran_gagal).toLocaleString('id-ID')}</td>
+                        <td style="text-align:right;">${Number(r.cod_gagal).toLocaleString('id-ID')}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            printWin.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Laporan Loper Barang / BTT</title>
+                    <style>
+                        @page { size: A4 landscape; margin: 7mm; }
+                        body { font-family: Arial, sans-serif; font-size: 8.5px; color: #0f172a; margin: 0; padding: 8px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+                        th, td { border: 1px solid #94a3b8; padding: 3px 4px; vertical-align: middle; }
+                        th { background-color: #004b84 !important; color: #ffffff !important; font-size: 8px; text-transform: uppercase; }
+                    </style>
+                </head>
+                <body onload="window.print()">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                        <div>
+                            <strong style="font-size:12px; color:#004b84;">DAKOTA LOGISTIK INDONESIA</strong><br/>
+                            <span style="font-size:9px;">Cabang: <b>${cabangNama}</b> | Periode: <b>${filterTgla} s/d ${filterTgle}</b> | Dicetak oleh: <b>${adminName}</b></span>
+                        </div>
+                        <img src="${window.location.origin}${dliLogo}" style="height:34px;" onerror="this.style.display='none'"/>
+                    </div>
+                    <h3 style="text-align:center; margin:6px 0; font-size:13px; letter-spacing:1px;">LAPORAN LOPER BARANG / BTT</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th rowspan="2">No. Loper</th>
+                                <th rowspan="2">Tanggal</th>
+                                <th rowspan="2">No. Mobil</th>
+                                <th rowspan="2">Supir</th>
+                                <th rowspan="2">Kerani</th>
+                                <th rowspan="2">BTT Keseluruhan</th>
+                                <th rowspan="2">BTT Berhasil Diloper</th>
+                                <th rowspan="2">BTT Gagal Diloper</th>
+                                <th rowspan="2">BTT Blm Diinput</th>
+                                <th colspan="5">BERHASIL DILOPER</th>
+                                <th colspan="5">GAGAL DILOPER</th>
+                            </tr>
+                            <tr>
+                                <th>Koli</th><th>Kilo</th><th>Volume</th><th>Ukuran</th><th>COD</th>
+                                <th>Koli</th><th>Kilo</th><th>Volume</th><th>Ukuran</th><th>COD</th>
+                            </tr>
+                        </thead>
+                        <tbody>${bodyHtml}</tbody>
+                        <tfoot>
+                            <tr style="font-weight:bold; background:#e2e8f0;">
+                                <td colspan="5" style="text-align:right;">TOTAL KESELURUHAN :</td>
+                                <td style="text-align:right;">${tBtt.toLocaleString('id-ID')}</td>
+                                <td style="text-align:right;">${tTerloper.toLocaleString('id-ID')}</td>
+                                <td style="text-align:right;">${tGagal.toLocaleString('id-ID')}</td>
+                                <td style="text-align:right;">${tBlm.toLocaleString('id-ID')}</td>
+                                <td style="text-align:right;">${tKoliOk.toLocaleString('id-ID')}</td>
+                                <td style="text-align:right;">${tBeratOk.toLocaleString('id-ID')}</td>
+                                <td style="text-align:right;">${tVolOk.toLocaleString('id-ID')}</td>
+                                <td style="text-align:right;">${tUkrOk.toLocaleString('id-ID')}</td>
+                                <td style="text-align:right;">${tCodOk.toLocaleString('id-ID')}</td>
+                                <td style="text-align:right;">${tKoliNo.toLocaleString('id-ID')}</td>
+                                <td style="text-align:right;">${tBeratNo.toLocaleString('id-ID')}</td>
+                                <td style="text-align:right;">${tVolNo.toLocaleString('id-ID')}</td>
+                                <td style="text-align:right;">${tUkrNo.toLocaleString('id-ID')}</td>
+                                <td style="text-align:right;">${tCodNo.toLocaleString('id-ID')}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </body>
+                </html>
+            `);
+            printWin.document.close();
+        } catch (err) {
+            Swal.fire('Gagal', err.response?.data?.message || 'Gagal memuat laporan rekap loper', 'error');
+        } finally {
+            setPrintingReport(false);
+        }
+    };
+
+    // 3. HANDLER CETAK DETAIL LAPORAN LOPER (opr_t_laporan_loper_detail.asp)
+    const handleCetakDetailLoper = async () => {
+        setPrintingReport(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await api.get('/operasional/loper/report-detail', {
+                params: {
+                    tgla: filterTgla,
+                    tgle: filterTgle,
+                    no_loper: filterNoLoper,
+                    no_mobil: filterNoMobil,
+                    sopir: filterSopir,
+                    kerani: filterKerani,
+                    no_btt: filterNoBtt
+                },
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const rows = res.data?.data || [];
+            if (rows.length === 0) {
+                Swal.fire('Info', 'Tidak ada data detail BTT Loper pada periode/filter ini untuk dicetak.', 'info');
+                return;
+            }
+
+            const printWin = window.open('', '_blank', 'width=1250,height=800');
+            if (!printWin) return;
+
+            const adminName = localStorage.getItem('username') || 'ADMIN OPS';
+            const cabangNama = localStorage.getItem('active_cabang_nama') || 'DLI PUSAT';
+
+            let tColly = 0, tBerat = 0, tHarga = 0, tPenerus = 0;
+
+            const bodyHtml = rows.map((r, i) => {
+                tColly += Number(r.colly || 0);
+                tBerat += Number(r.berat || 0);
+                tHarga += Number(r.harga || 0);
+                tPenerus += Number(r.biaya_penerus || 0);
+
+                return `
+                    <tr style="background:${i % 2 === 1 ? '#f8fafc' : '#ffffff'};">
+                        <td style="font-family:monospace; font-weight:bold; white-space:nowrap;">${r.loper_eid}</td>
+                        <td style="text-align:center;">${r.loper_tanggal}</td>
+                        <td style="font-family:monospace; font-weight:bold;">${r.loper_nomobil}</td>
+                        <td>${r.nama_sopir} [ Nip : ${r.nip_sopir} ]</td>
+                        <td>${r.nama_kerani !== '-' ? `${r.nama_kerani} [ Nip : ${r.nip_kerani} ]` : '-'}</td>
+                        <td style="font-family:monospace; font-weight:bold;">${r.no_btt}</td>
+                        <td style="text-align:right;">${Number(r.colly).toLocaleString('id-ID')}</td>
+                        <td style="text-align:right;">${Number(r.berat).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td style="text-align:right;">${Number(r.harga).toLocaleString('id-ID')}</td>
+                        <td style="text-align:right;">${Number(r.biaya_penerus).toLocaleString('id-ID')}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            printWin.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Laporan Detail Loper Barang / BTT</title>
+                    <style>
+                        @page { size: A4 landscape; margin: 8mm; }
+                        body { font-family: Arial, sans-serif; font-size: 9.5px; color: #0f172a; margin: 0; padding: 10px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+                        th, td { border: 1px solid #94a3b8; padding: 4px 5px; vertical-align: middle; }
+                        th { background-color: #004b84 !important; color: #ffffff !important; font-size: 9px; text-transform: uppercase; }
+                    </style>
+                </head>
+                <body onload="window.print()">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                        <div>
+                            <strong style="font-size:12px; color:#004b84;">DAKOTA LOGISTIK INDONESIA</strong><br/>
+                            <span style="font-size:9.5px;">Cabang: <b>${cabangNama}</b> | Periode: <b>${filterTgla} s/d ${filterTgle}</b> | Dicetak oleh: <b>${adminName}</b></span>
+                        </div>
+                        <img src="${window.location.origin}${dliLogo}" style="height:36px;" onerror="this.style.display='none'"/>
+                    </div>
+                    <h3 style="text-align:center; margin:8px 0; font-size:13px; letter-spacing:1px;">LAPORAN DETAIL LOPER BARANG / BTT</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>No. Loper</th>
+                                <th>Tanggal</th>
+                                <th>No. Mobil</th>
+                                <th>Supir</th>
+                                <th>Kerani</th>
+                                <th>No. BTT</th>
+                                <th>Colly</th>
+                                <th>Berat</th>
+                                <th>Harga</th>
+                                <th>Penerus</th>
+                            </tr>
+                        </thead>
+                        <tbody>${bodyHtml}</tbody>
+                        <tfoot>
+                            <tr style="font-weight:bold; background:#e2e8f0;">
+                                <td colspan="5" style="text-align:right;">TOTAL KESELURUHAN :</td>
+                                <td style="text-align:right;">${rows.length.toLocaleString('id-ID')} BTT</td>
+                                <td style="text-align:right;">${tColly.toLocaleString('id-ID')}</td>
+                                <td style="text-align:right;">${tBerat.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                <td style="text-align:right;">${tHarga.toLocaleString('id-ID')}</td>
+                                <td style="text-align:right;">${tPenerus.toLocaleString('id-ID')}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </body>
+                </html>
+            `);
+            printWin.document.close();
+        } catch (err) {
+            Swal.fire('Gagal', err.response?.data?.message || 'Gagal memuat laporan detail loper', 'error');
+        } finally {
+            setPrintingReport(false);
+        }
+    };
+
     return (
         <div className="space-y-4 font-sans">
             {/* PANEL FILTER ATAS */}
@@ -1000,6 +1335,49 @@ const Loper = () => {
                 <div className="pt-2 border-t border-slate-100">
                     <button type="button" onClick={fetchLoperData} className="px-5 py-2.5 bg-indigo-900 hover:bg-indigo-800 text-white rounded-lg flex items-center gap-2 font-black text-xs uppercase cursor-pointer">
                         <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> REFRESH DATA MANIFES
+                    </button>
+                </div>
+                <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={fetchLoperData}
+                        className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-1.5 font-black text-xs uppercase cursor-pointer shadow-xs"
+                    >
+                        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> REFRESH
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={handleOpenCreate}
+                        className="px-4 py-2.5 bg-[#004b84] hover:bg-[#003863] text-white rounded-lg flex items-center gap-1.5 font-black text-xs uppercase cursor-pointer shadow-xs"
+                    >
+                        <PackageCheck size={14} /> TAMBAH LOPER DARI PROSES LOADING
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={handleOpenDirectBtt}
+                        className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg flex items-center gap-1.5 font-black text-xs uppercase cursor-pointer shadow-xs"
+                    >
+                        <PlusCircle size={14} /> TAMBAH LOPER LANGSUNG DARI BTT
+                    </button>
+
+                    <button
+                        type="button"
+                        disabled={printingReport}
+                        onClick={handleCetakRekapLoper}
+                        className="px-4 py-2.5 bg-slate-600 hover:bg-slate-700 text-white rounded-lg flex items-center gap-1.5 font-black text-xs uppercase cursor-pointer shadow-xs"
+                    >
+                        <Printer size={14} /> CETAK
+                    </button>
+
+                    <button
+                        type="button"
+                        disabled={printingReport}
+                        onClick={handleCetakDetailLoper}
+                        className="px-4 py-2.5 bg-slate-700 hover:bg-slate-800 text-white rounded-lg flex items-center gap-1.5 font-black text-xs uppercase cursor-pointer shadow-xs"
+                    >
+                        <Printer size={14} /> CETAK DETAIL
                     </button>
                 </div>
             </div>
@@ -1800,6 +2178,129 @@ const Loper = () => {
                                 KEMBALI KE DAFTAR LOPER
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* MODAL 3: TAMBAH LOPER LANGSUNG DARI BTT (OPR_T_LOPER_A_BTT.ASP MODERN)    */}
+            {/* ========================================================================= */}
+            {isDirectBttOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+                    <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+                        <div className="px-6 py-4 bg-gradient-to-r from-sky-700 to-[#004b84] text-white flex justify-between items-center">
+                            <h3 className="font-black text-sm uppercase tracking-wide flex items-center gap-2">
+                                <Truck size={18} /> PEMBUATAN LOPER BARANG (LANGSUNG DARI BTT)
+                            </h3>
+                            <button onClick={() => setIsDirectBttOpen(false)} className="p-1 hover:bg-white/10 rounded-full cursor-pointer">
+                                <XIcon size={20} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSubmitDirectBtt} className="p-6 space-y-4 text-xs">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                                <div>
+                                    <label className="block font-black text-slate-600 uppercase mb-1">TANGGAL LOPER :</label>
+                                    <input
+                                        type="date"
+                                        value={directForm.loper_tanggal}
+                                        onChange={e => setDirectForm({ ...directForm, loper_tanggal: e.target.value })}
+                                        className="w-full p-2.5 bg-white border border-slate-300 rounded-lg font-mono font-bold"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block font-black text-slate-600 uppercase mb-1">NOMOR MOBIL :</label>
+                                    <select
+                                        value={directForm.loper_nomobil}
+                                        onChange={e => setDirectForm({ ...directForm, loper_nomobil: e.target.value })}
+                                        className="w-full p-2.5 bg-white border border-slate-300 rounded-lg font-mono font-bold uppercase cursor-pointer"
+                                        required
+                                    >
+                                        <option value="">-- PILIH NOMOR MOBIL --</option>
+                                        {kendaraanList.map((k, idx) => {
+                                            const plat = k.kend_identid || k.kend_id;
+                                            return <option key={idx} value={plat}>{plat}</option>;
+                                        })}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block font-black text-slate-600 uppercase mb-1">SOPIR / PENGEMUDI :</label>
+                                    <select
+                                        value={directForm.loper_nipsopir}
+                                        onChange={e => setDirectForm({ ...directForm, loper_nipsopir: e.target.value })}
+                                        className="w-full p-2.5 bg-white border border-slate-300 rounded-lg font-bold uppercase cursor-pointer"
+                                        required
+                                    >
+                                        <option value="">-- PILIH SOPIR --</option>
+                                        {sopirList.map((s, idx) => (
+                                            <option key={idx} value={s.kry_nip}>{s.kry_nama} [{s.kry_nip}]</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block font-black text-slate-600 uppercase mb-1">KERANI :</label>
+                                    <div className="flex items-center gap-4 pt-2 font-bold">
+                                        <label className="flex items-center gap-1.5 cursor-pointer">
+                                            <input
+                                                type="radio"
+                                                name="direct_keraniyn"
+                                                checked={directForm.loper_keraniyn === 'Y'}
+                                                onChange={() => setDirectForm({ ...directForm, loper_keraniyn: 'Y' })}
+                                            />
+                                            <span>Ya</span>
+                                        </label>
+                                        <label className="flex items-center gap-1.5 cursor-pointer">
+                                            <input
+                                                type="radio"
+                                                name="direct_keraniyn"
+                                                checked={directForm.loper_keraniyn !== 'Y'}
+                                                onChange={() => setDirectForm({ ...directForm, loper_keraniyn: 'N', loper_nipkerani: '' })}
+                                            />
+                                            <span>Tidak</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                {directForm.loper_keraniyn === 'Y' && (
+                                    <div className="md:col-span-2">
+                                        <label className="block font-black text-slate-600 uppercase mb-1">NAMA KERANI :</label>
+                                        <select
+                                            value={directForm.loper_nipkerani}
+                                            onChange={e => setDirectForm({ ...directForm, loper_nipkerani: e.target.value })}
+                                            className="w-full p-2.5 bg-white border border-slate-300 rounded-lg font-bold uppercase cursor-pointer"
+                                            required
+                                        >
+                                            <option value="">-- PILIH KERANI --</option>
+                                            {sopirList.map((s, idx) => (
+                                                <option key={idx} value={s.kry_nip}>{s.kry_nama} [{s.kry_nip}]</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex justify-between items-center pt-3 border-t border-slate-200">
+                                <button
+                                    type="submit"
+                                    disabled={submittingDirect}
+                                    className="px-6 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-black rounded-xl text-xs uppercase flex items-center gap-1.5 shadow-sm cursor-pointer"
+                                >
+                                    <PlusCircle size={15} /> {submittingDirect ? 'MEMPROSES...' : 'TAMBAH RINCIAN'}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setIsDirectBttOpen(false)}
+                                    className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-xl text-xs uppercase cursor-pointer"
+                                >
+                                    BATAL
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}
