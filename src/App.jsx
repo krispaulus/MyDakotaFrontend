@@ -24,7 +24,7 @@ import BttClosingHarianDashboard from './components/organisms/BttClosingHarianDa
 import MasterAreaLoper from './pages/MasterAreaLoper';
 import SuratPengantarPengiriman from './pages/SuratPengantarPengiriman';
 import SuratPengantarTurun from './pages/SuratPengantarTurun';
-import Loper from './pages/SuratLoper';
+import Loper from './pages/Loper';
 import SuratKembaliBTT from './pages/SuratKembaliBTT';
 import SuratPengantarPrint from './pages/SuratPengantarPrint';
 import SuratPengantarPAD from './pages/SuratPengantarPAD';
@@ -632,7 +632,7 @@ function App() {
       <Route path="/operasional/cetak-surat-pengiriman" element={<MainLayout><CetakSuratPengiriman menuName="CetakSuratPengiriman" /></MainLayout>} />
 
       <Route path="/operasional/loading-barang" element={<MainLayout><LoadingBarang menuName="LoadingBarang" /></MainLayout>} />
-      <Route path="/operasional/loper" element={<MainLayout><Loper /></MainLayout>} />
+      <Route path="/operasional/loper" element={<MainLayout><Loper menuName="Loper" /></MainLayout>} />
       <Route path="/operasional/loper-deadline" element={<MainLayout><LoperDeadline menuName="LoperDeadline" /></MainLayout>} />
       <Route path="/operasional/pembongkaran-barang" element={<MainLayout><PembongkaranBarang menuName="PembongkaranBarang" /></MainLayout>} />
       <Route path="/operasional/stok/stok-barang-gudang" element={<MainLayout><StokBarangGudang /></MainLayout>} />
