@@ -1556,7 +1556,7 @@ const Invoice = () => {
                     totalBerat += berat;
 
                     return `
-                        <tr style="font-size: 9.5px; font-family: Arial, sans-serif;">
+                        <tr style="font-size: 9.5px; font-family: Arial, sans-serif; page-break-inside: avoid; break-inside: avoid;">
                             <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center;">${idx + 1}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px; font-weight: bold; color: #0284c7;">${b.bttt_id}</td>
                             <td style="border: 1px solid #94a3b8; padding: 4px 2px; text-align: center;">${formatTanggalIndonesia(b.bttt_tanggal)}</td>
@@ -1599,6 +1599,8 @@ const Invoice = () => {
                             body { font-family: Arial, sans-serif; font-size: 10.5px; margin: 0; padding: 8px; color: #1e293b; }
                             table { width: 100%; border-collapse: collapse; }
                             th { border: 1px solid #94a3b8; padding: 5px 2px; background-color: #e2e8f0; font-size: 8.5px; text-align: center; font-weight: bold; color: #0f172a; text-transform: uppercase; }
+                            tr { page-break-inside: avoid; break-inside: avoid; }
+                            thead { display: table-header-group; }
                             .no-print { margin-bottom: 10px; text-align: right; }
                             .btn-print { padding: 6px 16px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; color: white; margin: 0 4px; font-size: 11px; text-transform: uppercase; }
                             @media print { .no-print { display: none !important; } }
@@ -1635,7 +1637,7 @@ const Invoice = () => {
                         <div style="height: 2px; background: #004b84; margin-bottom: 8px;"></div>
                         
                         <!-- INFORMASI PELANGGAN & DETAIL KWITANSI -->
-                        <table style="width: 100%; margin-bottom: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px;">
+                        <table style="width: 100%; word-wrap: break-word; margin-bottom: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px;">
                             <tr>
                                 <td style="width: 48%; vertical-align: top; padding: 4px;">
                                     <div style="color: #64748b; font-size: 9px; text-transform: uppercase; font-weight: bold;">Nama Pelanggan :</div>
@@ -1689,7 +1691,7 @@ const Invoice = () => {
                         </table>
 
                             <!-- TABEL RESI BTT MENYATU DENGAN FOOTER -->
-                            <table style="width: 100%; border: 1px solid #94a3b8; border-collapse: collapse;">
+                            <table style="width: 100%; table-layout: fixed; word-wrap: break-word; border: 1px solid #94a3b8; border-collapse: collapse;">
                                 <thead>
                                     <tr>
                                         <th style="width: 3%;">NO URUT</th>
