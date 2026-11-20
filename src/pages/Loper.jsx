@@ -576,17 +576,47 @@ const Loper = () => {
                     <h3 style="margin:0; font-size:13px; letter-spacing:1px;">LOPER BTT</h3>
                     <div style="font-family:monospace; font-size:12px; font-weight:bold; margin-top:2px;">NOMOR LOPER: ${editHeader.loper_eid}</div>
                 </div>
-                <div style="display:flex; justify-content:space-between; margin-top:8px; font-size:9.5px; background:#f1f5f9; padding:6px 10px; border-radius:6px; border:1px solid #cbd5e1;">
-                    <div>
-                        <b>OTP Driver:</b> ${editHeader.loper_otp || '-'} &nbsp;|&nbsp;
-                        <b>Tanggal Loper:</b> ${editHeader.loper_tanggal} &nbsp;|&nbsp;
-                        <b>No. Mobil:</b> ${editHeader.loper_nomobil}
-                    </div>
-                    <div>
-                        <b>Sopir:</b> ${sopirObj?.kry_nama || '-'} (${editHeader.loper_nipsopir}) &nbsp;|&nbsp;
-                        <b>Kerani:</b> ${editHeader.loper_keraniyn === 'Y' ? `${keraniObj?.kry_nama || '-'} (${editHeader.loper_nipkerani})` : '-'}
-                    </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-top:8px; font-size:9.5px; background:#f8fafc; padding:8px 12px; border-radius:6px; border:1px solid #cbd5e1;">
+                    <!-- KOLOM KIRI (BERSUSUN KE BAWAH) -->
+                    <table style="width:auto; border:none; margin:0; border-collapse:collapse;">
+                        <tr>
+                            <td style="border:none; padding:1.5px 6px 1.5px 0; font-weight:bold;">OTP</td>
+                            <td style="border:none; padding:1.5px 6px; font-weight:bold;">:</td>
+                            <td style="border:none; padding:1.5px 0; font-weight:bold; font-family:monospace;">${hdrData.loper_otp || '-'}</td>
+                        </tr>
+                        <tr>
+                            <td style="border:none; padding:1.5px 6px 1.5px 0;">Tanggal Loper</td>
+                            <td style="border:none; padding:1.5px 6px;">:</td>
+                            <td style="border:none; padding:1.5px 0; font-family:monospace;">${hdrData.loper_tanggal}</td>
+                        </tr>
+                        <tr>
+                            <td style="border:none; padding:1.5px 6px 1.5px 0;">No. Mobil</td>
+                            <td style="border:none; padding:1.5px 6px;">:</td>
+                            <td style="border:none; padding:1.5px 0; font-weight:bold; font-family:monospace;">${hdrData.loper_nomobil}</td>
+                        </tr>
+                    </table>
+
+                    <!-- KOLOM KANAN (BERSUSUN KE BAWAH) -->
+                    <table style="width:auto; border:none; margin:0 15% 0 0; border-collapse:collapse;">
+                        <tr>
+                            <td style="border:none; padding:1.5px 6px 1.5px 0;">Sopir</td>
+                            <td style="border:none; padding:1.5px 6px;">:</td>
+                            <td style="border:none; padding:1.5px 0; font-weight:bold;">${sopirObj?.kry_nama || hdrData.nama_sopir || '-'} (${hdrData.loper_nipsopir})</td>
+                        </tr>
+                        <tr>
+                            <td style="border:none; padding:1.5px 6px 1.5px 0;">Kerani</td>
+                            <td style="border:none; padding:1.5px 6px;">:</td>
+                            <td style="border:none; padding:1.5px 0;">${hdrData.loper_keraniyn === 'Y' ? `${keraniObj?.kry_nama || hdrData.nama_kerani || '-'} (${hdrData.loper_nipkerani})` : ''}</td>
+                        </tr>
+                        <tr>
+                            <td style="border:none; padding:1.5px 6px 1.5px 0;">&nbsp;</td>
+                            <td style="border:none; padding:1.5px 6px;">:</td>
+                            <td style="border:none; padding:1.5px 0;">&nbsp;</td>
+                        </tr>
+                    </table>
                 </div>
+
                 <table>
                     <thead>
                         <tr>
@@ -747,17 +777,42 @@ const Loper = () => {
                     <h3 style="margin:0; font-size:13px; letter-spacing:1px;">LOPER BTT</h3>
                     <div style="font-family:monospace; font-size:12px; font-weight:bold; margin-top:2px;">NOMOR LOPER: ${hdrData.loper_eid}</div>
                 </div>
-                <div style="display:flex; justify-content:space-between; margin-top:8px; font-size:9.5px; background:#f1f5f9; padding:6px 10px; border-radius:6px; border:1px solid #cbd5e1;">
-                    <div>
-                        <b>OTP Driver:</b> ${hdrData.loper_otp || '-'} &nbsp;|&nbsp;
-                        <b>Tanggal Loper:</b> ${hdrData.loper_tanggal} &nbsp;|&nbsp;
-                        <b>No. Mobil:</b> ${hdrData.loper_nomobil}
-                    </div>
-                    <div>
-                        <b>Sopir:</b> ${sopirObj?.kry_nama || hdrData.nama_sopir || '-'} (${hdrData.loper_nipsopir}) &nbsp;|&nbsp;
-                        <b>Kerani:</b> ${hdrData.loper_keraniyn === 'Y' ? `${keraniObj?.kry_nama || hdrData.nama_kerani || '-'} (${hdrData.loper_nipkerani})` : '-'}
-                    </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-top:8px; font-size:9.5px; background:#f8fafc; padding:8px 12px; border-radius:6px; border:1px solid #cbd5e1;">
+                <!-- KOLOM KIRI (BERSUSUN KE BAWAH) -->
+                <table style="width:auto; border:none; margin:0; border-collapse:collapse;">
+                    <tr>
+                        <td style="border:none; padding:1.5px 6px 1.5px 0; font-weight:bold;">OTP</td>
+                        <td style="border:none; padding:1.5px 6px; font-weight:bold;">:</td>
+                        <td style="border:none; padding:1.5px 0; font-weight:bold; font-family:monospace;">${hdrData.loper_otp || '-'}</td>
+                    </tr>
+                    <tr>
+                        <td style="border:none; padding:1.5px 6px 1.5px 0;">Tanggal Loper</td>
+                        <td style="border:none; padding:1.5px 6px;">:</td>
+                        <td style="border:none; padding:1.5px 0; font-family:monospace;">${hdrData.loper_tanggal}</td>
+                    </tr>
+                    <tr>
+                        <td style="border:none; padding:1.5px 6px 1.5px 0;">No. Mobil</td>
+                        <td style="border:none; padding:1.5px 6px;">:</td>
+                        <td style="border:none; padding:1.5px 0; font-weight:bold; font-family:monospace;">${hdrData.loper_nomobil}</td>
+                    </tr>
+                </table>
+
+                <!-- KOLOM KANAN (BERSUSUN KE BAWAH) -->
+                <table style="width:auto; border:none; margin:0 15% 0 0; border-collapse:collapse;">
+                    <tr>
+                        <td style="border:none; padding:1.5px 6px 1.5px 0;">Sopir</td>
+                        <td style="border:none; padding:1.5px 6px;">:</td>
+                        <td style="border:none; padding:1.5px 0; font-weight:bold;">${sopirObj?.kry_nama || hdrData.nama_sopir || '-'} (${hdrData.loper_nipsopir})</td>
+                    </tr>
+                    <tr>
+                        <td style="border:none; padding:1.5px 6px 1.5px 0;">Kerani</td>
+                        <td style="border:none; padding:1.5px 6px;">:</td>
+                        <td style="border:none; padding:1.5px 0;">${hdrData.loper_keraniyn === 'Y' ? `${keraniObj?.kry_nama || hdrData.nama_kerani || '-'} (${hdrData.loper_nipkerani})` : ''}</td>
+                    </tr>
+                </table>
                 </div>
+
                 <table>
                     <thead>
                         <tr>
