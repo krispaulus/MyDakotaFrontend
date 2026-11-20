@@ -375,7 +375,7 @@ const SuratTugas = () => {
 
         const payload = {
             ...formData,
-            sjh_id: finalSjhId,
+            sjh_id: isEditMode ? formData.sjh_id : '',
             sjh_tanggal: fullTglBerangkat,
             sjh_tanggalkembali: fullTglKembali,
             nominal_um: parseFloat(formData.nominal_um) || 0
@@ -1903,7 +1903,7 @@ const SuratTugas = () => {
                                     {/* 🌟 2. RINCIAN TUGAS & JADWAL */}
                                     <div className="grid grid-cols-12 gap-y-1.5 py-1 text-slate-700 font-medium">
                                         <div className="col-span-3 font-bold uppercase text-slate-900">TUGAS</div>
-                                        <div className="col-span-9 font-bold uppercase text-slate-900">: {printData.ass_nama}</div>
+                                        <div className="col-span-9 font-bold uppercase text-slate-900">: {printData.sjh_keterangan || printData.ass_nama}</div>
 
                                         <div className="col-span-3 text-slate-600">TGL BERANGKAT</div>
                                         <div className="col-span-9 font-mono font-semibold">: {printData.sjh_tanggal}</div>
