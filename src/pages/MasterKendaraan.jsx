@@ -1,43 +1,46 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
-import DataTableTemplate from '../components/organisms/DataTableTemplate'; // Jalur Relatif Lapis Baja Anti-Vite Error bray
+import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import Swal from 'sweetalert2';
-import { Truck, ShieldAlert, Wrench, Search, Calendar, Map, CheckCircle, AlertTriangle, AlertCircle, Plus, Edit, Trash2, X as XIcon } from 'lucide-react';
 import TarifCsvUploadModal from '../components/organisms/TarifCsvUploadModal';
+import { Truck, Wrench, Search, AlertCircle, Plus, X as XIcon, FileSpreadsheet } from 'lucide-react';
 
 const MasterKendaraan = () => {
-    const isDarkMode = false;
-
-    // State Data Kendaraan & Loading[cite: 3]
     const [vehicles, setVehicles] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // State Filter[cite: 3]
+    // Master Dropdown Lists (Karyawan/Sopir, Cabang, & Jenis Mobil)
+    const [karyawanList, setKaryawanList] = useState([]);
+    const [agenList, setAgenList] = useState([]);
+    const [jenisList, setJenisList] = useState([]);
+    const [penerimaSearch, setPenerimaSearch] = useState('');
+
+    // State Filter
     const [filterNopol, setFilterNopol] = useState('');
     const [filterStatus, setFilterAktif] = useState('Y');
 
-    // State Ranjau Auto Pop-up Expired Service[cite: 3]
+    // State Auto Pop-up Expired Service
     const [expiredServiceList, setExpiredServiceList] = useState([]);
     const [showExpiredModal, setShowExpiredModal] = useState(false);
     const [processingId, setProcessingId] = useState(null);
 
-    // 👑 STATE MODAL DILETAK KAN DI ATAS BIAR TIDAK BENTROK PANGGILAN BRAY![cite: 3]
-    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [formData, setFormData] = useState({
-        kend_id: '', kend_pemilik: '', kend_pt: 'A', kend_leasing: 'A',
+    const defaultAddForm = {
+        kend_id: '', kend_pemilik: '', kend_pt: 'C', kend_leasing: 'C',
         kend_alamat: '', kend_lokasiid: '', kend_merk: '', kend_type: '',
         kend_jenis: '', kend_thnbuat: '2026', kend_thnrakit: '2026',
         kend_isisilinder: '0', kend_warna: '', kend_nik: '', kend_nomesin: '',
         kend_identid: '', kend_warnatnkb: '', kend_bahanbakar: '', kend_jarak: '0',
         kend_warnaplat: 'h', kend_berlakustnk: '2026-07-14', kend_berlakupajak: '2026-07-14',
-        kend_berlakukir: '2026-07-14', kend_serahterimatime: '2026-07-14',
+        kend_berlakukir: '2026-07-14', kend_serahterimatime: new Date().toISOString().split('T')[0],
         kend_serahterimaid: '', kend_sopir1: '', kend_sopir2: ''
-    });
+    };
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [formData, setFormData] = useState(defaultAddForm);
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [selectedNopol, setSelectedNopol] = useState('');
     const [editFormData, setEditFormData] = useState({
-        kend_pemilik: '', kend_pt: 'A', kend_leasing: 'A',
+        kend_pemilik: '', kend_pt: 'C', kend_leasing: 'C',
         kend_alamat: '', kend_lokasiid: '', kend_merk: '', kend_type: '',
         kend_jenis: '', kend_thnbuat: '2026', kend_thnrakit: '2026',
         kend_isisilinder: '0', kend_warna: '', kend_nik: '', kend_nomesin: '',
@@ -50,14 +53,35 @@ const MasterKendaraan = () => {
     useEffect(() => {
         fetchMasterKendaraan();
         checkExpiredService();
+        fetchDropdownMasters();
     }, []);
+
+    const fetchDropdownMasters = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const headers = { Authorization: `Bearer ${token}` };
+            const [resKaryawan, resAgen, resJenis] = await Promise.all([
+                api.get('/sopir-list', { headers }).catch(() => api.get('/sopir/list', { headers })).catch(() => ({ data: [] })),
+                api.get('/agens', { headers }).catch(() => ({ data: [] })),
+                api.get('/master/kendaraan/jenis', { headers }).catch(() => ({ data: [] }))
+            ]);
+
+            const listKry = resKaryawan.data?.data || resKaryawan.data || [];
+            const listAgn = resAgen.data?.data || resAgen.data || [];
+            const listJns = resJenis.data?.data || resJenis.data || [];
+
+            setKaryawanList(Array.isArray(listKry) ? listKry : []);
+            setAgenList(Array.isArray(listAgn) ? listAgn : []);
+            setJenisList(Array.isArray(listJns) ? listJns : []);
+        } catch (err) {
+            console.error("Gagal memuat master dropdown:", err);
+        }
+    };
 
     const fetchMasterKendaraan = async () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            // 👑 Tembak ke endpoint kendaraan internal yang benar bray, bukan sewa-kendaraan!
-            // 👑 Singkirkan filter tanggal gaib yang memicu ReferenceError!
             const res = await api.get(`/master/kendaraan?nopol=${filterNopol}&aktif=${filterStatus}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -100,7 +124,7 @@ const MasterKendaraan = () => {
                 setShowExpiredModal(false);
             }
             fetchMasterKendaraan();
-        } catch (err) {
+        } catch {
             Swal.fire('Gagal', 'Gagal memperbarui status bengkel', 'error');
         } finally {
             setProcessingId(null);
@@ -108,22 +132,24 @@ const MasterKendaraan = () => {
     };
 
     const handleTambahArmada = () => {
+        setFormData(defaultAddForm);
+        setPenerimaSearch('');
         setIsAddModalOpen(true);
     };
 
     const handleFormSubmit = async (e) => {
         e.preventDefault();
-        if (!formData.kend_id) return Swal.fire('Error', 'No. Polisi Harus Diisi bray!', 'error');
+        if (!formData.kend_id) return Swal.fire('Error', 'No. Polisi Harus Diisi!', 'error');
         try {
             const token = localStorage.getItem('token');
-            await api.post('/master/master/kendaraan', formData, {
+            await api.post('/master/kendaraan', formData, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             Swal.fire('Sukses', 'Data kendaraan berhasil disimpan', 'success');
             setIsAddModalOpen(false);
             fetchMasterKendaraan();
         } catch (err) {
-            Swal.fire('Gagal', 'Gagal menyimpan armada', 'error');
+            Swal.fire('Gagal', err.response?.data?.message || 'Gagal menyimpan armada', 'error');
         }
     };
 
@@ -142,11 +168,11 @@ const MasterKendaraan = () => {
                 return {
                     kendid: document.getElementById('swal-svc-nopol').value.trim().toUpperCase(),
                     tglselesai: document.getElementById('swal-svc-end').value
-                }
+                };
             }
         }).then(async (result) => {
             if (result.isConfirmed) {
-                if (!result.value.kendid || !result.value.tglselesai) return Swal.fire('Peringatan', 'Semua field wajib diisi bray.', 'warning');
+                if (!result.value.kendid || !result.value.tglselesai) return Swal.fire('Peringatan', 'Semua field wajib diisi.', 'warning');
                 try {
                     const token = localStorage.getItem('token');
                     const params = new URLSearchParams();
@@ -162,23 +188,27 @@ const MasterKendaraan = () => {
                     Swal.fire('Berhasil', `Armada ${result.value.kendid} resmi masuk daftar perbaikan`, 'success');
                     fetchMasterKendaraan();
                     checkExpiredService();
-                } catch (err) { Swal.fire('Gagal', 'Gagal memproses pendaftaran service', 'error'); }
+                } catch {
+                    Swal.fire('Gagal', 'Gagal memproses pendaftaran service', 'error');
+                }
             }
         });
     };
 
     const handleEditArmada = (item) => {
         setSelectedNopol(item.kend_id);
-        // 🛡️ AMAN DARIPADA TYPEERROR SPLIT PADA POINTER STRING KOSONG BRAY!
+        const matchedKry = karyawanList.find(k => String(k.kry_nip).trim() === String(item.kend_serahterimaid || '').trim());
+        setPenerimaSearch(matchedKry ? matchedKry.kry_nama : (item.kend_serahterimaid || ''));
+
         const safeSplit = (dateStr) => {
-            if (!dateStr || !dateStr.includes('T')) return '2026-07-14';
-            return dateStr.split('T')[0];
+            if (!dateStr) return '2026-07-14';
+            return dateStr.includes('T') ? dateStr.split('T')[0] : dateStr.split(' ')[0];
         };
 
         setEditFormData({
             kend_pemilik: item.kend_pemilik || '',
-            kend_pt: item.kend_pt || 'A',
-            kend_leasing: item.kend_leasing || 'A',
+            kend_pt: item.kend_pt || 'C',
+            kend_leasing: item.kend_leasing || 'C',
             kend_alamat: item.kend_alamat || '',
             kend_lokasiid: item.kend_lokasiid || '',
             kend_merk: item.kend_merk || '',
@@ -218,9 +248,18 @@ const MasterKendaraan = () => {
             setIsEditModalOpen(false);
             fetchMasterKendaraan();
         } catch (err) {
-            Swal.fire('Gagal', 'Gagal memperbarui data armada bray', 'error');
+            Swal.fire('Gagal', err.response?.data?.message || 'Gagal memperbarui data armada', 'error');
         }
     };
+
+    const filteredKaryawan = karyawanList.filter(k => {
+        if (!penerimaSearch.trim()) return true;
+        const q = penerimaSearch.toLowerCase();
+        return (
+            (k.kry_nama && k.kry_nama.toLowerCase().includes(q)) ||
+            (k.kry_nip && k.kry_nip.toLowerCase().includes(q))
+        );
+    });
 
     const columnsKendaraan = [
         { header: 'NO. POLISI', accessor: 'kend_id', render: (i) => <span className="font-mono font-bold text-blue-600 text-sm cursor-pointer hover:underline" onClick={() => handleEditArmada(i)}>{i.kend_id}</span> },
@@ -254,16 +293,40 @@ const MasterKendaraan = () => {
         }
     ];
 
+    const [exporting, setExporting] = useState(false);
+
+    const handleExportExcel = async () => {
+        setExporting(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await api.get('/master/kendaraan/export-excel', {
+                params: { nopol: filterNopol, aktif: filterStatus },
+                headers: { Authorization: `Bearer ${token}` },
+                responseType: 'blob'
+            });
+
+            const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `Master_Kendaraan_${new Date().toISOString().slice(0, 10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            Swal.fire('Gagal', err.response?.data?.message || 'Gagal mengekspor data kendaraan ke Excel', 'error');
+        } finally {
+            setExporting(false);
+        }
+    };
+
     return (
         <div className="min-h-screen p-4 space-y-4 bg-slate-50 text-slate-800">
             <div className="flex items-center justify-between border-b pb-2 border-slate-200">
                 <h3 className="text-base font-black text-slate-700 flex items-center gap-2 uppercase">
                     <Truck size={20} className="text-blue-600" /> Master Inventaris Kendaraan Armada
                 </h3>
-                <div className="flex items-center gap-2">
-                    <button onClick={handleRegistrasiService} className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 shadow-sm transition"><Wrench size={13} /> SERVICE KENDARAAN</button>
-                    <button onClick={handleTambahArmada} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 shadow-sm transition"><Plus size={13} /> TAMBAH DATA</button>
-                </div>
             </div>
 
             <div className="p-4 rounded-xl border grid grid-cols-3 gap-4 items-end text-xs bg-white border-slate-200 shadow-xs">
@@ -278,7 +341,18 @@ const MasterKendaraan = () => {
                         <option value="N">TIDAK (ARMADA NON-AKTIF)</option>
                     </select>
                 </div>
-                <button onClick={fetchMasterKendaraan} className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 shadow-md transition h-[42px]"><Search size={14} /> Cari Armada</button>
+                <button onClick={fetchMasterKendaraan} className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 shadow-md transition h-[42px] cursor-pointer"><Search size={14} /> Cari Armada</button>
+                <div className="flex items-center gap-2">
+                    <button onClick={handleRegistrasiService} className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 shadow-sm transition cursor-pointer"><Wrench size={13} /> SERVICE KENDARAAN</button>
+                    <button
+                        type="button"
+                        disabled={exporting}
+                        onClick={handleExportExcel}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 shadow-sm transition cursor-pointer uppercase"
+                    >
+                        <FileSpreadsheet size={14} /> {exporting ? 'EXPORTING...' : 'EXPORT TO EXCEL'}
+                    </button>
+                </div>
             </div>
 
             <DataTableTemplate
@@ -323,9 +397,9 @@ const MasterKendaraan = () => {
                                                 <button
                                                     onClick={() => handleSelesaiService(item.kend_id)}
                                                     disabled={processingId === item.kend_id}
-                                                    className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-bold text-xs rounded-md shadow-xs transition"
+                                                    className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-bold text-xs rounded-md shadow-xs transition cursor-pointer"
                                                 >
-                                                    {processingId === item.kend_id ? 'Proses...' : '🔧 Selesai Service'}
+                                                    {processingId === item.kend_id ? 'Proses...' : 'Selesai Service'}
                                                 </button>
                                             </td>
                                         </tr>
@@ -341,9 +415,14 @@ const MasterKendaraan = () => {
             {isAddModalOpen && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto">
                     <div className="w-full max-w-6xl p-6 bg-white rounded-2xl shadow-2xl border border-slate-200 text-slate-800 flex flex-col my-8">
-                        <div className="text-center border-b pb-3 mb-4">
+                        <div className="flex justify-between items-center border-b pb-3 mb-4">
+                            <div className="w-8" />
                             <span className="px-4 py-1.5 border border-dashed border-blue-400 text-blue-700 font-bold text-sm tracking-wide rounded-sm uppercase">TAMBAH DATA KENDARAAN</span>
+                            <button type="button" onClick={() => setIsAddModalOpen(false)} className="p-1.5 hover:bg-slate-100 rounded-full cursor-pointer">
+                                <XIcon size={18} />
+                            </button>
                         </div>
+
                         <form onSubmit={handleFormSubmit} className="space-y-4 text-xs font-bold text-slate-700">
                             <div className="grid grid-cols-12 gap-3">
                                 <div className="col-span-2">
@@ -371,6 +450,7 @@ const MasterKendaraan = () => {
                                     </div>
                                 </div>
                             </div>
+
                             <div className="grid grid-cols-12 gap-3">
                                 <div className="col-span-6">
                                     <label className="block mb-1">ALAMAT</label>
@@ -378,12 +458,16 @@ const MasterKendaraan = () => {
                                 </div>
                                 <div className="col-span-6">
                                     <label className="block mb-1">CABANG</label>
-                                    <select className="w-full p-2 border border-slate-300 rounded font-normal" value={formData.kend_lokasiid} onChange={e => setFormData({ ...formData, kend_lokasiid: e.target.value })}>
+                                    {/* Hanya menampilkan nama cabang tanpa kode cabang di depannya */}
+                                    <select className="w-full p-2 border border-slate-300 rounded font-normal uppercase" value={formData.kend_lokasiid} onChange={e => setFormData({ ...formData, kend_lokasiid: e.target.value })}>
                                         <option value="">-- PILIH CABANG PENEMPATAN --</option>
-                                        <option value="853">ADIWERNA AGEN</option>
+                                        {agenList.map((a, idx) => (
+                                            <option key={idx} value={a.agen_id}>{a.agen_nama}</option>
+                                        ))}
                                     </select>
                                 </div>
                             </div>
+
                             <div className="grid grid-cols-4 gap-3">
                                 <div>
                                     <label className="block mb-1">MERK/TIPE</label>
@@ -391,9 +475,15 @@ const MasterKendaraan = () => {
                                 </div>
                                 <div>
                                     <label className="block mb-1">JENIS/MODEL</label>
-                                    <select className="w-full p-2 border border-slate-300 rounded font-normal" value={formData.kend_jenis} onChange={e => setFormData({ ...formData, kend_jenis: e.target.value })}>
-                                        <option value="K0001">Blind Van</option>
-                                        <option value="K0002">Colt Diesel</option>
+                                    <select
+                                        className="w-full p-2 border border-slate-300 rounded font-normal"
+                                        value={formData.kend_jenis}
+                                        onChange={e => setFormData({ ...formData, kend_jenis: e.target.value })}
+                                    >
+                                        <option value="">-- PILIH JENIS / MODEL --</option>
+                                        {jenisList.map((j, idx) => (
+                                            <option key={idx} value={j.jnskend_id}>{j.jnskend_nama}</option>
+                                        ))}
                                     </select>
                                 </div>
                                 <div>
@@ -405,6 +495,7 @@ const MasterKendaraan = () => {
                                     <input type="text" className="w-full p-2 border border-slate-300 rounded font-normal" value={formData.kend_thnrakit} onChange={e => setFormData({ ...formData, kend_thnrakit: e.target.value })} />
                                 </div>
                             </div>
+
                             <div className="grid grid-cols-4 gap-3">
                                 <div>
                                     <label className="block mb-1">ISI SILINDER</label>
@@ -423,6 +514,7 @@ const MasterKendaraan = () => {
                                     <input type="text" className="w-full p-2 border border-slate-300 rounded font-normal" value={formData.kend_nomesin} onChange={e => setFormData({ ...formData, kend_nomesin: e.target.value })} />
                                 </div>
                             </div>
+
                             <div className="grid grid-cols-4 gap-3">
                                 <div>
                                     <label className="block mb-1">IDENTITAS</label>
@@ -441,6 +533,7 @@ const MasterKendaraan = () => {
                                     <input type="text" className="w-full p-2 border border-slate-300 rounded font-normal" value={formData.kend_jarak} onChange={e => setFormData({ ...formData, kend_jarak: e.target.value })} />
                                 </div>
                             </div>
+
                             <div className="grid grid-cols-4 gap-3">
                                 <div>
                                     <label className="block mb-1">WARNA PLAT KENDARAAN :</label>
@@ -462,6 +555,8 @@ const MasterKendaraan = () => {
                                     <input type="date" className="w-full p-2 border border-slate-300 rounded font-normal" value={formData.kend_berlakukir} onChange={e => setFormData({ ...formData, kend_berlakukir: e.target.value })} />
                                 </div>
                             </div>
+
+                            {/* TAMBAHAN RINCIAN BARU (WAJIB DIISI) */}
                             <div className="text-center pt-2 pb-1 border-t border-slate-100 mt-4">
                                 <span className="px-4 py-1 border border-dashed border-cyan-400 text-cyan-700 font-bold text-[11px] rounded-sm uppercase">TAMBAHAN RINCIAN BARU (WAJIB DIISI)</span>
                             </div>
@@ -472,26 +567,49 @@ const MasterKendaraan = () => {
                                 </div>
                                 <div>
                                     <label className="block mb-1">PENERIMA</label>
-                                    <select className="w-full p-2 border border-slate-300 rounded font-normal" value={formData.kend_serahterimaid} onChange={e => setFormData({ ...formData, kend_serahterimaid: e.target.value })}>
-                                        <option value="">-- PILIH KARYAWAN --</option>
-                                    </select>
+                                    {/* Hanya menampilkan nama karyawan tanpa kode NIP di depannya */}
+                                    <input
+                                        type="text"
+                                        list="datalist-karyawan-add"
+                                        placeholder="Ketik atau pilih nama karyawan..."
+                                        className="w-full p-2 border border-slate-300 rounded font-bold uppercase"
+                                        value={penerimaSearch}
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            setPenerimaSearch(val);
+                                            const matched = karyawanList.find(k => String(k.kry_nama).toUpperCase() === val.trim().toUpperCase());
+                                            setFormData({ ...formData, kend_serahterimaid: matched ? matched.kry_nip : '' });
+                                        }}
+                                    />
+                                    <datalist id="datalist-karyawan-add">
+                                        {filteredKaryawan.map((k, idx) => (
+                                            <option key={idx} value={k.kry_nama} />
+                                        ))}
+                                    </datalist>
                                 </div>
                                 <div>
                                     <label className="block mb-1">DRIVER 1</label>
-                                    <select className="w-full p-2 border border-slate-300 rounded font-normal" value={formData.kend_sopir1} onChange={e => setFormData({ ...formData, kend_sopir1: e.target.value })}>
+                                    <select className="w-full p-2 border border-slate-300 rounded font-bold uppercase" value={formData.kend_sopir1} onChange={e => setFormData({ ...formData, kend_sopir1: e.target.value })}>
                                         <option value="">-- PILIH SOPIR UTAMA --</option>
+                                        {karyawanList.map((k, idx) => (
+                                            <option key={idx} value={k.kry_nip}>{k.kry_nama}</option>
+                                        ))}
                                     </select>
                                 </div>
                                 <div>
                                     <label className="block mb-1">DRIVER 2</label>
-                                    <select className="w-full p-2 border border-slate-300 rounded font-normal" value={formData.kend_sopir2} onChange={e => setFormData({ ...formData, kend_sopir2: e.target.value })}>
+                                    <select className="w-full p-2 border border-slate-300 rounded font-bold uppercase" value={formData.kend_sopir2} onChange={e => setFormData({ ...formData, kend_sopir2: e.target.value })}>
                                         <option value="">-- PILIH SOPIR CADANGAN --</option>
+                                        {karyawanList.map((k, idx) => (
+                                            <option key={idx} value={k.kry_nip}>{k.kry_nama}</option>
+                                        ))}
                                     </select>
                                 </div>
                             </div>
+
                             <div className="flex items-center justify-center gap-3 pt-4 border-t border-slate-200 mt-6">
-                                <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-6 py-2 border border-slate-300 text-slate-600 font-bold rounded-lg bg-white hover:bg-slate-50 transition tracking-wide text-xs uppercase shadow-xs">CANCEL</button>
-                                <button type="submit" className="px-6 py-2 bg-indigo-900 hover:bg-indigo-950 text-white font-bold rounded-lg transition tracking-wide text-xs uppercase shadow-md">ADD VEHICLE</button>
+                                <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-6 py-2 border border-slate-300 text-slate-600 font-bold rounded-lg bg-white hover:bg-slate-50 transition tracking-wide text-xs uppercase shadow-xs cursor-pointer">CANCEL</button>
+                                <button type="submit" className="px-6 py-2 bg-indigo-900 hover:bg-indigo-950 text-white font-bold rounded-lg transition tracking-wide text-xs uppercase shadow-md cursor-pointer">SIMPAN</button>
                             </div>
                         </form>
                     </div>
@@ -502,9 +620,14 @@ const MasterKendaraan = () => {
             {isEditModalOpen && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto">
                     <div className="w-full max-w-6xl p-6 bg-white rounded-2xl shadow-2xl border border-slate-200 text-slate-800 flex flex-col my-8">
-                        <div className="text-center border-b pb-3 mb-4">
+                        <div className="flex justify-between items-center border-b pb-3 mb-4">
+                            <div className="w-8" />
                             <span className="px-4 py-1.5 border border-dashed border-amber-500 text-amber-700 font-bold text-sm tracking-wide rounded-sm uppercase">EDIT DATA KENDARAAN: {selectedNopol}</span>
+                            <button type="button" onClick={() => setIsEditModalOpen(false)} className="p-1.5 hover:bg-slate-100 rounded-full cursor-pointer">
+                                <XIcon size={18} />
+                            </button>
                         </div>
+
                         <form onSubmit={handleEditFormSubmit} className="space-y-4 text-xs font-bold text-slate-700">
                             <div className="grid grid-cols-12 gap-3">
                                 <div className="col-span-2">
@@ -532,6 +655,7 @@ const MasterKendaraan = () => {
                                     </div>
                                 </div>
                             </div>
+
                             <div className="grid grid-cols-12 gap-3">
                                 <div className="col-span-6">
                                     <label className="block mb-1">ALAMAT</label>
@@ -539,12 +663,15 @@ const MasterKendaraan = () => {
                                 </div>
                                 <div className="col-span-6">
                                     <label className="block mb-1">CABANG</label>
-                                    <select className="w-full p-2 border border-slate-300 rounded font-normal" value={editFormData.kend_lokasiid} onChange={e => setEditFormData({ ...editFormData, kend_lokasiid: e.target.value })}>
+                                    <select className="w-full p-2 border border-slate-300 rounded font-normal uppercase" value={editFormData.kend_lokasiid} onChange={e => setEditFormData({ ...editFormData, kend_lokasiid: e.target.value })}>
                                         <option value="">-- PILIH CABANG PENEMPATAN --</option>
-                                        <option value="853">ADIWERNA AGEN</option>
+                                        {agenList.map((a, idx) => (
+                                            <option key={idx} value={a.agen_id}>{a.agen_nama}</option>
+                                        ))}
                                     </select>
                                 </div>
                             </div>
+
                             <div className="grid grid-cols-4 gap-3">
                                 <div>
                                     <label className="block mb-1">MERK/TIPE</label>
@@ -553,8 +680,10 @@ const MasterKendaraan = () => {
                                 <div>
                                     <label className="block mb-1">JENIS/MODEL</label>
                                     <select className="w-full p-2 border border-slate-300 rounded font-normal" value={editFormData.kend_jenis} onChange={e => setEditFormData({ ...editFormData, kend_jenis: e.target.value })}>
-                                        <option value="K0001">Blind Van</option>
-                                        <option value="K0002">Colt Diesel</option>
+                                        <option value="">-- PILIH JENIS --</option>
+                                        {jenisList.map((j, idx) => (
+                                            <option key={idx} value={j.jnskend_id}>{j.jnskend_nama}</option>
+                                        ))}
                                     </select>
                                 </div>
                                 <div>
@@ -566,6 +695,7 @@ const MasterKendaraan = () => {
                                     <input type="text" className="w-full p-2 border border-slate-300 rounded font-normal" value={editFormData.kend_thnrakit} onChange={e => setEditFormData({ ...editFormData, kend_thnrakit: e.target.value })} />
                                 </div>
                             </div>
+
                             <div className="grid grid-cols-4 gap-3">
                                 <div>
                                     <label className="block mb-1">ISI SILINDER</label>
@@ -584,6 +714,7 @@ const MasterKendaraan = () => {
                                     <input type="text" className="w-full p-2 border border-slate-300 rounded font-normal" value={editFormData.kend_nomesin} onChange={e => setEditFormData({ ...editFormData, kend_nomesin: e.target.value })} />
                                 </div>
                             </div>
+
                             <div className="grid grid-cols-4 gap-3">
                                 <div>
                                     <label className="block mb-1">IDENTITAS</label>
@@ -602,6 +733,7 @@ const MasterKendaraan = () => {
                                     <input type="text" className="w-full p-2 border border-slate-300 rounded font-normal" value={editFormData.kend_jarak} onChange={e => setEditFormData({ ...editFormData, kend_jarak: e.target.value })} />
                                 </div>
                             </div>
+
                             <div className="grid grid-cols-4 gap-3">
                                 <div>
                                     <label className="block mb-1">WARNA PLAT KENDARAAN :</label>
@@ -623,6 +755,7 @@ const MasterKendaraan = () => {
                                     <input type="date" className="w-full p-2 border border-slate-300 rounded font-normal" value={editFormData.kend_berlakukir} onChange={e => setEditFormData({ ...editFormData, kend_berlakukir: e.target.value })} />
                                 </div>
                             </div>
+
                             <div className="grid grid-cols-4 gap-3">
                                 <div>
                                     <label className="block mb-1 text-blue-600">ARMADA INI AKTIF OPERASIONAL?</label>
@@ -632,6 +765,7 @@ const MasterKendaraan = () => {
                                     </select>
                                 </div>
                             </div>
+
                             <div className="text-center pt-2 pb-1 border-t border-slate-100 mt-4">
                                 <span className="px-4 py-1 border border-dashed border-cyan-400 text-cyan-700 font-bold text-[11px] rounded-sm uppercase">TAMBAHAN RINCIAN BARU (WAJIB DIISI)</span>
                             </div>
@@ -642,26 +776,48 @@ const MasterKendaraan = () => {
                                 </div>
                                 <div>
                                     <label className="block mb-1">PENERIMA</label>
-                                    <select className="w-full p-2 border border-slate-300 rounded font-normal" value={editFormData.kend_serahterimaid} onChange={e => setEditFormData({ ...editFormData, kend_serahterimaid: e.target.value })}>
-                                        <option value="">-- PILIH KARYAWAN --</option>
-                                    </select>
+                                    <input
+                                        type="text"
+                                        list="datalist-karyawan-edit"
+                                        placeholder="Ketik atau pilih nama karyawan..."
+                                        className="w-full p-2 border border-slate-300 rounded font-bold uppercase"
+                                        value={penerimaSearch}
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            setPenerimaSearch(val);
+                                            const matched = karyawanList.find(k => String(k.kry_nama).toUpperCase() === val.trim().toUpperCase());
+                                            setEditFormData({ ...editFormData, kend_serahterimaid: matched ? matched.kry_nip : '' });
+                                        }}
+                                    />
+                                    <datalist id="datalist-karyawan-edit">
+                                        {karyawanList.map((k, idx) => (
+                                            <option key={idx} value={k.kry_nama} />
+                                        ))}
+                                    </datalist>
                                 </div>
                                 <div>
                                     <label className="block mb-1">DRIVER 1</label>
-                                    <select className="w-full p-2 border border-slate-300 rounded font-normal" value={editFormData.kend_sopir1} onChange={e => setEditFormData({ ...editFormData, kend_sopir1: e.target.value })}>
+                                    <select className="w-full p-2 border border-slate-300 rounded font-bold uppercase" value={editFormData.kend_sopir1} onChange={e => setEditFormData({ ...editFormData, kend_sopir1: e.target.value })}>
                                         <option value="">-- PILIH SOPIR UTAMA --</option>
+                                        {karyawanList.map((k, idx) => (
+                                            <option key={idx} value={k.kry_nip}>{k.kry_nama}</option>
+                                        ))}
                                     </select>
                                 </div>
                                 <div>
                                     <label className="block mb-1">DRIVER 2</label>
-                                    <select className="w-full p-2 border border-slate-300 rounded font-normal" value={editFormData.kend_sopir2} onChange={e => setEditFormData({ ...editFormData, kend_sopir2: e.target.value })}>
+                                    <select className="w-full p-2 border border-slate-300 rounded font-bold uppercase" value={editFormData.kend_sopir2} onChange={e => setEditFormData({ ...editFormData, kend_sopir2: e.target.value })}>
                                         <option value="">-- PILIH SOPIR CADANGAN --</option>
+                                        {karyawanList.map((k, idx) => (
+                                            <option key={idx} value={k.kry_nip}>{k.kry_nama}</option>
+                                        ))}
                                     </select>
                                 </div>
                             </div>
+
                             <div className="flex items-center justify-center gap-3 pt-4 border-t border-slate-200 mt-6">
-                                <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-6 py-2 border border-slate-300 text-slate-600 font-bold rounded-lg bg-white hover:bg-slate-50 transition tracking-wide text-xs uppercase shadow-xs">CANCEL</button>
-                                <button type="submit" className="px-6 py-2 bg-indigo-900 hover:bg-indigo-950 text-white font-bold rounded-lg transition tracking-wide text-xs uppercase shadow-md">UPDATE VEHICLE</button>
+                                <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-6 py-2 border border-slate-300 text-slate-600 font-bold rounded-lg bg-white hover:bg-slate-50 transition tracking-wide text-xs uppercase shadow-xs cursor-pointer">CANCEL</button>
+                                <button type="submit" className="px-6 py-2 bg-indigo-900 hover:bg-indigo-950 text-white font-bold rounded-lg transition tracking-wide text-xs uppercase shadow-md cursor-pointer">UPDATE</button>
                             </div>
                         </form>
                     </div>

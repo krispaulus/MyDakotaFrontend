@@ -174,7 +174,13 @@ export default function MasterSopir() {
                                 </div>
                                 <div className="col-span-6">
                                     <label className="block mb-1">NAMA LENGKAP SOPIR</label>
-                                    <input type="text" required className="w-full p-2 border rounded font-normal text-sm uppercase" placeholder="Masukkan nama lengkap supir" value={formData.supir_name} onChange={e => setFormData({ ...formData, supir_name: e.target.value.toUpperCase() })} />
+                                    <input
+                                        type="text"
+                                        required className="w-full p-2 border rounded font-normal text-sm uppercase"
+                                        placeholder="Masukkan nama lengkap supir"
+                                        value={formData.supir_nama}
+                                        onChange={e => setFormData({ ...formData, supir_nama: e.target.value.toUpperCase() })}
+                                    />
                                 </div>
                                 <div className="col-span-3">
                                     <label className="block mb-1">SISTEM KERJA PENGGAJIAN</label>
@@ -281,6 +287,17 @@ export default function MasterSopir() {
                             <div className="flex items-center justify-center gap-3 pt-4 border-t mt-6">
                                 <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-6 py-2 border text-slate-600 font-bold rounded-lg bg-white hover:bg-slate-50 text-xs uppercase">CANCEL</button>
                                 <button type="submit" className="px-6 py-2 bg-indigo-900 hover:bg-indigo-950 text-white font-bold rounded-lg text-xs uppercase shadow-md">UPDATE DATA</button>
+                            </div>
+                            <div>
+                                <label className="block mb-1">STATUS KEAKTIFAN</label>
+                                <select
+                                    className="w-full p-2 border rounded bg-white font-bold"
+                                    value={editFormData.supir_aktif_yn || 'Y'}
+                                    onChange={e => setEditFormData({ ...editFormData, supir_aktif_yn: e.target.value })}
+                                >
+                                    <option value="Y">READY JALAN (AKTIF)</option>
+                                    <option value="N">NON-AKTIF / RESIGN</option>
+                                </select>
                             </div>
                         </form>
                     </div>
