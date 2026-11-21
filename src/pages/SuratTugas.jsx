@@ -24,6 +24,16 @@ const SuratTugas = () => {
     const [tugasList, setTugasList] = useState([]);
     const [trayekList, setTrayekList] = useState([]);
 
+    // State Searchable Combobox (Kendaraan, Pengemudi 1, Pengemudi 2)
+    const [searchKendaraan, setSearchKendaraan] = useState('');
+    const [isKendDropdownOpen, setIsKendDropdownOpen] = useState(false);
+
+    const [searchSopir1, setSearchSopir1] = useState('');
+    const [isSopir1DropdownOpen, setIsSopir1DropdownOpen] = useState(false);
+
+    const [searchSopir2, setSearchSopir2] = useState('');
+    const [isSopir2DropdownOpen, setIsSopir2DropdownOpen] = useState(false);
+
     // State Toggle Filter
     const [showFilter, setShowFilter] = useState(true);
 
@@ -84,7 +94,8 @@ const SuratTugas = () => {
 
             const [resKend, resSopir, resAgen, resTugas, resTrayek] = await Promise.all([
                 api.get('/master/kendaraan', { headers }).catch(() => ({ data: [] })),
-                api.get('/sopir-list', { headers }).catch(() => api.get('/sopir/list', { headers })).catch(() => ({ data: [] })),
+                api.get('/master/sopir', { headers }).catch(() => api.get('/sopir-list', { headers })).catch(() => ({ data: [] })),
+                // api.get('/sopir-list', { headers }).catch(() => api.get('/sopir/list', { headers })).catch(() => ({ data: [] })),
                 api.get('/agens', { headers }).catch(() => ({ data: [] })),
                 api.get('/master/assignment', { headers }).catch(() => ({ data: [] })),
                 api.get('/master/trayek', { headers }).catch(() => ({ data: [] }))
@@ -206,6 +217,12 @@ const SuratTugas = () => {
     };
 
     const handleAdd = () => {
+        setSearchKendaraan('');
+        setSearchSopir1('');
+        setSearchSopir2('');
+        setIsKendDropdownOpen(false);
+        setIsSopir1DropdownOpen(false);
+        setIsSopir2DropdownOpen(false);
         setIsEditMode(false);
         setFormData({
             ...defaultForm,
@@ -217,6 +234,20 @@ const SuratTugas = () => {
     };
 
     const handleEdit = (item) => {
+        setSearchKendaraan(item.sjh_kendid || '');
+        setSearchSopir1(
+            item.sjh_sopir1_nip && item.sjh_sopir1_nip !== '-'
+                ? `${item.nmsopir1 || ''} [${item.sjh_sopir1_nip}]`
+                : ''
+        );
+        setSearchSopir2(
+            item.sjh_sopir2_nip && item.sjh_sopir2_nip !== '-'
+                ? `${item.nmsopir2 || ''} [${item.sjh_sopir2_nip}]`
+                : ''
+        );
+        setIsKendDropdownOpen(false);
+        setIsSopir1DropdownOpen(false);
+        setIsSopir2DropdownOpen(false);
         setIsEditMode(true);
         const tglBerangkat = item.sjh_tanggal ? item.sjh_tanggal.split(' ')[0] : today;
         const jamBerangkat = item.sjh_tanggal && item.sjh_tanggal.includes(' ') ? item.sjh_tanggal.split(' ')[1] : '11:00:00';
@@ -1446,57 +1477,194 @@ const SuratTugas = () => {
 
                             {/* Baris 3: Armada, Pengemudi 1, Pengemudi 2 */}
                             <div className="grid grid-cols-12 gap-4">
-                                <div className="col-span-12 md:col-span-4">
+                                <div className="col-span-12 md:col-span-4 relative">
                                     <label className="block mb-1 text-slate-600 uppercase">NOMOR KENDARAAN :</label>
-                                    <select
-                                        className="w-full p-2.5 border border-slate-300 rounded-xl outline-none focus:border-emerald-600 bg-white cursor-pointer uppercase font-bold text-slate-800"
-                                        value={formData.sjh_kendid}
-                                        onChange={e => setFormData({ ...formData, sjh_kendid: e.target.value })}
-                                        required
-                                    >
-                                        <option value="">-- PILIH ARMADA --</option>
-                                        {kendaraanList.map((k, i) => (
-                                            <option key={i} value={k.kend_id || k.kend_identid}>{k.kend_identid || k.kend_id}</option>
-                                        ))}
-                                    </select>
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            placeholder="Ketik No. Polisi / Merk (misal: B9304)..."
+                                            className="w-full p-2.5 pr-8 border border-slate-300 rounded-xl outline-none focus:border-emerald-600 bg-white uppercase font-bold text-slate-800"
+                                            value={searchKendaraan}
+                                            onFocus={() => setIsKendDropdownOpen(true)}
+                                            onBlur={() => setTimeout(() => setIsKendDropdownOpen(false), 180)}
+                                            onChange={(e) => {
+                                                const val = e.target.value.toUpperCase();
+                                                setSearchKendaraan(val);
+                                                setFormData(prev => ({ ...prev, sjh_kendid: '' }));
+                                                setIsKendDropdownOpen(true);
+                                            }}
+                                            required={!formData.sjh_kendid}
+                                        />
+                                        {searchKendaraan && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setSearchKendaraan('');
+                                                    setFormData(prev => ({ ...prev, sjh_kendid: '' }));
+                                                }}
+                                                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                                            >
+                                                <XIcon size={15} />
+                                            </button>
+                                        )}
+                                    </div>
+                                    {isKendDropdownOpen && (
+                                        <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white border border-slate-300 rounded-xl shadow-xl z-30 divide-y divide-slate-100">
+                                            {kendaraanList
+                                                .filter((k) => {
+                                                    const q = searchKendaraan.replace(/\s+/g, '').toLowerCase();
+                                                    const nopol = String(k.kend_id || '').replace(/\s+/g, '').toLowerCase();
+                                                    const merk = String(k.kend_merk || '').toLowerCase();
+                                                    return !q || nopol.includes(q) || merk.includes(searchKendaraan.toLowerCase());
+                                                })
+                                                .map((k, i) => {
+                                                    const nopol = String(k.kend_id || '').trim();
+                                                    const merk = String(k.kend_merk || '').trim();
+                                                    const isSelected = formData.sjh_kendid === nopol;
+                                                    return (
+                                                        <button
+                                                            key={i}
+                                                            type="button"
+                                                            onMouseDown={() => {
+                                                                setFormData(prev => ({ ...prev, sjh_kendid: nopol }));
+                                                                setSearchKendaraan(merk ? `${nopol} - ${merk}` : nopol);
+                                                                setIsKendDropdownOpen(false);
+                                                            }}
+                                                            className={`w-full text-left px-3 py-2 text-xs hover:bg-emerald-50 flex justify-between items-center cursor-pointer ${isSelected ? 'bg-emerald-100 text-emerald-900 font-black' : 'text-slate-800 font-bold'}`}
+                                                        >
+                                                            <span className="font-mono">{nopol}</span>
+                                                            {merk && <span className="text-[10px] text-slate-500 font-medium">{merk}</span>}
+                                                        </button>
+                                                    );
+                                                })}
+                                        </div>
+                                    )}
                                 </div>
 
-                                <div className="col-span-12 md:col-span-4">
+                                <div className="col-span-12 md:col-span-4 relative">
                                     <label className="block mb-1 text-slate-600 uppercase">PENGEMUDI 1 :</label>
-                                    <select
-                                        className="w-full p-2.5 border border-slate-300 rounded-xl outline-none focus:border-emerald-600 bg-white cursor-pointer uppercase text-xs font-bold text-slate-800"
-                                        value={formData.sjh_sopir1_nip}
-                                        onChange={e => setFormData({ ...formData, sjh_sopir1_nip: e.target.value })}
-                                        disabled={formData.by_loading === 'Ya'}
-                                    >
-                                        <option value="">-- PILIH PENGEMUDI 1 --</option>
-                                        {formData.by_loading === 'Ya' ? (
-                                            <option value="">DAFTAR PENGEMUDI DIKOSONGKAN</option>
-                                        ) : (
-                                            sopirList.map((s, i) => (
-                                                <option key={i} value={s.kry_nip}>{s.kry_nama} [{s.kry_nip}]</option>
-                                            ))
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            disabled={formData.by_loading === 'Ya'}
+                                            placeholder={formData.by_loading === 'Ya' ? 'DIKOSONGKAN (BY LOADING)' : 'Ketik Nama / NIP Pengemudi 1...'}
+                                            className="w-full p-2.5 pr-8 border border-slate-300 rounded-xl outline-none focus:border-emerald-600 bg-white disabled:bg-slate-100 uppercase font-bold text-slate-800"
+                                            value={formData.by_loading === 'Ya' ? '' : searchSopir1}
+                                            onFocus={() => setIsSopir1DropdownOpen(true)}
+                                            onBlur={() => setTimeout(() => setIsSopir1DropdownOpen(false), 180)}
+                                            onChange={(e) => {
+                                                const val = e.target.value.toUpperCase();
+                                                setSearchSopir1(val);
+                                                setFormData(prev => ({ ...prev, sjh_sopir1_nip: '' }));
+                                                setIsSopir1DropdownOpen(true);
+                                            }}
+                                        />
+                                        {searchSopir1 && formData.by_loading !== 'Ya' && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setSearchSopir1('');
+                                                    setFormData(prev => ({ ...prev, sjh_sopir1_nip: '' }));
+                                                }}
+                                                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                                            >
+                                                <XIcon size={15} />
+                                            </button>
                                         )}
-                                    </select>
+                                    </div>
+                                    {isSopir1DropdownOpen && formData.by_loading !== 'Ya' && (
+                                        <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white border border-slate-300 rounded-xl shadow-xl z-30 divide-y divide-slate-100">
+                                            {sopirList
+                                                .filter((s) => {
+                                                    const q = searchSopir1.toLowerCase();
+                                                    const nama = String(s.kry_nama || s.supir_nama || '').toLowerCase();
+                                                    const nip = String(s.kry_nip || s.supir_id || '').toLowerCase();
+                                                    return !q || nama.includes(q) || nip.includes(q);
+                                                })
+                                                .map((s, i) => {
+                                                    const nip = String(s.kry_nip || s.supir_id || '').trim();
+                                                    const nama = String(s.kry_nama || s.supir_nama || '').trim();
+                                                    return (
+                                                        <button
+                                                            key={i}
+                                                            type="button"
+                                                            onMouseDown={() => {
+                                                                setFormData(prev => ({ ...prev, sjh_sopir1_nip: nip }));
+                                                                setSearchSopir1(`${nama} [${nip}]`);
+                                                                setIsSopir1DropdownOpen(false);
+                                                            }}
+                                                            className={`w-full text-left px-3 py-2 text-xs hover:bg-emerald-50 flex justify-between items-center cursor-pointer ${formData.sjh_sopir1_nip === nip ? 'bg-emerald-100 text-emerald-900 font-black' : 'text-slate-800 font-bold'}`}
+                                                        >
+                                                            <span className="truncate">{nama}</span>
+                                                            <span className="font-mono text-[10px] text-slate-500 ml-2">{nip}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                        </div>
+                                    )}
                                 </div>
 
-                                <div className="col-span-12 md:col-span-4">
+                                <div className="col-span-12 md:col-span-4 relative">
                                     <label className="block mb-1 text-slate-600 uppercase">PENGEMUDI 2 :</label>
-                                    <select
-                                        className="w-full p-2.5 border border-slate-300 rounded-xl outline-none focus:border-emerald-600 bg-white cursor-pointer uppercase text-xs font-bold text-slate-800"
-                                        value={formData.sjh_sopir2_nip}
-                                        onChange={e => setFormData({ ...formData, sjh_sopir2_nip: e.target.value })}
-                                        disabled={formData.by_loading === 'Ya'}
-                                    >
-                                        <option value="">-- PILIH PENGEMUDI 2 (OPSIONAL) --</option>
-                                        {formData.by_loading === 'Ya' ? (
-                                            <option value="">DAFTAR PENGEMUDI DIKOSONGKAN</option>
-                                        ) : (
-                                            sopirList.map((s, i) => (
-                                                <option key={i} value={s.kry_nip}>{s.kry_nama} [{s.kry_nip}]</option>
-                                            ))
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            disabled={formData.by_loading === 'Ya'}
+                                            placeholder={formData.by_loading === 'Ya' ? 'DIKOSONGKAN (BY LOADING)' : 'Ketik Nama / NIP Pengemudi 2...'}
+                                            className="w-full p-2.5 pr-8 border border-slate-300 rounded-xl outline-none focus:border-emerald-600 bg-white disabled:bg-slate-100 uppercase font-bold text-slate-800"
+                                            value={formData.by_loading === 'Ya' ? '' : searchSopir2}
+                                            onFocus={() => setIsSopir2DropdownOpen(true)}
+                                            onBlur={() => setTimeout(() => setIsSopir2DropdownOpen(false), 180)}
+                                            onChange={(e) => {
+                                                const val = e.target.value.toUpperCase();
+                                                setSearchSopir2(val);
+                                                setFormData(prev => ({ ...prev, sjh_sopir2_nip: '' }));
+                                                setIsSopir2DropdownOpen(true);
+                                            }}
+                                        />
+                                        {searchSopir2 && formData.by_loading !== 'Ya' && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setSearchSopir2('');
+                                                    setFormData(prev => ({ ...prev, sjh_sopir2_nip: '' }));
+                                                }}
+                                                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                                            >
+                                                <XIcon size={15} />
+                                            </button>
                                         )}
-                                    </select>
+                                    </div>
+                                    {isSopir2DropdownOpen && formData.by_loading !== 'Ya' && (
+                                        <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white border border-slate-300 rounded-xl shadow-xl z-30 divide-y divide-slate-100">
+                                            {sopirList
+                                                .filter((s) => {
+                                                    const q = searchSopir2.toLowerCase();
+                                                    const nama = String(s.kry_nama || s.supir_nama || '').toLowerCase();
+                                                    const nip = String(s.kry_nip || s.supir_id || '').toLowerCase();
+                                                    return !q || nama.includes(q) || nip.includes(q);
+                                                })
+                                                .map((s, i) => {
+                                                    const nip = String(s.kry_nip || s.supir_id || '').trim();
+                                                    const nama = String(s.kry_nama || s.supir_nama || '').trim();
+                                                    return (
+                                                        <button
+                                                            key={i}
+                                                            type="button"
+                                                            onMouseDown={() => {
+                                                                setFormData(prev => ({ ...prev, sjh_sopir2_nip: nip }));
+                                                                setSearchSopir2(`${nama} [${nip}]`);
+                                                                setIsSopir2DropdownOpen(false);
+                                                            }}
+                                                            className={`w-full text-left px-3 py-2 text-xs hover:bg-emerald-50 flex justify-between items-center cursor-pointer ${formData.sjh_sopir2_nip === nip ? 'bg-emerald-100 text-emerald-900 font-black' : 'text-slate-800 font-bold'}`}
+                                                        >
+                                                            <span className="truncate">{nama}</span>
+                                                            <span className="font-mono text-[10px] text-slate-500 ml-2">{nip}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
