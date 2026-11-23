@@ -41,7 +41,10 @@ const DriverPortal = () => {
 
             const [resST, resLoper] = await Promise.all([
                 api.get('/driver/surat-tugas', {
-                    params: { supir_nip: overrideNip || undefined },
+                    params: {
+                        supir_nip: overrideNip || undefined,
+                        status: 'BERJALAN'
+                    },
                     headers
                 }),
                 api.get('/driver/loper-resi', {
@@ -60,7 +63,10 @@ const DriverPortal = () => {
                 supir_nama: drv.supir_nama || prev.supir_nama,
                 username: drv.username || prev.username
             }));
-            setSuratTugasList(resST.data?.data || []);
+            const activeSTList = (resST.data?.data || []).filter(
+                (st) => String(st.complete_yn || 'N').toUpperCase() !== 'Y'
+            );
+            setSuratTugasList(activeSTList);
             setLoperResiList(resLoper.data?.data || []);
 
             if (drv.is_admin && sopirList.length === 0) {
@@ -232,8 +238,8 @@ const DriverPortal = () => {
                         type="button"
                         onClick={() => setActiveTab('surat-tugas')}
                         className={`py-3 px-3 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 transition cursor-pointer ${activeTab === 'surat-tugas'
-                                ? 'bg-[#004b84] text-white shadow-xs'
-                                : 'text-slate-600 hover:bg-slate-100'
+                            ? 'bg-[#004b84] text-white shadow-xs'
+                            : 'text-slate-600 hover:bg-slate-100'
                             }`}
                     >
                         <ClipboardList size={15} /> Surat Tugas ({suratTugasList.length})
@@ -242,8 +248,8 @@ const DriverPortal = () => {
                         type="button"
                         onClick={() => setActiveTab('loper')}
                         className={`py-3 px-3 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 transition cursor-pointer ${activeTab === 'loper'
-                                ? 'bg-[#059669] text-white shadow-xs'
-                                : 'text-slate-600 hover:bg-slate-100'
+                            ? 'bg-[#059669] text-white shadow-xs'
+                            : 'text-slate-600 hover:bg-slate-100'
                             }`}
                     >
                         <Package size={15} /> Loper Resi ({loperResiList.length})
@@ -276,8 +282,8 @@ const DriverPortal = () => {
                                             <span className="font-mono font-black text-sm text-[#004b84]">{st.no_surat_tugas}</span>
                                         </div>
                                         <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${st.complete_yn === 'Y'
-                                                ? 'bg-emerald-100 text-emerald-700'
-                                                : 'bg-amber-100 text-amber-800'
+                                            ? 'bg-emerald-100 text-emerald-700'
+                                            : 'bg-amber-100 text-amber-800'
                                             }`}>
                                             {st.complete_yn === 'Y' ? 'SELESAI' : 'AKTIF JALAN'}
                                         </span>
@@ -440,8 +446,8 @@ const DriverPortal = () => {
                                                 type="button"
                                                 onClick={() => handleUpdateStatusAntar(resi)}
                                                 className={`w-full py-3 px-4 rounded-2xl text-xs font-black uppercase flex items-center justify-center gap-2 cursor-pointer transition ${isDelivered
-                                                        ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                                                        : 'bg-[#059669] hover:bg-emerald-700 text-white shadow-xs'
+                                                    ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                                                    : 'bg-[#059669] hover:bg-emerald-700 text-white shadow-xs'
                                                     }`}
                                             >
                                                 <CheckCircle2 size={16} />

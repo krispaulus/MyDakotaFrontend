@@ -769,8 +769,8 @@ function App() {
       <Route path="/marketing/btt/barcode" element={<BttBarcodePrintPage />} />
       <Route path="/scan-surat-tugas" element={<ScanSuratTugas />} />
 
-      <Route path="/operasional/driver-portal" element={<MainLayout><DriverPortal /></MainLayout>} />
-      <Route path="/driver/portal" element={<MainLayout><DriverPortal /></MainLayout>} />
+      <Route path="/operasional/driver-portal" element={<DriverPortal />} />
+      <Route path="/driver/portal" element={<DriverPortal />} />
 
       {/* Jika nanti ada halaman lain, tinggal bungkus lagi pakai MainLayout 
       <Route
