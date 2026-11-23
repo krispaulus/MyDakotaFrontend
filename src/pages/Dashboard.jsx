@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
+import { jwtDecode } from 'jwt-decode';
 import {
   Package,
   Truck,
@@ -53,6 +54,30 @@ const Dashboard = () => {
   // State BTT Berjalan Sisi Kanan (Real DB)
   const [recentBTTList, setRecentBTTList] = useState([]);
 
+  // Gunakan helper kecil di dalam Dashboard.jsx
+  // const getActiveCabang = () =>
+  //   localStorage.getItem('active_agen_id') ||
+  //   localStorage.getItem('selected_agen') ||
+  //   localStorage.getItem('kode_cabang') ||
+  //   '';
+
+  const getActiveCabang = () => {
+    const saved = localStorage.getItem('active_agen_id');
+    if (saved && saved !== 'null' && saved !== 'EMPTY') return saved;
+
+    try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        const decoded = jwtDecode(token);
+        if (Array.isArray(decoded.cabangs) && decoded.cabangs.length > 0) {
+          return decoded.cabangs[0];
+        }
+        if (decoded.agent_code) return decoded.agent_code;
+      }
+    } catch (e) { }
+    return '';
+  };
+
   // State Chatbot AI
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [messages, setMessages] = useState([
@@ -69,7 +94,8 @@ const Dashboard = () => {
   const fetchDashboardMetrics = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await api.get('/dashboard/metrics', {
+      const kodeCabang = getActiveCabang();
+      const res = await api.get(`/dashboard/metrics?kode_cabang=${encodeURIComponent(kodeCabang)}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.data?.data) {
@@ -84,11 +110,12 @@ const Dashboard = () => {
   const fetchRecentActiveBTT = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await api.get('/dashboard/btt-by-status?status=IN%20TRANSIT&limit=5', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      console.log("Data BTT Aktif Berjalan:", res.data);
-      if (res.data?.data && res.data.data.length > 0) {
+      const kodeCabang = getActiveCabang();
+      const res = await api.get(
+        `/dashboard/btt-by-status?status=IN%20TRANSIT&limit=5&kode_cabang=${encodeURIComponent(kodeCabang)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.data?.data) {
         setRecentBTTList(res.data.data);
       }
     } catch (err) {
@@ -106,9 +133,10 @@ const Dashboard = () => {
     try {
       const token = localStorage.getItem('token');
       const ptId = localStorage.getItem('pt_id') || 'C';
+      const kodeCabang = getActiveCabang();
 
       const res = await api.get(
-        `/dashboard/btt-by-status?pt_id=${ptId}&status=${encodeURIComponent(categoryKey)}&limit=5`,
+        `/dashboard/btt-by-status?pt_id=${ptId}&status=${encodeURIComponent(categoryKey)}&limit=5&kode_cabang=${encodeURIComponent(kodeCabang)}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 

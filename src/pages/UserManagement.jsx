@@ -253,8 +253,8 @@ const UserManagement = () => {
   }, []);
 
   useEffect(() => {
+    const allCodes = agens.map(a => getAgenKode(a)).filter(Boolean);
     if (addUser.allcabang === "Y" || addUser.allcabang === "Ya") {
-      const allCodes = agens.map(a => a.Agen_Kode || a.agen_kode);
       if (addUser.kode_cabang?.length !== allCodes.length) {
         setAddUser(prev => ({ ...prev, kode_cabang: allCodes }));
       }
@@ -265,12 +265,58 @@ const UserManagement = () => {
     }
   }, [addUser.allcabang, agens]);
 
+  // Letakkan di dalam komponen UserManagement (sekitar baris 95)
+  const getAgenKode = (agen) => {
+    if (!agen) return "";
+    // 1. Cek semua kemungkinan nama properti kode / ID
+    let val =
+      agen.Agen_Kode ??
+      agen.agen_kode ??
+      agen.AGEN_KODE ??
+      agen.kode_cabang ??
+      agen.Kode_Cabang ??
+      agen.KODE_CABANG ??
+      agen.kode ??
+      agen.Kode ??
+      agen.KODE ??
+      agen.agen_id ??
+      agen.Agen_ID ??
+      agen.AGEN_ID ??
+      agen.id ??
+      agen.ID;
+
+    // 2. Cari properti apa pun yang mengandung kata "kode" atau "id"
+    if (val === undefined || val === null || String(val).trim() === "") {
+      const dynamicKey = Object.keys(agen).find(
+        (k) =>
+          (k.toLowerCase().includes("kode") || k.toLowerCase().includes("id")) &&
+          agen[k] !== null &&
+          String(agen[k]).trim() !== ""
+      );
+      if (dynamicKey) {
+        val = agen[dynamicKey];
+      }
+    }
+
+    // 3. Fallback terakhir: gunakan nama agen jika memang tidak ada field kode/id sama sekali
+    if (val === undefined || val === null || String(val).trim() === "") {
+      val = getAgenNama(agen);
+    }
+
+    return val !== undefined && val !== null ? String(val).trim() : "";
+  };
+
+  const getAgenNama = (agen) => {
+    if (!agen) return "";
+    return agen.Agen_Nama || agen.agen_nama || agen.AGEN_NAMA || agen.nama_cabang || agen.nama || "";
+  };
+
   const isAllSelected = addUser.allcabang === "Y" || addUser.allcabang === "Ya";
   const isAllSelectedEdit = editUser?.all_cabangyn === "Y";
 
   useEffect(() => {
+    const allCodes = agens.map(a => getAgenKode(a)).filter(Boolean);
     if (editUser?.all_cabangyn === "Y") {
-      const allCodes = agens.map(a => a.Agen_Kode || a.agen_kode);
       if (editUser.kode_cabang?.length !== allCodes.length) {
         setEditUser(prev => ({
           ...prev,
@@ -344,6 +390,8 @@ const UserManagement = () => {
         api.get('/users', { headers })
       ]);
 
+      const agensList = resAgens.data?.data || resAgens.data || [];
+      console.log("STRUKTUR DATA AGEN:", agensList[0]);
       setAgens(resAgens.data?.data || resAgens.data || []);
       setUsers(resUsers.data?.data || resUsers.data || []);
     } catch (err) {
@@ -407,21 +455,27 @@ const UserManagement = () => {
     }
   };
 
+  // Ubah fungsi handleEditClick di UserManagement.jsx (sekitar baris 436)
   const handleEditClick = (user) => {
-    const cabangRaw = user.kode_cabang || "";
-    const cabangArray = Array.isArray(cabangRaw)
-      ? cabangRaw
-      : (cabangRaw !== "" ? cabangRaw.split(',').map(s => s.trim()) : []);
+    // Tangkap baik snake_case maupun PascalCase dari backend
+    const cabangRaw = user.kode_cabang || user.KodeCabang || "";
+
+    let cabangArray = [];
+    if (Array.isArray(cabangRaw)) {
+      cabangArray = cabangRaw.map(s => String(s).trim());
+    } else if (typeof cabangRaw === 'string' && cabangRaw !== "" && cabangRaw !== "ALL CABANG") {
+      cabangArray = cabangRaw.split(',').map(s => s.trim()).filter(Boolean);
+    }
 
     const userData = {
       ...user,
       pt_id: user.PT_ID || user.pt_id || localStorage.getItem('pt_ID'),
-      realname: user.realname || user.real_name || user.RealName,
-      email: user.email || "",
-      mobilenumber: user.mobilenumber || user.mobileNumber || "",
+      realname: user.realname || user.real_name || user.RealName || "",
+      email: user.email || user.Email || "",
+      mobilenumber: user.mobilenumber || user.mobileNumber || user.MobileNumber || "",
       aktifyn: user.user_aktifyn || user.aktifyn || 'N',
       gender: user.gender !== undefined ? Number(user.gender) : '',
-      all_cabangyn: user.all_cabangyn || 'N',
+      all_cabangyn: (user.all_cabangyn || user.All_cabangYN || 'N').toUpperCase(),
       kode_cabang: cabangArray,
       usertype: user.usertype || user.UserType || user.user_type || ''
     };
@@ -539,7 +593,9 @@ const UserManagement = () => {
     const aktifyn = user.aktifyn || 'N';
     const all_cabangyn = (user.all_cabangValue === "Ya (Semua Cabang)" || user.all_cabangyn === "Y") ? "Y" : "N";
     const finalPtId = pt_id || user.pt_id || user.PT_ID || '';
-    const kodecabang = Array.isArray(user.kode_cabang) ? user.kode_cabang : [];
+    const kodecabang = Array.isArray(user.kode_cabang)
+      ? user.kode_cabang.map(k => String(k).trim()).filter(Boolean)
+      : [];
 
     const payload = {
       Username: username,
@@ -646,17 +702,14 @@ const UserManagement = () => {
 
   const normalizedUsers = useMemo(() => {
     return users.map(user => {
-      const rawCabang = user.kode_cabang || "";
+      const rawCabang = user.kode_cabang || user.KodeCabang || "";
       const kodeArray = Array.isArray(rawCabang)
         ? rawCabang
-        : rawCabang.split(',').map(s => s.trim()).filter(s => s !== "");
+        : String(rawCabang).split(',').map(s => s.trim()).filter(s => s !== "" && s !== "ALL CABANG");
 
       const namaArray = kodeArray.map(kode => {
-        const found = agens.find(a => {
-          const masterKode = (a.agen_kode || a.Agen_Kode || "").toString().trim();
-          return masterKode === kode.toString().trim();
-        });
-        return found ? (found.agen_nama || found.Agen_Nama) : kode;
+        const found = agens.find(a => getAgenKode(a) === String(kode).trim());
+        return found ? getAgenNama(found) : kode;
       });
 
       let displayCabang = "-";
@@ -840,14 +893,14 @@ const UserManagement = () => {
                 className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500 cursor-pointer"
               >
                 <option value="">-- SEMUA CABANG --</option>
-                {agens.map((agen, index) => (
-                  <option
-                    key={agen.Agen_Kode || agen.agen_kode || index}
-                    value={agen.Agen_Kode || agen.agen_kode}
-                  >
-                    {agen.Agen_Nama || agen.agen_nama}
-                  </option>
-                ))}
+                {agens.map((agen, index) => {
+                  const kode = getAgenKode(agen);
+                  return (
+                    <option key={kode || index} value={kode}>
+                      {getAgenNama(agen)}
+                    </option>
+                  );
+                })}
               </select>
             </div>
           </div>
@@ -1113,7 +1166,7 @@ const UserManagement = () => {
                           checked={addUser.kode_cabang?.length === agens.length}
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setAddUser({ ...addUser, kode_cabang: agens.map(a => a.Agen_Kode || a.agen_kode) });
+                              setAddUser({ ...addUser, kode_cabang: agens.map(a => getAgenKode(a)).filter(Boolean) });
                             } else {
                               setAddUser({ ...addUser, kode_cabang: [] });
                             }
@@ -1125,8 +1178,8 @@ const UserManagement = () => {
 
                     <div className="max-h-48 overflow-y-auto p-1">
                       {filteredAgens.map((agen) => {
-                        const kode = agen.Agen_Kode || agen.agen_kode;
-                        const nama = agen.Agen_Nama || agen.agen_nama;
+                        const kode = getAgenKode(agen);
+                        const nama = getAgenNama(agen);
                         const isChecked = addUser.kode_cabang?.includes(kode);
 
                         return (
@@ -1389,7 +1442,7 @@ const UserManagement = () => {
                               if (e.target.checked) {
                                 setEditUser({
                                   ...editUser,
-                                  kode_cabang: agens.map(a => a.Agen_Kode || a.agen_kode)
+                                  kode_cabang: agens.map(a => getAgenKode(a)).filter(Boolean)
                                 });
                               } else {
                                 setEditUser({ ...editUser, kode_cabang: [] });
@@ -1403,22 +1456,23 @@ const UserManagement = () => {
                       </div>
 
                       <div className="max-h-48 overflow-y-auto mt-2 p-1">
-                        {filteredEditAgens.map((agen) => {
-                          const kode = agen.Agen_Kode || agen.agen_kode;
-                          const nama = agen.Agen_Nama || agen.agen_nama;
-                          const isChecked = editUser?.kode_cabang?.includes(kode);
+                        {filteredEditAgens.map((agen, idx) => {
+                          const kode = getAgenKode(agen);
+                          const nama = getAgenNama(agen);
+                          const isChecked = (editUser?.kode_cabang || []).map(String).includes(kode);
 
                           return (
-                            <label key={kode} className={`flex items-center space-x-3 p-2 rounded cursor-pointer transition-colors ${isDarkMode ? 'hover:bg-blue-600' : 'hover:bg-blue-50'
+                            <label key={kode || idx} className={`flex items-center space-x-3 p-2 rounded cursor-pointer transition-colors ${isDarkMode ? 'hover:bg-blue-600' : 'hover:bg-blue-50'
                               } ${isChecked ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}>
                               <input
                                 type="checkbox"
                                 className="w-4 h-4 text-blue-600 rounded"
                                 checked={isChecked}
                                 onChange={() => {
+                                  if (!kode) return; // Cegah memasukkan string kosong
                                   let updated = [...(editUser?.kode_cabang || [])];
                                   if (isChecked) {
-                                    updated = updated.filter(item => item !== kode);
+                                    updated = updated.filter(item => String(item) !== kode);
                                   } else {
                                     updated.push(kode);
                                   }

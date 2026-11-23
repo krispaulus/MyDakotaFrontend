@@ -37,6 +37,7 @@ const Header = () => {
 
     const pathnames = location.pathname.split('/').filter((x) => x);
 
+    // Ganti bagian useEffect di Header.jsx (baris 40-128) dengan kode berikut:
     useEffect(() => {
         updateHeader();
 
@@ -46,81 +47,65 @@ const Header = () => {
                 const decoded = jwtDecode(token);
 
                 const tokenRole = decoded.usertype || decoded.user_type || '';
-                let isCurrentUserSuperadmin = false;
+                const isCurrentUserSuperadmin = tokenRole !== ''
+                    ? (tokenRole === 'S' || tokenRole === 'Superadmin')
+                    : (decoded.username?.toLowerCase() === 'superdbs' || decoded.username?.toLowerCase() === 'superdli');
 
-                if (tokenRole !== '') {
-                    isCurrentUserSuperadmin = (tokenRole === 'S' || tokenRole === 'Superadmin');
-                } else {
-                    isCurrentUserSuperadmin = (decoded.username?.toLowerCase() === 'superdbs' || decoded.username?.toLowerCase() === 'superdli');
-                }
-
-                if (isCurrentUserSuperadmin) {
-                    setRole('Superadmin');
-                    localStorage.setItem('role_akses', 'S');
-                } else {
-                    setRole('User');
-                    localStorage.setItem('role_akses', 'U');
-                }
+                const isAllCabang = isCurrentUserSuperadmin || decoded.all_cabangyn === 'Y';
+                setRole(isAllCabang ? 'Superadmin' : 'User');
+                localStorage.setItem('role_akses', isAllCabang ? 'S' : 'U');
 
                 api.get('/agens', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 })
                     .then(res => {
                         const response = res.data;
-                        let finalData = response.data || response;
-                        if (!Array.isArray(finalData)) {
-                            finalData = [];
-                        }
+                        const finalData = Array.isArray(response.data || response) ? (response.data || response) : [];
 
                         let listAgenTampil = finalData;
 
-                        if (!isCurrentUserSuperadmin && decoded.all_cabangyn !== 'Y') {
-                            const userAllowedCabangs = decoded.cabangs || localStorage.getItem('kode_cabang')?.split(',') || [];
-                            if (userAllowedCabangs.length > 0) {
-                                const cleanAllowedCabangs = userAllowedCabangs.map(c => c.trim().toUpperCase());
-                                const filtered = finalData.filter(agen => {
-                                    return cleanAllowedCabangs.includes(agen.agen_kode?.toUpperCase()) ||
-                                        cleanAllowedCabangs.includes(agen.agen_id?.toString().toUpperCase());
-                                });
+                        // Filter cabang khusus untuk user non-All-Cabang (contoh: TRIAS_2 -> hanya DLI SURABAYA)
+                        if (!isAllCabang) {
+                            const rawCabangs = Array.isArray(decoded.cabangs)
+                                ? decoded.cabangs
+                                : (localStorage.getItem('kode_cabang')?.split(',') || []);
+                            const cleanAllowed = rawCabangs.map(c => String(c).trim().toUpperCase()).filter(Boolean);
 
-                                if (filtered.length > 0) {
-                                    listAgenTampil = filtered;
-                                }
-                            }
+                            listAgenTampil = finalData.filter(agen => {
+                                const kode = String(agen.agen_kode || agen.Agen_Kode || '').trim().toUpperCase();
+                                const id = String(agen.agen_id || agen.Agen_ID || '').trim().toUpperCase();
+                                return cleanAllowed.includes(kode) || cleanAllowed.includes(id);
+                            });
                         }
 
-                        setAgens(listAgenTampil.length > 0 ? listAgenTampil : finalData);
+                        setAgens(listAgenTampil);
 
-                        let savedAgen = localStorage.getItem('active_agen_id');
-                        if (savedAgen === '1' || savedAgen === 'PST001') {
-                            savedAgen = 'PUSAT DAKOTA';
-                            localStorage.setItem('active_agen_id', 'PUSAT DAKOTA');
-                        }
+                        // Cek apakah active_agen_id yang tersimpan valid & termasuk dalam hak akses user
+                        const savedAgen = String(localStorage.getItem('active_agen_id') || '').trim();
+                        const matchedSaved = listAgenTampil.find(a =>
+                            String(a.agen_kode || a.Agen_Kode || '').trim().toUpperCase() === savedAgen.toUpperCase() ||
+                            String(a.agen_id || a.Agen_ID || '').trim().toUpperCase() === savedAgen.toUpperCase()
+                        );
 
-                        if (savedAgen && savedAgen !== 'null' && savedAgen !== '') {
-                            setSelectedAgen(savedAgen);
-                        } else {
-                            setSelectedAgen('PUSAT DAKOTA');
-                            localStorage.setItem('active_agen_id', 'PUSAT DAKOTA');
-                        }
+                        if (matchedSaved && savedAgen.toUpperCase() !== 'EMPTY') {
+                            const activeCode = String(matchedSaved.agen_kode || matchedSaved.agen_id).trim();
+                            setSelectedAgen(activeCode);
+                            localStorage.setItem('active_agen_id', activeCode);
+                            localStorage.setItem('active_agen_nama', matchedSaved.agen_nama || matchedSaved.Agen_Nama);
+                        } else if (listAgenTampil.length > 0) {
+                            // Auto-select cabang pertama milik user dari database (tanpa hardcode PUSAT DAKOTA)
+                            const firstAgen = listAgenTampil[0];
+                            const firstCode = String(firstAgen.agen_kode || firstAgen.agen_id).trim();
+                            const firstName = firstAgen.agen_nama || firstAgen.Agen_Nama || firstCode;
 
-                        const currentActiveId = localStorage.getItem('active_agen_id');
-                        if (currentActiveId === 'PUSAT DAKOTA' || currentActiveId === 'BKI0101' || currentActiveId === 'PST001') {
-                            localStorage.setItem('active_agen_nama', 'PUSAT DAKOTA');
-                        } else if (currentActiveId && currentActiveId !== 'null') {
-                            const queryTarget = currentActiveId.toString().trim().toUpperCase();
-                            const matchedAgen = finalData.find(a =>
-                                a.agen_kode?.toString().trim().toUpperCase() === queryTarget ||
-                                a.agen_id?.toString().trim().toUpperCase() === queryTarget
-                            );
-                            if (matchedAgen) {
-                                localStorage.setItem('active_agen_nama', matchedAgen.agen_nama);
-                            }
+                            setSelectedAgen(firstCode);
+                            localStorage.setItem('active_agen_id', firstCode);
+                            localStorage.setItem('active_agen_nama', firstName);
                         }
                     })
                     .catch(err => {
                         console.error("[Header] Gagal sinkronisasi data agen database:", err);
-                        setAgens([{ agen_id: 'PUSAT DAKOTA', agen_kode: 'PUSAT', agen_nama: 'PUSAT DAKOTA' }]);
+                        setAgens([]);
                     });
 
             } catch (error) {
@@ -138,25 +123,17 @@ const Header = () => {
     }, [location]);
 
     const handleAgenChangeClick = (selectedIdentifier) => {
-        const queryTarget = selectedIdentifier?.toString().trim().toUpperCase();
+        const queryTarget = String(selectedIdentifier || '').trim().toUpperCase();
+        const agenFound = agens.find(a =>
+            String(a.agen_kode || '').trim().toUpperCase() === queryTarget ||
+            String(a.agen_id || '').trim().toUpperCase() === queryTarget ||
+            String(a.agen_nama || '').trim().toUpperCase() === queryTarget
+        );
 
-        let namaAgenTujuan = "PUSAT DAKOTA";
-        let targetValueToSave = "PUSAT DAKOTA";
+        if (!agenFound) return;
 
-        if (queryTarget !== "PUSAT DAKOTA" && queryTarget !== "BKI0101" && queryTarget !== "PST001") {
-            const agenFound = agens.find(a =>
-                a.agen_id?.toString().trim().toUpperCase() === queryTarget ||
-                a.agen_kode?.toString().trim().toUpperCase() === queryTarget ||
-                a.agen_nama?.toString().trim().toUpperCase() === queryTarget
-            );
-
-            if (agenFound) {
-                namaAgenTujuan = agenFound.agen_nama;
-                targetValueToSave = agenFound.agen_id || agenFound.agen_kode;
-            } else {
-                targetValueToSave = selectedIdentifier;
-            }
-        }
+        const namaAgenTujuan = agenFound.agen_nama;
+        const targetValueToSave = String(agenFound.agen_kode || agenFound.agen_id).trim();
 
         Swal.fire({
             title: 'Konfirmasi Perpindahan Agen',
@@ -183,9 +160,6 @@ const Header = () => {
                 }).then(() => {
                     window.location.reload();
                 });
-            } else {
-                const currentActive = localStorage.getItem('active_agen_id') || 'PUSAT DAKOTA';
-                setSelectedAgen(currentActive);
             }
         });
     };
@@ -206,7 +180,7 @@ const Header = () => {
                     </div>
 
                     <div className="text-xs font-black text-indigo-600 mt-0.5">
-                        {localStorage.getItem('active_agen_nama') || 'PUSAT DAKOTA'}
+                        {localStorage.getItem('active_agen_nama') || '-'}
                     </div>
 
                     <nav className={`flex text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-400'}`}>
@@ -250,19 +224,12 @@ const Header = () => {
                     >
                         <span className="text-sm font-bold tracking-wide uppercase select-none">
                             📍 {(() => {
-                                if (selectedAgen === 'PUSAT DAKOTA' || selectedAgen === 'BKI0101' || selectedAgen === 'PST001' || selectedAgen === '1' || !selectedAgen) {
-                                    return 'PUSAT DAKOTA (HOLDING)';
-                                }
-
-                                const queryTarget = selectedAgen?.toString().trim().toUpperCase();
-
+                                const queryTarget = String(selectedAgen || '').trim().toUpperCase();
                                 const agenFound = agens.find(a =>
-                                    a.agen_id?.toString().trim().toUpperCase() === queryTarget ||
-                                    a.agen_kode?.toString().trim().toUpperCase() === queryTarget ||
-                                    a.agen_nama?.toString().trim().toUpperCase() === queryTarget
+                                    String(a.agen_kode || '').trim().toUpperCase() === queryTarget ||
+                                    String(a.agen_id || '').trim().toUpperCase() === queryTarget
                                 );
-
-                                return agenFound ? agenFound.agen_nama : `AGEN ${selectedAgen}`;
+                                return agenFound ? agenFound.agen_nama : (localStorage.getItem('active_agen_nama') || 'Pilih Cabang');
                             })()}
                         </span>
                         <ChevronDown size={16} className={`transition-transform duration-200 ${isOpenDropdownAgen ? 'rotate-180' : 'opacity-60'}`} />
@@ -294,7 +261,6 @@ const Header = () => {
                                         setSearchTermAgen('');
                                     }}
                                 >
-                                    🏢 PUSAT DAKOTA (HOLDING)
                                 </div>
 
                                 {agens
