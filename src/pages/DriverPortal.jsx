@@ -127,8 +127,9 @@ const DriverPortal = () => {
         const cleanCode = String(rawCode || scanKoliInput || '').trim().toUpperCase();
         if (!cleanCode || !podModalResi) return;
 
-        const baseResi = String(podModalResi.no_btt || '').trim().toUpperCase();
-        // Validasi kode scan harus milik resi ini (awalan 16 digit sama)
+        // Ambil 16 digit pertama sebagai Nomor Resi BTT dasar (misal: 001112026C001528)
+        const baseResi = String(podModalResi.no_btt || '').trim().toUpperCase().slice(0, 16);
+
         if (!cleanCode.startsWith(baseResi)) {
             Swal.fire({
                 toast: true,
@@ -559,13 +560,13 @@ const DriverPortal = () => {
                                     onChange={(e) => setPodStatus(e.target.value)}
                                     className="w-full p-3 border border-slate-300 rounded-xl font-bold text-slate-800 bg-white outline-none focus:border-[#004b84]"
                                 >
-                                    <option value="AKSES_JALAN_DITUTUP">AKSES JALAN DITUTUP </option>
-                                    <option value="AKSES_JALAN_TERGANGGU">AKSES JALAN TERGANGGU</option>
-                                    <option value="ALAMAT_SUDAH_BENAR_TAPI_NAMA_PENERIMA_TIDAK_SESUAI">ALAMAT SUDAH BENAR TAPI NAMA PENERIMA TIDAK SESUAI</option>
-                                    <option value="ALAMAT_TIDAK_DITEMUKAN">ALAMAT TIDAK DITEMUKAN</option>
-                                    <option value="AKSES_JALAN_DITUTUP">AKSES JALAN DITUTUP</option>
-                                    <option value="BARANG_RUSAK_PADA_SAAT_PROSES_PENGIRIMAN">BARANG RUSAK PADA SAAT PROSES PENGIRIMAN</option>
+                                    <option value="TERKIRIM">TERKIRIM / DITERIMA</option>
                                     <option value="DITOLAK_OLEH_PENERIMA">DITOLAK OLEH PENERIMA</option>
+                                    <option value="ALAMAT_TIDAK_DITEMUKAN">ALAMAT TIDAK DITEMUKAN</option>
+                                    <option value="ALAMAT_SUDAH_BENAR_TAPI_NAMA_PENERIMA_TIDAK_SESUAI">ALAMAT SUDAH BENAR TAPI NAMA PENERIMA TIDAK SESUAI</option>
+                                    <option value="AKSES_JALAN_DITUTUP">AKSES JALAN DITUTUP</option>
+                                    <option value="AKSES_JALAN_TERGANGGU">AKSES JALAN TERGANGGU</option>
+                                    <option value="BARANG_RUSAK_PADA_SAAT_PROSES_PENGIRIMAN">BARANG RUSAK PADA SAAT PROSES PENGIRIMAN</option>
                                     <option value="DITUNDA_KARENA_CUACA_BURUK">DITUNDA KARENA CUACA BURUK</option>
                                     <option value="MENUNGGU_PROSES_PEMBAYARAN_DARI_PENGIRIM">MENUNGGU PROSES PEMBAYARAN DARI PENGIRIM</option>
                                     <option value="MENUNGGU_PROSES_PENGAMBILAN_BARANG_OLEH_PENERIMA">MENUNGGU PROSES PENGAMBILAN BARANG OLEH PENERIMA</option>
@@ -582,7 +583,6 @@ const DriverPortal = () => {
                                     <option value="PENGIRIM_MEMINTA_PENGANTARAN_KE_ALAMAT_LAIN">PENGIRIM MEMINTA PENGANTARAN KE ALAMAT LAIN</option>
                                     <option value="PENGIRIMAN_DIBATALKAN_ATAS_PERMINTAAN_PENGIRIM">PENGIRIMAN DIBATALKAN ATAS PERMINTAAN PENGIRIM</option>
                                     <option value="UKURAN_BARANG_TERLALU_BESAR_UNTUK_DIANTAR">UKURAN BARANG TERLALU BESAR UNTUK DIANTAR</option>
-
                                 </select>
                             </div>
 
