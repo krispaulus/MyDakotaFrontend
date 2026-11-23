@@ -538,13 +538,25 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
     },
     {
       name: 'Operasional Checker',
-      icon: <Truck size={20} />, // 🚚 Icon Truk khas operasional lapangan
-      roles: ['CHECKER', 'C', 'S', 'A'],
+      icon: <Truck size={20} />,
+      roles: ['C', 'c', 'S', 'A'],
       children: [
         {
           name: 'Scan QR Surat Tugas',
           path: '/operasional/scan-surat-tugas',
-          roles: ['CHECKER', 'C', 'S', 'A']
+          roles: ['C', 'c', 'S', 'A']
+        },
+      ]
+    },
+    {
+      name: 'Driver Portal',
+      icon: <Truck size={20} />,
+      roles: ['D', 'd', 'U', 'u', 'S', 'A'],
+      children: [
+        {
+          name: 'Surat Tugas & Loper Saya',
+          path: '/operasional/driver-portal',
+          roles: ['D', 'd', 'U', 'u', 'S', 'A']
         },
       ]
     },

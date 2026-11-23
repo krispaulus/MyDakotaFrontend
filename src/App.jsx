@@ -146,6 +146,7 @@ import MobileValidasiSuratTugas from './pages/MobileValidasiSuratTugas';
 import ScanSuratTugas from './pages/ScanSuratTugas';
 import UploadKimiaFarmaCSV from "./pages/UploadKimiaFarmaCSV";
 import BttBarcodePrintPage from './pages/BttBarcodePrintPage';
+import DriverPortal from './pages/DriverPortal';
 
 const getCompanyName = (pt) => {
   if (pt === 'A') return 'Dakota Buana Sarana';
@@ -767,6 +768,9 @@ function App() {
       <Route path="/marketing/customer-upload-CSV/upload-kimia-farma-csv" element={<MainLayout><UploadKimiaFarmaCSV menuName="UploadKimiaFarmaCSV" /></MainLayout>} />
       <Route path="/marketing/btt/barcode" element={<BttBarcodePrintPage />} />
       <Route path="/scan-surat-tugas" element={<ScanSuratTugas />} />
+
+      <Route path="/operasional/driver-portal" element={<MainLayout><DriverPortal /></MainLayout>} />
+      <Route path="/driver/portal" element={<MainLayout><DriverPortal /></MainLayout>} />
 
       {/* Jika nanti ada halaman lain, tinggal bungkus lagi pakai MainLayout 
       <Route

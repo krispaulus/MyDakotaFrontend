@@ -198,7 +198,14 @@ const Login = () => {
       localStorage.removeItem('lockedUntil');
       localStorage.removeItem('isBlocked');
 
-      navigate('/dashboard');
+      const normalizedRole = String(userRole).toUpperCase().trim();
+      if (normalizedRole === 'D') {
+        navigate('/operasional/driver-portal');
+      } else if (normalizedRole === 'C') {
+        navigate('/operasional/scan-surat-tugas');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (error) {
       console.error('Login Gagal:', error.response?.data?.message || error.message);
       const attempts = getFailedAttempts() + 1;

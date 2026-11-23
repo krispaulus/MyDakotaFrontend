@@ -1051,6 +1051,8 @@ const UserManagement = () => {
                   <option value="A">Admin</option>
                   <option value="V">Supervisor</option>
                   <option value="U">User</option>
+                  <option value="C">Checker</option>
+                  <option value="D">Driver / Sopir</option>
                 </select>
               </div>
 
@@ -1331,6 +1333,8 @@ const UserManagement = () => {
                   <option value="A">Admin</option>
                   <option value="V">Supervisor</option>
                   <option value="U">User</option>
+                  <option value="C">Checker</option>
+                  <option value="D">Driver / Sopir</option>
                 </select>
               </div>
 
