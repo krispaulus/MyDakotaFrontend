@@ -7,6 +7,7 @@ import {
     Navigation, RefreshCw, Search, ClipboardList,
     UserCheck, ChevronRight, QrCode, Camera, X, Trash2
 } from 'lucide-react';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 
 const DriverPortal = () => {
     const [activeTab, setActiveTab] = useState('surat-tugas'); // 'surat-tugas' | 'loper'
@@ -122,12 +123,25 @@ const DriverPortal = () => {
         setPodModalResi(null);
     };
 
+    // Hindari spam pembacaan frame kamera yang sama dalam 1.5 detik
+    const lastScanRef = useRef({ code: '', time: 0 });
+
     // Tambah hasil scan barcode/QR barang turun
     const handleAddScannedKoli = (rawCode) => {
-        const cleanCode = String(rawCode || scanKoliInput || '').trim().toUpperCase();
-        if (!cleanCode || !podModalResi) return;
+        const rawStr = String(rawCode || scanKoliInput || '').trim().toUpperCase();
+        if (!rawStr || !podModalResi) return;
 
-        // Ambil 16 digit pertama sebagai Nomor Resi BTT dasar (misal: 001112026C001528)
+        // Jika QR Code berisi URL (misal https://.../track/001112026C0015520001), ambil kode BTT-nya
+        const matchBtt = rawStr.match(/[0-9]{9}[A-Z][0-9]{6,10}/);
+        const cleanCode = matchBtt ? matchBtt[0] : rawStr;
+
+        const now = Date.now();
+        if (lastScanRef.current.code === cleanCode && now - lastScanRef.current.time < 1500) {
+            return;
+        }
+        lastScanRef.current = { code: cleanCode, time: now };
+
+        // Ambil 16 digit pertama sebagai Nomor Resi BTT dasar (misal: 001112026C001552)
         const baseResi = String(podModalResi.no_btt || '').trim().toUpperCase().slice(0, 16);
 
         if (!cleanCode.startsWith(baseResi)) {
@@ -137,26 +151,34 @@ const DriverPortal = () => {
                 icon: 'error',
                 title: `Barcode [${cleanCode}] bukan milik resi ${baseResi}!`,
                 showConfirmButton: false,
-                timer: 2200
+                timer: 2000
             });
             setScanKoliInput('');
             return;
         }
 
-        if (scannedKoliList.includes(cleanCode)) {
+        setScannedKoliList((prev) => {
+            if (prev.includes(cleanCode)) {
+                Swal.fire({
+                    toast: true,
+                    position: 'top',
+                    icon: 'warning',
+                    title: `Koli [${cleanCode}] sudah di-scan!`,
+                    showConfirmButton: false,
+                    timer: 1500
+                });
+                return prev;
+            }
             Swal.fire({
                 toast: true,
                 position: 'top',
-                icon: 'warning',
-                title: `Koli [${cleanCode}] sudah di-scan!`,
+                icon: 'success',
+                title: `Masuk: ${cleanCode}`,
                 showConfirmButton: false,
-                timer: 1800
+                timer: 1200
             });
-            setScanKoliInput('');
-            return;
-        }
-
-        setScannedKoliList((prev) => [...prev, cleanCode]);
+            return [...prev, cleanCode];
+        });
         setScanKoliInput('');
     };
 
@@ -165,11 +187,26 @@ const DriverPortal = () => {
         setIsCameraOpen(true);
         setTimeout(async () => {
             try {
-                const scanner = new Html5Qrcode('pod-qr-reader');
+                if (qrScannerRef.current) {
+                    await qrScannerRef.current.stop().catch(() => { });
+                }
+                const scanner = new Html5Qrcode('pod-qr-reader', {
+                    formatsToSupport: [
+                        Html5QrcodeSupportedFormats.QR_CODE,
+                        Html5QrcodeSupportedFormats.CODE_128,
+                        Html5QrcodeSupportedFormats.CODE_39,
+                        Html5QrcodeSupportedFormats.EAN_13
+                    ],
+                    verbose: false
+                });
                 qrScannerRef.current = scanner;
                 await scanner.start(
                     { facingMode: 'environment' },
-                    { fps: 10, qrbox: { width: 220, height: 220 } },
+                    {
+                        fps: 15,
+                        qrbox: { width: 240, height: 240 },
+                        aspectRatio: 1.0
+                    },
                     (decodedText) => {
                         handleAddScannedKoli(decodedText);
                     },
@@ -178,9 +215,9 @@ const DriverPortal = () => {
             } catch (err) {
                 console.error('Kamera gagal dibuka:', err);
                 setIsCameraOpen(false);
-                Swal.fire('Kamera Tidak Tersedia', 'Pastikan izin kamera browser aktif atau gunakan input manual.', 'warning');
+                Swal.fire('Kamera Tidak Tersedia', 'Pastikan akses HTTPS/izin kamera browser aktif atau gunakan input manual.', 'warning');
             }
-        }, 200);
+        }, 250);
     };
 
     const stopCameraScanner = () => {
