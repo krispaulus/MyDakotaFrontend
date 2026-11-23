@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../api/axios';
 import Swal from 'sweetalert2';
-import { Html5Qrcode } from 'html5-qrcode';
 import {
     Truck, Package, Phone, CheckCircle2,
     Navigation, RefreshCw, Search, ClipboardList,
