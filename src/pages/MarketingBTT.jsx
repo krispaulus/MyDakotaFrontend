@@ -286,16 +286,22 @@ const MarketingBTT = () => {
         try {
             const currentToken = localStorage.getItem('token');
             const agenIdFix = targetAgenId || localStorage.getItem('active_agen_id') || '';
+            const activeAgenNama = (localStorage.getItem('active_agen_nama') || '').toUpperCase();
+            const isDliPusat = agenIdFix === '1' || agenIdFix === '001' || activeAgenNama.includes('DLI PUSAT');
 
             // Tentukan cabang yang difilter
             const selectedBranch = customParams.cabang !== undefined ? customParams.cabang : filterCabang;
+
+            const branchFilterFinal = selectedBranch !== ''
+                ? selectedBranch
+                : (isDliPusat && !activeAgenNama.includes('HOLDING') ? '001' : '');
 
             const queryParams = new URLSearchParams({
                 agen_id: agenIdFix,
                 start_date: bypassTanggal ? '' : (customParams.start_date ?? filterStartDate),
                 end_date: bypassTanggal ? '' : (customParams.end_date ?? filterEndDate),
                 bypass_tanggal: bypassTanggal ? 'Y' : 'N',
-                cabang: selectedBranch || '', // Kirim string kosong jika "-- SEMUA CABANG --"
+                cabang: branchFilterFinal,
                 ...(customParams.jenis_btt && { jenis_btt: customParams.jenis_btt }),
                 ...(customParams.customer && { customer: customParams.customer }),
                 ...(customParams.no_btt && { no_btt: customParams.no_btt }),

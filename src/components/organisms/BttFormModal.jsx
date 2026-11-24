@@ -158,24 +158,35 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                 ? String(initialData.bttt_tanggal).substring(0, 10)
                 : (initialData.tanggal ? String(initialData.tanggal).substring(0, 10) : todayStr);
 
-            // 🌟 Pisahkan CUSTOMER (Pemilik Akun Tagihan) vs NAMA PENGIRIM (Client/Lokasi Pickup)
             const namaCustomer = initialData.customer_nama || initialData.bttt_asalname || initialData.asal_name || 'UMUM';
             const namaPengirim = initialData.bttt_asalname || initialData.asal_name || namaCustomer;
             const idCustomer = String(initialData.bttt_asalcustid || initialData.asal_custid || '').trim();
 
-            // 🌟 Deteksi apakah transaksi ini CARTER atau PAKET
             const isCarter = (initialData.layanan_id === 'C' || initialData.bttt_layananid === 'C' || initialData.bttt_paketyn === 'N' || (initialData.bttt_charterjnskend && initialData.bttt_charterjnskend !== '-'));
             const jenisKendaraanCarter = initialData.bttt_charterjnskend || initialData.kode_kendaraan || '';
 
-            // 🌟 Metode pembayaran prioritas dari bttt_pembayaran ('2' = KREDIT, '0' = TUNAI, '1' = COD)
+            // ✅ Deteksi Layanan Darat / Laut / Udara dari DB
+            const rawServId = String(initialData.bttt_servid || '').trim();
+            const rawVia = String(initialData.bttt_via || initialData.bttt_service || '').trim().toUpperCase();
+            let layananNamaInit = 'Darat';
+            let kodeLayananInit = '1';
+            if (rawServId === '3' || rawVia.includes('UDARA')) {
+                layananNamaInit = 'Udara';
+                kodeLayananInit = '3';
+            } else if (rawServId === '2' || rawVia.includes('LAUT')) {
+                layananNamaInit = 'Laut';
+                kodeLayananInit = '2';
+            }
+
             const kodePembayaran = String(
                 initialData.bttt_pembayaran !== undefined && initialData.bttt_pembayaran !== null && initialData.bttt_pembayaran !== ''
                     ? initialData.bttt_pembayaran
                     : (initialData.metode_pembayaran === 'KREDIT' ? '2' : initialData.metode_pembayaran === 'TUNAI' ? '0' : '1')
             ).trim();
 
-            setKeywordCustomer(namaCustomer);
             setIsCustomerSelected(true);
+            setKeywordCustomer(namaCustomer);
+            setRekomendasiCustomer([]);
 
             setFormData({
                 bttt_nobtt: initialData.id || initialData.bttt_id || '',
@@ -186,10 +197,10 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                 bttt_dliexpryn: initialData.bttt_dliexpryn || 'N',
                 bttt_promoid: initialData.bttt_promoid || '',
 
-                // 🌟 PENGIRIM & CUSTOMER
+                // PENGIRIM & CUSTOMER
                 bttt_asalcustid: idCustomer,
                 bttt_asalname: namaPengirim,
-                bttt_up: namaPengirim,
+                bttt_up: initialData.bttt_up || namaPengirim,
                 bttt_asalalamat: initialData.bttt_asalalamat || initialData.asal_alamat || '',
                 bttt_asalkota: initialData.bttt_asalkota || initialData.asal_kota || '',
                 bttt_asaltelp: initialData.bttt_asaltelp || initialData.asal_telp || '',
@@ -197,7 +208,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                 bttt_asalemail: initialData.bttt_asalemail || '',
                 bttt_asalagenid: initialData.bttt_asalagenid || initialData.asal_agen_id || '1',
 
-                // 🌟 PENERIMA & AGEN TUJUAN
+                // PENERIMA & AGEN TUJUAN
                 bttt_tujuannama: initialData.bttt_tujuannama || initialData.tujuan_nama || '',
                 bttt_up_penerima: initialData.bttt_up_penerima || initialData.bttt_up || initialData.up || '',
                 bttt_tujuanalamat: initialData.bttt_tujuanalamat || initialData.tujuan_alamat || '',
@@ -214,9 +225,12 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                 bttt_tujuanagenid: initialData.tujuan_agen_nama || initialData.bttt_tujuanagenid || initialData.tujuan_agen_id || '',
                 bttt_kodecabangagen: initialData.bttt_tujuanagenid || initialData.tujuan_agen_id || initialData.bttt_kodecabangagen || '',
 
-                // 🌟 Layanan & Muatan
+                // Layanan & Muatan
                 bttt_paketyn: isCarter ? 'N' : 'Y',
                 bttt_pilihcarter: isCarter ? (jenisKendaraanCarter || 'BUILD UP') : '',
+                bttt_layanan_nama: layananNamaInit,
+                bttt_kodelayanan: kodeLayananInit,
+                bttt_servid: kodeLayananInit,
                 bttt_jenisharga: kodePembayaran,
                 bttt_jeniskiriman: 'BERAT',
                 bttt_isikiriman: initialData.bttt_namabarang || initialData.nama_barang || initialData.bttt_isikiriman || '',
@@ -237,6 +251,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
 
     // Live search Pelanggan
     useEffect(() => {
+        if (isEditMode) return;
         const namaPelanggan = keywordCustomer.trim();
 
         if (isCustomerSelected) {
@@ -987,6 +1002,9 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
     };
 
     // 🔍 Validasi Field Wajib & Format Email/Telepon
+    const emailRegexCheck = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    // 🔍 Validasi Field Wajib & Format Email/Telepon (Murni tanpa setState saat render!)
     const isFormValid = Boolean(
         formData.bttt_tanggal &&
         formData.bttt_asalname?.trim() &&
@@ -1001,9 +1019,8 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
         formData.bttt_isikiriman?.trim() &&
         (parseFloat(formData.bttt_berat) > 0) &&
         (parseFloat(formData.bttt_harga) > 0) &&
-        // Jika email diisi, format harus valid; jika kosong, tetap dianggap valid (opsional)
-        (!formData.bttt_asalemail || validateEmailPengirim(formData.bttt_asalemail)) &&
-        (!formData.bttt_tujuanemail || validateEmailPenerima(formData.bttt_tujuanemail))
+        (!formData.bttt_asalemail?.trim() || emailRegexCheck.test(formData.bttt_asalemail.trim())) &&
+        (!formData.bttt_tujuanemail?.trim() || emailRegexCheck.test(formData.bttt_tujuanemail.trim()))
     );
 
     console.log("STATUS VALIDASI FORM:", {
@@ -1086,8 +1103,15 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                 {/* 🎯 1. HEADER BIRU ELEGAN KHAS INVOICE */}
                 <div className="px-6 py-3.5 bg-[#004b84] text-white flex items-center justify-between shadow-xs">
                     <div className="flex items-center gap-2">
-                        <span className="text-lg font-bold">+</span>
-                        <h2 className="text-sm font-black uppercase tracking-wider">ENTRY BUKTI TANDA TERIMA (BTT)</h2>
+                        <span className="text-lg font-bold">{isEditMode ? '✎' : '+'}</span>
+                        <h2 className="text-sm font-black uppercase tracking-wider">
+                            {isEditMode ? 'EDIT BUKTI TANDA TERIMA (BTT)' : 'ENTRY BUKTI TANDA TERIMA (BTT)'}
+                        </h2>
+                        {isEditMode && formData.bttt_nobtt && (
+                            <span className="px-3 py-0.5 bg-amber-400 text-slate-950 font-mono font-black text-xs rounded-lg shadow-xs">
+                                {formData.bttt_nobtt}
+                            </span>
+                        )}
                     </div>
                     <button
                         onClick={onClose}
@@ -1604,6 +1628,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                                             ...prev,
                                             bttt_layanan_nama: val,
                                             bttt_kodelayanan: kode,
+                                            bttt_servid: kode,
                                             bttt_nosmu: val !== 'Udara' ? '' : prev.bttt_nosmu
                                         }));
                                     }}
