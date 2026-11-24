@@ -17,7 +17,7 @@ const MobileValidasiSuratTugas = () => {
     const [loading, setLoading] = useState(false);
     const [processing, setProcessing] = useState(false);
 
-    // State Proses Muat Barang (Loading Checker)
+    // State Proses Muat Barang (Loading Checker - 1 ST = Banyak Loading)
     const [isLoadingMode, setIsLoadingMode] = useState(false);
     const [loadingId, setLoadingId] = useState('');
     const [isLoadingFinished, setIsLoadingFinished] = useState(false);
@@ -36,19 +36,55 @@ const MobileValidasiSuratTugas = () => {
     const loggedUser = localStorage.getItem('username')
         || localStorage.getItem('realname')
         || 'PETUGAS CHECKER';
-    const loggedCabang = localStorage.getItem('active_cabang_nama')
+    const loggedCabang = localStorage.getItem('active_agen_nama')
+        || localStorage.getItem('active_cabang_nama')
         || localStorage.getItem('cabang_nama')
         || 'DLI PUSAT';
 
-    const fetchDetail = async (nomor) => {
+    // Helper: Reset penuh kembali ke halaman awal Scan Surat Tugas
+    const resetKeScanAwal = () => {
+        stopScanner();
+        stopKoliScanner();
+        setIsLoadingMode(false);
+        setIsLoadingFinished(false);
+        setLoadingId('');
+        setKoliInput('');
+        setInputManualNo('');
+        setData(null);
+        setSearchParams({});
+    };
+
+    const fetchDetail = async (nomor, targetLoadingId = '') => {
         if (!nomor) return;
         setLoading(true);
         try {
             const ptId = localStorage.getItem('pt_id') || 'C';
             const res = await api.get(`/operasional/surat-tugas/public-detail`, {
-                params: { no: nomor, pt_id: ptId }
+                params: {
+                    no: nomor,
+                    pt_id: ptId,
+                    loading_id: targetLoadingId || ''
+                }
             });
-            setData(res.data?.data || null);
+
+            const detailData = res.data?.data || null;
+            if (!detailData) {
+                setData(null);
+                return;
+            }
+
+            // Jika targetLoadingId kosong (baru scan Surat Tugas, belum klik TAMBAH RINCIAN),
+            // kosongkan daftar BTT di layar agar tidak menumpuk dengan sesi loading sebelumnya
+            if (!targetLoadingId) {
+                setLoadingId('');
+                setData({
+                    ...detailData,
+                    btt_list: [],
+                    total_btt: 0
+                });
+            } else {
+                setData(detailData);
+            }
         } catch {
             setData(null);
         } finally {
@@ -58,7 +94,7 @@ const MobileValidasiSuratTugas = () => {
 
     useEffect(() => {
         if (noSuratTugas) {
-            fetchDetail(noSuratTugas);
+            fetchDetail(noSuratTugas, '');
         }
     }, [noSuratTugas]);
 
@@ -117,7 +153,7 @@ const MobileValidasiSuratTugas = () => {
     };
 
     // =========================================================================
-    // 📦 2. KLIK "TAMBAH RINCIAN" -> MULAI PROSES MUAT BARANG (LOADING)
+    // 📦 2. KLIK "TAMBAH RINCIAN" -> BUAT SESI LOADING BARU (1 ST = BANYAK LOADING)
     // =========================================================================
     const handleTambahRincian = async () => {
         if (!data) return;
@@ -125,23 +161,28 @@ const MobileValidasiSuratTugas = () => {
             const ptId = localStorage.getItem('pt_id') || 'C';
             const targetNo = data.raw_sjh_id || data.no_surat_tugas || noSuratTugas;
             const res = await api.post(`/operasional/surat-tugas/start-loading?pt_id=${ptId}`, {
-                no_surat_tugas: targetNo
+                no_surat_tugas: targetNo,
+                force_new: true
             });
 
-            setLoadingId(res.data?.loading_id || `LC001${Date.now()}`);
+            const newLoadId = res.data?.loading_id || `LC001${Date.now()}`;
+            setLoadingId(newLoadId);
             setIsLoadingMode(true);
             setIsLoadingFinished(false);
+
+            // Muat ulang detail khusus untuk sesi loading baru ini (kosong bersih)
+            await fetchDetail(targetNo, newLoadId);
 
             setTimeout(() => {
                 if (koliInputRef.current) koliInputRef.current.focus();
             }, 250);
         } catch (err) {
-            Swal.fire('Gagal', err.response?.data?.message || 'Gagal memulai proses muat barang', 'error');
+            Swal.fire('Gagal', err.response?.data?.message || 'Gagal memulai sesi loading baru', 'error');
         }
     };
 
     // =========================================================================
-    // 📷 3. SCAN QR / BARCODE KOLI BTT KE DALAM SURAT TUGAS
+    // 📷 3. SCAN QR / BARCODE KOLI BTT KE SESI LOADING AKTIF
     // =========================================================================
     const handleScanKoliSubmit = async (kodeKoliRaw) => {
         const cleanKode = (kodeKoliRaw || '').trim().toUpperCase();
@@ -154,10 +195,11 @@ const MobileValidasiSuratTugas = () => {
 
             const res = await api.post(`/operasional/surat-tugas/scan-btt-koli?pt_id=${ptId}`, {
                 no_surat_tugas: targetNo,
+                loading_id: loadingId,
                 kode_scan: cleanKode
             });
 
-            await fetchDetail(targetNo);
+            await fetchDetail(targetNo, loadingId);
             setKoliInput('');
 
             Swal.fire({
@@ -224,40 +266,50 @@ const MobileValidasiSuratTugas = () => {
         };
     }, []);
 
-    // Hapus BTT dari daftar muatan
+    // Hapus BTT dari sesi loading aktif
     const handleRemoveBTT = async (noBtt) => {
         try {
             const ptId = localStorage.getItem('pt_id') || 'C';
             const targetNo = data.raw_sjh_id || data.no_surat_tugas || noSuratTugas;
             await api.delete(`/operasional/surat-tugas/remove-btt`, {
-                params: { pt_id: ptId, sjh_id: targetNo, no_btt: noBtt }
+                params: {
+                    pt_id: ptId,
+                    sjh_id: targetNo,
+                    loading_id: loadingId,
+                    no_btt: noBtt
+                }
             });
-            fetchDetail(targetNo);
+            fetchDetail(targetNo, loadingId);
         } catch {
             Swal.fire('Gagal', 'Tidak dapat menghapus BTT dari daftar muat', 'error');
         }
     };
 
     // =========================================================================
-    // ✅ 4. SELESAI SCAN CHECKER & JALANKAN TUGAS OLEH KEPALA OPERASIONAL
+    // ✅ 4. SELESAI SCAN CHECKER -> LANGSUNG KEMBALI KE LAYAR SCAN SURAT TUGAS
     // =========================================================================
     const handleSelesaiScanChecker = () => {
         if (!data?.btt_list || data.btt_list.length === 0) {
-            Swal.fire('Peringatan', 'Belum ada BTT yang dipindai ke dalam surat tugas ini!', 'warning');
+            Swal.fire('Peringatan', 'Belum ada BTT yang dipindai ke dalam sesi loading ini!', 'warning');
             return;
         }
-        stopKoliScanner();
-        setIsLoadingMode(false);
-        setIsLoadingFinished(true);
+
+        const finishedLoadId = loadingId;
 
         Swal.fire({
             icon: 'success',
             title: 'Pemindaian Barang Selesai!',
-            text: 'Muatan barang sudah masuk ke surat jalan. Kepala Operasional dapat menekan tombol "Jalankan Tugas".',
-            confirmButtonColor: '#004b84'
+            text: `Sesi Loading ${finishedLoadId} tersimpan. Kembali ke scan Surat Tugas...`,
+            timer: 1500,
+            showConfirmButton: false
+        }).then(() => {
+            resetKeScanAwal();
         });
     };
 
+    // =========================================================================
+    // ▶️ 5. JALANKAN TUGAS OLEH KEPALA OPERASIONAL -> KEMBALI KE LAYAR SCAN AWAL
+    // =========================================================================
     const handleJalankanTugas = async () => {
         const confirm = await Swal.fire({
             title: 'Jalankan Tugas Operasional?',
@@ -278,15 +330,16 @@ const MobileValidasiSuratTugas = () => {
                     no_surat_tugas: targetNo
                 });
 
-                Swal.fire({
+                await Swal.fire({
                     icon: 'success',
                     title: 'TUGAS BERJALAN!',
                     text: 'Surat Tugas berhasil diaktifkan (PROSES).',
-                    timer: 1800,
+                    timer: 1600,
                     showConfirmButton: false
-                }).then(() => {
-                    setData(prev => ({ ...prev, status: 'PROSES' }));
                 });
+
+                // Langsung kembali ke halaman awal Scan Surat Tugas
+                resetKeScanAwal();
             } catch (err) {
                 Swal.fire('Gagal', err.response?.data?.message || 'Gagal mengaktifkan surat tugas.', 'error');
             } finally {
@@ -296,17 +349,7 @@ const MobileValidasiSuratTugas = () => {
     };
 
     const handleBatal = () => {
-        stopKoliScanner();
-        if (isLoadingMode) {
-            setIsLoadingMode(false);
-            return;
-        }
-        if (window.history.length > 1) {
-            window.history.back();
-        } else {
-            setSearchParams({});
-            setData(null);
-        }
+        resetKeScanAwal();
     };
 
     const getFormattedNo = () => {
@@ -326,8 +369,6 @@ const MobileValidasiSuratTugas = () => {
         }
         return `001JC${yyyymm}${urut}`;
     };
-
-    const isSudahProses = data?.status === 'PROSES' && (data?.btt_list?.length || 0) > 0 && isLoadingFinished;
 
     return (
         <div className="min-h-screen bg-slate-100 text-slate-800 p-4 pb-28 font-sans max-w-md mx-auto">
@@ -486,7 +527,7 @@ const MobileValidasiSuratTugas = () => {
                         </div>
                     </div>
 
-                    {/* 🌟 TOMBOL "TAMBAH RINCIAN" (GAMBAR 2 ASP LAWAS) */}
+                    {/* 🌟 TOMBOL "TAMBAH RINCIAN" -> BUAT LOADING BARU */}
                     {!isLoadingMode && (
                         <div className="bg-white p-3.5 rounded-2xl border border-sky-200 shadow-xs flex items-center justify-between gap-2">
                             <div>
@@ -503,7 +544,7 @@ const MobileValidasiSuratTugas = () => {
                         </div>
                     )}
 
-                    {/* 🌟 AREA SCANNER QR / BARCODE KOLI BTT (AKTIF SAAT KLIK TAMBAH RINCIAN) */}
+                    {/* 🌟 AREA SCANNER QR / BARCODE KOLI BTT */}
                     {isLoadingMode && (
                         <div className="bg-sky-50 border-2 border-sky-400 p-3.5 rounded-2xl space-y-2.5 shadow-sm">
                             <div className="flex items-center justify-between">
@@ -591,7 +632,7 @@ const MobileValidasiSuratTugas = () => {
                                     {(!data.btt_list || data.btt_list.length === 0) ? (
                                         <tr>
                                             <td colSpan={isLoadingMode ? 7 : 6} className="text-center py-6 text-slate-400 italic font-normal">
-                                                Belum ada BTT muatan yang terdaftar pada surat tugas ini.
+                                                Belum ada BTT muatan yang terdaftar pada sesi loading ini.
                                             </td>
                                         </tr>
                                     ) : (
@@ -654,15 +695,6 @@ const MobileValidasiSuratTugas = () => {
                                 <PackageCheck size={16} />
                                 <span>SELESAI</span>
                             </button>
-                        ) : isSudahProses ? (
-                            <button
-                                type="button"
-                                disabled
-                                className="flex-1 py-3 bg-[#94a3b8] text-white font-black rounded-xl text-xs uppercase tracking-wider shadow-xs flex items-center justify-center gap-1.5 cursor-not-allowed opacity-90"
-                            >
-                                <CheckCircle2 size={16} />
-                                <span>SUDAH PROSES</span>
-                            </button>
                         ) : (
                             <button
                                 type="button"
@@ -686,10 +718,7 @@ const MobileValidasiSuratTugas = () => {
                     <p className="text-xs text-slate-500 font-mono">Nomor: {noSuratTugas}</p>
                     <button
                         type="button"
-                        onClick={() => {
-                            setSearchParams({});
-                            setInputManualNo('');
-                        }}
+                        onClick={resetKeScanAwal}
                         className="w-full py-2.5 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-xl text-xs uppercase cursor-pointer"
                     >
                         Coba Nomor Lain
