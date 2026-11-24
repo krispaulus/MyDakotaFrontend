@@ -274,7 +274,12 @@ export default function ScanSuratTugas() {
 
         const finishedLoadId = loadingId;
 
-        // Reset penuh ke tampilan awal Scan Surat Tugas (Image 2)
+        // Hapus parameter ?no= di URL agar tidak otomatis memuat ulang ST yang baru saja selesai
+        if (window.location.search.includes('no=')) {
+            window.history.replaceState({}, '', window.location.pathname);
+        }
+
+        // Reset penuh ke tampilan awal Scan Surat Tugas
         setDocumentData(null);
         setIsLoadingMode(false);
         setIsLoadingFinished(false);
@@ -296,9 +301,13 @@ export default function ScanSuratTugas() {
     const handleJalankanTugas = () => {
         if (!documentData) return;
 
+        const targetNoST = documentData.no_surat_tugas;
+        const targetRawID = documentData.raw_sjh_id || documentData.no_surat_tugas;
+        const targetKend = documentData.no_kendaraan || '-';
+
         Swal.fire({
             title: 'Jalankan Tugas Operasional?',
-            html: `Surat Tugas <b>${documentData.no_surat_tugas}</b> akan diaktifkan ke status <b>PROSES</b> dan armada siap diberangkatkan.`,
+            html: `Aktifkan Surat Tugas <b>${targetNoST}</b> untuk armada <b>${targetKend}</b>?`,
             icon: 'question',
             showCancelButton: true,
             confirmButtonColor: '#16a34a',
@@ -311,18 +320,32 @@ export default function ScanSuratTugas() {
                     const token = localStorage.getItem('token');
                     const ptId = localStorage.getItem('pt_id') || 'C';
                     await api.post(`/operasional/surat-tugas/update-proses?pt_id=${ptId}`, {
-                        no_surat_tugas: documentData.raw_sjh_id || documentData.no_surat_tugas
+                        no_surat_tugas: targetRawID
                     }, {
                         headers: { Authorization: `Bearer ${token}` }
                     });
 
-                    await fetchSuratTugasDetail(documentData.raw_sjh_id || documentData.no_surat_tugas);
-                    Swal.fire({
+                    await Swal.fire({
                         icon: 'success',
-                        title: 'TUGAS AKTIF / BERJALAN!',
-                        text: `Surat Tugas ${documentData.no_surat_tugas} resmi berstatus PROSES.`,
-                        confirmButtonColor: '#16a34a'
+                        title: 'TUGAS BERJALAN!',
+                        text: 'Surat Tugas berhasil diaktifkan (PROSES).',
+                        confirmButtonColor: '#16a34a',
+                        timer: 1800,
+                        showConfirmButton: false
                     });
+
+                    if (window.location.search.includes('no=')) {
+                        window.history.replaceState({}, '', window.location.pathname);
+                    }
+
+                    // Reset penuh ke halaman awal Scan Surat Tugas (Image 5)
+                    setDocumentData(null);
+                    setIsLoadingMode(false);
+                    setIsLoadingFinished(false);
+                    setShowKoliCamera(false);
+                    setLoadingId('');
+                    setKoliInput('');
+                    setManualCode('');
                 } catch (err) {
                     Swal.fire('Gagal', err.response?.data?.message || 'Gagal mengaktifkan surat tugas', 'error');
                 }
