@@ -119,27 +119,35 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
     }, [isLayananPaket]);
 
     // Auto generate ID Pelanggan awal
+    // Ganti pemicuGenerateID & useEffect pembuka modal di BttFormModal.jsx
     const pemicuGenerateID = () => {
         const token = localStorage.getItem('token');
-        const kodeAgenAktif = localStorage.getItem('active_agen_id') || '';
+        const kodeAgenAktif = localStorage.getItem('active_agen_id') || localStorage.getItem('active_agen_nama') || '';
 
-        api.get(`/btt/generate-custid?kode_agen=${kodeAgenAktif}`, {
+        api.get(`/btt/generate-custid?kode_agen=${encodeURIComponent(kodeAgenAktif)}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         })
             .then(res => {
                 if (res.data && res.data.status === "success") {
-                    setFormData(prev => ({ ...prev, bttt_asalcustid: res.data.generated_id || res.data.cust_id }));
+                    const mappedCustId = res.data.cust_id || res.data.generated_id || '';
+                    setKeywordCustomer('UMUM');
+                    setIsCustomerSelected(true);
+                    setFormData(prev => ({
+                        ...prev,
+                        bttt_asalcustid: mappedCustId,
+                        bttt_asalname: 'UMUM',
+                        bttt_up: 'UMUM'
+                    }));
                 }
             })
-            .catch(err => console.warn("Gagal auto-generate ID awal", err.message));
+            .catch(err => console.warn("Gagal load default Cust ID agen:", err.message));
     };
 
     useEffect(() => {
-        // Hanya generate ID retail jika BUKAN mode edit
-        if (!isEditMode && !initialData) {
+        if (isOpen && !isEditMode && !initialData) {
             pemicuGenerateID();
         }
-    }, [isEditMode, initialData]);
+    }, [isOpen, isEditMode, initialData]);
 
     // 🌟 SINKRONISASI DATA EDIT (initialData) KE FORM
     useEffect(() => {
@@ -1138,6 +1146,15 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                                             type="text"
                                             className="w-full p-2 border border-slate-300 rounded-lg font-bold uppercase text-slate-800 bg-white outline-none focus:border-sky-500"
                                             value={keywordCustomer}
+                                            onFocus={() => {
+                                                const token = localStorage.getItem('token');
+                                                const activeAgen = localStorage.getItem('active_agen_id') || localStorage.getItem('active_agen_nama') || '';
+                                                api.get(`/btt/search-customer?search=${encodeURIComponent(keywordCustomer === 'UMUM' ? '' : keywordCustomer)}&agen_id=${encodeURIComponent(activeAgen)}`, {
+                                                    headers: { Authorization: `Bearer ${token}` }
+                                                }).then(res => {
+                                                    if (res.data?.status === 'success') setRekomendasiCustomer(res.data.data || []);
+                                                });
+                                            }}
                                             onChange={(e) => {
                                                 const val = e.target.value;
                                                 setKeywordCustomer(val);
