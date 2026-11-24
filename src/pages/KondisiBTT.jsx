@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
-import { Filter, CheckCircle2, XCircle, Search, RefreshCw, Printer, Truck, FileCheck, DollarSign } from 'lucide-react';
+import { Filter, CheckCircle2, XCircle, RefreshCw, Printer, FileSpreadsheet } from 'lucide-react';
 import Swal from 'sweetalert2';
 import dakotaLogo from '../assets/new_logo 2.png';
 
@@ -12,8 +12,8 @@ const KondisiBTT = () => {
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
     const today = now.toISOString().split('T')[0];
 
-    // State Buka-Tutup Filter
-    const [showFilter, setShowFilter] = useState(false);
+    // ✅ 1. Filter selalu aktif sejak halaman dibuka
+    const [showFilter, setShowFilter] = useState(true);
 
     const [cabangList, setCabangList] = useState([]);
     const [picList, setPicList] = useState([]);
@@ -168,6 +168,133 @@ const KondisiBTT = () => {
         fetchData();
     };
 
+    // ✅ 2. FUNGSI EXPORT TO EXCEL
+    const handleExportExcel = () => {
+        if (!data || data.length === 0) {
+            Swal.fire({
+                title: 'DATA KOSONG',
+                text: 'Tidak ada data Kondisi BTT & Order Jemput yang dapat di-export ke Excel.',
+                icon: 'warning',
+                confirmButtonColor: '#059669'
+            });
+            return;
+        }
+
+        const activeFilterCabang = !isHoldingUser ? currentActiveAgen.id : selectedCabang;
+        const foundCabang = cabangList.find(c => String(c.agen_id || c.AgenID) === String(activeFilterCabang));
+        const namaCabang = activeFilterCabang
+            ? (foundCabang?.agen_nama || foundCabang?.AgenNama || `CABANG ${activeFilterCabang}`)
+            : 'KONSOLIDASI (SEMUA CABANG)';
+        const periodeStr = bypassTanggal ? 'SEMUA PERIODE' : `${startDate} s/d ${endDate}`;
+
+        let totalKoliAll = 0;
+        let totalBeratAll = 0;
+        let totalBiayaAll = 0;
+
+        const rowsHtml = data.map((item, idx) => {
+            const koli = Number(item.koli || 0);
+            const berat = Number(item.berat || 0);
+            const biaya = Number(item.total_biaya || 0);
+
+            totalKoliAll += koli;
+            totalBeratAll += berat;
+            totalBiayaAll += biaya;
+
+            const isKembali = item.btt_kembali_yn === 'Y' ? 'KEMBALI' : 'BELUM';
+            const statusFaktur = item.sudah_invoice_yn === 'Y' ? (item.no_invoice || 'FAKTUR') : 'UNBILLED';
+            const isLunas = item.terbayar_yn === 'Y' ? 'LUNAS' : 'BELUM';
+            const tglDok = String(item.tgl_dokumen || '').split('T')[0] || '-';
+
+            return `
+                <tr>
+                    <td style="text-align:center;">${idx + 1}</td>
+                    <td style="mso-number-format:'\\@'; font-weight:bold;">${item.no_dokumen || '-'}</td>
+                    <td style="text-align:center;">${item.tipe_dokumen || '-'}</td>
+                    <td style="text-align:center; mso-number-format:'\\@';">${tglDok}</td>
+                    <td>${item.cust_name || '-'}</td>
+                    <td>${item.penerima || '-'}</td>
+                    <td>${item.kota_tujuan || '-'}</td>
+                    <td style="text-align:center;">${item.pic || '-'}</td>
+                    <td style="text-align:right;">${koli}</td>
+                    <td style="text-align:right;">${berat}</td>
+                    <td style="text-align:right;">${biaya}</td>
+                    <td style="text-align:center;">${item.metode_bayar || '-'}</td>
+                    <td style="text-align:center;">${isKembali}</td>
+                    <td style="text-align:center; mso-number-format:'\\@';">${statusFaktur}</td>
+                    <td style="text-align:center;">${isLunas}</td>
+                </tr>
+            `;
+        }).join('');
+
+        const excelTemplate = `
+            <html xmlns:o="urn:schemas-microsoft-com:office:office"
+                  xmlns:x="urn:schemas-microsoft-com:office:excel"
+                  xmlns="http://www.w3.org/TR/REC-html40">
+            <head>
+                <meta charset="UTF-8" />
+                <style>
+                    table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 11px; }
+                    th { background-color: #0284c7; color: #ffffff; font-weight: bold; border: 1px solid #333; padding: 6px; }
+                    td { border: 1px solid #94a3b8; padding: 5px; }
+                    .title { font-size: 14px; font-weight: bold; border: none; }
+                    .sub { font-size: 11px; border: none; }
+                </style>
+            </head>
+            <body>
+                <table>
+                    <tr><td colspan="15" class="title">PT DAKOTA LOGISTIK INDONESIA - LAPORAN KONDISI BTT & ORDER JEMPUT</td></tr>
+                    <tr><td colspan="15" class="sub">Cabang: ${namaCabang} | Periode: ${periodeStr}</td></tr>
+                    <tr><td colspan="15" class="sub"></td></tr>
+                    <thead>
+                        <tr>
+                            <th>NO</th>
+                            <th>NO. DOKUMEN</th>
+                            <th>TIPE</th>
+                            <th>TANGGAL</th>
+                            <th>PELANGGAN / PENGIRIM</th>
+                            <th>PENERIMA</th>
+                            <th>KOTA TUJUAN</th>
+                            <th>PIC MARKETING</th>
+                            <th>KOLI</th>
+                            <th>BERAT (KG)</th>
+                            <th>TOTAL BIAYA (RP)</th>
+                            <th>METODE BAYAR</th>
+                            <th>BTT KEMBALI</th>
+                            <th>STATUS INVOICE</th>
+                            <th>STATUS LUNAS</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                    </tbody>
+                    <tfoot>
+                        <tr style="background-color: #f1f5f9; font-weight: bold;">
+                            <td colspan="8" style="text-align:center;">TOTAL (${data.length} TRANSAKSI)</td>
+                            <td style="text-align:right;">${totalKoliAll}</td>
+                            <td style="text-align:right;">${totalBeratAll}</td>
+                            <td style="text-align:right;">${totalBiayaAll}</td>
+                            <td colspan="4"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </body>
+            </html>
+        `;
+
+        const blob = new Blob(['\ufeff', excelTemplate], {
+            type: 'application/vnd.ms-excel;charset=utf-8'
+        });
+        const downloadUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        const fileNameDate = bypassTanggal ? 'ALL_PERIODE' : `${startDate}_sd_${endDate}`;
+        link.href = downloadUrl;
+        link.download = `Laporan_Kondisi_BTT_${fileNameDate}.xls`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(downloadUrl);
+    };
+
     // 🖨️ CETAK LAPORAN RESMI KONDISI BTT & ORDER JEMPUT (A4 LANDSCAPE POPUP)
     const handlePrintReport = async () => {
         if (!data || data.length === 0) {
@@ -180,7 +307,6 @@ const KondisiBTT = () => {
             return;
         }
 
-        // Convert logo ke Base64 agar tampil di jendela baru
         let base64Logo = '';
         try {
             const logoImg = new Image();
@@ -285,40 +411,17 @@ const KondisiBTT = () => {
             <head>
                 <title>Laporan Kondisi BTT & Order Jemput - ${namaCabang}</title>
                 <style>
-                    @page { 
-                        margin: 8mm 10mm 10mm 10mm; 
-                    }
-                    * { 
-                        box-sizing: border-box; 
-                    }
+                    @page { margin: 8mm 10mm 10mm 10mm; }
+                    * { box-sizing: border-box; }
                     html, body { 
-                        width: 100%;
-                        margin: 0; 
-                        padding: 0; 
-                        font-family: Arial, Helvetica, sans-serif; 
-                        font-size: 11px; 
-                        color: #000; 
-                        -webkit-print-color-adjust: exact !important; 
-                        print-color-adjust: exact !important; 
+                        width: 100%; margin: 0; padding: 0; 
+                        font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #000; 
+                        -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; 
                     }
-                    table { 
-                        width: 100%; 
-                        border-collapse: collapse; 
-                    }
-                    th {
-                        padding: 7px 5px;
-                        font-size: 10px;
-                        background-color: #cbd5e1 !important;
-                    }
-                    td {
-                        padding: 6px 5px;
-                        font-size: 10px;
-                    }
-                    .header-kop {
-                        border-bottom: 2px solid #000;
-                        padding-bottom: 6px;
-                        margin-bottom: 12px;
-                    }
+                    table { width: 100%; border-collapse: collapse; }
+                    th { padding: 7px 5px; font-size: 10px; background-color: #cbd5e1 !important; }
+                    td { padding: 6px 5px; font-size: 10px; }
+                    .header-kop { border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 12px; }
                 </style>
             </head>
             <body>
@@ -495,12 +598,14 @@ const KondisiBTT = () => {
 
     return (
         <div className="space-y-5">
-            {/* Filter Panel (Kondisional Buka/Tutup) */}
+            {/* ✅ Filter Panel Selalu Aktif */}
             {showFilter && (
                 <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all">
-                    <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
-                        <Filter size={16} className="text-sky-600" />
-                        FILTER KONDISI BTT & ORDER JEMPUT
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
+                            <Filter size={16} className="text-sky-600" />
+                            FILTER KONDISI BTT & ORDER JEMPUT
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -680,6 +785,13 @@ const KondisiBTT = () => {
                     <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                         <button
                             type="button"
+                            onClick={handleExportExcel}
+                            className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition flex items-center gap-1.5 uppercase shadow-sm cursor-pointer"
+                        >
+                            <FileSpreadsheet size={14} /> Export Excel
+                        </button>
+                        <button
+                            type="button"
                             onClick={handlePrintReport}
                             className="px-5 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold rounded-xl transition flex items-center gap-1.5 uppercase cursor-pointer"
                         >
@@ -702,6 +814,17 @@ const KondisiBTT = () => {
                 </form>
             )}
 
+            {/* Bar Tombol Tambahan (Di sebelah tombol Filter DataTableTemplate) */}
+            <div className="flex items-center gap-2">
+                <button
+                    type="button"
+                    onClick={handleExportExcel}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                >
+                    <FileSpreadsheet size={15} /> Export to Excel
+                </button>
+            </div>
+
             {/* Tabel List Monitoring */}
             <DataTableTemplate
                 title="KONDISI BTT DAN ORDER JEMPUT"
@@ -713,7 +836,7 @@ const KondisiBTT = () => {
                 hideAddButton={true}
                 hideActions={true}
                 hideActionColumn={true}
-                onFilter={() => setShowFilter(prev => !prev)}
+                onFilter={null} // ✅ Dinonaktifkan agar tombol toggle Filter tidak menyembunyikan panel filter
                 onEdit={(item) => {
                     Swal.fire({
                         title: `Detail Resi ${item.no_dokumen}`,
