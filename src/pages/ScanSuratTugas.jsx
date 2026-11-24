@@ -91,6 +91,7 @@ export default function ScanSuratTugas() {
     }, [scanMode, documentData]);
 
     // Ambil Detail Surat Tugas beserta Daftar Sesi Loading & BTT Terdaftar
+    // Ambil Detail Surat Tugas (Kosongkan tabel BTT saat scan awal agar tidak menumpuk)
     const fetchSuratTugasDetail = async (nomorSurat, targetLoadingId = '') => {
         const cleanNo = (nomorSurat || '').trim();
         if (!cleanNo) return;
@@ -103,18 +104,25 @@ export default function ScanSuratTugas() {
                 params: {
                     no: cleanNo,
                     pt_id: ptId,
-                    loading_id: targetLoadingId || loadingId || ''
+                    loading_id: targetLoadingId || ''
                 },
                 headers: { Authorization: `Bearer ${token}` }
             });
 
             if (res.data?.status === 'success') {
                 const data = res.data.data;
-                setDocumentData(data);
 
-                // Jika belum ada loadingId aktif namun surat tugas sudah punya daftar loading, pilih sesi loading terbaru
-                if (!targetLoadingId && !loadingId && Array.isArray(data.loading_list) && data.loading_list.length > 0) {
-                    setLoadingId(data.loading_list[0].loading_id);
+                // Jika targetLoadingId kosong (baru scan ST, belum klik Tambah Rincian),
+                // kosongkan btt_list di layar agar tidak menumpuk dengan loading sebelumnya
+                if (!targetLoadingId) {
+                    setLoadingId('');
+                    setDocumentData({
+                        ...data,
+                        btt_list: [],
+                        total_btt: 0
+                    });
+                } else {
+                    setDocumentData(data);
                 }
             }
         } catch (err) {
@@ -260,18 +268,28 @@ export default function ScanSuratTugas() {
     // =========================================================================
     const handleSelesaiScanChecker = () => {
         if (!documentData?.btt_list || documentData.btt_list.length === 0) {
-            Swal.fire('Peringatan', 'Belum ada BTT yang dipindai ke dalam surat tugas ini!', 'warning');
+            Swal.fire('Peringatan', 'Belum ada BTT yang dipindai ke dalam sesi loading ini!', 'warning');
             return;
         }
+
+        const finishedLoadId = loadingId;
+
+        // Reset penuh ke tampilan awal Scan Surat Tugas (Image 2)
+        setDocumentData(null);
         setIsLoadingMode(false);
-        setIsLoadingFinished(true);
+        setIsLoadingFinished(false);
         setShowKoliCamera(false);
+        setLoadingId('');
+        setKoliInput('');
+        setManualCode('');
 
         Swal.fire({
+            toast: true,
+            position: 'top-end',
             icon: 'success',
-            title: 'Pemindaian Barang Selesai!',
-            text: 'Data muatan telah terkunci. Kepala Operasional dapat menekan tombol "Jalankan Tugas" untuk mengaktifkan surat tugas.',
-            confirmButtonColor: '#004b84'
+            title: `Loading ${finishedLoadId} selesai! Silakan scan Surat Tugas berikutnya.`,
+            showConfirmButton: false,
+            timer: 2200
         });
     };
 
@@ -490,15 +508,15 @@ export default function ScanSuratTugas() {
                     {!isLoadingMode && (
                         <div className="bg-white p-4 rounded-2xl border border-sky-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
                             <div>
-                                <div className="font-black text-xs text-slate-800 uppercase">Input Muatan Koli BTT</div>
-                                <div className="text-[11px] text-slate-500">Klik Tambah Loading Baru untuk membuat sesi pemindaian baru (1 ST bisa memiliki banyak Loading).</div>
+                                <div className="font-black text-xs text-slate-800 uppercase">MUATAN KOLI BTT</div>
+                                <div className="text-[11px] text-slate-500">Scan QR / Barcode stiker koli BTT</div>
                             </div>
                             <button
                                 type="button"
                                 onClick={handleTambahRincian}
                                 className="px-5 py-2.5 bg-[#00668c] hover:bg-[#004b66] text-white font-black rounded-xl text-xs uppercase flex items-center gap-2 shadow-sm cursor-pointer transition active:scale-95"
                             >
-                                <PlusCircle size={16} /> TAMBAH LOADING BARU
+                                <PlusCircle size={16} /> TAMBAH RINCIAN
                             </button>
                         </div>
                     )}
