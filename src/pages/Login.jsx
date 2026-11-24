@@ -142,7 +142,7 @@ const Login = () => {
         pt_id: selectedPT
       });
 
-      const { token, user, pt_id } = response.data;
+      const { token, user, pt_id, active_agen_id, active_agen_nama } = response.data;
       const finalPT = pt_id || user?.pt_id || selectedPT;
 
       const savedIdleTime = localStorage.getItem('max_idle_time');
@@ -174,19 +174,22 @@ const Login = () => {
       const userRole = user?.usertype || user?.user_type || 'U';
       localStorage.setItem('role_akses', userRole);
 
-      const validAgenId = user?.agen_id || user?.id_agen || user?.kode_agen || '1';
+      const resolvedAgenId = active_agen_id || user?.agen_id || user?.agent_code || '1';
+      const resolvedAgenNama = active_agen_nama || user?.agen_nama || '';
 
       if (userRole === 'S' || user?.all_cabangyn === 'Y') {
         localStorage.setItem('kode_cabang', 'PUSAT DAKOTA');
-        localStorage.setItem('active_agen_id', String(validAgenId));
+        localStorage.setItem('active_agen_id', String(resolvedAgenId));
         localStorage.setItem('active_agen_nama', 'PUSAT DAKOTA');
       } else {
-        const rawCabangString = user?.kode_cabang || '';
-        if (rawCabangString !== '') {
-          const firstCleanCabang = rawCabangString.split(',')[0].trim();
-          localStorage.setItem('kode_cabang', rawCabangString);
-          localStorage.setItem('active_agen_id', String(user?.agen_id || firstCleanCabang));
-          localStorage.setItem('active_agen_nama', user?.agen_nama || firstCleanCabang);
+        const cabangsArr = Array.isArray(user?.cabangs) ? user.cabangs : [];
+        const rawCabangString = user?.kode_cabang || cabangsArr.join(', ') || '';
+
+        if (rawCabangString !== '' || resolvedAgenNama !== '') {
+          const firstCleanCabang = rawCabangString ? rawCabangString.split(',')[0].trim() : resolvedAgenId;
+          localStorage.setItem('kode_cabang', rawCabangString || firstCleanCabang);
+          localStorage.setItem('active_agen_id', String(resolvedAgenId || firstCleanCabang));
+          localStorage.setItem('active_agen_nama', resolvedAgenNama || firstCleanCabang);
         } else {
           localStorage.setItem('kode_cabang', 'EMPTY');
           localStorage.setItem('active_agen_id', 'EMPTY');
