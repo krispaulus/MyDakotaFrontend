@@ -90,8 +90,8 @@ export default function ScanSuratTugas() {
         return () => { stopScanner(); };
     }, [scanMode, documentData]);
 
-    // Ambil Detail Surat Tugas beserta Daftar BTT Terdaftar
-    const fetchSuratTugasDetail = async (nomorSurat) => {
+    // Ambil Detail Surat Tugas beserta Daftar Sesi Loading & BTT Terdaftar
+    const fetchSuratTugasDetail = async (nomorSurat, targetLoadingId = '') => {
         const cleanNo = (nomorSurat || '').trim();
         if (!cleanNo) return;
 
@@ -100,12 +100,22 @@ export default function ScanSuratTugas() {
             const token = localStorage.getItem('token');
             const ptId = localStorage.getItem('pt_id') || 'C';
             const res = await api.get(`/operasional/surat-tugas/detail-public`, {
-                params: { no: cleanNo, pt_id: ptId },
+                params: {
+                    no: cleanNo,
+                    pt_id: ptId,
+                    loading_id: targetLoadingId || loadingId || ''
+                },
                 headers: { Authorization: `Bearer ${token}` }
             });
 
             if (res.data?.status === 'success') {
-                setDocumentData(res.data.data);
+                const data = res.data.data;
+                setDocumentData(data);
+
+                // Jika belum ada loadingId aktif namun surat tugas sudah punya daftar loading, pilih sesi loading terbaru
+                if (!targetLoadingId && !loadingId && Array.isArray(data.loading_list) && data.loading_list.length > 0) {
+                    setLoadingId(data.loading_list[0].loading_id);
+                }
             }
         } catch (err) {
             Swal.fire({
@@ -120,36 +130,36 @@ export default function ScanSuratTugas() {
         }
     };
 
-    // =========================================================================
-    // 2. KLIK "TAMBAH RINCIAN" -> MULAI PROSES MUAT BARANG (GAMBAR 2 -> GAMBAR 4)
-    // =========================================================================
+    // Klik "TAMBAH RINCIAN / LOADING BARU" -> Buat Nomor Loading Baru (LC...)
     const handleTambahRincian = async () => {
         if (!documentData) return;
         try {
             const token = localStorage.getItem('token');
             const ptId = localStorage.getItem('pt_id') || 'C';
             const res = await api.post(`/operasional/surat-tugas/start-loading?pt_id=${ptId}`, {
-                no_surat_tugas: documentData.raw_sjh_id || documentData.no_surat_tugas
+                no_surat_tugas: documentData.raw_sjh_id || documentData.no_surat_tugas,
+                force_new: true
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            setLoadingId(res.data?.loading_id || `LC001${Date.now()}`);
+            const newLoadId = res.data?.loading_id || '';
+            setLoadingId(newLoadId);
             setIsLoadingMode(true);
             setIsLoadingFinished(false);
 
-            // Auto-fokus ke input scan barcode/QR koli
+            // Muat ulang detail dengan filter loading baru (tabel kosong khusus untuk sesi loading baru ini)
+            await fetchSuratTugasDetail(documentData.raw_sjh_id || documentData.no_surat_tugas, newLoadId);
+
             setTimeout(() => {
                 if (koliInputRef.current) koliInputRef.current.focus();
             }, 200);
         } catch (err) {
-            Swal.fire('Gagal', err.response?.data?.message || 'Gagal memulai proses muat barang', 'error');
+            Swal.fire('Gagal', err.response?.data?.message || 'Gagal memulai sesi loading baru', 'error');
         }
     };
 
-    // =========================================================================
-    // 3. SCAN QR / BARCODE KOLI BTT KE DALAM SURAT TUGAS (GAMBAR 3 & 4)
-    // =========================================================================
+    // Scan QR / Barcode Koli BTT masuk ke sesi loadingId yang sedang aktif
     const handleScanKoliSubmit = async (kodeKoliRaw) => {
         const cleanKode = (kodeKoliRaw || '').trim().toUpperCase();
         if (!cleanKode || !documentData || scanningKoli) return;
@@ -160,13 +170,13 @@ export default function ScanSuratTugas() {
             const ptId = localStorage.getItem('pt_id') || 'C';
             const res = await api.post(`/operasional/surat-tugas/scan-btt-koli?pt_id=${ptId}`, {
                 no_surat_tugas: documentData.raw_sjh_id || documentData.no_surat_tugas,
+                loading_id: loadingId,
                 kode_scan: cleanKode
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            // Refresh daftar BTT pada Surat Tugas secara realtime
-            await fetchSuratTugasDetail(documentData.raw_sjh_id || documentData.no_surat_tugas);
+            await fetchSuratTugasDetail(documentData.raw_sjh_id || documentData.no_surat_tugas, loadingId);
             setKoliInput('');
 
             Swal.fire({
@@ -188,6 +198,26 @@ export default function ScanSuratTugas() {
         } finally {
             setScanningKoli(false);
             if (koliInputRef.current) koliInputRef.current.focus();
+        }
+    };
+
+    // Hapus BTT dari sesi loading aktif
+    const handleRemoveBTT = async (noBtt) => {
+        try {
+            const token = localStorage.getItem('token');
+            const ptId = localStorage.getItem('pt_id') || 'C';
+            await api.delete(`/operasional/surat-tugas/remove-btt`, {
+                params: {
+                    pt_id: ptId,
+                    sjh_id: documentData.raw_sjh_id || documentData.no_surat_tugas,
+                    loading_id: loadingId,
+                    no_btt: noBtt
+                },
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            fetchSuratTugasDetail(documentData.raw_sjh_id || documentData.no_surat_tugas, loadingId);
+        } catch (err) {
+            Swal.fire('Gagal', 'Tidak dapat menghapus BTT dari daftar muat', 'error');
         }
     };
 
@@ -224,25 +254,6 @@ export default function ScanSuratTugas() {
             }
         };
     }, [showKoliCamera, isLoadingMode]);
-
-    // Hapus BTT dari daftar muatan jika salah scan
-    const handleRemoveBTT = async (noBtt) => {
-        try {
-            const token = localStorage.getItem('token');
-            const ptId = localStorage.getItem('pt_id') || 'C';
-            await api.delete(`/operasional/surat-tugas/remove-btt`, {
-                params: {
-                    pt_id: ptId,
-                    sjh_id: documentData.raw_sjh_id || documentData.no_surat_tugas,
-                    no_btt: noBtt
-                },
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            fetchSuratTugasDetail(documentData.raw_sjh_id || documentData.no_surat_tugas);
-        } catch (err) {
-            Swal.fire('Gagal', 'Tidak dapat menghapus BTT dari daftar muat', 'error');
-        }
-    };
 
     // =========================================================================
     // 4. SELESAI SCAN & AKTIFKAN "JALANKAN TUGAS" OLEH KEPALA OPERASIONAL
@@ -429,19 +440,65 @@ export default function ScanSuratTugas() {
                         </div>
                     </div>
 
+                    {/* DAFTAR SESI LOADING PADA SURAT TUGAS INI (1 ST = BANYAK LOADING) */}
+                    {Array.isArray(documentData.loading_list) && documentData.loading_list.length > 0 && (
+                        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-2.5">
+                            <div className="flex items-center justify-between">
+                                <span className="font-black text-xs text-slate-800 uppercase">
+                                    SESI LOADING TERDAFTAR ({documentData.loading_list.length} LOADING)
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setLoadingId('ALL');
+                                        fetchSuratTugasDetail(documentData.raw_sjh_id || documentData.no_surat_tugas, 'ALL');
+                                    }}
+                                    className={`text-[11px] font-bold px-2.5 py-1 rounded-lg cursor-pointer transition ${loadingId === 'ALL' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                >
+                                    Tampilkan Semua
+                                </button>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                                {documentData.loading_list.map((ld, idx) => {
+                                    const isActive = loadingId === ld.loading_id;
+                                    return (
+                                        <button
+                                            key={ld.loading_id || idx}
+                                            type="button"
+                                            onClick={() => {
+                                                setLoadingId(ld.loading_id);
+                                                fetchSuratTugasDetail(documentData.raw_sjh_id || documentData.no_surat_tugas, ld.loading_id);
+                                            }}
+                                            className={`px-3 py-2 rounded-xl border text-left transition cursor-pointer ${isActive
+                                                ? 'bg-[#004b84] text-white border-[#004b84] shadow-xs'
+                                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-sky-50'
+                                                }`}
+                                        >
+                                            <div className="font-mono font-black text-xs">{ld.loading_id}</div>
+                                            <div className={`text-[10px] ${isActive ? 'text-sky-200' : 'text-slate-500'}`}>
+                                                {ld.total_btt} BTT • {ld.total_koli} Koli
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
                     {/* TOMBOL "TAMBAH RINCIAN" — MUNCUL SELAMA BELUM MODE LOADING */}
                     {!isLoadingMode && (
                         <div className="bg-white p-4 rounded-2xl border border-sky-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
                             <div>
                                 <div className="font-black text-xs text-slate-800 uppercase">Input Muatan Koli BTT</div>
-                                <div className="text-[11px] text-slate-500">Klik Tambah Rincian untuk mulai memindai QR/Barcode BTT ke dalam surat jalan ini.</div>
+                                <div className="text-[11px] text-slate-500">Klik Tambah Loading Baru untuk membuat sesi pemindaian baru (1 ST bisa memiliki banyak Loading).</div>
                             </div>
                             <button
                                 type="button"
                                 onClick={handleTambahRincian}
                                 className="px-5 py-2.5 bg-[#00668c] hover:bg-[#004b66] text-white font-black rounded-xl text-xs uppercase flex items-center gap-2 shadow-sm cursor-pointer transition active:scale-95"
                             >
-                                <PlusCircle size={16} /> TAMBAH RINCIAN
+                                <PlusCircle size={16} /> TAMBAH LOADING BARU
                             </button>
                         </div>
                     )}
