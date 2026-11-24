@@ -32,8 +32,11 @@ export default function ScanSuratTugas() {
     const koliInputRef = useRef(null);
 
     // Otomatis load jika URL memiliki parameter ?no=... (dari hasil scan QR fisik)
+    const hasConsumedUrlParam = useRef(false);
+
     useEffect(() => {
-        if (initialNoFromUrl) {
+        if (initialNoFromUrl && !hasConsumedUrlParam.current) {
+            hasConsumedUrlParam.current = true;
             fetchSuratTugasDetail(initialNoFromUrl);
         }
     }, [initialNoFromUrl]);
