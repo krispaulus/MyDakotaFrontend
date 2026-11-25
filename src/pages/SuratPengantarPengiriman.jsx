@@ -60,10 +60,11 @@ const SuratPengantarPengiriman = () => {
         spt_tujuan_agen_nama: '',
         spt_transityn: 'N',
         spt_namasopir: '',
+        spt_namasopir2: '',
         spt_nomobil: '',
         spt_surattugas: '',
         spt_boronganyn: 'N',
-        spt_service: 1
+        spt_service: '1'
     });
 
     // Modal Edit SP & Scan Tambah/Hapus BTT (opr_t_sp_terima_e.asp)
@@ -141,57 +142,106 @@ const SuratPengantarPengiriman = () => {
         }
     };
 
-    // 2. Tambah SP dari Proses Loading Barang (opr_t_sp_terima_f.asp)
+    // 2. Tambah SP dari Proses Loading Barang (opr_t_sp_terima_f.asp / opr_t_sp_terima_a.asp)
     const handleOpenFromLoading = () => {
         Swal.fire({
             title: 'Tambah SP Dari Proses Loading',
             input: 'text',
             inputLabel: 'Masukkan Nomor Loading (LoadH_ID) atau Nomor Surat Tugas:',
-            inputPlaceholder: 'Contoh: LC0012026110000001 atau 001JC2026...',
+            inputPlaceholder: 'Contoh: LC0012026110000038 atau 001JC2026...',
             showCancelButton: true,
             confirmButtonText: 'Tarik Data Loading',
-            confirmButtonColor: '#2563eb'
-        }).then(async (res) => {
-            if (res.isConfirmed && res.value) {
+            confirmButtonColor: '#2563eb',
+            showLoaderOnConfirm: true,
+            preConfirm: async (val) => {
+                const cleanCode = String(val || '').trim().toUpperCase();
+                if (!cleanCode) {
+                    Swal.showValidationMessage('Nomor Loading / Surat Tugas wajib diisi!');
+                    return false;
+                }
                 try {
                     const token = localStorage.getItem('token');
                     const resp = await api.get('/operasional/sp-terima/from-loading', {
-                        params: { load_id: res.value.trim() },
+                        params: { load_id: cleanCode },
                         headers: { Authorization: `Bearer ${token}` }
                     });
-                    const hdr = resp.data?.header || {};
-                    const btts = resp.data?.btts || [];
-
-                    setFormData({
-                        spt_tujuan_agen_nama: hdr.tujuan_agen_nama || '',
-                        spt_transityn: 'N',
-                        spt_namasopir: [hdr.sopir1, hdr.sopir2].filter(Boolean).join(' / '),
-                        spt_nomobil: hdr.no_mobil || '',
-                        spt_surattugas: hdr.surat_tugas || '',
-                        spt_boronganyn: 'N',
-                        spt_service: 1
-                    });
-                    setManifestData(btts.map((b, i) => ({
-                        no_urut: i + 1,
-                        btt_id: b.btt_id,
-                        penerima: b.penerima,
-                        kota: b.kota,
-                        scan_time: 'FROM LOADING',
-                        status_muat: 'READY'
-                    })));
-                    setIsCreateModalOpen(true);
+                    return resp.data;
                 } catch (err) {
-                    Swal.fire('Tidak Ditemukan', err.response?.data?.message || 'Data loading tidak ditemukan', 'error');
+                    const msg = err.response?.data?.message || err.message || 'Data loading tidak ditemukan';
+                    Swal.showValidationMessage(msg);
+                    return false;
+                }
+            },
+            allowOutsideClick: () => !Swal.isLoading()
+        }).then((result) => {
+            if (result.isConfirmed && result.value) {
+                const hdr = result.value?.header || {};
+                const btts = Array.isArray(result.value?.btts) ? result.value.btts : [];
+
+                const s1 = String(hdr.sopir1 || '').trim().toUpperCase();
+                const s2 = String(hdr.sopir2 || '').trim().toUpperCase();
+
+                setFormData({
+                    spt_tujuan_agen_nama: String(hdr.tujuan_agen_nama || '').trim().toUpperCase(),
+                    spt_transityn: 'N',
+                    spt_namasopir: s1,
+                    spt_namasopir2: s2,
+                    spt_nomobil: String(hdr.no_mobil || '').trim().toUpperCase(),
+                    spt_surattugas: String(hdr.surat_tugas || hdr.load_id || '').trim().toUpperCase(),
+                    spt_boronganyn: 'N',
+                    spt_service: '1'
+                });
+
+                setManifestData(btts.map((b, i) => ({
+                    no_urut: i + 1,
+                    btt_id: b.btt_id,
+                    no_sj: b.no_sj || '-',
+                    tgl_btt: b.tgl_btt || '-',
+                    pengirim: b.pengirim || '-',
+                    penerima: b.penerima || '-',
+                    alamat: b.alamat || '-',
+                    kota: b.kota || '-',
+                    telp: b.telp || '-',
+                    koli: b.koli || 1,
+                    berat: b.berat || 0,
+                    scan_time: 'FROM LOADING',
+                    status_muat: 'READY'
+                })));
+
+                setIsCreateModalOpen(true);
+
+                if (btts.length === 0) {
+                    Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'info',
+                        title: `Header ${hdr.load_id} (${hdr.no_mobil}) ditarik, belum ada BTT di loading ini.`,
+                        showConfirmButton: false,
+                        timer: 3000
+                    });
                 }
             }
         });
     };
 
     // 3. Scan Tambah BTT pada Modal Buat SP Baru
-    const handleAddBTT = (e) => {
+    const handleAddBTT = async (e) => {
         if (e) e.preventDefault();
-        const cleanBTT = barcodeInput.trim().toUpperCase();
-        if (!cleanBTT) return;
+        const rawScan = barcodeInput.trim().toUpperCase();
+        if (!rawScan) {
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'warning',
+                title: 'Silakan ketik atau scan nomor BTT terlebih dahulu!',
+                showConfirmButton: false,
+                timer: 1800
+            });
+            return;
+        }
+
+        // Ambil 16 digit nomor BTT dasar jika yang discan adalah barcode koli 20 digit
+        const cleanBTT = rawScan.slice(0, 16);
 
         if (manifestData.some(item => item.btt_id === cleanBTT)) {
             Swal.fire('Duplikasi BTT!', `Resi ${cleanBTT} sudah ada dalam daftar muatan.`, 'warning');
@@ -228,7 +278,7 @@ const SuratPengantarPengiriman = () => {
             const payload = {
                 spt_asal_agen_nama: currentActiveAgen,
                 ...formData,
-                spt_service: parseInt(formData.spt_service, 10) || 1,
+                spt_service: String(formData.spt_service || '1'),
                 daftar_btt: manifestData.map(item => item.btt_id)
             };
 
@@ -647,7 +697,7 @@ const SuratPengantarPengiriman = () => {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
                                     <label className="block mb-1 text-slate-600">NO. KENDARAAN *</label>
                                     <select value={formData.spt_nomobil} onChange={e => setFormData({ ...formData, spt_nomobil: e.target.value })} className="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-mono">
@@ -655,16 +705,6 @@ const SuratPengantarPengiriman = () => {
                                         {fleet.map((f, idx) => (
                                             <option key={idx} value={f.kend_id || f.nopol}>{f.kend_id || f.nopol}</option>
                                         ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block mb-1 text-slate-600">SOPIR / PENGEMUDI *</label>
-                                    <select value={formData.spt_namasopir} onChange={e => setFormData({ ...formData, spt_namasopir: e.target.value })} className="w-full p-2.5 border border-slate-300 rounded-xl bg-white">
-                                        <option value="">-- PILIH SOPIR --</option>
-                                        {drivers.map((d, idx) => {
-                                            const nm = d.kry_nama || d.supir_nama || d.nama || '';
-                                            return <option key={idx} value={nm}>{nm}</option>;
-                                        })}
                                     </select>
                                 </div>
                                 <div>
@@ -684,6 +724,44 @@ const SuratPengantarPengiriman = () => {
                                 </div>
                             </div>
 
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block mb-1 text-slate-600">SOPIR / PENGEMUDI 1 *</label>
+                                    <select
+                                        value={formData.spt_namasopir}
+                                        onChange={e => setFormData({ ...formData, spt_namasopir: e.target.value })}
+                                        className="w-full p-2.5 border border-slate-300 rounded-xl bg-white uppercase"
+                                    >
+                                        <option value="">-- PILIH SOPIR 1 --</option>
+                                        {formData.spt_namasopir && !drivers.some(d => String(d.kry_nama || d.supir_nama || d.nama || '').trim().toUpperCase() === formData.spt_namasopir) && (
+                                            <option value={formData.spt_namasopir}>{formData.spt_namasopir}</option>
+                                        )}
+                                        {drivers.map((d, idx) => {
+                                            const nm = String(d.kry_nama || d.supir_nama || d.nama || '').trim().toUpperCase();
+                                            return <option key={idx} value={nm}>{nm}</option>;
+                                        })}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block mb-1 text-slate-600">SOPIR / PENGEMUDI 2 (OPSIONAL)</label>
+                                    <select
+                                        value={formData.spt_namasopir2}
+                                        onChange={e => setFormData({ ...formData, spt_namasopir2: e.target.value })}
+                                        className="w-full p-2.5 border border-slate-300 rounded-xl bg-white uppercase"
+                                    >
+                                        <option value="">-- PILIH SOPIR 2 (JIKA ADA) --</option>
+                                        {formData.spt_namasopir2 && !drivers.some(d => String(d.kry_nama || d.supir_nama || d.nama || '').trim().toUpperCase() === formData.spt_namasopir2) && (
+                                            <option value={formData.spt_namasopir2}>{formData.spt_namasopir2}</option>
+                                        )}
+                                        {drivers.map((d, idx) => {
+                                            const nm = String(d.kry_nama || d.supir_nama || d.nama || '').trim().toUpperCase();
+                                            return <option key={idx} value={nm}>{nm}</option>;
+                                        })}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Scan Barcode BTT */}
                             {/* Scan Barcode BTT */}
                             <div className="pt-3 border-t border-slate-200 flex gap-2 items-end">
                                 <div className="flex-1">
@@ -718,7 +796,30 @@ const SuratPengantarPengiriman = () => {
                                         ) : manifestData.map((row, i) => (
                                             <tr key={i}>
                                                 <td className="p-2.5 font-mono">{i + 1}</td>
-                                                <td className="p-2.5 font-mono font-bold text-indigo-700">{row.btt_id}</td>
+                                                <td className="p-2.5 font-mono font-bold">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => Swal.fire({
+                                                            title: `Detail Resi ${row.btt_id}`,
+                                                            html: `
+                                                                <div class="text-left text-xs space-y-1.5 bg-slate-50 p-3 rounded-xl border">
+                                                                    <div><b>No. Surat Jalan:</b> ${row.no_sj || '-'}</div>
+                                                                    <div><b>Tanggal BTT:</b> ${row.tgl_btt || '-'}</div>
+                                                                    <div><b>Pengirim:</b> ${row.pengirim || '-'}</div>
+                                                                    <div><b>Penerima:</b> ${row.penerima || '-'}</div>
+                                                                    <div><b>Alamat:</b> ${row.alamat || '-'}</div>
+                                                                    <div><b>Kota Tujuan:</b> ${row.kota || '-'}</div>
+                                                                    <div><b>No. Telp:</b> ${row.telp || '-'}</div>
+                                                                    <div><b>Jumlah / Berat:</b> ${row.koli || 1} Koli / ${row.berat || 0} Kg</div>
+                                                                </div>
+                                                            `,
+                                                            confirmButtonText: 'Tutup'
+                                                        })}
+                                                        className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg underline cursor-pointer transition"
+                                                    >
+                                                        {row.btt_id}
+                                                    </button>
+                                                </td>
                                                 <td className="p-2.5 text-slate-500">{row.penerima ? `${row.penerima} (${row.kota})` : row.scan_time}</td>
                                                 <td className="p-2.5 text-center">
                                                     <button type="button" onClick={() => setManifestData(manifestData.filter((_, idx) => idx !== i))} className="text-rose-500 hover:text-rose-700 cursor-pointer">
