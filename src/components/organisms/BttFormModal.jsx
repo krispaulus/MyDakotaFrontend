@@ -145,6 +145,13 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
 
     useEffect(() => {
         if (isOpen && !isEditMode && !initialData) {
+            const activeAgenId = localStorage.getItem('active_agen_id') || localStorage.getItem('active_cabang_id') || '';
+            const activeAgenNama = localStorage.getItem('active_agen_nama') || localStorage.getItem('active_cabang_nama') || '';
+            setFormData(prev => ({
+                ...prev,
+                bttt_asalagenid: activeAgenId || activeAgenNama,
+                bttt_asalkota: prev.bttt_asalkota || activeAgenNama.replace(/^DLI\s+/i, '').trim()
+            }));
             pemicuGenerateID();
         }
     }, [isOpen, isEditMode, initialData]);
@@ -728,10 +735,17 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
             const endpoint = isEditMode ? '/btt/update' : '/btt/add';
             const totalBiayaFinal = parseFloat(formData.bttt_harga) + parseFloat(formData.bttt_biayapenerus || 0) + parseFloat(formData.bttt_biayapacking || 0);
 
+            const sessionAgenFix =
+                formData.bttt_asalagenid ||
+                localStorage.getItem('active_agen_id') ||
+                localStorage.getItem('active_cabang_id') ||
+                localStorage.getItem('active_agen_nama') || '';
+
             const payload = {
                 no_btt: formData.bttt_nobtt,
                 id: formData.bttt_nobtt,
                 ...formData,
+                bttt_asalagenid: sessionAgenFix,
                 total_biaya: totalBiayaFinal,
                 bttt_harga: parseFloat(formData.bttt_harga),
                 bttt_biayapenerus: parseFloat(formData.bttt_biayapenerus || 0),
@@ -828,7 +842,11 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
         const kec = kecamatanTujuan || formData.bttt_tujuankecamatan;
         if (!kec) return;
 
-        const activeAgenId = localStorage.getItem('active_agen_id') || formData.bttt_asalagenid || 'BDO004';
+        const activeAgenId =
+            formData.bttt_asalagenid ||
+            localStorage.getItem('active_agen_id') ||
+            localStorage.getItem('active_cabang_id') ||
+            localStorage.getItem('active_agen_nama') || '';
         const beratAsli = parseFloat(formData.bttt_berat) || 0;
         const beratVolManual = parseFloat(formData.bttt_beratvol) || 0;
         const p = parseFloat(formData.bttt_panjang) || 0;

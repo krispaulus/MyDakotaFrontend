@@ -630,14 +630,21 @@ const Invoice = () => {
         let totalPPN = 0;
         let totalPiutang = 0;
 
+
+
         const rowsHtml = data.map((item, idx) => {
             const piutangUsaha = Number(item.artih_total || 0);
 
-            let noFakturPajakDisplay = String(item.artih_fktpajak || '').trim();
-            if (!noFakturPajakDisplay || noFakturPajakDisplay === '010.' || noFakturPajakDisplay === '010' || noFakturPajakDisplay === '-') {
-                // Ambil nomor faktur pajak lengkap yang tersimpan pada invoice atau fallback format resmi
-                noFakturPajakDisplay = item.faktur_pajak_lengkap || item.artih_fktpajak_full || (item.artih_fktpajak && item.artih_fktpajak.length > 5 ? item.artih_fktpajak : '-');
-            }
+            const rawFktPajak = String(item.artih_fktpajak || item.faktur_pajak_lengkap || '').trim();
+            const noFakturPajakDisplay = (rawFktPajak && rawFktPajak !== '-')
+                ? rawFktPajak
+                : '-';
+
+            // let noFakturPajakDisplay = String(item.artih_fktpajak || '').trim();
+            // if (!noFakturPajakDisplay || noFakturPajakDisplay === '010.' || noFakturPajakDisplay === '010' || noFakturPajakDisplay === '-') {
+            //     // Ambil nomor faktur pajak lengkap yang tersimpan pada invoice atau fallback format resmi
+            //     noFakturPajakDisplay = item.faktur_pajak_lengkap || item.artih_fktpajak_full || (item.artih_fktpajak && item.artih_fktpajak.length > 5 ? item.artih_fktpajak : '-');
+            // }
 
             // 🌟 1. HARGA JUAL / NILAI JUAL / DPP (Persis Kwitansi Penagihan)
             let hargaJual = Number(item.artih_dpp || 0);
@@ -1608,6 +1615,7 @@ const Invoice = () => {
                     </head>
                     <body>
                         <div class="no-print">
+                            <button class="btn-print" style="background:#0284c7;" onclick="exportKwitansiToExcel()">EXPORT TO EXCEL</button>
                             <button class="btn-print" style="background:#16a34a;" onclick="window.print()">PRINT</button>
                             <button class="btn-print" style="background:#e11d48;" onclick="window.close()">TUTUP</button>
                         </div>
@@ -1691,10 +1699,10 @@ const Invoice = () => {
                         </table>
 
                             <!-- TABEL RESI BTT MENYATU DENGAN FOOTER -->
-                            <table style="width: 100%; table-layout: fixed; word-wrap: break-word; border: 1px solid #94a3b8; border-collapse: collapse;">
+                            <table id="tblKwitansi1" style="width: 100%; table-layout: fixed; word-wrap: break-word; border: 1px solid #94a3b8; border-collapse: collapse;">
                                 <thead>
                                     <tr>
-                                        <th style="width: 3%;">NO URUT</th>
+                                        <th style="width: 3%;">NO</th>
                                         <th style="width: 13%;">NO RESI PENGIRIMAN</th>
                                         <th style="width: 10%;">TANGGAL KIRIM</th>
                                         <th style="width: 9%;">KOTA TUJUAN</th>
@@ -1713,7 +1721,7 @@ const Invoice = () => {
                             </table>
                             
                             <!-- FOOTER REKAPITULASI BIAYA & TANDA TANGAN (HANYA MUNCUL DI HALAMAN TERAKHIR) -->
-                            <table style="width: 100%; border: 1px solid #94a3b8; border-top: none; border-collapse: collapse; page-break-inside: avoid; break-inside: avoid;">
+                            <table id="tblFooterKwitansi1" style="width: 100%; border: 1px solid #94a3b8; border-top: none; border-collapse: collapse; page-break-inside: avoid; break-inside: avoid;">
                                 <tr style="background: #ffffff;">
                                     <td style="width: 35%; border: 1px solid #94a3b8; padding: 8px; vertical-align: top; font-size: 9.5px; line-height: 1.4;">
                                         <div style="font-weight: bold; color: #004b84; margin-bottom: 3px; font-size: 9.5px;">Transfer ke :</div>
@@ -1780,6 +1788,208 @@ const Invoice = () => {
                                     </td>
                                 </tr>
                             </table>
+                            <script>
+                                function getLogoInfo(cb) {
+                                    var imgEl = document.querySelector('img[alt="Logo"]');
+                                    if (!imgEl || !imgEl.src) {
+                                        cb({ b64: '', width: 58, height: 42 });
+                                        return;
+                                    }
+                                    function convert(imageObj) {
+                                        try {
+                                            var natW = imageObj.naturalWidth || 160;
+                                            var natH = imageObj.naturalHeight || 115;
+                                            var targetH = 42;
+                                            var targetW = Math.round((natW / natH) * targetH);
+
+                                            var canvas = document.createElement('canvas');
+                                            canvas.width = natW;
+                                            canvas.height = natH;
+                                            var ctx = canvas.getContext('2d');
+                                            ctx.drawImage(imageObj, 0, 0);
+                                            var dataUrl = canvas.toDataURL('image/png');
+                                            cb({ b64: dataUrl.split(',')[1] || '', width: targetW, height: targetH });
+                                        } catch (e) {
+                                            cb({ b64: '', width: 58, height: 42 });
+                                        }
+                                    }
+                                    if (imgEl.complete && imgEl.naturalWidth > 0) {
+                                        convert(imgEl);
+                                    } else {
+                                        var tmp = new Image();
+                                        tmp.crossOrigin = 'Anonymous';
+                                        tmp.onload = function() { convert(tmp); };
+                                        tmp.onerror = function() { cb({ b64: '', width: 58, height: 42 }); };
+                                        tmp.src = imgEl.src;
+                                    }
+                                }
+
+                                function exportKwitansiToExcel() {
+                                    getLogoInfo(function(logoInfo) {
+                                        var logoB64 = logoInfo.b64;
+                                        var custNameEsc = '${(header.cust_name || header.artih_custname || '-').replace(/\\/g, '\\\\').replace(/'/g, "\\'")}';
+                                        var custAlamat1Esc = '${(header.cust_alamat || header.cust_alamat1 || 'KANTOR PUSAT OPERASIONAL').replace(/\\/g, '\\\\').replace(/'/g, "\\'")}';
+                                        var custAlamat2Esc = '${(header.cust_alamat2 || '').trim().replace(/\\/g, '\\\\').replace(/'/g, "\\'")}';
+                                        var pejabatEsc = '${pejabatAccounting.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}';
+                                        var hasPO = ${hasNomorPO ? 'true' : 'false'};
+                                        var noPOEsc = '${nomorPOCustomer.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}';
+
+                                        var logoCellHtml = logoB64
+                                            ? '<td colspan="2" style="text-align:left; vertical-align:middle; border-bottom:2px solid #004b84; padding:4px;">' +
+                                                  '<img src="http://dakota.local/logo.png" width="' + logoInfo.width + '" height="' + logoInfo.height + '" />' +
+                                              '</td>'
+                                            : '';
+
+                                        var kopColSpanLeft = logoB64 ? 4 : 6;
+
+                                        var kopHtml =
+                                            '<table style="width:100%; border-collapse:collapse; font-family:Arial,sans-serif;">' +
+                                                '<tr style="height:52px;">' +
+                                                    logoCellHtml +
+                                                    '<td colspan="' + kopColSpanLeft + '" style="font-size:14pt; font-weight:bold; color:#004b84; vertical-align:middle; border-bottom:2px solid #004b84; padding:6px 6px;">' +
+                                                        'PT DAKOTA LOGISTIK INDONESIA<br/>' +
+                                                        '<span style="font-size:8.5pt; font-weight:normal; color:#64748b;">Jl. Wibawa Mukti II No. 99, Jatiasih, Bekasi - Jawa Barat</span>' +
+                                                    '</td>' +
+                                                    '<td colspan="5" style="font-size:15pt; font-weight:bold; color:#004b84; text-align:right; vertical-align:middle; border-bottom:2px solid #004b84; padding:6px 4px;">' +
+                                                        'KWITANSI PENAGIHAN' +
+                                                    '</td>' +
+                                                '</tr>' +
+                                                '<tr><td colspan="11" style="height:6px;"></td></tr>' +
+                                            '</table>';
+
+                                        var infoRows =
+                                            '<tr>' +
+                                                '<td colspan="6" rowspan="' + (hasPO ? 6 : 5) + '" style="background:#f8fafc; border:1px solid #cbd5e1; padding:6px; vertical-align:top; font-family:Arial,sans-serif;">' +
+                                                    '<span style="font-size:8pt; font-weight:bold; color:#64748b;">NAMA PELANGGAN :</span><br/>' +
+                                                    '<span style="font-size:11pt; font-weight:bold; color:#0f172a;">' + custNameEsc + '</span><br/>' +
+                                                    '<span style="font-size:8.5pt; color:#475569;">' + custAlamat1Esc + (custAlamat2Esc ? '<br/>' + custAlamat2Esc : '') + '</span>' +
+                                                '</td>' +
+                                                '<td colspan="2" style="background:#f8fafc; border-top:1px solid #cbd5e1; padding:2px 6px; font-size:9pt; color:#475569;">Tanggal Kwitansi</td>' +
+                                                '<td colspan="3" style="background:#f8fafc; border-top:1px solid #cbd5e1; border-right:1px solid #cbd5e1; padding:2px 6px; font-size:9pt; color:#0f172a;">: ${tglKwitansiIndo}</td>' +
+                                            '</tr>' +
+                                            '<tr>' +
+                                                '<td colspan="2" style="background:#f8fafc; padding:2px 6px; font-size:9pt; color:#475569;">Nomor Kwitansi</td>' +
+                                                '<td colspan="3" style="background:#f8fafc; border-right:1px solid #cbd5e1; padding:2px 6px; font-size:9pt; color:#004b84;">: ${kwitansiDisplayNo || '-'}</td>' +
+                                            '</tr>' +
+                                            '<tr>' +
+                                                '<td colspan="2" style="background:#f8fafc; padding:2px 6px; font-size:9pt; color:#475569;">Nomor Invoice</td>' +
+                                                '<td colspan="3" style="background:#f8fafc; border-right:1px solid #cbd5e1; padding:2px 6px; font-size:9pt; color:#0284c7;">: ${noInvoiceResmi}</td>' +
+                                            '</tr>' +
+                                            '<tr>' +
+                                                '<td colspan="2" style="background:#f8fafc; padding:2px 6px; font-size:9pt; color:#475569;">Nomor Faktur Pajak</td>' +
+                                                '<td colspan="3" style="background:#f8fafc; border-right:1px solid #cbd5e1; padding:2px 6px; font-size:9pt; color:#0f172a; mso-number-format:\\@;">: ${noFakturPajak}</td>' +
+                                            '</tr>' +
+                                            '<tr>' +
+                                                '<td colspan="2" style="background:#f8fafc; ' + (!hasPO ? 'border-bottom:1px solid #cbd5e1;' : '') + ' padding:2px 6px; font-size:9pt; color:#334155;">Tanggal Jatuh Tempo</td>' +
+                                                '<td colspan="3" style="background:#f8fafc; border-right:1px solid #cbd5e1; ' + (!hasPO ? 'border-bottom:1px solid #cbd5e1;' : '') + ' padding:2px 6px; font-size:9pt; color:#1e293b;">: ${tglJatuhTempoIndo}</td>' +
+                                            '</tr>' +
+                                            (hasPO ?
+                                                '<tr>' +
+                                                    '<td colspan="2" style="background:#f8fafc; border-bottom:1px solid #cbd5e1; padding:2px 6px; font-size:9pt; font-weight:bold;">Nomor PO</td>' +
+                                                    '<td colspan="3" style="background:#f8fafc; border-right:1px solid #cbd5e1; border-bottom:1px solid #cbd5e1; padding:2px 6px; font-size:9pt; font-weight:bold;">: ' + noPOEsc + '</td>' +
+                                                '</tr>'
+                                            : '');
+
+                                        var infoBoxHtml =
+                                            '<table style="width:100%; border-collapse:collapse; font-family:Arial,sans-serif;">' +
+                                                infoRows +
+                                                '<tr><td colspan="11" style="height:6px;"></td></tr>' +
+                                            '</table>';
+
+                                        var tblUtama = document.getElementById('tblKwitansi1').outerHTML;
+
+                                        var footerBoxHtml =
+                                            '<table style="width:100%; border-collapse:collapse; font-family:Arial,sans-serif; font-size:9pt;">' +
+                                                '<tr>' +
+                                                    '<td colspan="4" rowspan="8" style="border:1px solid #94a3b8; padding:8px; vertical-align:top; line-height:1.4;">' +
+                                                        '<b style="color:#004b84;">Transfer ke :</b><br/>' +
+                                                        '<b style="color:#0f172a;">DAKOTA LOGISTIK INDONESIA PT</b><br/>' +
+                                                        '<b style="color:#334155;">BANK CENTRAL ASIA (BCA)</b><br/>' +
+                                                        '<b style="color:#334155;">KCU KALIMALANG</b><br/><br/>' +
+                                                        '<b style="color:#0284c7; font-size:10pt;">NO REKENING : 2303937226</b>' +
+                                                    '</td>' +
+                                                    '<td colspan="4" rowspan="8" style="border:1px solid #94a3b8; padding:8px; text-align:center; vertical-align:top;">' +
+                                                        '<b style="color:#0f172a;">PT. DAKOTA LOGISTIK INDONESIA</b>' +
+                                                        '<br/><br/><br/><br/><br/>' +
+                                                        '<b style="text-decoration:underline; color:#0f172a;">' + pejabatEsc + '</b>' +
+                                                    '</td>' +
+                                                    '<td colspan="2" style="border:1px solid #94a3b8; padding:3px 6px; font-weight:bold; color:#334155;">JUMLAH</td>' +
+                                                    '<td style="border:1px solid #94a3b8; padding:3px 6px; text-align:right; font-weight:bold;">${totalBiayaKirim.toLocaleString('id-ID')}.00</td>' +
+                                                '</tr>' +
+                                                '<tr>' +
+                                                    '<td colspan="2" style="border:1px solid #94a3b8; padding:3px 6px; color:#64748b;">(-) DISKON</td>' +
+                                                    '<td style="border:1px solid #94a3b8; padding:3px 6px; text-align:right;">0.00</td>' +
+                                                '</tr>' +
+                                                '<tr>' +
+                                                    '<td colspan="2" style="border:1px solid #94a3b8; padding:3px 6px; color:#64748b;">(+) ASURANSI/LOLO</td>' +
+                                                    '<td style="border:1px solid #94a3b8; padding:3px 6px; text-align:right;">0.00</td>' +
+                                                '</tr>' +
+                                                '<tr>' +
+                                                    '<td colspan="2" style="border:1px solid #94a3b8; padding:3px 6px; color:#64748b;">(+) PACKING/BM/LAIN</td>' +
+                                                    '<td style="border:1px solid #94a3b8; padding:3px 6px; text-align:right;">${packingDanLainDisplay.toLocaleString('id-ID')}.00</td>' +
+                                                '</tr>' +
+                                                '<tr>' +
+                                                    '<td colspan="2" style="border:1px solid #94a3b8; padding:3px 6px; font-weight:bold; background:#f8fafc; color:#0f172a;">NILAI JUAL</td>' +
+                                                    '<td style="border:1px solid #94a3b8; padding:3px 6px; text-align:right; font-weight:bold; background:#f8fafc;">${nilaiJual.toLocaleString('id-ID')}.00</td>' +
+                                                '</tr>' +
+                                                '<tr>' +
+                                                    '<td colspan="2" style="border:1px solid #94a3b8; padding:3px 6px; color:#64748b;">DPP</td>' +
+                                                    '<td style="border:1px solid #94a3b8; padding:3px 6px; text-align:right;">${dpp.toLocaleString('id-ID')}.00</td>' +
+                                                '</tr>' +
+                                                '<tr>' +
+                                                    '<td colspan="2" style="border:1px solid #94a3b8; padding:3px 6px; color:#64748b;">PPN 1.1%</td>' +
+                                                    '<td style="border:1px solid #94a3b8; padding:3px 6px; text-align:right;">${ppn.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>' +
+                                                '</tr>' +
+                                                '<tr>' +
+                                                    '<td colspan="2" style="border:1px solid #94a3b8; padding:4px 6px; font-weight:bold; background:#f1f5f9; color:#004b84;">TOTAL TAGIHAN</td>' +
+                                                    '<td style="border:1px solid #94a3b8; padding:4px 6px; text-align:right; font-weight:bold; background:#f1f5f9; color:#b91c1c;">${totalTagihan.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>' +
+                                                '</tr>' +
+                                            '</table>';
+
+                                        var htmlBody =
+                                            '<!DOCTYPE html>' +
+                                            '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">' +
+                                            '<head><meta charset="UTF-8">' +
+                                            '<style>' +
+                                                'body { font-family: Arial, sans-serif; }' +
+                                                'table { border-collapse: collapse; }' +
+                                                '#tblKwitansi1 th { background-color: #e2e8f0; color: #0f172a; font-weight: bold; border: 1px solid #94a3b8; padding: 5px; text-align: center; }' +
+                                                '#tblKwitansi1 td { border: 1px solid #94a3b8; padding: 4px; }' +
+                                            '</style>' +
+                                            '</head><body>' +
+                                            kopHtml + infoBoxHtml + tblUtama + footerBoxHtml +
+                                            '</body></html>';
+
+                                        var boundary = "----=_NextPart_DAKOTA_XLS_001";
+                                        var b64Wrapped = logoB64 ? logoB64.replace(/(.{76})/g, "$1\\r\\n") : "";
+                                        var mhtml =
+                                            "MIME-Version: 1.0\\r\\n" +
+                                            "Content-Type: multipart/related; boundary=\\"" + boundary + "\\"\\r\\n\\r\\n" +
+                                            "--" + boundary + "\\r\\n" +
+                                            "Content-Type: text/html; charset=\\"utf-8\\"\\r\\n" +
+                                            "Content-Transfer-Encoding: 8bit\\r\\n\\r\\n" +
+                                            htmlBody + "\\r\\n\\r\\n" +
+                                            (b64Wrapped ? (
+                                                "--" + boundary + "\\r\\n" +
+                                                "Content-Location: http://dakota.local/logo.png\\r\\n" +
+                                                "Content-Type: image/png\\r\\n" +
+                                                "Content-Transfer-Encoding: base64\\r\\n\\r\\n" +
+                                                b64Wrapped + "\\r\\n\\r\\n"
+                                            ) : "") +
+                                            "--" + boundary + "--";
+
+                                        var blob = new Blob([mhtml], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+                                        var url = URL.createObjectURL(blob);
+                                        var a = document.createElement('a');
+                                        a.href = url;
+                                        a.download = 'Kwitansi_${(kwitansiDisplayNo || noInvoiceResmi).replace(/\//g, '_')}.xls';
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        document.body.removeChild(a);
+                                        URL.revokeObjectURL(url);
+                                    });
+                                }
+                            <\/script>
                     </body>
                     </html>
                 `);
@@ -4256,7 +4466,7 @@ const Invoice = () => {
         <div className="space-y-5">
             {/* Panel Filter */}
             {showFilter && (
-                <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all">
                     <div className="flex items-center gap-2 font-black uppercase text-slate-700 tracking-wider">
                         <Filter size={16} className="text-sky-600" />
                         FILTER INVOICE PENAGIHAN PIUTANG
@@ -4470,14 +4680,20 @@ const Invoice = () => {
                                 RESET
                             </button>
                             <button
-                                type="submit"
-                                className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5"
+                                type="button"
+                                disabled={loading}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    fetchInvoiceList();
+                                }}
+                                className="px-6 py-2 bg-sky-600 hover:bg-sky-700 disabled:opacity-60 text-white font-bold rounded-xl uppercase transition shadow-md cursor-pointer flex items-center gap-1.5"
                             >
-                                <RefreshCw size={14} /> REFRESH DATA
+                                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                                {loading ? 'MEMUAT...' : 'REFRESH DATA'}
                             </button>
                         </div>
                     </div>
-                </form>
+                </div>
             )}
 
             <DataTableTemplate
