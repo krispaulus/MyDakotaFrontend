@@ -366,6 +366,24 @@ const LaporanLSPB = () => {
         );
     });
 
+    const handleExportExcelLSPB = (customFilename, customTitle) => {
+        const exportCols = columns.map(col => ({
+            header: col.header,
+            key: typeof col.accessor === 'string' ? col.accessor : undefined,
+            accessor: typeof col.accessor === 'function' ? col.accessor : undefined,
+            align: col.align || 'left'
+        }));
+
+        exportDataToExcel({
+            filename: customFilename || `LAPORAN_LSPB_${filterTgla}_sd_${filterTgle}.xls`,
+            sheetName: 'Laporan LSPB',
+            title: customTitle || 'INFORMASI & LAPORAN LSPB',
+            customerName: filterCustomer ? filterCustomer.toUpperCase() : '',
+            columns: exportCols,
+            data: filteredData
+        });
+    };
+
     return (
         <div className="space-y-4 font-sans">
             {/* PANEL FILTER ATAS */}
@@ -513,14 +531,7 @@ const LaporanLSPB = () => {
 
                 <button
                     type="button"
-                    onClick={() => {
-                        exportDataToExcel({
-                            filename: `LSPB_With_Car_In_Out_${filterTgla}.xls`,
-                            sheetName: 'LSPB Car In Out',
-                            columns: columns,
-                            data: filteredData
-                        });
-                    }}
+                    onClick={() => handleExportExcelLSPB(`LSPB_With_Car_In_Out_${filterTgla}.xls`, 'LSPB WITH CAR IN OUT AND DATE TIME')}
                     className="px-4 py-2 bg-[#217346] hover:bg-[#1a5c37] text-white font-bold rounded-xl text-xs uppercase flex items-center gap-1.5 transition active:scale-95 shadow-xs cursor-pointer"
                 >
                     <FileSpreadsheet size={13} /> Export To Excel With Car In Out And Date Time
@@ -528,14 +539,7 @@ const LaporanLSPB = () => {
 
                 <button
                     type="button"
-                    onClick={() => {
-                        exportDataToExcel({
-                            filename: `LSPB_With_Delivery_History_${filterTgla}.xls`,
-                            sheetName: 'LSPB History',
-                            columns: columns,
-                            data: filteredData
-                        });
-                    }}
+                    onClick={() => handleExportExcelLSPB(`LSPB_With_Delivery_History_${filterTgla}.xls`, 'LSPB WITH DELIVERY HISTORY')}
                     className="px-4 py-2 bg-[#217346] hover:bg-[#1a5c37] text-white font-bold rounded-xl text-xs uppercase flex items-center gap-1.5 transition active:scale-95 shadow-xs cursor-pointer"
                 >
                     <FileSpreadsheet size={13} /> Export To Excel With Delivery History
@@ -592,6 +596,7 @@ const LaporanLSPB = () => {
                 onAdd={handleAdd}
                 onEdit={(item) => handleEdit(item)}
                 onDelete={(item) => handleDelete(item)}
+                onExport={() => handleExportExcelLSPB()}
             />
 
             {/* MODAL INPUT / EDIT LSPB (DESIGN MODERN WEB BARU + SUSUNAN KOLOM & FUNCTION WEB LAWAS) */}

@@ -20,9 +20,10 @@ const MarketingBTT = () => {
     // Filter Form State
     const [showFilter, setShowFilter] = useState(true);
 
+    const formatLocalYMD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const now = new Date();
-    const firstDayStr = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const todayStr = new Date().toISOString().split('T')[0];
+    const firstDayStr = formatLocalYMD(new Date(now.getFullYear(), now.getMonth(), 1));
+    const todayStr = formatLocalYMD(now);
     const [filterStartDate, setFilterStartDate] = useState(todayStr);
     const [filterEndDate, setFilterEndDate] = useState(todayStr);
     const [filterCabang, setFilterCabang] = useState('');
@@ -587,7 +588,10 @@ const MarketingBTT = () => {
                 isDarkMode={isDarkMode}
                 initialData={selectedBtt}
                 isEditMode={isEditMode}
-                onSave={() => fetchBTT(filterAgenId)}
+                onSave={() => {
+                    setBypassTanggal(true);
+                    fetchBTT(filterAgenId, { bypass_tanggal: 'Y' });
+                }}
             />
         </div>
     );
