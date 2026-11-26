@@ -414,8 +414,8 @@ const BttPrintPage = () => {
                     <tbody>
                       <tr className="font-black text-slate-800">
                         <td className="p-1 border-r border-gray-300 bg-slate-50/50">{jumlahKoliFinal} Koli</td>
-                        <td className="p-1 border-r border-gray-300">{formatDesimal(bttData.bttt_berat, 2)} kg</td>
-                        <td className="p-1 border-r border-gray-300">{formatDesimal(bttData.bttt_beratvol, 2)} kg</td>
+                        <td className="p-1 border-r border-gray-300">{formatDesimal(bttData.bttt_berat, 3)} kg</td>
+                        <td className="p-1 border-r border-gray-300">{formatDesimal(bttData.bttt_beratvol, 3)} kg</td>
                         <td className="p-1">{formatDesimal(bttData.bttt_ukuran, 3)} m³</td>
                       </tr>
                     </tbody>

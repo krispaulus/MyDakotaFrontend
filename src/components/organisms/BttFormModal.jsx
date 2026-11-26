@@ -325,7 +325,7 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
         // 🌟 Jika P, L, T lengkap diisi (> 0), hitung otomatis by system
         if (p > 0 && l > 0 && t > 0) {
             const hitungVol = (p * l * t) / divisor;
-            const finalVol = Math.round(hitungVol * 100) / 100;
+            const finalVol = Math.round(hitungVol * 1000) / 1000;
 
             // Hitung kubikasi sekalian jika P x L x T diisi
             const hitungKubikasi = (p * l * t) / 1000000;
@@ -1879,11 +1879,11 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                                                         const num = parseFloat(String(formData.bttt_beratvol).replace(',', '.'));
                                                         setFormData(prev => ({
                                                             ...prev,
-                                                            bttt_beratvol: isNaN(num) ? 0 : Number(num.toFixed(2))
+                                                            bttt_beratvol: isNaN(num) ? 0 : Number(num.toFixed(3))
                                                         }));
                                                     }
                                                 }}
-                                                placeholder="0.00"
+                                                placeholder="0.000"
                                                 className={`w-full p-2 border rounded-lg font-black text-right outline-none transition ${isAutoVol
                                                     ? 'bg-slate-100 border-slate-300 text-amber-700 cursor-not-allowed'
                                                     : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500 focus:ring-1 focus:ring-sky-200'
