@@ -172,6 +172,12 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
             const isCarter = (initialData.layanan_id === 'C' || initialData.bttt_layananid === 'C' || initialData.bttt_paketyn === 'N' || (initialData.bttt_charterjnskend && initialData.bttt_charterjnskend !== '-'));
             const jenisKendaraanCarter = initialData.bttt_charterjnskend || initialData.kode_kendaraan || '';
 
+            const rawKetEdit = String(initialData.bttt_ket || initialData.keterangan || '').trim();
+            const matchBarangEdit = rawKetEdit.match(/^([^(]+)\(\d+\s*KOLI\)/i);
+            const isiKirimanResolved =
+                (initialData.bttt_isikiriman || initialData.isi_kiriman || initialData.bttt_namabarang || initialData.nama_barang || '').trim() ||
+                (matchBarangEdit ? matchBarangEdit[1].trim().toUpperCase() : '');
+
             // ✅ Deteksi Layanan Darat / Laut / Udara dari DB
             const rawServId = String(initialData.bttt_servid || '').trim();
             const rawVia = String(initialData.bttt_via || initialData.bttt_service || '').trim().toUpperCase();
@@ -240,7 +246,8 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                 bttt_servid: kodeLayananInit,
                 bttt_jenisharga: kodePembayaran,
                 bttt_jeniskiriman: 'BERAT',
-                bttt_isikiriman: initialData.bttt_namabarang || initialData.nama_barang || initialData.bttt_isikiriman || '',
+                bttt_isikiriman: isiKirimanResolved,
+                // bttt_isikiriman: initialData.bttt_namabarang || initialData.nama_barang || initialData.bttt_isikiriman || '',
                 bttt_jmlkoli: parseInt(initialData.bttt_jmlunit || initialData.jumlah_koli) || 1,
                 bttt_berat: parseFloat(initialData.bttt_berat || initialData.berat) || 1,
                 bttt_beratvol: parseFloat(initialData.bttt_beratvol || initialData.berat_volume) || 0,
@@ -746,12 +753,14 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                 id: formData.bttt_nobtt,
                 ...formData,
                 bttt_asalagenid: sessionAgenFix,
+                bttt_berat: parseFloat(String(formData.bttt_berat).replace(',', '.')) || 0,
+                bttt_beratvol: parseFloat(String(formData.bttt_beratvol).replace(',', '.')) || 0,
+                bttt_ukuran: parseFloat(String(formData.bttt_ukuran).replace(',', '.')) || 0,
                 total_biaya: totalBiayaFinal,
                 bttt_harga: parseFloat(formData.bttt_harga),
                 bttt_biayapenerus: parseFloat(formData.bttt_biayapenerus || 0),
                 bttt_biayapacking: parseFloat(formData.bttt_biayapacking || 0)
             };
-
             const res = await api.post(endpoint, payload, {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -1848,20 +1857,33 @@ const BttFormModal = ({ isOpen, onClose, onSave, isDarkMode, isEditMode = false,
                                                 )}
                                             </div>
                                             <input
-                                                type="number"
-                                                step="0.01"
-                                                min="0"
+                                                type="text"
+                                                inputMode="decimal"
                                                 name="bttt_beratvol"
                                                 readOnly={isAutoVol}
                                                 value={formData.bttt_beratvol !== undefined && formData.bttt_beratvol !== null ? formData.bttt_beratvol : ''}
                                                 onChange={(e) => {
-                                                    // Hanya bisa diketik jika dimensi P, L, T kosong
                                                     if (!isAutoVol) {
-                                                        const val = e.target.value === '' ? '' : parseFloat(e.target.value) || 0;
-                                                        setFormData(prev => ({ ...prev, bttt_beratvol: val }));
+                                                        // Izinkan angka, titik (.), dan koma (,)
+                                                        let raw = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
+                                                        // Cegah lebih dari satu titik desimal
+                                                        const parts = raw.split('.');
+                                                        if (parts.length > 2) {
+                                                            raw = parts[0] + '.' + parts.slice(1).join('');
+                                                        }
+                                                        setFormData(prev => ({ ...prev, bttt_beratvol: raw }));
                                                     }
                                                 }}
-                                                placeholder="0"
+                                                onBlur={() => {
+                                                    if (!isAutoVol && formData.bttt_beratvol !== '') {
+                                                        const num = parseFloat(String(formData.bttt_beratvol).replace(',', '.'));
+                                                        setFormData(prev => ({
+                                                            ...prev,
+                                                            bttt_beratvol: isNaN(num) ? 0 : Number(num.toFixed(2))
+                                                        }));
+                                                    }
+                                                }}
+                                                placeholder="0.00"
                                                 className={`w-full p-2 border rounded-lg font-black text-right outline-none transition ${isAutoVol
                                                     ? 'bg-slate-100 border-slate-300 text-amber-700 cursor-not-allowed'
                                                     : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500 focus:ring-1 focus:ring-sky-200'

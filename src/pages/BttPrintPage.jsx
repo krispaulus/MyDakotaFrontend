@@ -149,6 +149,16 @@ const BttPrintPage = () => {
   const isDangerousGoods =
     isiKirimanFinal.toUpperCase().includes('CHEMICAL') ||
     /\bDG\b|DANGEROUS/i.test(keteranganAtas);
+
+  // 🌟 Helper format angka desimal rapi (contoh: 1.35 -> 1,35 | 2.00 -> 2)
+  const formatDesimal = (val, maxDec = 2) => {
+    const num = parseFloat(String(val ?? 0).replace(',', '.')) || 0;
+    return num.toLocaleString('id-ID', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: maxDec
+    });
+  };
+
   const tipeLembaran = [
     { label: "Untuk Pengirim", kasta: "Lembar 1 dari 3", isHarga: true, isStempel: false },
     { label: "Kembali Ke Cab. Pengirim", kasta: "Lembar 2 dari 3", isHarga: false, isStempel: true },
@@ -404,9 +414,9 @@ const BttPrintPage = () => {
                     <tbody>
                       <tr className="font-black text-slate-800">
                         <td className="p-1 border-r border-gray-300 bg-slate-50/50">{jumlahKoliFinal} Koli</td>
-                        <td className="p-1 border-r border-gray-300">{bttData.bttt_berat || 0} kg</td>
-                        <td className="p-1 border-r border-gray-300">{bttData.bttt_beratvol || 0} kg</td>
-                        <td className="p-1">{bttData.bttt_ukuran || 0} m³</td>
+                        <td className="p-1 border-r border-gray-300">{formatDesimal(bttData.bttt_berat, 2)} kg</td>
+                        <td className="p-1 border-r border-gray-300">{formatDesimal(bttData.bttt_beratvol, 2)} kg</td>
+                        <td className="p-1">{formatDesimal(bttData.bttt_ukuran, 3)} m³</td>
                       </tr>
                     </tbody>
                   </table>
