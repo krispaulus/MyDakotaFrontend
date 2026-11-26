@@ -1499,9 +1499,19 @@ const Invoice = () => {
                 }
             }
 
-            const pejabatAccounting = dbAccHead && dbAccHead.trim() !== ''
-                ? dbAccHead.trim()
-                : '( .................................... )';
+            // Cek apakah invoice diterbitkan oleh DLI PUSAT (kode cabang '001' atau nama cabang mengandung 'PUSAT')
+            const invKodeCabang = String(
+                header.artih_agenid ||
+                String(header.artih_id || '').trim().slice(0, 3) ||
+                ''
+            ).trim().padStart(3, '0');
+
+            const invNamaCabang = `${header.agen_nama || ''} ${btts[0]?.bttt_asalagennama || ''}`.toUpperCase();
+            const isDliPusat = invKodeCabang === '001' || invNamaCabang.includes('PUSAT');
+
+            const pejabatAccounting = isDliPusat
+                ? (dbAccHead && dbAccHead.trim() !== '' ? dbAccHead.trim() : '')
+                : '';
 
             const rawNoKW = header.artih_nokw || savedKwitansiNo || '';
             const kwitansiDisplayNo = String(rawNoKW).trim().replace(/\/OTA\//g, '/001/');

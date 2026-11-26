@@ -10,6 +10,7 @@ import Swal from 'sweetalert2';
 import dliLogo from '../assets/logoDLI.png';
 
 const SuratPengantarPAD = () => {
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const { isDarkMode } = useDarkMode();
 
     const formatNamaAgen = (nama, id = '') => {
@@ -122,7 +123,7 @@ const SuratPengantarPAD = () => {
         }
     };
 
-    // 2. Tambah SP PAD dari Proses Loading Barang (opr_t_sp_pad_loading.asp & _f.asp)
+    // 2. Tambah SP PAD dari Proses Loading Barang (Pop-up Modal seperti Surat Pengantar - Pengiriman)
     const handleLoadFromLoadingPAD = () => {
         Swal.fire({
             title: 'Tambah SP PAD Dari Proses Loading',
@@ -158,17 +159,15 @@ const SuratPengantarPAD = () => {
                 const hdr = result.value?.header || {};
                 const btts = Array.isArray(result.value?.btts) ? result.value.btts : [];
 
-                if (hdr.existing_sp) {
-                    Swal.fire('Info', `Loading ${hdr.load_id} sudah memiliki SP PAD nomor ${hdr.existing_sp}.`, 'info');
-                }
-
                 const sopirGabung = [hdr.sopir1_nama, hdr.sopir2_nama].filter(Boolean).join(' / ');
-                setConfigPAD(prev => ({
-                    ...prev,
-                    driverVendor: sopirGabung || prev.driverVendor,
+                setConfigPAD({
+                    vendorEkspedisi: '',
+                    noResiVendor: '',
+                    driverVendor: sopirGabung || '',
+                    noMobil: hdr.no_mobil || '',
                     noSuratTugas: hdr.surat_tugas || '',
                     loadHID: hdr.load_id || ''
-                }));
+                });
 
                 setDraftBTTList(btts.map((b, idx) => ({
                     no: idx + 1,
@@ -177,21 +176,26 @@ const SuratPengantarPAD = () => {
                     tgl_btt: b.tgl_btt || '-',
                     pengirim: b.pengirim || '-',
                     penerima: b.penerima || '-',
+                    alamat: b.alamat || '-',
                     kota: b.kota || '-',
+                    telp: b.telp || '-',
                     service_nama: b.service_nama || 'DARAT',
                     koli: b.koli || 1,
-                    berat: b.berat || 0,
-                    sumber: `LOADING (${hdr.load_id})`
+                    berat: b.berat || 0
                 })));
 
-                Swal.fire({
-                    toast: true,
-                    position: 'top-end',
-                    icon: 'success',
-                    title: `${btts.length} BTT dari Loading ${hdr.load_id} siap diterbitkan SP PAD!`,
-                    showConfirmButton: false,
-                    timer: 2500
-                });
+                setIsCreateModalOpen(true);
+
+                if (hdr.existing_sp) {
+                    Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'info',
+                        title: `Info: Loading ${hdr.load_id} sebelumnya tercatat di ${hdr.existing_sp}.`,
+                        showConfirmButton: false,
+                        timer: 3000
+                    });
+                }
             }
         });
     };
@@ -261,8 +265,9 @@ const SuratPengantarPAD = () => {
 
             if (res.data?.status === 'success') {
                 Swal.fire('BERHASIL', `Surat Pengantar PAD ${res.data.no_sp || ''} Berhasil Terbit!`, 'success');
+                setIsCreateModalOpen(false);
                 setDraftBTTList([]);
-                setConfigPAD({ vendorEkspedisi: '', noResiVendor: '', driverVendor: '', noSuratTugas: '', loadHID: '' });
+                setConfigPAD({ vendorEkspedisi: '', noResiVendor: '', driverVendor: '', noMobil: '', noSuratTugas: '', loadHID: '' });
                 fetchHistorySPPAD();
             }
         } catch (err) {
@@ -606,147 +611,6 @@ const SuratPengantarPAD = () => {
                 </div>
             </div>
 
-            {/* 🚚 PANEL 2: KONFIGURASI PEMBERANGKATAN TRANSAKSI VENDOR (SP PAD) */}
-            <div className={`p-5 rounded-2xl border shadow-xs space-y-4 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-slate-200'}`}>
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                    <div className="flex items-center gap-2 text-indigo-600 font-black tracking-wider text-xs">
-                        <Truck size={16} />
-                        <span>KONFIGURASI PEMBERANGKATAN VIA VENDOR REKANAN (PAD)</span>
-                    </div>
-                    {configPAD.loadHID && (
-                        <span className="px-2.5 py-0.5 bg-sky-100 text-sky-800 rounded-full text-[10px] font-mono font-bold">
-                            Loading: {configPAD.loadHID} {configPAD.noSuratTugas ? `| ST: ${configPAD.noSuratTugas}` : ''}
-                        </span>
-                    )}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white p-4 border border-slate-300 rounded-xl text-xs">
-                    <div>
-                        <label className="text-[10px] font-bold text-slate-600 uppercase">LOKET AGEN DLI ASAL</label>
-                        <input
-                            type="text"
-                            value={currentActiveAgen}
-                            readOnly
-                            className="w-full mt-1 p-2.5 border border-slate-300 rounded-lg bg-slate-100 font-black text-slate-900 uppercase outline-none"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="text-[10px] font-bold text-slate-600 uppercase">PILIH / KETIK VENDOR EKSPEDISI *</label>
-                        <input
-                            type="text"
-                            list="list-vendor-pad"
-                            placeholder="PILIH ATAU KETIK EKSPEDISI LAIN..."
-                            value={configPAD.vendorEkspedisi}
-                            onChange={e => setConfigPAD({ ...configPAD, vendorEkspedisi: e.target.value.toUpperCase() })}
-                            className="w-full mt-1 p-2.5 border border-slate-300 rounded-lg bg-white font-black text-slate-900 uppercase outline-none focus:border-indigo-600"
-                        />
-                        <datalist id="list-vendor-pad">
-                            {vendors && vendors.map((v, idx) => {
-                                const vendorName = (typeof v === 'object' && v !== null)
-                                    ? (v.vend_name || v.vendor_nama || v.nama || v.id || '')
-                                    : String(v);
-                                return <option key={idx} value={vendorName.toUpperCase()} />;
-                            })}
-                        </datalist>
-                    </div>
-
-                    <div>
-                        <label className="text-[10px] font-bold text-slate-600 uppercase">NO RESI / MANIFEST LUAR</label>
-                        <input
-                            type="text"
-                            placeholder="OPSIONAL RESI VENDOR LUAR..."
-                            value={configPAD.noResiVendor}
-                            onChange={e => setConfigPAD({ ...configPAD, noResiVendor: e.target.value.toUpperCase() })}
-                            className="w-full mt-1 p-2.5 border border-slate-300 rounded-lg bg-white font-black text-slate-900 uppercase placeholder-slate-400 outline-none focus:border-indigo-600"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="text-[10px] font-bold text-slate-600 uppercase">NAMA SOPIR / KONTAK VENDOR</label>
-                        <input
-                            type="text"
-                            placeholder="NAMA SOPIR / KONTAK..."
-                            value={configPAD.driverVendor}
-                            onChange={e => setConfigPAD({ ...configPAD, driverVendor: e.target.value.toUpperCase() })}
-                            className="w-full mt-1 p-2.5 border border-slate-300 rounded-lg bg-white font-black text-slate-900 uppercase placeholder-slate-400 outline-none focus:border-indigo-600"
-                        />
-                    </div>
-                </div>
-
-                {/* BARCODE SCANNER MUAT BARANG */}
-                <form onSubmit={handleScanMuat} className="pt-2 space-y-1">
-                    <label className="text-indigo-600 uppercase font-black text-xs flex items-center gap-1.5">
-                        <QrCode size={15} /> ENTRY BARCODE SCANNER MUAT BARANG EKSPEDISI LAIN
-                    </label>
-                    <div className="flex gap-2">
-                        <input
-                            type="text"
-                            placeholder="Ketik nomor resi koli lalu tekan Enter..."
-                            value={inputBarcode}
-                            onChange={(e) => setInputBarcode(e.target.value)}
-                            className="w-full p-3 border border-slate-300 focus:border-indigo-600 rounded-xl bg-white outline-none uppercase font-mono font-black text-xs tracking-widest text-slate-900 placeholder-slate-400"
-                        />
-                        <button type="submit" className="px-6 py-3 bg-indigo-950 hover:bg-indigo-900 active:scale-98 text-white font-black rounded-xl shadow-xs uppercase tracking-wider text-xs cursor-pointer transition">
-                            SCAN MUAT
-                        </button>
-                    </div>
-                </form>
-
-                {/* TABEL DRAFT MUATAN BTT SEBELUM TERBIT SP PAD */}
-                {draftBTTList.length > 0 && (
-                    <div className="mt-4 border border-indigo-200 rounded-2xl overflow-hidden bg-indigo-50/30">
-                        <div className="px-4 py-2.5 bg-indigo-900 text-white flex justify-between items-center text-xs font-bold">
-                            <span>DAFTAR DRAFT MUATAN SP PAD ({draftBTTList.length} BTT SIAP PROSES)</span>
-                            <div className="flex gap-2">
-                                <button type="button" onClick={() => setDraftBTTList([])} className="px-3 py-1 bg-rose-600 hover:bg-rose-700 rounded-lg text-[11px] uppercase cursor-pointer">
-                                    RESET DRAFT
-                                </button>
-                                <button type="button" onClick={handleSaveSPPAD} className="px-4 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-[11px] uppercase flex items-center gap-1 cursor-pointer">
-                                    <Save size={13} /> PROSES & TERBITKAN SP PAD
-                                </button>
-                            </div>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse text-[11px]">
-                                <thead className="bg-slate-100 text-slate-700">
-                                    <tr>
-                                        <th className="p-2">NO</th>
-                                        <th className="p-2">NO. BTT</th>
-                                        <th className="p-2">SURAT JALAN</th>
-                                        <th className="p-2">PENGIRIM</th>
-                                        <th className="p-2">PENERIMA</th>
-                                        <th className="p-2">KOTA</th>
-                                        <th className="p-2 text-right">KOLI</th>
-                                        <th className="p-2 text-right">BERAT</th>
-                                        <th className="p-2 text-center">HAPUS</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-200 bg-white">
-                                    {draftBTTList.map((row, idx) => (
-                                        <tr key={idx}>
-                                            <td className="p-2 font-mono">{idx + 1}</td>
-                                            <td className="p-2 font-mono font-bold text-indigo-700">{row.btt_id}</td>
-                                            <td className="p-2">{row.no_sj}</td>
-                                            <td className="p-2">{row.pengirim}</td>
-                                            <td className="p-2">{row.penerima}</td>
-                                            <td className="p-2">{row.kota}</td>
-                                            <td className="p-2 text-right font-mono">{row.koli}</td>
-                                            <td className="p-2 text-right font-mono">{row.berat}</td>
-                                            <td className="p-2 text-center">
-                                                <button type="button" onClick={() => setDraftBTTList(draftBTTList.filter((_, i) => i !== idx))} className="text-rose-500 hover:text-rose-700 cursor-pointer">
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                )}
-            </div>
-
             {/* 📊 PANEL 3: DATATABLE HISTORI SP PAD */}
             <DataTableTemplate
                 title={`DATALIST SURAT PENGANTAR PAD (${filteredTableData.length} ITEMS)`}
@@ -754,10 +618,171 @@ const SuratPengantarPAD = () => {
                 data={filteredTableData}
                 loading={loading}
                 isDarkMode={isDarkMode}
-                searchValue={globalSearch}
-                onSearchChange={(e) => setGlobalSearch(e.target.value)}
-                onAdd={handleSaveSPPAD}
+                hideAddButton={true}
             />
+            {/* MODAL PEMBUATAN SP PAD BARU (DARI PROSES LOADING / SCAN BTT) */}
+            {isCreateModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+                    <div className="w-full max-w-5xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden max-h-[92vh] flex flex-col">
+                        <div className="px-6 py-4 bg-indigo-900 text-white flex justify-between items-center">
+                            <h3 className="font-black text-sm uppercase flex items-center gap-2">
+                                <Truck size={18} /> PEMBUATAN SURAT PENGANTAR PAD (EKSPEDISI LAIN)
+                            </h3>
+                            <button type="button" onClick={() => setIsCreateModalOpen(false)} className="p-1 hover:bg-white/10 rounded-full cursor-pointer">
+                                <XIcon size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4 text-xs font-bold text-slate-700 overflow-y-auto">
+                            {/* Baris 1: Cabang Asal, No. Mobil, No. Surat Tugas, Loading ID */}
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div>
+                                    <label className="block mb-1 text-slate-500">CABANG ASAL</label>
+                                    <input type="text" readOnly value={currentActiveAgen} className="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-xl" />
+                                </div>
+                                <div>
+                                    <label className="block mb-1 text-slate-500">NO. MOBIL</label>
+                                    <input type="text" readOnly value={configPAD.noMobil || '-'} className="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-xl font-mono" />
+                                </div>
+                                <div>
+                                    <label className="block mb-1 text-slate-500">NO. SURAT TUGAS</label>
+                                    <input type="text" value={configPAD.noSuratTugas} onChange={e => setConfigPAD({ ...configPAD, noSuratTugas: e.target.value.toUpperCase() })} className="w-full p-2.5 border border-slate-300 rounded-xl font-mono uppercase" />
+                                </div>
+                                <div>
+                                    <label className="block mb-1 text-slate-500">ID LOADING</label>
+                                    <input type="text" readOnly value={configPAD.loadHID || 'MANUAL BTT'} className="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-xl font-mono" />
+                                </div>
+                            </div>
+
+                            {/* Baris 2: Ekspedisi Lain (Wajib), Sopir / Pengemudi, No Resi Luar */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-indigo-50/60 border border-indigo-200 rounded-2xl">
+                                <div>
+                                    <label className="block mb-1 text-indigo-900">EKSPEDISI LAIN / VENDOR REKANAN *</label>
+                                    <input
+                                        type="text"
+                                        list="list-vendor-pad"
+                                        autoFocus
+                                        placeholder="PILIH ATAU KETIK EKSPEDISI LAIN..."
+                                        value={configPAD.vendorEkspedisi}
+                                        onChange={e => setConfigPAD({ ...configPAD, vendorEkspedisi: e.target.value.toUpperCase() })}
+                                        className="w-full p-2.5 border-2 border-indigo-400 rounded-xl bg-white text-slate-900 uppercase"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block mb-1 text-slate-600">SUPIR / PENGEMUDI</label>
+                                    <input
+                                        type="text"
+                                        value={configPAD.driverVendor}
+                                        onChange={e => setConfigPAD({ ...configPAD, driverVendor: e.target.value.toUpperCase() })}
+                                        className="w-full p-2.5 border border-slate-300 rounded-xl bg-white uppercase"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block mb-1 text-slate-600">NO. RESI VENDOR LUAR (OPSIONAL)</label>
+                                    <input
+                                        type="text"
+                                        placeholder="OPSIONAL..."
+                                        value={configPAD.noResiVendor}
+                                        onChange={e => setConfigPAD({ ...configPAD, noResiVendor: e.target.value.toUpperCase() })}
+                                        className="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-mono uppercase"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Tambah Scan BTT Tambahan jika diperlukan */}
+                            <form onSubmit={handleScanMuat} className="flex gap-2 items-end">
+                                <div className="flex-1">
+                                    <label className="block mb-1 text-indigo-700">SCAN BARCODE / TAMBAH NOMOR BTT :</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Scan atau ketik nomor BTT lalu tekan Enter..."
+                                        value={inputBarcode}
+                                        onChange={e => setInputBarcode(e.target.value)}
+                                        className="w-full p-2.5 border border-slate-300 rounded-xl font-mono uppercase"
+                                    />
+                                </div>
+                                <button type="submit" className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl uppercase cursor-pointer">
+                                    + TAMBAH BTT
+                                </button>
+                            </form>
+
+                            {/* Tabel Rincian BTT */}
+                            <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                                <table className="w-full text-left border-collapse text-[11px]">
+                                    <thead className="bg-slate-800 text-white">
+                                        <tr>
+                                            <th className="p-2.5">NO</th>
+                                            <th className="p-2.5">NO. BTT</th>
+                                            <th className="p-2.5">SURAT JALAN</th>
+                                            <th className="p-2.5">TGL BTT</th>
+                                            <th className="p-2.5">PENGIRIM</th>
+                                            <th className="p-2.5">PENERIMA</th>
+                                            <th className="p-2.5">KOTA</th>
+                                            <th className="p-2.5 text-right">JUMLAH</th>
+                                            <th className="p-2.5 text-right">BERAT</th>
+                                            <th className="p-2.5 text-center">HAPUS</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {draftBTTList.length === 0 ? (
+                                            <tr><td colSpan="10" className="p-4 text-center text-slate-400">Belum ada BTT dalam daftar muatan</td></tr>
+                                        ) : draftBTTList.map((row, idx) => (
+                                            <tr key={idx} className="hover:bg-slate-50">
+                                                <td className="p-2.5 font-mono">{idx + 1}</td>
+                                                <td className="p-2.5 font-mono font-bold">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => Swal.fire({
+                                                            title: `Detail Resi ${row.btt_id}`,
+                                                            html: `
+                                                    <div class="text-left text-xs space-y-1.5 bg-slate-50 p-3 rounded-xl border">
+                                                        <div><b>No. Surat Jalan:</b> ${row.no_sj || '-'}</div>
+                                                        <div><b>Tanggal BTT:</b> ${row.tgl_btt || '-'}</div>
+                                                        <div><b>Pengirim:</b> ${row.pengirim || '-'}</div>
+                                                        <div><b>Penerima:</b> ${row.penerima || '-'}</div>
+                                                        <div><b>Alamat:</b> ${row.alamat || '-'}</div>
+                                                        <div><b>Kota Tujuan:</b> ${row.kota || '-'}</div>
+                                                        <div><b>No. Telp:</b> ${row.telp || '-'}</div>
+                                                        <div><b>Jumlah / Berat:</b> ${row.koli || 1} Koli / ${row.berat || 0} Kg</div>
+                                                    </div>
+                                                `,
+                                                            confirmButtonText: 'Tutup'
+                                                        })}
+                                                        className="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded underline cursor-pointer"
+                                                    >
+                                                        {row.btt_id}
+                                                    </button>
+                                                </td>
+                                                <td className="p-2.5">{row.no_sj}</td>
+                                                <td className="p-2.5 font-mono">{row.tgl_btt}</td>
+                                                <td className="p-2.5">{row.pengirim}</td>
+                                                <td className="p-2.5">{row.penerima}</td>
+                                                <td className="p-2.5">{row.kota}</td>
+                                                <td className="p-2.5 text-right font-mono">{row.koli}</td>
+                                                <td className="p-2.5 text-right font-mono">{row.berat}</td>
+                                                <td className="p-2.5 text-center">
+                                                    <button type="button" onClick={() => setDraftBTTList(draftBTTList.filter((_, i) => i !== idx))} className="text-rose-500 hover:text-rose-700 cursor-pointer">
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                                <button type="button" onClick={() => setIsCreateModalOpen(false)} className="px-5 py-2.5 border border-slate-300 rounded-xl uppercase cursor-pointer">
+                                    BATAL
+                                </button>
+                                <button type="button" onClick={handleSaveSPPAD} className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl flex items-center gap-1.5 uppercase cursor-pointer">
+                                    <Save size={15} /> PROSES & TERBITKAN SP PAD ({draftBTTList.length} BTT)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* MODAL EDIT & SCAN BTT SP PAD (opr_t_sp_pad_e.asp) */}
             {isEditModalOpen && editHeader && (
