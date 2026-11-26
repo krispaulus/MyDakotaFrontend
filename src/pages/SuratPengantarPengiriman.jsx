@@ -383,7 +383,7 @@ const SuratPengantarPengiriman = () => {
         });
     };
 
-    // 7. Cetak Dokumen SP Individual (opr_t_sp_terima_print.asp)
+    // 7. Cetak Dokumen SP Individual (Desain Modern + Data Lengkap Sesuai Aplikasi Lawas)
     const handlePrintSingleSP = async (item) => {
         const targetNoSP = String(item?.no_sp || item?.spt_eid || '').trim();
         if (!targetNoSP) {
@@ -402,9 +402,9 @@ const SuratPengantarPengiriman = () => {
 
             const totalKoli = items.reduce((acc, r) => acc + Number(r.jumlah || 0), 0);
             const totalBerat = items.reduce((acc, r) => acc + Number(r.berat || 0), 0);
-            const totalCod = items.reduce((acc, r) => acc + Number(r.cod || 0), 0);
+            const totalBiaya = items.reduce((acc, r) => acc + Number(r.biaya_kirim || 0), 0);
 
-            const win = window.open('', '_blank', 'width=1050,height=780');
+            const win = window.open('', '_blank', 'width=1080,height=780');
             if (!win) {
                 Swal.fire('Pop-up Diblokir', 'Izinkan pop-up browser untuk mencetak dokumen SP.', 'warning');
                 return;
@@ -419,16 +419,19 @@ const SuratPengantarPengiriman = () => {
                         body { font-family: Arial, sans-serif; padding: 20px; font-size: 11px; color: #000; }
                         table { width: 100%; border-collapse: collapse; margin-top: 12px; }
                         th, td { border: 1px solid #333; padding: 5px 6px; }
-                        th { background: #004b84; color: #fff; font-size: 10px; }
+                        th { background: #004b84; color: #fff; font-size: 10px; text-transform: uppercase; }
                         tfoot td { font-weight: bold; background: #f1f5f9; }
                     </style>
                 </head>
                 <body onload="window.print()">
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #000; padding-bottom:10px;">
-                        <div>
-                            <div style="font-size:15px; font-weight:bold;">PT. DAKOTA LOGISTIK INDONESIA</div>
-                            <div style="font-size:13px; font-weight:bold; margin-top:2px;">SURAT PENGANTAR PENGIRIMAN (SP)</div>
-                            <div style="margin-top:4px;">No. SP: <b>${hdr.no_sp || targetNoSP}</b> | Tanggal: <b>${hdr.tanggal || item.tanggal || '-'}</b></div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #000; padding-bottom:10px;">
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <img src="${dliLogo}" alt="Logo DLI" style="height:46px; object-fit:contain;" />
+                            <div>
+                                <div style="font-size:15px; font-weight:bold;">PT. DAKOTA LOGISTIK INDONESIA</div>
+                                <div style="font-size:13px; font-weight:bold; color:#004b84; margin-top:2px;">SURAT PENGANTAR PENGIRIMAN (SP)</div>
+                                <div style="margin-top:3px;">No. SP: <b>${hdr.no_sp || targetNoSP}</b> | Tanggal: <b>${hdr.tanggal || item.tanggal || '-'}</b></div>
+                            </div>
                         </div>
                         <div style="text-align:right; line-height:1.5;">
                             <div>Asal: <b>${hdr.asal_nama || item.asal || '-'}</b> &rarr; Tujuan: <b>${hdr.tujuan_nama || item.tujuan || '-'}</b> ${hdr.transit_yn === 'Y' ? '(TRANSIT)' : ''}</div>
@@ -440,16 +443,16 @@ const SuratPengantarPengiriman = () => {
                     <table>
                         <thead>
                             <tr>
-                                <th width="30">NO</th>
-                                <th>NO. BTT</th>
-                                <th>NO. SJ CUSTOMER</th>
-                                <th>TGL BTT</th>
+                                <th width="28">NO</th>
+                                <th>BTT</th>
+                                <th>SURAT JALAN (NO. OD CUSTOMER)</th>
+                                <th>PEMBAYARAN</th>
+                                <th>SERVICE</th>
                                 <th>PENGIRIM</th>
                                 <th>PENERIMA</th>
-                                <th>KOTA TUJUAN</th>
-                                <th>JML KOLI</th>
-                                <th>BERAT (KG)</th>
-                                <th>COD (RP)</th>
+                                <th width="45">KOLI</th>
+                                <th width="55">BERAT</th>
+                                <th width="85">BIAYA KIRIM</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -458,38 +461,46 @@ const SuratPengantarPengiriman = () => {
                                     <td align="center">${i + 1}</td>
                                     <td><b>${r.btt_id || '-'}</b></td>
                                     <td>${r.no_sj || '-'}</td>
-                                    <td align="center">${r.tgl_btt || '-'}</td>
+                                    <td align="center">${r.pembayaran || '-'}</td>
+                                    <td align="center">${r.service_nama || 'Darat'}</td>
                                     <td>${r.pengirim || '-'}</td>
                                     <td>${r.penerima || '-'}</td>
-                                    <td>${r.kota || '-'}</td>
                                     <td align="right">${Number(r.jumlah || 0).toLocaleString('id-ID')}</td>
                                     <td align="right">${Number(r.berat || 0).toLocaleString('id-ID')}</td>
-                                    <td align="right">${Number(r.cod || 0) > 0 ? Number(r.cod).toLocaleString('id-ID') : '-'}</td>
+                                    <td align="right">${Number(r.biaya_kirim || 0).toLocaleString('id-ID')}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
                         <tfoot>
                             <tr>
-                                <td colspan="7" align="right">TOTAL (${items.length} BTT)</td>
+                                <td colspan="7" align="right">TOTAL (${items.length} BTT) :</td>
                                 <td align="right">${totalKoli.toLocaleString('id-ID')}</td>
                                 <td align="right">${totalBerat.toLocaleString('id-ID')}</td>
-                                <td align="right">${totalCod > 0 ? totalCod.toLocaleString('id-ID') : '-'}</td>
+                                <td align="right">${totalBiaya.toLocaleString('id-ID')}</td>
                             </tr>
                         </tfoot>
                     </table>
 
-                    <div style="display:flex; justify-content:space-between; margin-top:32px; text-align:center;">
-                        <div style="width:30%;">
-                            <div>Petugas / Pembuat SP,</div>
-                            <div style="margin-top:50px;">( ______________________ )</div>
+                    <div style="font-style:italic; font-size:10px; margin-top:8px;">
+                        Menerangkan bahwa pengemudi dan checker telah melakukan serah terima barang, sudah menghitung serta memeriksa barang kiriman tsb. Kami menyatakan barang tersebut dalam keadaan BAIK, dan sesuai ketentuan untuk diserahterimakan.
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; margin-top:28px; text-align:center;">
+                        <div style="width:23%;">
+                            <div>Pembuat SP,</div>
+                            <div style="margin-top:48px;">[ ___________________ ]</div>
                         </div>
-                        <div style="width:30%;">
-                            <div>Sopir / Pengemudi,</div>
-                            <div style="margin-top:50px;">( ${hdr.nama_sopir || item.sopir || '______________________'} )</div>
+                        <div style="width:23%;">
+                            <div>Checker,</div>
+                            <div style="margin-top:48px;">[ ___________________ ]</div>
                         </div>
-                        <div style="width:30%;">
-                            <div>Penerima Cabang Tujuan,</div>
-                            <div style="margin-top:50px;">( ______________________ )</div>
+                        <div style="width:26%;">
+                            <div>Pengemudi,</div>
+                            <div style="margin-top:48px;">[ ${hdr.nama_sopir || item.sopir || '___________________'} ]</div>
+                        </div>
+                        <div style="width:23%;">
+                            <div>Diterima Oleh,</div>
+                            <div style="margin-top:48px;">[ ___________________ ]</div>
                         </div>
                     </div>
                 </body>
