@@ -2,30 +2,45 @@ import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
-import { Search, Truck, QrCode } from 'lucide-react';
+import {
+    Search, Truck, QrCode, PackageCheck, Printer,
+    Edit3, Trash2, Save, X as XIcon, ScanBarcode
+} from 'lucide-react';
 import Swal from 'sweetalert2';
+import dliLogo from '../assets/logoDLI.png';
 
 const SuratPengantarPAD = () => {
     const { isDarkMode } = useDarkMode();
 
-    // 🏢 Multi-Tenant Agen Lock
+    const formatNamaAgen = (nama, id = '') => {
+        const cleanNama = String(nama || '').trim().toUpperCase();
+        const cleanId = String(id || '').trim().toUpperCase();
+        if (cleanNama === 'PUSAT DAKOTA' || cleanId === '001' || cleanId === 'PST001' || cleanId === '1') {
+            return 'DLI PUSAT';
+        }
+        return String(nama || '').trim() || 'DLI PUSAT';
+    };
+
     const [currentActiveAgen] = useState(() => {
-        return localStorage.getItem('active_agen_nama') ||
-            localStorage.getItem('kode_cabang') ||
-            'PUSAT DAKOTA';
+        const rawAgen = localStorage.getItem('active_agen_nama') || localStorage.getItem('kode_cabang') || 'DLI PUSAT';
+        const rawId = localStorage.getItem('active_agen_id') || '';
+        return formatNamaAgen(rawAgen, rawId);
     });
 
-    // 📊 State Data & Filter
+    const now = new Date();
+    const firstDayOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    const today = now.toISOString().split('T')[0];
+
     const [loading, setLoading] = useState(false);
     const [vendors, setVendors] = useState([]);
-    const [tableData, setTableData] = useState([]); // Data yang tampil di DataTable
+    const [tableData, setTableData] = useState([]);
+    const [draftBTTList, setDraftBTTList] = useState([]);
     const [inputBarcode, setInputBarcode] = useState('');
     const [globalSearch, setGlobalSearch] = useState('');
 
-    // Range tanggal default dari 2017 agar data lama langsung terserap
     const [filterData, setFilterData] = useState({
-        dariTanggal: new Date().toISOString().split('T')[0],
-        sampaiTanggal: new Date().toISOString().split('T')[0],
+        dariTanggal: firstDayOfMonth,
+        sampaiTanggal: today,
         noSP: '',
         noBTT: '',
         ekspedisiLain: ''
@@ -34,10 +49,18 @@ const SuratPengantarPAD = () => {
     const [configPAD, setConfigPAD] = useState({
         vendorEkspedisi: '',
         noResiVendor: '',
-        driverVendor: ''
+        driverVendor: '',
+        noSuratTugas: '',
+        loadHID: ''
     });
 
-    // 🔄 Fetch Master Vendor & Auto Fetch Data Histori SP PAD Pertama Kali
+    // Modal Edit SP PAD Existing (opr_t_sp_pad_e.asp)
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editHeader, setEditHeader] = useState(null);
+    const [editItems, setEditItems] = useState([]);
+    const [editScanBtt, setEditScanBtt] = useState('');
+    const [selectedRemoveBtts, setSelectedRemoveBtts] = useState([]);
+
     useEffect(() => {
         fetchVendors();
         fetchHistorySPPAD();
@@ -46,7 +69,6 @@ const SuratPengantarPAD = () => {
     const fetchVendors = async () => {
         try {
             const token = localStorage.getItem('token');
-            // 💡 Sesuaikan endpoint dengan route main.go: /master/vendor/list
             const res = await api.get('/master/vendor/list', {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -54,7 +76,6 @@ const SuratPengantarPAD = () => {
             if (Array.isArray(dataVendor) && dataVendor.length > 0) {
                 setVendors(dataVendor);
             } else {
-                // Fallback jika DB master vendor masih kosong
                 setVendors([
                     { id: 'DBS', vendor_nama: 'DBS LOGISTIK' },
                     { id: 'JNE', vendor_nama: 'JNE LOGISTIK' },
@@ -63,7 +84,6 @@ const SuratPengantarPAD = () => {
                 ]);
             }
         } catch (err) {
-            console.error("Fetch vendor error, menggunakan fallback list:", err);
             setVendors([
                 { id: 'DBS', vendor_nama: 'DBS LOGISTIK' },
                 { id: 'JNE', vendor_nama: 'JNE LOGISTIK' },
@@ -73,7 +93,7 @@ const SuratPengantarPAD = () => {
         }
     };
 
-    // 🔍 Fungsi Tarik Data Histori SP PAD dari Backend Golang
+    // 1. Tarik Daftar Histori SP PAD (opr_t_sp_pad.asp)
     const fetchHistorySPPAD = async (e) => {
         if (e) e.preventDefault();
         setLoading(true);
@@ -81,6 +101,8 @@ const SuratPengantarPAD = () => {
             const token = localStorage.getItem('token');
             const res = await api.get('/operasional/sp-pad', {
                 params: {
+                    dariTanggal: filterData.dariTanggal,
+                    sampaiTanggal: filterData.sampaiTanggal,
                     noSP: filterData.noSP,
                     noBTT: filterData.noBTT,
                     ekspedisiLain: filterData.ekspedisiLain
@@ -89,62 +111,134 @@ const SuratPengantarPAD = () => {
             });
 
             const resData = res.data?.data || res.data || [];
-            if (Array.isArray(resData)) {
-                setTableData(resData);
-                if (e) {
-                    Swal.fire('BERHASIL', `Ditemukan ${resData.length} data Surat Pengantar PAD`, 'success');
-                }
-            } else {
-                setTableData([]);
+            setTableData(Array.isArray(resData) ? resData : []);
+            if (e) {
+                Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: `Ditemukan ${resData.length} dokumen SP PAD`, showConfirmButton: false, timer: 1800 });
             }
         } catch (err) {
-            console.error("Gagal narik data SP PAD:", err);
             setTableData([]);
-            if (e) {
-                Swal.fire('INFO', 'Data tidak ditemukan dengan kriteria filter tersebut', 'info');
-            }
         } finally {
             setLoading(false);
         }
     };
 
-    // 🛒 Scan Muat Barang
-    const handleScanMuat = (e) => {
-        if (e) e.preventDefault();
-        const cleanBTT = inputBarcode.trim().toUpperCase();
-        if (!cleanBTT) return;
-
-        const newItem = {
-            no_sp_pad: 'DRAFT_BARU',
-            tanggal_sp: new Date().toLocaleDateString('id-ID'),
-            cabang_asal: currentActiveAgen,
-            vendor_expedisi_lain: configPAD.vendorEkspedisi || 'VENDOR LUAR',
-            status_aktif: 'DRAFT MUAT',
-            noBtt: cleanBTT
-        };
-
-        setTableData([newItem, ...tableData]);
-        setInputBarcode('');
+    // 2. Tambah SP PAD dari Proses Loading Barang (opr_t_sp_pad_loading.asp & _f.asp)
+    const handleLoadFromLoadingPAD = () => {
         Swal.fire({
-            toast: true,
-            position: 'top-end',
-            icon: 'success',
-            title: `Resi ${cleanBTT} Masuk ke Draft Muat`,
-            showConfirmButton: false,
-            timer: 1500
+            title: 'Tambah SP PAD Dari Proses Loading',
+            input: 'text',
+            inputLabel: 'Masukkan Nomor Loading Barang (LoadH_ID) atau Nomor Surat Tugas:',
+            inputPlaceholder: 'Contoh: LC0012026110000038 atau 001JC2026...',
+            showCancelButton: true,
+            confirmButtonText: 'Tarik Data Loading',
+            confirmButtonColor: '#2563eb',
+            showLoaderOnConfirm: true,
+            preConfirm: async (val) => {
+                const cleanCode = String(val || '').trim().toUpperCase();
+                if (!cleanCode) {
+                    Swal.showValidationMessage('Nomor Loading / Surat Tugas wajib diisi!');
+                    return false;
+                }
+                try {
+                    const token = localStorage.getItem('token');
+                    const resp = await api.get('/operasional/sp-pad/from-loading', {
+                        params: { load_id: cleanCode },
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    return resp.data;
+                } catch (err) {
+                    const msg = err.response?.data?.message || err.message || 'Data loading tidak ditemukan';
+                    Swal.showValidationMessage(msg);
+                    return false;
+                }
+            },
+            allowOutsideClick: () => !Swal.isLoading()
+        }).then((result) => {
+            if (result.isConfirmed && result.value) {
+                const hdr = result.value?.header || {};
+                const btts = Array.isArray(result.value?.btts) ? result.value.btts : [];
+
+                if (hdr.existing_sp) {
+                    Swal.fire('Info', `Loading ${hdr.load_id} sudah memiliki SP PAD nomor ${hdr.existing_sp}.`, 'info');
+                }
+
+                const sopirGabung = [hdr.sopir1_nama, hdr.sopir2_nama].filter(Boolean).join(' / ');
+                setConfigPAD(prev => ({
+                    ...prev,
+                    driverVendor: sopirGabung || prev.driverVendor,
+                    noSuratTugas: hdr.surat_tugas || '',
+                    loadHID: hdr.load_id || ''
+                }));
+
+                setDraftBTTList(btts.map((b, idx) => ({
+                    no: idx + 1,
+                    btt_id: b.btt_id,
+                    no_sj: b.no_sj || '-',
+                    tgl_btt: b.tgl_btt || '-',
+                    pengirim: b.pengirim || '-',
+                    penerima: b.penerima || '-',
+                    kota: b.kota || '-',
+                    service_nama: b.service_nama || 'DARAT',
+                    koli: b.koli || 1,
+                    berat: b.berat || 0,
+                    sumber: `LOADING (${hdr.load_id})`
+                })));
+
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: `${btts.length} BTT dari Loading ${hdr.load_id} siap diterbitkan SP PAD!`,
+                    showConfirmButton: false,
+                    timer: 2500
+                });
+            }
         });
     };
 
-    // 🗑️ Delete Row Table
-    const handleDeleteRow = (item) => {
-        const filtered = tableData.filter(i => (i.no_sp_pad || i.noBtt) !== (item.no_sp_pad || item.noBtt));
-        setTableData(filtered);
+    // 3. Scan Barcode BTT Langsung (opr_t_sp_pad_a_BTT.asp)
+    const handleScanMuat = (e) => {
+        if (e) e.preventDefault();
+        const rawScan = inputBarcode.trim().toUpperCase();
+        if (!rawScan) {
+            Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title: 'Ketik atau scan nomor BTT terlebih dahulu!', showConfirmButton: false, timer: 1600 });
+            return;
+        }
+        const cleanBTT = rawScan.slice(0, 16);
+
+        if (draftBTTList.some(item => item.btt_id === cleanBTT)) {
+            Swal.fire('Duplikasi BTT', `Resi ${cleanBTT} sudah ada dalam daftar muatan SP PAD!`, 'warning');
+            setInputBarcode('');
+            return;
+        }
+
+        setDraftBTTList(prev => [
+            ...prev,
+            {
+                no: prev.length + 1,
+                btt_id: cleanBTT,
+                no_sj: '-',
+                tgl_btt: new Date().toLocaleDateString('id-ID'),
+                pengirim: '-',
+                penerima: '-',
+                kota: '-',
+                service_nama: 'DARAT',
+                koli: 1,
+                berat: 0,
+                sumber: 'SCAN MANUAL'
+            }
+        ]);
+        setInputBarcode('');
     };
 
-    // 💾 Simpan SP PAD Final
+    // 4. Simpan & Terbitkan SP PAD Final (p-opr_t_sp_pad_loading_f.asp)
     const handleSaveSPPAD = async () => {
-        if (!configPAD.vendorEkspedisi || !configPAD.noResiVendor) {
-            Swal.fire('PERINGATAN', 'Pilih Vendor Ekspedisi dan No. Resi Luar terlebih dahulu!', 'warning');
+        if (!configPAD.vendorEkspedisi) {
+            Swal.fire('PERINGATAN', 'Pilih atau ketik Vendor Ekspedisi Lain terlebih dahulu!', 'warning');
+            return;
+        }
+        if (draftBTTList.length === 0) {
+            Swal.fire('PERINGATAN', 'Daftar BTT masih kosong! Tarik dari Loading atau scan barcode BTT terlebih dahulu.', 'warning');
             return;
         }
 
@@ -156,7 +250,9 @@ const SuratPengantarPAD = () => {
                 spp_expedisilain: configPAD.vendorEkspedisi,
                 spp_noresi_vendor: configPAD.noResiVendor,
                 spp_sopir: configPAD.driverVendor,
-                daftar_btt: tableData.map(i => i.noBtt).filter(Boolean)
+                spp_surattugas: configPAD.noSuratTugas,
+                spp_loadhid: configPAD.loadHID,
+                daftar_btt: draftBTTList.map(i => i.btt_id)
             };
 
             const res = await api.post('/operasional/sp-pad', payload, {
@@ -165,6 +261,8 @@ const SuratPengantarPAD = () => {
 
             if (res.data?.status === 'success') {
                 Swal.fire('BERHASIL', `Surat Pengantar PAD ${res.data.no_sp || ''} Berhasil Terbit!`, 'success');
+                setDraftBTTList([]);
+                setConfigPAD({ vendorEkspedisi: '', noResiVendor: '', driverVendor: '', noSuratTugas: '', loadHID: '' });
                 fetchHistorySPPAD();
             }
         } catch (err) {
@@ -174,17 +272,231 @@ const SuratPengantarPAD = () => {
         }
     };
 
-    // 📌 Definisi Kolom DataTableTemplate
+    // 5. Buka Modal Edit SP PAD Existing (opr_t_sp_pad_e.asp)
+    const handleOpenEditSPPAD = async (item) => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await api.get('/operasional/sp-pad/detail', {
+                params: { sp_id: item.no_sp_pad },
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setEditHeader(res.data?.header || {});
+            setEditItems(res.data?.items || []);
+            setSelectedRemoveBtts([]);
+            setEditScanBtt('');
+            setIsEditModalOpen(true);
+        } catch (err) {
+            Swal.fire('Gagal', 'Tidak dapat memuat detail SP PAD', 'error');
+        }
+    };
+
+    const handleScanAddToSPPAD = async (e) => {
+        e.preventDefault();
+        if (!editScanBtt.trim() || !editHeader) return;
+        try {
+            const token = localStorage.getItem('token');
+            const res = await api.put('/operasional/sp-pad/update', {
+                no_sp_pad: editHeader.no_sp_pad,
+                add_btt: editScanBtt.trim()
+            }, { headers: { Authorization: `Bearer ${token}` } });
+
+            Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: res.data?.message, showConfirmButton: false, timer: 1800 });
+            setEditScanBtt('');
+            handleOpenEditSPPAD({ no_sp_pad: editHeader.no_sp_pad });
+            fetchHistorySPPAD();
+        } catch (err) {
+            Swal.fire('Peringatan', err.response?.data?.message || 'Gagal menambah BTT', 'warning');
+        }
+    };
+
+    const handleSaveEditSPPAD = async (e) => {
+        e.preventDefault();
+        try {
+            const token = localStorage.getItem('token');
+            await api.put('/operasional/sp-pad/update', {
+                no_sp_pad: editHeader.no_sp_pad,
+                expedisi_lain: editHeader.expedisi_lain,
+                surat_tugas: editHeader.surat_tugas,
+                remove_btts: selectedRemoveBtts
+            }, { headers: { Authorization: `Bearer ${token}` } });
+
+            Swal.fire('Tersimpan!', 'Perubahan SP PAD berhasil disimpan.', 'success');
+            setIsEditModalOpen(false);
+            fetchHistorySPPAD();
+        } catch (err) {
+            Swal.fire('Gagal', err.response?.data?.message || 'Gagal menyimpan perubahan SP PAD', 'error');
+        }
+    };
+
+    // 6. Non-Aktifkan SP PAD (p-opr_t_sp_pad_h.asp)
+    const handleDeleteRow = (item) => {
+        Swal.fire({
+            title: 'Non-Aktifkan SP PAD?',
+            text: `Dokumen ${item.no_sp_pad} akan dinonaktifkan.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#e11d48',
+            confirmButtonText: 'Ya, Non-Aktifkan!'
+        }).then(async (res) => {
+            if (res.isConfirmed) {
+                try {
+                    const token = localStorage.getItem('token');
+                    await api.delete('/operasional/sp-pad/delete', {
+                        params: { sp_id: item.no_sp_pad },
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    Swal.fire('Berhasil', 'SP PAD dinonaktifkan.', 'success');
+                    fetchHistorySPPAD();
+                } catch (err) {
+                    Swal.fire('Gagal', err.response?.data?.message || 'Gagal menghapus SP PAD', 'error');
+                }
+            }
+        });
+    };
+
+    // 7. Cetak Dokumen SP PAD (opr_t_sp_pad_print.asp)
+    const handlePrintSPPAD = async (item) => {
+        const targetNoSP = String(item?.no_sp_pad || '').trim();
+        if (!targetNoSP) return;
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await api.get('/operasional/sp-pad/detail', {
+                params: { sp_id: targetNoSP },
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const hdr = res.data?.header || {};
+            const items = Array.isArray(res.data?.items) ? res.data.items : [];
+
+            const totKoli = items.reduce((a, b) => a + Number(b.koli || 0), 0);
+            const totBeratAsli = items.reduce((a, b) => a + Number(b.berat_asli || 0), 0);
+            const totBeratVol = items.reduce((a, b) => a + Number(b.berat_vol || 0), 0);
+            const totHarga = items.reduce((a, b) => a + Number(b.harga_kirim || 0), 0);
+
+            const win = window.open('', '_blank', 'width=1050,height=780');
+            if (!win) {
+                Swal.fire('Pop-up Diblokir', 'Izinkan pop-up browser untuk mencetak SP PAD.', 'warning');
+                return;
+            }
+
+            win.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Surat Pengantar PAD - ${targetNoSP}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; font-size: 11px; color: #000; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+                        th, td { border: 1px solid #333; padding: 5px 6px; }
+                        th { background: #004b84; color: #fff; font-size: 10px; text-transform: uppercase; }
+                        tfoot td { font-weight: bold; background: #f1f5f9; }
+                    </style>
+                </head>
+                <body onload="window.print()">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #000; padding-bottom:10px;">
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <img src="${dliLogo}" alt="Logo DLI" style="height:46px; object-fit:contain;" />
+                            <div>
+                                <div style="font-size:14px; font-weight:bold;">PT. DAKOTA LOGISTIK INDONESIA</div>
+                                <div style="font-size:10px;">${hdr.asal_alamat || ''} - ${hdr.asal_kota || ''} (${hdr.asal_telp || ''})</div>
+                                <div style="font-size:13px; font-weight:bold; color:#004b84; margin-top:4px;">SURAT PENGANTAR PAD (EKSPEDISI LAIN)</div>
+                                <div>Nomor SP PAD: <b>${hdr.no_sp_pad || targetNoSP}</b></div>
+                            </div>
+                        </div>
+                        <div style="text-align:right; line-height:1.5;">
+                            <div>Asal / Dari: <b>${hdr.asal_agen || item.cabang_asal || '-'}</b></div>
+                            <div>Ekspedisi Lain: <b>${hdr.expedisi_lain || item.vendor_expedisi_lain || '-'}</b></div>
+                            <div>Tanggal SP: <b>${hdr.tanggal_sp || item.tanggal_sp || '-'}</b></div>
+                            <div>Pengemudi 1: <b>${hdr.sopir1 || '-'}</b> ${hdr.sopir2 ? `| Pengemudi 2: <b>${hdr.sopir2}</b>` : ''}</div>
+                            <div>No. Polisi: <b>${hdr.no_mobil || '-'}</b> | No. Surat Tugas: <b>${hdr.surat_tugas || '-'}</b></div>
+                        </div>
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th width="28">NO</th>
+                                <th>BTT</th>
+                                <th>SURAT JALAN (NO. OD)</th>
+                                <th>PENGIRIM</th>
+                                <th>PENERIMA</th>
+                                <th width="45">KOLI</th>
+                                <th width="65">BERAT ASLI</th>
+                                <th width="65">BERAT VOL</th>
+                                <th width="85">HARGA KIRIM</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${items.map((r, i) => `
+                                <tr>
+                                    <td align="center">${i + 1}.</td>
+                                    <td><b>${r.btt_id || '-'}</b></td>
+                                    <td>${r.no_sj || '-'}</td>
+                                    <td>${r.pengirim || '-'}</td>
+                                    <td>${r.penerima || '-'}</td>
+                                    <td align="right">${Number(r.koli || 0).toLocaleString('id-ID')}</td>
+                                    <td align="right">${Number(r.berat_asli || 0).toLocaleString('id-ID')}</td>
+                                    <td align="right">${Number(r.berat_vol || 0).toLocaleString('id-ID')}</td>
+                                    <td align="right">${Number(r.harga_kirim || 0).toLocaleString('id-ID')}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="5" align="right">TOTAL (${items.length} BTT) :</td>
+                                <td align="right">${totKoli.toLocaleString('id-ID')}</td>
+                                <td align="right">${totBeratAsli.toLocaleString('id-ID')}</td>
+                                <td align="right">${totBeratVol.toLocaleString('id-ID')}</td>
+                                <td align="right">${totHarga.toLocaleString('id-ID')}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                    <div style="font-style:italic; font-size:10px; margin-top:8px;">
+                        Melalui SURAT PENGANTAR PENGIRIMAN / MANIFEST ini, kami memberangkatkan barang sesuai dengan yang tertera pada daftar di atas dan benar adanya.
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; margin-top:30px; text-align:center;">
+                        <div style="width:30%;">
+                            <div>Pembuat SP-PAD,</div>
+                            <div style="margin-top:48px;">( ${hdr.update_id || '___________________'} )</div>
+                        </div>
+                        <div style="width:30%;">
+                            <div>Supir / Pengemudi,</div>
+                            <div style="margin-top:48px;">( ${hdr.sopir1 || '___________________'} )</div>
+                        </div>
+                        <div style="width:30%;">
+                            <div>Diterima dengan baik oleh,</div>
+                            <div style="margin-top:48px;">( ___________________ )</div>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `);
+            win.document.close();
+        } catch (err) {
+            Swal.fire('Gagal', err.response?.data?.message || 'Gagal menyiapkan cetakan SP PAD', 'error');
+        }
+    };
+
     const columns = [
         {
             header: 'NO. SP PAD',
             accessor: 'no_sp_pad',
-            render: (i) => <span className="font-mono font-black text-indigo-700">📜 {i.no_sp_pad || i.noBtt || '-'}</span>
+            render: (i) => (
+                <button
+                    type="button"
+                    onClick={() => handleOpenEditSPPAD(i)}
+                    className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-mono font-bold text-xs rounded-lg cursor-pointer transition"
+                >
+                    {i.no_sp_pad || '-'}
+                </button>
+            )
         },
         {
             header: 'TANGGAL SP',
             accessor: 'tanggal_sp',
-            render: (i) => <span className="font-bold text-slate-800">{i.tanggal_sp || i.waktuMuat || '-'}</span>
+            render: (i) => <span className="font-mono text-xs font-bold text-slate-700">{i.tanggal_sp || '-'}</span>
         },
         {
             header: 'CABANG ASAL',
@@ -194,20 +506,43 @@ const SuratPengantarPAD = () => {
         {
             header: 'VENDOR / EKSPEDISI LAIN',
             accessor: 'vendor_expedisi_lain',
-            render: (i) => <span className="font-black text-emerald-800 uppercase bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">{i.vendor_expedisi_lain || i.vendor || '-'}</span>
+            render: (i) => <span className="font-black text-emerald-800 uppercase bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">{i.vendor_expedisi_lain || '-'}</span>
+        },
+        {
+            header: 'BTT',
+            accessor: 'jumlah_btt',
+            render: (i) => <span className="font-mono font-bold text-indigo-700">{i.jumlah_btt ?? 0}</span>
         },
         {
             header: 'STATUS',
             accessor: 'status_aktif',
             render: (i) => (
-                <span className={`px-2.5 py-1 rounded-full font-black text-[10px] uppercase border ${i.status_aktif === 'Aktif' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-amber-100 text-amber-800 border-amber-200'}`}>
-                    {i.status_aktif || i.status || 'Aktif'}
+                <span className={`px-2.5 py-1 rounded-full font-black text-[10px] uppercase border ${i.status_aktif === 'Aktif' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-rose-100 text-rose-800 border-rose-200'}`}>
+                    {i.status_aktif || 'Aktif'}
                 </span>
+            )
+        },
+        {
+            header: 'ACTION',
+            accessor: 'action',
+            render: (item) => (
+                <div className="flex items-center justify-center gap-1.5">
+                    <button type="button" onClick={() => handleOpenEditSPPAD(item)} title="Edit / Scan BTT SP PAD" className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg cursor-pointer">
+                        <Edit3 size={15} />
+                    </button>
+                    <button type="button" onClick={() => handlePrintSPPAD(item)} title="Cetak Surat Pengantar PAD" className="p-1.5 text-sky-600 hover:bg-sky-50 rounded-lg cursor-pointer">
+                        <Printer size={15} />
+                    </button>
+                    {item.status_aktif === 'Aktif' && (
+                        <button type="button" onClick={() => handleDeleteRow(item)} title="Non-Aktifkan SP PAD" className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg cursor-pointer">
+                            <Trash2 size={15} />
+                        </button>
+                    )}
+                </div>
             )
         }
     ];
 
-    // Filter Search Global di Table
     const filteredTableData = tableData.filter(item => {
         if (!globalSearch.trim()) return true;
         const q = globalSearch.toLowerCase();
@@ -249,19 +584,22 @@ const SuratPengantarPAD = () => {
                         <input type="date" value={filterData.sampaiTanggal} onChange={e => setFilterData({ ...filterData, sampaiTanggal: e.target.value })} className="w-full mt-1 p-2 border rounded-lg bg-transparent text-xs" />
                     </div>
                     <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase">NO. SP NAIK</label>
-                        <input type="text" placeholder="Cari No SP..." value={filterData.noSP} onChange={e => setFilterData({ ...filterData, noSP: e.target.value })} className="w-full mt-1 p-2 border rounded-lg bg-transparent text-xs uppercase" />
+                        <label className="text-[10px] font-bold text-slate-400 uppercase">NO. SP PAD</label>
+                        <input type="text" placeholder="Cari No SP..." value={filterData.noSP} onChange={e => setFilterData({ ...filterData, noSP: e.target.value.toUpperCase() })} onKeyDown={e => e.key === 'Enter' && fetchHistorySPPAD(e)} className="w-full mt-1 p-2 border rounded-lg bg-transparent text-xs uppercase font-mono" />
                     </div>
                     <div>
                         <label className="text-[10px] font-bold text-slate-400 uppercase">NO. BTT / RESI</label>
-                        <input type="text" placeholder="Cari No BTT..." value={filterData.noBTT} onChange={e => setFilterData({ ...filterData, noBTT: e.target.value })} className="w-full mt-1 p-2 border rounded-lg bg-transparent text-xs uppercase" />
+                        <input type="text" placeholder="Cari No BTT..." value={filterData.noBTT} onChange={e => setFilterData({ ...filterData, noBTT: e.target.value.toUpperCase() })} onKeyDown={e => e.key === 'Enter' && fetchHistorySPPAD(e)} className="w-full mt-1 p-2 border rounded-lg bg-transparent text-xs uppercase font-mono" />
                     </div>
                     <div>
                         <label className="text-[10px] font-bold text-slate-400 uppercase">EKSPEDISI LAIN</label>
-                        <input type="text" placeholder="Cari Vendor..." value={filterData.ekspedisiLain} onChange={e => setFilterData({ ...filterData, ekspedisiLain: e.target.value })} className="w-full mt-1 p-2 border rounded-lg bg-transparent text-xs uppercase" />
+                        <input type="text" placeholder="Cari Vendor..." value={filterData.ekspedisiLain} onChange={e => setFilterData({ ...filterData, ekspedisiLain: e.target.value.toUpperCase() })} onKeyDown={e => e.key === 'Enter' && fetchHistorySPPAD(e)} className="w-full mt-1 p-2 border rounded-lg bg-transparent text-xs uppercase" />
                     </div>
                 </div>
-                <div className="flex justify-end">
+                <div className="flex flex-wrap justify-between items-center gap-2">
+                    <button type="button" onClick={handleLoadFromLoadingPAD} className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-xs cursor-pointer">
+                        <PackageCheck size={15} /> TAMBAH SP PAD DARI PROSES LOADING
+                    </button>
                     <button type="button" onClick={fetchHistorySPPAD} className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow-xs cursor-pointer">
                         🚀 JALANKAN FILTER DATA
                     </button>
@@ -270,9 +608,16 @@ const SuratPengantarPAD = () => {
 
             {/* 🚚 PANEL 2: KONFIGURASI PEMBERANGKATAN TRANSAKSI VENDOR (SP PAD) */}
             <div className={`p-5 rounded-2xl border shadow-xs space-y-4 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-slate-200'}`}>
-                <div className="flex items-center gap-2 text-indigo-600 font-black tracking-wider border-b border-slate-100 pb-2 text-xs">
-                    <Truck size={16} />
-                    <span>KONFIGURASI PEMBERANGKATAN VIA VENDOR REKANAN (PAD)</span>
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <div className="flex items-center gap-2 text-indigo-600 font-black tracking-wider text-xs">
+                        <Truck size={16} />
+                        <span>KONFIGURASI PEMBERANGKATAN VIA VENDOR REKANAN (PAD)</span>
+                    </div>
+                    {configPAD.loadHID && (
+                        <span className="px-2.5 py-0.5 bg-sky-100 text-sky-800 rounded-full text-[10px] font-mono font-bold">
+                            Loading: {configPAD.loadHID} {configPAD.noSuratTugas ? `| ST: ${configPAD.noSuratTugas}` : ''}
+                        </span>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white p-4 border border-slate-300 rounded-xl text-xs">
@@ -287,33 +632,30 @@ const SuratPengantarPAD = () => {
                     </div>
 
                     <div>
-                        <label className="text-[10px] font-bold text-slate-600 uppercase">PILIH VENDOR EKSPEDISI *</label>
-                        <select
+                        <label className="text-[10px] font-bold text-slate-600 uppercase">PILIH / KETIK VENDOR EKSPEDISI *</label>
+                        <input
+                            type="text"
+                            list="list-vendor-pad"
+                            placeholder="PILIH ATAU KETIK EKSPEDISI LAIN..."
                             value={configPAD.vendorEkspedisi}
-                            onChange={e => setConfigPAD({ ...configPAD, vendorEkspedisi: e.target.value })}
-                            className="w-full mt-1 p-2.5 border border-slate-300 rounded-lg bg-white font-black text-slate-900 outline-none focus:border-indigo-600 cursor-pointer"
-                        >
-                            <option value="" className="text-slate-500 font-normal">-- PILIH EKSPEDISI LAIN --</option>
+                            onChange={e => setConfigPAD({ ...configPAD, vendorEkspedisi: e.target.value.toUpperCase() })}
+                            className="w-full mt-1 p-2.5 border border-slate-300 rounded-lg bg-white font-black text-slate-900 uppercase outline-none focus:border-indigo-600"
+                        />
+                        <datalist id="list-vendor-pad">
                             {vendors && vendors.map((v, idx) => {
-                                // Extrak string nama vendor dari field DB 'vend_name'
                                 const vendorName = (typeof v === 'object' && v !== null)
-                                    ? (v.vend_name || v.vendor_nama || v.nama || v.id || `VENDOR #${idx + 1}`)
+                                    ? (v.vend_name || v.vendor_nama || v.nama || v.id || '')
                                     : String(v);
-
-                                return (
-                                    <option key={idx} value={vendorName} className="text-slate-900 font-bold">
-                                        {vendorName}
-                                    </option>
-                                );
+                                return <option key={idx} value={vendorName.toUpperCase()} />;
                             })}
-                        </select>
+                        </datalist>
                     </div>
 
                     <div>
-                        <label className="text-[10px] font-bold text-slate-600 uppercase">NO RESI / MANIFEST LUAR *</label>
+                        <label className="text-[10px] font-bold text-slate-600 uppercase">NO RESI / MANIFEST LUAR</label>
                         <input
                             type="text"
-                            placeholder="MASUKKAN RESI VENDOR LUAR..."
+                            placeholder="OPSIONAL RESI VENDOR LUAR..."
                             value={configPAD.noResiVendor}
                             onChange={e => setConfigPAD({ ...configPAD, noResiVendor: e.target.value.toUpperCase() })}
                             className="w-full mt-1 p-2.5 border border-slate-300 rounded-lg bg-white font-black text-slate-900 uppercase placeholder-slate-400 outline-none focus:border-indigo-600"
@@ -324,7 +666,7 @@ const SuratPengantarPAD = () => {
                         <label className="text-[10px] font-bold text-slate-600 uppercase">NAMA SOPIR / KONTAK VENDOR</label>
                         <input
                             type="text"
-                            placeholder="MASUKKAN NAMA KONTAK VENDOR..."
+                            placeholder="NAMA SOPIR / KONTAK..."
                             value={configPAD.driverVendor}
                             onChange={e => setConfigPAD({ ...configPAD, driverVendor: e.target.value.toUpperCase() })}
                             className="w-full mt-1 p-2.5 border border-slate-300 rounded-lg bg-white font-black text-slate-900 uppercase placeholder-slate-400 outline-none focus:border-indigo-600"
@@ -350,9 +692,62 @@ const SuratPengantarPAD = () => {
                         </button>
                     </div>
                 </form>
+
+                {/* TABEL DRAFT MUATAN BTT SEBELUM TERBIT SP PAD */}
+                {draftBTTList.length > 0 && (
+                    <div className="mt-4 border border-indigo-200 rounded-2xl overflow-hidden bg-indigo-50/30">
+                        <div className="px-4 py-2.5 bg-indigo-900 text-white flex justify-between items-center text-xs font-bold">
+                            <span>DAFTAR DRAFT MUATAN SP PAD ({draftBTTList.length} BTT SIAP PROSES)</span>
+                            <div className="flex gap-2">
+                                <button type="button" onClick={() => setDraftBTTList([])} className="px-3 py-1 bg-rose-600 hover:bg-rose-700 rounded-lg text-[11px] uppercase cursor-pointer">
+                                    RESET DRAFT
+                                </button>
+                                <button type="button" onClick={handleSaveSPPAD} className="px-4 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-[11px] uppercase flex items-center gap-1 cursor-pointer">
+                                    <Save size={13} /> PROSES & TERBITKAN SP PAD
+                                </button>
+                            </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse text-[11px]">
+                                <thead className="bg-slate-100 text-slate-700">
+                                    <tr>
+                                        <th className="p-2">NO</th>
+                                        <th className="p-2">NO. BTT</th>
+                                        <th className="p-2">SURAT JALAN</th>
+                                        <th className="p-2">PENGIRIM</th>
+                                        <th className="p-2">PENERIMA</th>
+                                        <th className="p-2">KOTA</th>
+                                        <th className="p-2 text-right">KOLI</th>
+                                        <th className="p-2 text-right">BERAT</th>
+                                        <th className="p-2 text-center">HAPUS</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-200 bg-white">
+                                    {draftBTTList.map((row, idx) => (
+                                        <tr key={idx}>
+                                            <td className="p-2 font-mono">{idx + 1}</td>
+                                            <td className="p-2 font-mono font-bold text-indigo-700">{row.btt_id}</td>
+                                            <td className="p-2">{row.no_sj}</td>
+                                            <td className="p-2">{row.pengirim}</td>
+                                            <td className="p-2">{row.penerima}</td>
+                                            <td className="p-2">{row.kota}</td>
+                                            <td className="p-2 text-right font-mono">{row.koli}</td>
+                                            <td className="p-2 text-right font-mono">{row.berat}</td>
+                                            <td className="p-2 text-center">
+                                                <button type="button" onClick={() => setDraftBTTList(draftBTTList.filter((_, i) => i !== idx))} className="text-rose-500 hover:text-rose-700 cursor-pointer">
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
             </div>
 
-            {/* 📊 PANEL 3: DATATABLE TEMPLATE KONSISTEN */}
+            {/* 📊 PANEL 3: DATATABLE HISTORI SP PAD */}
             <DataTableTemplate
                 title={`DATALIST SURAT PENGANTAR PAD (${filteredTableData.length} ITEMS)`}
                 columns={columns}
@@ -362,9 +757,110 @@ const SuratPengantarPAD = () => {
                 searchValue={globalSearch}
                 onSearchChange={(e) => setGlobalSearch(e.target.value)}
                 onAdd={handleSaveSPPAD}
-                onDelete={handleDeleteRow}
             />
 
+            {/* MODAL EDIT & SCAN BTT SP PAD (opr_t_sp_pad_e.asp) */}
+            {isEditModalOpen && editHeader && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+                    <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden max-h-[92vh] flex flex-col">
+                        <div className="px-6 py-4 bg-indigo-900 text-white flex justify-between items-center">
+                            <h3 className="font-black text-sm uppercase">
+                                EDIT SURAT PENGANTAR PAD : <span className="font-mono text-amber-300">{editHeader.no_sp_pad}</span>
+                            </h3>
+                            <button onClick={() => setIsEditModalOpen(false)} className="p-1 hover:bg-white/10 rounded-full cursor-pointer">
+                                <XIcon size={20} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSaveEditSPPAD} className="p-6 space-y-4 text-xs font-bold text-slate-700 overflow-y-auto">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block mb-1 text-slate-500">NO. SP PAD</label>
+                                    <input type="text" readOnly value={editHeader.no_sp_pad} className="w-full p-2.5 bg-slate-100 border rounded-xl font-mono" />
+                                </div>
+                                <div>
+                                    <label className="block mb-1 text-slate-600">EKSPEDISI LAIN / VENDOR</label>
+                                    <input type="text" value={editHeader.expedisi_lain} onChange={e => setEditHeader({ ...editHeader, expedisi_lain: e.target.value.toUpperCase() })} className="w-full p-2.5 border rounded-xl uppercase" />
+                                </div>
+                                <div>
+                                    <label className="block mb-1 text-slate-600">NO. SURAT TUGAS</label>
+                                    <input type="text" value={editHeader.surat_tugas} onChange={e => setEditHeader({ ...editHeader, surat_tugas: e.target.value.toUpperCase() })} className="w-full p-2.5 border rounded-xl font-mono uppercase" />
+                                </div>
+                            </div>
+
+                            <div className="p-3 bg-indigo-50/70 border border-indigo-200 rounded-xl flex gap-2 items-center">
+                                <ScanBarcode size={20} className="text-indigo-700" />
+                                <input
+                                    type="text"
+                                    placeholder="Scan Barcode BTT untuk ditambahkan ke SP PAD ini..."
+                                    value={editScanBtt}
+                                    onChange={e => setEditScanBtt(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && handleScanAddToSPPAD(e)}
+                                    className="flex-1 p-2 bg-white border border-indigo-300 rounded-lg font-mono uppercase"
+                                />
+                                <button type="button" onClick={handleScanAddToSPPAD} className="px-4 py-2 bg-indigo-700 text-white rounded-lg uppercase cursor-pointer">
+                                    SCAN TAMBAH
+                                </button>
+                            </div>
+
+                            <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                                <table className="w-full text-left border-collapse text-[11px]">
+                                    <thead className="bg-slate-800 text-white">
+                                        <tr>
+                                            <th className="p-2">NO</th>
+                                            <th className="p-2">NO. BTT</th>
+                                            <th className="p-2">SURAT JALAN</th>
+                                            <th className="p-2">PENGIRIM</th>
+                                            <th className="p-2">PENERIMA</th>
+                                            <th className="p-2 text-right">KOLI</th>
+                                            <th className="p-2 text-right">BERAT</th>
+                                            <th className="p-2 text-center">HAPUS</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {editItems.map((b, idx) => (
+                                            <tr key={idx}>
+                                                <td className="p-2 font-mono">{idx + 1}</td>
+                                                <td className="p-2 font-mono font-bold text-indigo-700">{b.btt_id}</td>
+                                                <td className="p-2">{b.no_sj}</td>
+                                                <td className="p-2">{b.pengirim}</td>
+                                                <td className="p-2">{b.penerima}</td>
+                                                <td className="p-2 text-right font-mono">{b.koli}</td>
+                                                <td className="p-2 text-right font-mono">{b.berat_asli}</td>
+                                                <td className="p-2 text-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedRemoveBtts.includes(b.btt_id)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) setSelectedRemoveBtts([...selectedRemoveBtts, b.btt_id]);
+                                                            else setSelectedRemoveBtts(selectedRemoveBtts.filter(id => id !== b.btt_id));
+                                                        }}
+                                                    />
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div className="flex justify-between items-center pt-4 border-t border-slate-100">
+                                <span className="text-slate-600">Total BTT Terdaftar: <b>{editItems.length}</b></span>
+                                <div className="flex gap-2">
+                                    <button type="button" onClick={() => handlePrintSPPAD(editHeader)} className="px-4 py-2.5 bg-sky-600 text-white rounded-xl uppercase cursor-pointer">
+                                        CETAK SP PAD
+                                    </button>
+                                    <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-5 py-2.5 border border-slate-300 rounded-xl uppercase cursor-pointer">
+                                        KELUAR
+                                    </button>
+                                    <button type="submit" className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl uppercase cursor-pointer">
+                                        SIMPAN PERUBAHAN
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
