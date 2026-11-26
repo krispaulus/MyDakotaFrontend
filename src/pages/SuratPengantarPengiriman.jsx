@@ -385,66 +385,119 @@ const SuratPengantarPengiriman = () => {
 
     // 7. Cetak Dokumen SP Individual (opr_t_sp_terima_print.asp)
     const handlePrintSingleSP = async (item) => {
+        const targetNoSP = String(item?.no_sp || item?.spt_eid || '').trim();
+        if (!targetNoSP) {
+            Swal.fire('Gagal', 'Nomor SP tidak ditemukan', 'error');
+            return;
+        }
+
         try {
             const token = localStorage.getItem('token');
-            const res = await api.get(`/operasional/sp-print/${encodeURIComponent(item.no_sp)}`, {
+            const res = await api.get('/operasional/sp-terima/detail', {
+                params: { sp_id: targetNoSP },
                 headers: { Authorization: `Bearer ${token}` }
             });
             const hdr = res.data?.header || {};
-            const items = res.data?.items || [];
+            const items = Array.isArray(res.data?.details) ? res.data.details : [];
 
-            const win = window.open('', '_blank', 'width=1000,height=750');
-            if (!win) return;
+            const totalKoli = items.reduce((acc, r) => acc + Number(r.jumlah || 0), 0);
+            const totalBerat = items.reduce((acc, r) => acc + Number(r.berat || 0), 0);
+            const totalCod = items.reduce((acc, r) => acc + Number(r.cod || 0), 0);
+
+            const win = window.open('', '_blank', 'width=1050,height=780');
+            if (!win) {
+                Swal.fire('Pop-up Diblokir', 'Izinkan pop-up browser untuk mencetak dokumen SP.', 'warning');
+                return;
+            }
+
             win.document.write(`
                 <!DOCTYPE html>
                 <html>
                 <head>
-                    <title>Surat Pengantar Pengiriman - ${item.no_sp}</title>
+                    <title>Surat Pengantar Pengiriman - ${targetNoSP}</title>
                     <style>
                         body { font-family: Arial, sans-serif; padding: 20px; font-size: 11px; color: #000; }
                         table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-                        th, td { border: 1px solid #444; padding: 5px 6px; }
-                        th { background: #004b84; color: #fff; }
+                        th, td { border: 1px solid #333; padding: 5px 6px; }
+                        th { background: #004b84; color: #fff; font-size: 10px; }
+                        tfoot td { font-weight: bold; background: #f1f5f9; }
                     </style>
                 </head>
                 <body onload="window.print()">
-                    <div style="display:flex; justify-content:space-between; border-bottom:2px solid #000; padding-bottom:8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #000; padding-bottom:10px;">
                         <div>
-                            <strong style="font-size:14px;">SURAT PENGANTAR PENGIRIMAN (SP)</strong><br/>
-                            <span>No. SP: <b>${hdr.spt_eid || item.no_sp}</b> | Tgl: ${hdr.tanggal_sp || item.tanggal}</span>
+                            <div style="font-size:15px; font-weight:bold;">PT. DAKOTA LOGISTIK INDONESIA</div>
+                            <div style="font-size:13px; font-weight:bold; margin-top:2px;">SURAT PENGANTAR PENGIRIMAN (SP)</div>
+                            <div style="margin-top:4px;">No. SP: <b>${hdr.no_sp || targetNoSP}</b> | Tanggal: <b>${hdr.tanggal || item.tanggal || '-'}</b></div>
                         </div>
-                        <div style="text-align:right;">
-                            <div>Asal: <b>${hdr.asal_agen || item.asal}</b> &rarr; Tujuan: <b>${hdr.tujuan_agen || item.tujuan}</b></div>
-                            <div>Armada: <b>${hdr.no_mobil || item.no_mobil}</b> | Sopir: <b>${hdr.sopir_nama || item.sopir}</b></div>
+                        <div style="text-align:right; line-height:1.5;">
+                            <div>Asal: <b>${hdr.asal_nama || item.asal || '-'}</b> &rarr; Tujuan: <b>${hdr.tujuan_nama || item.tujuan || '-'}</b> ${hdr.transit_yn === 'Y' ? '(TRANSIT)' : ''}</div>
+                            <div>No. Kendaraan: <b>${hdr.no_mobil || item.no_mobil || '-'}</b> | No. ST: <b>${hdr.surat_tugas || '-'}</b></div>
+                            <div>Sopir / Pengemudi: <b>${hdr.nama_sopir || item.sopir || '-'}</b></div>
                         </div>
                     </div>
+
                     <table>
                         <thead>
                             <tr>
-                                <th>No</th><th>No. BTT</th><th>Pengirim</th><th>Penerima</th><th>Kota</th><th>Koli</th><th>Berat</th><th>COD</th>
+                                <th width="30">NO</th>
+                                <th>NO. BTT</th>
+                                <th>NO. SJ CUSTOMER</th>
+                                <th>TGL BTT</th>
+                                <th>PENGIRIM</th>
+                                <th>PENERIMA</th>
+                                <th>KOTA TUJUAN</th>
+                                <th>JML KOLI</th>
+                                <th>BERAT (KG)</th>
+                                <th>COD (RP)</th>
                             </tr>
                         </thead>
                         <tbody>
                             ${items.map((r, i) => `
                                 <tr>
                                     <td align="center">${i + 1}</td>
-                                    <td><b>${r.btt_id}</b></td>
-                                    <td>${r.nama_pengirim}</td>
-                                    <td>${r.nama_penerima}</td>
-                                    <td>${r.kota_penerima}</td>
-                                    <td align="right">${r.koli}</td>
-                                    <td align="right">${r.berat_tertinggi}</td>
-                                    <td align="right">${Number(r.nilai_cod || 0).toLocaleString('id-ID')}</td>
+                                    <td><b>${r.btt_id || '-'}</b></td>
+                                    <td>${r.no_sj || '-'}</td>
+                                    <td align="center">${r.tgl_btt || '-'}</td>
+                                    <td>${r.pengirim || '-'}</td>
+                                    <td>${r.penerima || '-'}</td>
+                                    <td>${r.kota || '-'}</td>
+                                    <td align="right">${Number(r.jumlah || 0).toLocaleString('id-ID')}</td>
+                                    <td align="right">${Number(r.berat || 0).toLocaleString('id-ID')}</td>
+                                    <td align="right">${Number(r.cod || 0) > 0 ? Number(r.cod).toLocaleString('id-ID') : '-'}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="7" align="right">TOTAL (${items.length} BTT)</td>
+                                <td align="right">${totalKoli.toLocaleString('id-ID')}</td>
+                                <td align="right">${totalBerat.toLocaleString('id-ID')}</td>
+                                <td align="right">${totalCod > 0 ? totalCod.toLocaleString('id-ID') : '-'}</td>
+                            </tr>
+                        </tfoot>
                     </table>
+
+                    <div style="display:flex; justify-content:space-between; margin-top:32px; text-align:center;">
+                        <div style="width:30%;">
+                            <div>Petugas / Pembuat SP,</div>
+                            <div style="margin-top:50px;">( ______________________ )</div>
+                        </div>
+                        <div style="width:30%;">
+                            <div>Sopir / Pengemudi,</div>
+                            <div style="margin-top:50px;">( ${hdr.nama_sopir || item.sopir || '______________________'} )</div>
+                        </div>
+                        <div style="width:30%;">
+                            <div>Penerima Cabang Tujuan,</div>
+                            <div style="margin-top:50px;">( ______________________ )</div>
+                        </div>
+                    </div>
                 </body>
                 </html>
             `);
             win.document.close();
         } catch (err) {
-            Swal.fire('Gagal', 'Gagal menyiapkan cetakan SP', 'error');
+            Swal.fire('Gagal', err.response?.data?.message || 'Gagal menyiapkan cetakan SP', 'error');
         }
     };
 
