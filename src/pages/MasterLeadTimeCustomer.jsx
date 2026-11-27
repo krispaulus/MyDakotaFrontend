@@ -16,13 +16,17 @@ const MasterLeadTimeCustomer = () => {
     const [filterKotaAsal, setFilterKotaAsal] = useState('');
     const [filterKotaTujuan, setFilterKotaTujuan] = useState('');
 
-    // 🟢 Local Search State untuk Input di Tabel
+    // Local Search State untuk Input di Tabel
     const [globalSearch, setGlobalSearch] = useState('');
 
     // State Modal CRUD
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
+
+    // State Suggest Geografi (Menggunakan endpoint BTT /btt/search-geo)
+    const [geoSuggestions, setGeoSuggestions] = useState([]);
+    const [focusedField, setFocusedField] = useState(null); // 'kabupaten' | 'kota_asal' | 'kota_tujuan'
 
     const [formData, setFormData] = useState({
         customer_id: '',
@@ -44,7 +48,6 @@ const MasterLeadTimeCustomer = () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-
             const params = {};
             if (filterCustomer && filterCustomer.trim() !== '') params.customer_id = filterCustomer.trim();
             if (filterKotaAsal && filterKotaAsal.trim() !== '') params.kota_asal = filterKotaAsal.trim();
@@ -87,7 +90,44 @@ const MasterLeadTimeCustomer = () => {
         fetchLeadTime();
     }, []);
 
-    // 🟢 FILTER CLIENT-SIDE (Pencarian Instant dari Input Tabel)
+    // 🚀 FUNGSI LIVE SEARCH WILAYAH (MENGGUNAKAN ENDPOINT BTT)
+    const handleLiveSearchGeo = async (fieldName, value) => {
+        const upperVal = (value || '').toUpperCase();
+        setFormData(prev => ({ ...prev, [fieldName]: upperVal }));
+        setFocusedField(fieldName);
+
+        if (!upperVal || upperVal.trim().length < 2) {
+            setGeoSuggestions([]);
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await api.get(`/btt/search-geo?q=${encodeURIComponent(upperVal.trim())}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (res.data && res.data.status === "success") {
+                const rawList = Array.isArray(res.data.data) ? res.data.data : [];
+                // Hilangkan duplikat Kabupaten/Kota agar list rapi untuk master lead time
+                const uniqueMap = new Map();
+                rawList.forEach(item => {
+                    const key = `${item.kabupaten}-${item.propinsi}`;
+                    if (!uniqueMap.has(key) && item.kabupaten) {
+                        uniqueMap.set(key, item);
+                    }
+                });
+                setGeoSuggestions(Array.from(uniqueMap.values()));
+            } else {
+                setGeoSuggestions([]);
+            }
+        } catch (err) {
+            console.error("Gagal memuat suggest wilayah:", err);
+            setGeoSuggestions([]);
+        }
+    };
+
+    // FILTER CLIENT-SIDE (Pencarian Instant dari Input Tabel)
     const filteredData = dataList.filter(item => {
         if (!globalSearch.trim()) return true;
         const q = globalSearch.toLowerCase();
@@ -108,12 +148,18 @@ const MasterLeadTimeCustomer = () => {
         }
         try {
             const token = localStorage.getItem('token');
-            await api.post('/master/leadtime-customer/add', formData, {
+            // Sesuai logic ASP lawas: jika kabupaten kosong, samakan dengan kota_tujuan
+            const payload = {
+                ...formData,
+                kabupaten: formData.kabupaten.trim() || formData.kota_tujuan.trim()
+            };
+            await api.post('/master/leadtime-customer/add', payload, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             Swal.fire('Sukses', 'Data lead time baru berhasil disimpan', 'success');
             setIsAddModalOpen(false);
             setFormData({ customer_id: '', kota_asal: '', kota_tujuan: '', kabupaten: '', darat: 0, laut: 0, udara: 0 });
+            setGeoSuggestions([]);
             fetchLeadTime();
         } catch (err) {
             Swal.fire('Gagal', err.response?.data?.message || 'Gagal menambah data lead time baru', 'error');
@@ -222,6 +268,31 @@ const MasterLeadTimeCustomer = () => {
         },
     ];
 
+    // Komponen Dropdown Melayang ala BTT
+    const renderGeoDropdown = (onSelectCallback) => {
+        if (!Array.isArray(geoSuggestions) || geoSuggestions.length === 0) return null;
+        return (
+            <div className="absolute left-0 right-0 top-[62px] bg-white border-2 border-teal-400 text-slate-900 rounded-xl shadow-2xl z-[99999] max-h-48 overflow-y-auto text-xs text-left">
+                {geoSuggestions.map((item, idx) => (
+                    <div
+                        key={idx}
+                        onMouseDown={() => {
+                            onSelectCallback(item);
+                            setGeoSuggestions([]);
+                            setFocusedField(null);
+                        }}
+                        className="p-2.5 hover:bg-teal-50 cursor-pointer border-b last:border-b-0 font-bold text-slate-800 transition-colors"
+                    >
+                        📍 <span className="text-teal-700">{item.kabupaten}</span>
+                        <span className="block text-[10px] text-slate-400 font-normal pl-4">
+                            {item.propinsi} {item.kecamatan ? `(Kec. ${item.kecamatan})` : ''}
+                        </span>
+                    </div>
+                ))}
+            </div>
+        );
+    };
+
     return (
         <div className="min-h-screen p-4 space-y-4 bg-slate-50 text-slate-800">
             {/* Header Menu */}
@@ -233,7 +304,6 @@ const MasterLeadTimeCustomer = () => {
 
             {/* GRID FILTER PENCARIAN SERVER */}
             <div className="p-4 bg-white rounded-xl shadow-xs border border-slate-200 grid grid-cols-4 gap-4 items-end text-xs font-bold text-slate-600">
-                {/* 🟢 CUSTOMER SELECT FILTER */}
                 <div>
                     <label className="block mb-1 text-slate-500 uppercase">CUSTOMER</label>
                     <select
@@ -287,12 +357,16 @@ const MasterLeadTimeCustomer = () => {
                 isDarkMode={isDarkMode}
                 searchValue={globalSearch}
                 onSearchChange={(e) => setGlobalSearch(e.target.value)}
-                onAdd={() => setIsAddModalOpen(true)}
+                onAdd={() => {
+                    setGeoSuggestions([]);
+                    setFocusedField(null);
+                    setIsAddModalOpen(true);
+                }}
                 onEdit={handleEditTrigger}
                 onDelete={(item) => handleDeleteTrigger(item)}
             />
 
-            {/* MODAL TAMBAH */}
+            {/* MODAL TAMBAH DENGAN SUGGEST ALA BTT */}
             {isAddModalOpen && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto">
                     <div className="w-full max-w-3xl p-6 bg-white rounded-2xl shadow-2xl border flex flex-col my-8">
@@ -301,7 +375,7 @@ const MasterLeadTimeCustomer = () => {
                         </div>
                         <form onSubmit={handleAddSubmit} className="space-y-4 text-xs font-bold text-slate-700">
                             <div className="grid grid-cols-2 gap-3">
-                                {/* 🟢 CUSTOMER SELECT DI MODAL TAMBAH */}
+                                {/* CUSTOMER */}
                                 <div>
                                     <label className="block mb-1">CUSTOMER</label>
                                     <select
@@ -318,21 +392,74 @@ const MasterLeadTimeCustomer = () => {
                                         ))}
                                     </select>
                                 </div>
-                                <div>
+
+                                {/* KABUPATEN DENGAN SUGGEST */}
+                                <div className="relative">
                                     <label className="block mb-1">KABUPATEN</label>
-                                    <input type="text" className="w-full p-2 border rounded font-normal uppercase" placeholder="Contoh: KAB BEKASI" value={formData.kabupaten} onChange={e => setFormData({ ...formData, kabupaten: e.target.value.toUpperCase() })} />
+                                    <input
+                                        type="text"
+                                        className="w-full p-2 border rounded font-bold uppercase outline-none focus:border-teal-500"
+                                        placeholder="Ketik kabupaten... (Contoh: BOGOR)"
+                                        value={formData.kabupaten}
+                                        onChange={e => handleLiveSearchGeo('kabupaten', e.target.value)}
+                                        onFocus={() => setFocusedField('kabupaten')}
+                                        onBlur={() => setTimeout(() => setFocusedField(null), 200)}
+                                    />
+                                    {focusedField === 'kabupaten' && renderGeoDropdown((item) => {
+                                        const kab = (item.kabupaten || '').toUpperCase();
+                                        setFormData(prev => ({
+                                            ...prev,
+                                            kabupaten: kab,
+                                            kota_tujuan: prev.kota_tujuan || kab
+                                        }));
+                                    })}
                                 </div>
                             </div>
+
                             <div className="grid grid-cols-2 gap-3">
-                                <div>
+                                {/* KOTA ASAL DENGAN SUGGEST */}
+                                <div className="relative">
                                     <label className="block mb-1">KOTA ASAL</label>
-                                    <input type="text" required className="w-full p-2 border rounded font-normal uppercase" placeholder="Contoh: BEKASI" value={formData.kota_asal} onChange={e => setFormData({ ...formData, kota_asal: e.target.value.toUpperCase() })} />
+                                    <input
+                                        type="text"
+                                        required
+                                        className="w-full p-2 border rounded font-bold uppercase outline-none focus:border-teal-500"
+                                        placeholder="Ketik kota asal... (Contoh: BEKASI)"
+                                        value={formData.kota_asal}
+                                        onChange={e => handleLiveSearchGeo('kota_asal', e.target.value)}
+                                        onFocus={() => setFocusedField('kota_asal')}
+                                        onBlur={() => setTimeout(() => setFocusedField(null), 200)}
+                                    />
+                                    {focusedField === 'kota_asal' && renderGeoDropdown((item) => {
+                                        const kab = (item.kabupaten || '').toUpperCase();
+                                        setFormData(prev => ({ ...prev, kota_asal: kab }));
+                                    })}
                                 </div>
-                                <div>
+
+                                {/* KOTA TUJUAN DENGAN SUGGEST */}
+                                <div className="relative">
                                     <label className="block mb-1">KOTA TUJUAN</label>
-                                    <input type="text" required className="w-full p-2 border rounded font-normal uppercase" placeholder="Contoh: SURABAYA" value={formData.kota_tujuan} onChange={e => setFormData({ ...formData, kota_tujuan: e.target.value.toUpperCase() })} />
+                                    <input
+                                        type="text"
+                                        required
+                                        className="w-full p-2 border rounded font-bold uppercase outline-none focus:border-teal-500"
+                                        placeholder="Ketik kota tujuan... (Contoh: SURABAYA)"
+                                        value={formData.kota_tujuan}
+                                        onChange={e => handleLiveSearchGeo('kota_tujuan', e.target.value)}
+                                        onFocus={() => setFocusedField('kota_tujuan')}
+                                        onBlur={() => setTimeout(() => setFocusedField(null), 200)}
+                                    />
+                                    {focusedField === 'kota_tujuan' && renderGeoDropdown((item) => {
+                                        const kab = (item.kabupaten || '').toUpperCase();
+                                        setFormData(prev => ({
+                                            ...prev,
+                                            kota_tujuan: kab,
+                                            kabupaten: kab // Otomatis sinkron seperti di file lawas
+                                        }));
+                                    })}
                                 </div>
                             </div>
+
                             <div className="grid grid-cols-3 gap-3 bg-slate-50 p-3 rounded-lg border">
                                 <div>
                                     <label className="block mb-1 text-amber-700">🚚 DARAT (HARI)</label>
