@@ -322,7 +322,12 @@ const LaporanLSPB = () => {
         { header: 'HARI LIBUR', accessor: 'hari_libur', align: 'center' },
         { header: 'TANGGAL DITERIMA', accessor: 'tanggal_diterima' },
         { header: 'ESTIMASI TIBA', accessor: 'tanggal_sampai_harusnya' },
-        { header: 'REALISASI TIBA', accessor: 'realisasi_hari', align: 'center' },
+        {
+            header: 'REALISASI TIBA',
+            accessor: 'realisasi_hari',
+            align: 'center',
+            render: (r) => (r.realisasi_hari !== null && r.realisasi_hari !== undefined && r.tanggal_diterima) ? r.realisasi_hari : ''
+        },
         {
             header: 'ONTIME',
             accessor: 'on_time',

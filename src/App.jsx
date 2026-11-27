@@ -12,6 +12,7 @@ import Login from './pages/Login';
 import UnderConstruction from './components/organisms/UnderConstruction';
 import UserManagement from './pages/UserManagement';
 import MasterAgen from './pages/MasterAgen';
+import MasterHariLibur from './pages/MasterHariLibur';
 import MasterKodePos from './pages/MasterKodePos';
 import MasterTarifEkonomis from './pages/MasterTarifEkonomis';
 import MasterTarifReguler from './pages/MasterTarifReguler';
@@ -667,6 +668,7 @@ function App() {
       <Route path="/master/tarif-paket" element={<MainLayout><TarifPaket menuName="TarifPaket" /></MainLayout>} />
       <Route path="/master/jenis-kendaraan-carter" element={<MainLayout><JenisKendaraanCarter menuName="JenisKendaraanCarter" /></MainLayout>} />
       <Route path="/master/master-vendor" element={<MainLayout><MasterVendor menuName="MasterVendor" /></MainLayout>} />
+      <Route path="/master/hari-libur" element={<MainLayout><MasterHariLibur menuName="MasterHariLibur" /></MainLayout>} />
 
       <Route path="/hutang/aging-hutang" element={<MainLayout><AgingHutang menuName="AgingHutang" /></MainLayout>} />
       <Route path="/hutang/invoice-vendor" element={<MainLayout><InvoiceVendor menuName="InvoiceVendor" /></MainLayout>} />
@@ -771,6 +773,8 @@ function App() {
 
       <Route path="/operasional/driver-portal" element={<DriverPortal />} />
       <Route path="/driver/portal" element={<DriverPortal />} />
+
+
 
       {/* Jika nanti ada halaman lain, tinggal bungkus lagi pakai MainLayout 
       <Route
