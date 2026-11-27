@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import dliLogo from '../assets/logoDLI.png';
+import { QRCodeSVG } from 'qrcode.react';
+import { renderToStaticMarkup } from 'react-dom/server';
 
 const SuratPengantarPAD = () => {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -359,7 +361,7 @@ const SuratPengantarPAD = () => {
         });
     };
 
-    // 7. Cetak Dokumen SP PAD (opr_t_sp_pad_print.asp)
+    // 7. Cetak Dokumen SP PAD (Header 3 Kolom + QR Code)
     const handlePrintSPPAD = async (item) => {
         const targetNoSP = String(item?.no_sp_pad || '').trim();
         if (!targetNoSP) return;
@@ -378,6 +380,15 @@ const SuratPengantarPAD = () => {
             const totBeratVol = items.reduce((a, b) => a + Number(b.berat_vol || 0), 0);
             const totHarga = items.reduce((a, b) => a + Number(b.harga_kirim || 0), 0);
 
+            const sopir1Text = hdr.sopir1 && hdr.sopir1 !== '-' ? hdr.sopir1 : '-';
+            const sopir2Text = hdr.sopir2 && hdr.sopir2 !== '-' ? hdr.sopir2 : sopir1Text;
+            const finalNoSP = hdr.no_sp_pad || targetNoSP;
+
+            // Render QR Code SVG langsung dari library qrcode.react
+            const qrCodeSVG = renderToStaticMarkup(
+                <QRCodeSVG value={finalNoSP} size={64} level="M" />
+            );
+
             const win = window.open('', '_blank', 'width=1050,height=780');
             if (!win) {
                 Swal.fire('Pop-up Diblokir', 'Izinkan pop-up browser untuk mencetak SP PAD.', 'warning');
@@ -388,36 +399,92 @@ const SuratPengantarPAD = () => {
                 <!DOCTYPE html>
                 <html>
                 <head>
-                    <title>Surat Pengantar PAD - ${targetNoSP}</title>
+                    <title>Surat Pengantar PAD - ${finalNoSP}</title>
                     <style>
-                        body { font-family: Arial, sans-serif; padding: 20px; font-size: 11px; color: #000; }
-                        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-                        th, td { border: 1px solid #333; padding: 5px 6px; }
-                        th { background: #004b84; color: #fff; font-size: 10px; text-transform: uppercase; }
-                        tfoot td { font-weight: bold; background: #f1f5f9; }
+                        body { font-family: Arial, sans-serif; padding: 18px 22px; font-size: 11px; color: #000; }
+                        .header-wrap {
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: flex-start;
+                            border-bottom: 2px solid #000;
+                            padding-bottom: 10px;
+                            gap: 14px;
+                        }
+                        .col-left {
+                            width: 34%;
+                            display: flex;
+                            flex-direction: column;
+                            align-items: flex-start;
+                        }
+                        .col-center {
+                            width: 28%;
+                            text-align: center;
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                        }
+                        .col-right {
+                            width: 38%;
+                            font-size: 11px;
+                            line-height: 1.45;
+                        }
+                        .info-table { width: 100%; border-collapse: collapse; margin: 0; }
+                        .info-table td { border: none; padding: 1px 2px; vertical-align: top; }
+                        .info-label { font-weight: bold; width: 92px; white-space: nowrap; }
+                        .info-val { font-weight: bold; }
+                        table.manifest { width: 100%; border-collapse: collapse; margin-top: 12px; }
+                        table.manifest th, table.manifest td { border: 1px solid #333; padding: 5px 6px; }
+                        table.manifest th { background: #004b84; color: #fff; font-size: 10px; text-transform: uppercase; }
+                        table.manifest tfoot td { font-weight: bold; background: #f1f5f9; }
                     </style>
                 </head>
                 <body onload="window.print()">
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #000; padding-bottom:10px;">
-                        <div style="display:flex; align-items:center; gap:12px;">
-                            <img src="${dliLogo}" alt="Logo DLI" style="height:46px; object-fit:contain;" />
-                            <div>
-                                <div style="font-size:14px; font-weight:bold;">PT. DAKOTA LOGISTIK INDONESIA</div>
-                                <div style="font-size:10px;">${hdr.asal_alamat || ''} - ${hdr.asal_kota || ''} (${hdr.asal_telp || ''})</div>
-                                <div style="font-size:13px; font-weight:bold; color:#004b84; margin-top:4px;">SURAT PENGANTAR PAD (EKSPEDISI LAIN)</div>
-                                <div>Nomor SP PAD: <b>${hdr.no_sp_pad || targetNoSP}</b></div>
-                            </div>
+                    <div class="header-wrap">
+                        <!-- KOLOM KIRI: LOGO DLI (SUDAH ADA TEKS LOGO) + ALAMAT DI BAWAHNYA -->
+                        <div class="col-left">
+                            <img src="${dliLogo}" alt="Logo DLI" style="height:40px; max-width:100%; object-fit:contain;" />
+                            <div style="font-size:10px; font-weight:bold; color:#000; margin-top:4px;">PT. DAKOTA LOGISTIK INDONESIA</div>
+                            <div style="font-size:9px; color:#222; margin-top:1px;">${hdr.asal_alamat || ''} - ${hdr.asal_kota || ''}</div>
                         </div>
-                        <div style="text-align:right; line-height:1.5;">
-                            <div>Asal / Dari: <b>${hdr.asal_agen || item.cabang_asal || '-'}</b></div>
-                            <div>Ekspedisi Lain: <b>${hdr.expedisi_lain || item.vendor_expedisi_lain || '-'}</b></div>
-                            <div>Tanggal SP: <b>${hdr.tanggal_sp || item.tanggal_sp || '-'}</b></div>
-                            <div>Pengemudi 1: <b>${hdr.sopir1 || '-'}</b> ${hdr.sopir2 ? `| Pengemudi 2: <b>${hdr.sopir2}</b>` : ''}</div>
-                            <div>No. Polisi: <b>${hdr.no_mobil || '-'}</b> | No. Surat Tugas: <b>${hdr.surat_tugas || '-'}</b></div>
+
+                        <!-- KOLOM TENGAH: JUDUL, QR CODE & NOMOR SP PAD -->
+                        <div class="col-center">
+                            <div style="font-size:11px; font-weight:bold; color:#004b84; margin-bottom:5px; white-space:nowrap;">SURAT PENGANTAR PAD (EKSPEDISI LAIN)</div>
+                            <div>${qrCodeSVG}</div>
+                            <div style="font-size:10px; margin-top:5px;">Nomor SP PAD: <b>${finalNoSP}</b></div>
+                        </div>
+
+                        <!-- KOLOM KANAN: DETAIL PENGIRIMAN -->
+                        <div class="col-right">
+                            <table class="info-table">
+                                <tr>
+                                    <td class="info-label">Asal / Dari</td>
+                                    <td class="info-val">: ${hdr.asal_agen || item.cabang_asal || '-'}</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label">Ekspedisi Lain</td>
+                                    <td class="info-val">: ${hdr.expedisi_lain || item.vendor_expedisi_lain || '-'}</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label">Tanggal SP</td>
+                                    <td class="info-val">: ${hdr.tanggal_sp || item.tanggal_sp || '-'}</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label">Pengemudi 1</td>
+                                    <td class="info-val">: ${sopir1Text}</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label">Pengemudi 2</td>
+                                    <td class="info-val">: ${sopir2Text}</td>
+                                </tr>
+                            </table>
+                            <div style="font-weight:bold; margin-top:2px;">
+                                No. Polisi: ${hdr.no_mobil || '-'} | No. Surat Tugas: ${hdr.surat_tugas || '-'}
+                            </div>
                         </div>
                     </div>
 
-                    <table>
+                    <table class="manifest">
                         <thead>
                             <tr>
                                 <th width="28">NO</th>
@@ -468,7 +535,7 @@ const SuratPengantarPAD = () => {
                         </div>
                         <div style="width:30%;">
                             <div>Supir / Pengemudi,</div>
-                            <div style="margin-top:48px;">( ${hdr.sopir1 || '___________________'} )</div>
+                            <div style="margin-top:48px;">( ${sopir1Text !== '-' ? sopir1Text : '___________________'} )</div>
                         </div>
                         <div style="width:30%;">
                             <div>Diterima dengan baik oleh,</div>
@@ -478,6 +545,7 @@ const SuratPengantarPAD = () => {
                 </body>
                 </html>
             `);
+
             win.document.close();
         } catch (err) {
             Swal.fire('Gagal', err.response?.data?.message || 'Gagal menyiapkan cetakan SP PAD', 'error');
