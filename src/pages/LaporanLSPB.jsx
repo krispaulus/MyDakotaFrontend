@@ -302,7 +302,15 @@ const LaporanLSPB = () => {
             )
         },
         { header: 'CUSTOMER NAME', accessor: 'cust_name', render: (r) => <span className="font-bold uppercase">{r.cust_name || '-'}</span> },
-        { header: 'TANGGAL HANDOVER', accessor: 'tanggal_handover' },
+        {
+            header: 'TANGGAL HANDOVER',
+            accessor: 'tanggal_handover',
+            render: (r) => {
+                if (!r.tanggal_handover) return '-';
+                const [y, m, d] = r.tanggal_handover.split('-');
+                return (y && m && d) ? `${d}/${m}/${y}` : r.tanggal_handover;
+            }
+        },
         { header: 'NO. BTT', accessor: 'nomorbtt', render: (r) => <span className="font-mono font-bold">{r.nomorbtt || '-'}</span> },
         { header: 'PICKUP FROM', accessor: 'pickup_from' },
         { header: 'TUJUAN KEPADA', accessor: 'bttt_tujuannama', render: (r) => <span className="font-bold">{r.bttt_tujuannama || '-'}</span> },
