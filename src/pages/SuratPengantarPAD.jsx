@@ -489,7 +489,7 @@ const SuratPengantarPAD = () => {
                             <tr>
                                 <th width="28">NO</th>
                                 <th>BTT</th>
-                                <th>SURAT JALAN (NO. OD)</th>
+                                
                                 <th>PENGIRIM</th>
                                 <th>PENERIMA</th>
                                 <th width="45">KOLI</th>
@@ -503,7 +503,7 @@ const SuratPengantarPAD = () => {
                                 <tr>
                                     <td align="center">${i + 1}.</td>
                                     <td><b>${r.btt_id || '-'}</b></td>
-                                    <td>${r.no_sj || '-'}</td>
+                                    
                                     <td>${r.pengirim || '-'}</td>
                                     <td>${r.penerima || '-'}</td>
                                     <td align="right">${Number(r.koli || 0).toLocaleString('id-ID')}</td>
@@ -515,7 +515,7 @@ const SuratPengantarPAD = () => {
                         </tbody>
                         <tfoot>
                             <tr>
-                                <td colspan="5" align="right">TOTAL (${items.length} BTT) :</td>
+                                <td colspan="4" align="right">TOTAL (${items.length} BTT) :</td>
                                 <td align="right">${totKoli.toLocaleString('id-ID')}</td>
                                 <td align="right">${totBeratAsli.toLocaleString('id-ID')}</td>
                                 <td align="right">${totBeratVol.toLocaleString('id-ID')}</td>
