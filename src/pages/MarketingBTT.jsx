@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Edit3, Printer, Filter, RefreshCw, Trash2, QrCode } from 'lucide-react';
+import { Edit3, Printer, Filter, RefreshCw, Trash2, QrCode, FileSpreadsheet } from 'lucide-react';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import Swal from 'sweetalert2';
 import { useDarkMode } from "../context/DarkModeContext";
 import BttFormModal from '../components/organisms/BttFormModal';
 import api from '../api/axios';
+import { exportDataToExcel } from '../utils/exportTableHelper';
 
 
 const MarketingBTT = () => {
@@ -413,6 +414,51 @@ const MarketingBTT = () => {
         return () => clearTimeout(timer);
     }, [filterCustomer]);
 
+    // 📊 FUNGSI EXPORT TO EXCEL
+    const handleExportExcel = () => {
+        const exportColumns = [
+            { header: 'NO', key: 'no', align: 'center' },
+            { header: 'NO. BTT', key: 'id' },
+            {
+                header: 'TANGGAL',
+                accessor: (row) => row.tanggal ? new Date(row.tanggal).toLocaleDateString('id-ID') : '-'
+            },
+            { header: 'PENGIRIM', key: 'asal_name' },
+            { header: 'PENERIMA', key: 'tujuan_nama' },
+            { header: 'TUJUAN', key: 'tujuan_kota' },
+            { header: 'BARANG', key: 'nama_barang' },
+            {
+                header: 'KOLI',
+                align: 'center',
+                accessor: (row) => row.jumlah_koli || row.bttt_jmlkoli || 1
+            },
+            {
+                header: 'BERAT (KG)',
+                align: 'right',
+                accessor: (row) => row.berat || row.bttt_berat || 0
+            },
+            {
+                header: 'HARGA (RP)',
+                align: 'right',
+                accessor: (row) => (row.harga || 0).toLocaleString('id-ID')
+            },
+            { header: 'PEMBAYARAN', key: 'metode_pembayaran' },
+            { header: 'CREATED BY', key: 'create_by' }
+        ];
+
+        const activeCabangNama = localStorage.getItem('active_agen_nama') || 'DLI PUSAT';
+        const tglFile = new Date().toISOString().slice(0, 10);
+
+        exportDataToExcel({
+            filename: `DATA_BTT_${tglFile}.xls`,
+            sheetName: 'Data BTT',
+            title: 'LAPORAN BUKTI TANDA TERIMA (BTT)',
+            customerName: filterCustomer || activeCabangNama,
+            columns: exportColumns,
+            data: data
+        });
+    };
+
     return (
         <div className="relative space-y-4">
             {/* FORM FILTER */}
@@ -551,6 +597,13 @@ const MarketingBTT = () => {
                     </div>
 
                     <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={handleExportExcel}
+                            className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl uppercase transition shadow-sm cursor-pointer flex items-center gap-1.5"
+                        >
+                            <FileSpreadsheet size={14} /> EXPORT EXCEL
+                        </button>
                         <button
                             type="button"
                             onClick={handleResetFilter}
