@@ -484,8 +484,9 @@ const Invoice = () => {
     // 🖨️ CETAK SUMMARY REKAP FAKTUR
     // =========================================================================
     const handlePrintRekapRingkas = () => {
-        if (!data || data.length === 0) {
-            Swal.fire('Peringatan', 'Tidak ada data invoice untuk dicetak.', 'warning');
+        const activeInvoices = data.filter(item => item.artih_delete !== 'Y');
+        if (!activeInvoices || activeInvoices.length === 0) {
+            Swal.fire('Peringatan', 'Tidak ada data invoice aktif untuk dicetak.', 'warning');
             return;
         }
 
@@ -499,7 +500,7 @@ const Invoice = () => {
         let totalBiayaKirim = 0;
         let grandTotal = 0;
 
-        const rowsHtml = data.map((item, idx) => {
+        const rowsHtml = activeInvoices.map((item, idx) => {
             const total = Number(item.artih_total || 0);
             const berat = Number(item.artih_berat || item.total_berat || 0);
             const koli = Number(item.artih_koli || item.total_koli || 1);
@@ -535,9 +536,9 @@ const Invoice = () => {
             `;
         }).join('');
 
-        const headerFakturNo = data[0]?.artih_id || '-';
-        const headerKwitansiNo = data[0]?.artih_nokw || '-';
-        const headerCustomer = data.length === 1 ? (data[0]?.cust_name || data[0]?.artih_custname) : 'SEMUA CUSTOMER (TERFILTER)';
+        const headerFakturNo = activeInvoices[0]?.artih_id || '-';
+        const headerKwitansiNo = activeInvoices[0]?.artih_nokw || '-';
+        const headerCustomer = activeInvoices.length === 1 ? (activeInvoices[0]?.cust_name || activeInvoices[0]?.artih_custname) : 'SEMUA CUSTOMER (TERFILTER)';
 
         printWindow.document.open();
         printWindow.document.write(`
@@ -618,10 +619,17 @@ const Invoice = () => {
     // 🖨️ CETAK REKAP FAKTUR PAJAK (100% SESUAI KWITANSI PENAGIHAN)
     // =========================================================================
     const handlePrintRekapFakturPajak = () => {
+        const activeInvoices = data.filter(item => item.artih_delete !== 'Y');
+        if (!activeInvoices || activeInvoices.length === 0) {
+            Swal.fire('Peringatan', 'Tidak ada data invoice aktif untuk dicetak.', 'warning');
+            return;
+        }
+
         if (!data || data.length === 0) {
             Swal.fire('Peringatan', 'Tidak ada data faktur untuk membuat rekap.', 'warning');
             return;
         }
+
 
         const printWindow = window.open('', '_blank', 'width=1350,height=850');
         if (!printWindow) return;
@@ -630,9 +638,7 @@ const Invoice = () => {
         let totalPPN = 0;
         let totalPiutang = 0;
 
-
-
-        const rowsHtml = data.map((item, idx) => {
+        const rowsHtml = activeInvoices.map((item, idx) => {
             const piutangUsaha = Number(item.artih_total || 0);
 
             const rawFktPajak = String(item.artih_fktpajak || item.faktur_pajak_lengkap || '').trim();
@@ -1270,11 +1276,15 @@ const Invoice = () => {
     const handleDeleteInvoice = (item) => {
         if (!item) return;
 
-        // 🔒 Proteksi: Jika invoice sudah berstatus POSTED, minta user untuk unposting dulu
+        if (item.artih_delete === 'Y') {
+            Swal.fire('Info', `Invoice ${item.artih_id} sudah berstatus BATAL.`, 'info');
+            return;
+        }
+
         if (item.artih_postingyn === 'Y') {
             Swal.fire({
                 title: 'Invoice Sudah Diposting!',
-                text: `Invoice ${item.artih_id} sudah membentuk Jurnal Memorial. Silakan lakukan UNPOSTING terlebih dahulu sebelum menghapus invoice.`,
+                text: `Invoice ${item.artih_id} sudah membentuk Jurnal Memorial. Silakan lakukan UNPOSTING terlebih dahulu sebelum membatalkan invoice.`,
                 icon: 'warning',
                 confirmButtonColor: '#ea580c',
                 confirmButtonText: 'Mengerti'
@@ -1282,43 +1292,50 @@ const Invoice = () => {
             return;
         }
 
+        const noInvDisplay = formatNomorInvoiceResmi(item.artih_id, item.artih_tanggal, item.artih_agenid);
+
         Swal.fire({
-            title: 'Hapus Invoice?',
+            title: 'Batalkan Invoice?',
             html: `
             <div class="text-left text-xs space-y-2 p-1 text-slate-700">
-                <p>Apakah Anda yakin ingin menghapus Invoice <b class="font-mono text-rose-600">${item.artih_id}</b>?</p>
-                <p class="text-[11px] text-slate-500 italic">
-                    * Nomor resi BTT yang terhubung akan otomatis dikembalikan ke daftar BTT belum difakturkan (Unbilled).
+                <p>Anda akan membatalkan Invoice <b class="font-mono text-rose-600">${noInvDisplay}</b>.</p>
+                <p class="text-[11px] text-slate-500">
+                    • Status invoice akan berubah menjadi <b>BATAL (YA)</b> dan tetap tersimpan di riwayat sistem.<br/>
+                    • Nomor invoice <b>${noInvDisplay}</b> tidak dapat digunakan kembali.<br/>
+                    • Resi BTT terkait otomatis bebas kembali ke daftar BTT belum difakturkan.
                 </p>
             </div>
         `,
+            input: 'text',
+            inputPlaceholder: 'Masukkan alasan pembatalan (opsional)...',
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#e11d48',
             cancelButtonColor: '#64748b',
-            confirmButtonText: 'Ya, Hapus Invoice',
-            cancelButtonText: 'Batal'
+            confirmButtonText: 'Ya, Batalkan Invoice',
+            cancelButtonText: 'Tutup'
         }).then(async (res) => {
             if (res.isConfirmed) {
                 try {
                     const token = localStorage.getItem('token');
                     const ptId = localStorage.getItem('pt_id') || 'C';
+                    const alasanParam = res.value ? `&alasan=${encodeURIComponent(res.value)}` : '';
 
-                    await api.delete(`/piutang/invoice?id=${encodeURIComponent(item.artih_id)}&pt_id=${ptId}`, {
+                    await api.delete(`/piutang/invoice?id=${encodeURIComponent(item.artih_id)}&pt_id=${ptId}${alasanParam}`, {
                         headers: { Authorization: `Bearer ${token}` }
                     });
 
                     Swal.fire({
-                        title: 'Berhasil!',
-                        text: `Invoice ${item.artih_id} berhasil dihapus.`,
+                        title: 'Invoice Dibatalkan!',
+                        text: `Nomor ${noInvDisplay} telah ditandai BATAL di riwayat sistem.`,
                         icon: 'success',
-                        timer: 1500,
+                        timer: 1800,
                         showConfirmButton: false
                     });
 
                     fetchInvoiceList();
                 } catch (err) {
-                    Swal.fire('Gagal!', err.response?.data?.message || 'Gagal menghapus invoice.', 'error');
+                    Swal.fire('Gagal!', err.response?.data?.message || 'Gagal membatalkan invoice.', 'error');
                 }
             }
         });
@@ -3396,11 +3413,14 @@ const Invoice = () => {
         {
             header: 'NO. INVOICE',
             accessor: 'artih_id',
-            render: (item) => (
-                <span className="font-mono font-bold text-sky-600 select-all">
-                    {formatNomorInvoiceResmi(item.artih_id, item.artih_tanggal, item.artih_agenid)}
-                </span>
-            )
+            render: (item) => {
+                const isBatal = item.artih_delete === 'Y';
+                return (
+                    <span className={`font-mono font-bold select-all ${isBatal ? 'text-rose-600 line-through' : 'text-sky-600'}`}>
+                        {formatNomorInvoiceResmi(item.artih_id, item.artih_tanggal, item.artih_agenid)}
+                    </span>
+                );
+            }
         },
         {
             header: 'TANGGAL',
@@ -3408,13 +3428,41 @@ const Invoice = () => {
             render: (item) => <span className="font-mono font-bold text-slate-800">{String(item.artih_tanggal || '').split('T')[0]}</span>
         },
         {
+            header: 'KODE CUSTOMER',
+            accessor: 'artih_custid',
+            render: (item) => (
+                <span className="font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 select-all">
+                    {item.artih_custid || '-'}
+                </span>
+            )
+        },
+        {
             header: 'PELANGGAN',
             accessor: 'cust_name',
             render: (item) => (
-                <div>
-                    <span className="font-bold text-slate-900 block">{item.cust_name || item.artih_custname}</span>
-                    <span className="font-mono text-[10px] text-slate-500">ID: {item.artih_custid}</span>
-                </div>
+                <span className={`font-bold block ${item.artih_delete === 'Y' ? 'text-slate-400' : 'text-slate-900'}`}>
+                    {item.cust_name || item.artih_custname}
+                </span>
+            )
+        },
+        {
+            header: 'KETERANGAN',
+            accessor: 'artih_keterangan',
+            render: (item) => (
+                <span className={`text-[11px] block max-w-[220px] whitespace-normal leading-snug ${item.artih_delete === 'Y' ? 'text-rose-600 font-semibold' : 'text-slate-600'}`}>
+                    {item.artih_keterangan || '-'}
+                </span>
+            )
+        },
+        {
+            header: 'BATAL',
+            accessor: 'artih_delete',
+            render: (item) => item.artih_delete === 'Y' ? (
+                <span className="inline-flex items-center justify-center font-black text-rose-700 bg-rose-100 border border-rose-300 px-2.5 py-0.5 rounded text-[10px] tracking-wider">
+                    YA
+                </span>
+            ) : (
+                <span className="text-slate-300 font-bold text-[10px]">-</span>
             )
         },
         {
@@ -3423,6 +3471,19 @@ const Invoice = () => {
             render: (item) => {
                 const kwitansiDisplay = formatNomorKwitansiResmi(item.artih_nokw, item.artih_id, item.artih_tanggal);
                 return <span className="font-mono font-bold text-emerald-700 select-all">{kwitansiDisplay}</span>;
+            }
+        },
+        {
+            header: 'FAKTUR PAJAK',
+            accessor: 'artih_fktpajak',
+            render: (item) => {
+                const fkt = String(item.artih_fktpajak || '').trim();
+                const displayFkt = (fkt && fkt !== '010.' && fkt !== '010') ? fkt : '-';
+                return (
+                    <span className="font-mono text-[11px] font-semibold text-slate-700 select-all">
+                        {displayFkt}
+                    </span>
+                );
             }
         },
         {
@@ -3447,137 +3508,156 @@ const Invoice = () => {
         {
             header: 'STATUS POSTING',
             accessor: 'artih_postingyn',
-            render: (item) => item.artih_postingyn === 'Y' ? (
-                <span className="inline-flex items-center gap-1 font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[10px]">
-                    <CheckCircle2 size={12} /> POSTED
-                </span>
-            ) : (
-                <span className="inline-flex items-center gap-1 font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-[10px]">
-                    <XCircle size={12} /> DRAFT
-                </span>
-            )
+            render: (item) => {
+                if (item.artih_delete === 'Y') {
+                    return (
+                        <span className="inline-flex items-center gap-1 font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded text-[10px]">
+                            <XCircle size={12} /> DIBATALKAN
+                        </span>
+                    );
+                }
+                return item.artih_postingyn === 'Y' ? (
+                    <span className="inline-flex items-center gap-1 font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[10px]">
+                        <CheckCircle2 size={12} /> POSTED
+                    </span>
+                ) : (
+                    <span className="inline-flex items-center gap-1 font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-[10px]">
+                        <XCircle size={12} /> DRAFT
+                    </span>
+                );
+            }
         },
-
         {
             header: 'ACTION',
             accessor: 'artih_id',
-            render: (item) => (
-                <div className="flex items-center gap-1 justify-center relative" onClick={(e) => e.stopPropagation()}>
-                    {/* 1. CETAK DOKUMEN */}
-                    <div className="relative">
+            render: (item) => {
+                const isBatal = item.artih_delete === 'Y';
+                if (isBatal) {
+                    return (
+                        <div className="flex items-center justify-center">
+                            <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-1 rounded border border-rose-200">
+                                TERKUNCI (BATAL)
+                            </span>
+                        </div>
+                    );
+                }
+                return (
+                    <div className="flex items-center gap-1 justify-center relative" onClick={(e) => e.stopPropagation()}>
+                        {/* 1. CETAK DOKUMEN */}
+                        <div className="relative">
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActivePrintMenuId(activePrintMenuId === item.artih_id ? null : item.artih_id);
+                                }}
+                                className="p-1.5 text-sky-600 hover:bg-sky-50 border border-sky-200 rounded-lg transition cursor-pointer shadow-2xs"
+                                title="Pilihan Cetak Dokumen"
+                            >
+                                <Printer size={13} />
+                            </button>
+
+                            {activePrintMenuId === item.artih_id && (
+                                <div className="absolute right-0 top-8 w-44 bg-white border border-slate-200 shadow-2xl rounded-xl py-1.5 z-[999] text-left text-xs font-bold divide-y divide-slate-100 animate-in fade-in">
+                                    <button
+                                        type="button"
+                                        onClick={() => { setActivePrintMenuId(null); handlePrintDocument(item, 'FAKTUR'); }}
+                                        className="w-full px-3 py-1.5 text-slate-700 hover:bg-sky-50 hover:text-sky-600 text-left cursor-pointer flex items-center gap-1.5"
+                                    >
+                                        <Printer size={12} className="text-sky-600" /> Faktur Penagihan
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setActivePrintMenuId(null); handlePrintDocument(item, 'KWITANSI_1'); }}
+                                        className="w-full px-3 py-1.5 text-slate-700 hover:bg-amber-50 hover:text-amber-600 text-left cursor-pointer flex items-center gap-1.5"
+                                    >
+                                        <FileText size={12} className="text-amber-500" /> Kwitansi Tipe 1
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setActivePrintMenuId(null); handlePrintDocument(item, 'KWITANSI_2'); }}
+                                        className="w-full px-3 py-1.5 text-slate-700 hover:bg-sky-50 hover:text-sky-600 text-left cursor-pointer flex items-center gap-1.5"
+                                    >
+                                        <FileText size={12} className="text-sky-500" /> Kwitansi Tipe 2
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setActivePrintMenuId(null); handlePrintDocument(item, 'FAKTUR_2'); }}
+                                        className="w-full px-3 py-1.5 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 text-left cursor-pointer flex items-center gap-1.5"
+                                    >
+                                        <Printer size={12} className="text-indigo-600" /> Faktur Tipe 2
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setActivePrintMenuId(null); handlePrintDocument(item, 'SUMMARY'); }}
+                                        className="w-full px-3 py-1.5 text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 text-left cursor-pointer flex items-center gap-1.5"
+                                    >
+                                        <CheckSquare size={12} className="text-emerald-600" /> Summary Billing
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setActivePrintMenuId(null); handlePrintAllBTT(item); }}
+                                        className="w-full px-3 py-1.5 text-rose-700 hover:bg-rose-50 hover:text-rose-800 text-left cursor-pointer flex items-center gap-1.5"
+                                    >
+                                        <Printer size={12} className="text-rose-600" /> Print BTT All
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* 2. PREVIEW DOWNLOAD FAKTUR */}
                         <button
                             type="button"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setActivePrintMenuId(activePrintMenuId === item.artih_id ? null : item.artih_id);
-                            }}
-                            className="p-1.5 text-sky-600 hover:bg-sky-50 border border-sky-200 rounded-lg transition cursor-pointer shadow-2xs"
-                            title="Pilihan Cetak Dokumen"
-                        >
-                            <Printer size={13} />
-                        </button>
-
-                        {activePrintMenuId === item.artih_id && (
-                            <div className="absolute right-0 top-8 w-44 bg-white border border-slate-200 shadow-2xl rounded-xl py-1.5 z-[999] text-left text-xs font-bold divide-y divide-slate-100 animate-in fade-in">
-                                <button
-                                    type="button"
-                                    onClick={() => { setActivePrintMenuId(null); handlePrintDocument(item, 'FAKTUR'); }}
-                                    className="w-full px-3 py-1.5 text-slate-700 hover:bg-sky-50 hover:text-sky-600 text-left cursor-pointer flex items-center gap-1.5"
-                                >
-                                    <Printer size={12} className="text-sky-600" /> Faktur Penagihan
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => { setActivePrintMenuId(null); handlePrintDocument(item, 'KWITANSI_1'); }}
-                                    className="w-full px-3 py-1.5 text-slate-700 hover:bg-amber-50 hover:text-amber-600 text-left cursor-pointer flex items-center gap-1.5"
-                                >
-                                    <FileText size={12} className="text-amber-500" /> Kwitansi Tipe 1
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => { setActivePrintMenuId(null); handlePrintDocument(item, 'KWITANSI_2'); }}
-                                    className="w-full px-3 py-1.5 text-slate-700 hover:bg-sky-50 hover:text-sky-600 text-left cursor-pointer flex items-center gap-1.5"
-                                >
-                                    <FileText size={12} className="text-sky-500" /> Kwitansi Tipe 2
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => { setActivePrintMenuId(null); handlePrintDocument(item, 'FAKTUR_2'); }}
-                                    className="w-full px-3 py-1.5 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 text-left cursor-pointer flex items-center gap-1.5"
-                                >
-                                    <Printer size={12} className="text-indigo-600" /> Faktur Tipe 2
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => { setActivePrintMenuId(null); handlePrintDocument(item, 'SUMMARY'); }}
-                                    className="w-full px-3 py-1.5 text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 text-left cursor-pointer flex items-center gap-1.5"
-                                >
-                                    <CheckSquare size={12} className="text-emerald-600" /> Summary Billing
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => { setActivePrintMenuId(null); handlePrintAllBTT(item); }}
-                                    className="w-full px-3 py-1.5 text-rose-700 hover:bg-rose-50 hover:text-rose-800 text-left cursor-pointer flex items-center gap-1.5"
-                                >
-                                    <Printer size={12} className="text-rose-600" /> Print BTT All
-                                </button>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* 2. PREVIEW DOWNLOAD FAKTUR (PRINT | ExpToXLS | PRINTallBTT) */}
-                    <button
-                        type="button"
-                        onClick={() => handlePreviewDownloadInvoice(item)}
-                        className="p-1.5 text-amber-600 hover:bg-amber-50 border border-amber-200 rounded-lg transition cursor-pointer shadow-2xs"
-                        title="Preview & Download Faktur (Print / Export XLS / Print All BTT)"
-                    >
-                        <Download size={13} />
-                    </button>
-
-                    {/* 3. EDIT RINCIAN INVOICE */}
-                    <button
-                        type="button"
-                        onClick={() => handleOpenEditInvoice(item)}
-                        className="p-1.5 text-emerald-600 hover:bg-emerald-50 border border-emerald-200 rounded-lg transition cursor-pointer shadow-2xs"
-                        title="Buka / Edit Rincian Invoice"
-                    >
-                        <Edit3 size={13} />
-                    </button>
-
-                    {/* 4. POSTING / UNPOSTING BUTTON */}
-                    {item.artih_postingyn === 'Y' ? (
-                        <button
-                            type="button"
-                            onClick={() => handleUnpostingInvoice(item.artih_id)}
+                            onClick={() => handlePreviewDownloadInvoice(item)}
                             className="p-1.5 text-amber-600 hover:bg-amber-50 border border-amber-200 rounded-lg transition cursor-pointer shadow-2xs"
-                            title="Unposting Invoice (Kembalikan ke Draft)"
+                            title="Preview & Download Faktur (Print / Export XLS / Print All BTT)"
                         >
-                            <Unlock size={13} />
+                            <Download size={13} />
                         </button>
-                    ) : (
+
+                        {/* 3. EDIT RINCIAN INVOICE */}
                         <button
                             type="button"
-                            onClick={() => handlePostingInvoice(item.artih_id)}
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 border border-blue-200 rounded-lg transition cursor-pointer shadow-2xs"
-                            title="Posting Invoice"
+                            onClick={() => handleOpenEditInvoice(item)}
+                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 border border-emerald-200 rounded-lg transition cursor-pointer shadow-2xs"
+                            title="Buka / Edit Rincian Invoice"
                         >
-                            <Lock size={13} />
+                            <Edit3 size={13} />
                         </button>
-                    )}
 
-                    {/* 🌟 5. TOMBOL DELETE INVOICE (SELALU MUNCUL) */}
-                    <button
-                        type="button"
-                        onClick={() => handleDeleteInvoice(item)}
-                        className="p-1.5 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg transition cursor-pointer shadow-2xs"
-                        title="Hapus Invoice"
-                    >
-                        <Trash2 size={13} />
-                    </button>
-                </div>
-            )
+                        {/* 4. POSTING / UNPOSTING BUTTON */}
+                        {item.artih_postingyn === 'Y' ? (
+                            <button
+                                type="button"
+                                onClick={() => handleUnpostingInvoice(item.artih_id)}
+                                className="p-1.5 text-amber-600 hover:bg-amber-50 border border-amber-200 rounded-lg transition cursor-pointer shadow-2xs"
+                                title="Unposting Invoice (Kembalikan ke Draft)"
+                            >
+                                <Unlock size={13} />
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => handlePostingInvoice(item.artih_id)}
+                                className="p-1.5 text-blue-600 hover:bg-blue-50 border border-blue-200 rounded-lg transition cursor-pointer shadow-2xs"
+                                title="Posting Invoice"
+                            >
+                                <Lock size={13} />
+                            </button>
+                        )}
+
+                        {/* 5. TOMBOL BATALKAN INVOICE */}
+                        <button
+                            type="button"
+                            onClick={() => handleDeleteInvoice(item)}
+                            className="p-1.5 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg transition cursor-pointer shadow-2xs"
+                            title="Batalkan Invoice (Simpan Histori Batal)"
+                        >
+                            <Trash2 size={13} />
+                        </button>
+                    </div>
+                );
+            }
         }
     ];
 
