@@ -12,9 +12,7 @@ const KondisiBTT = () => {
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
     const today = now.toISOString().split('T')[0];
 
-    // ✅ 1. Filter selalu aktif sejak halaman dibuka
     const [showFilter, setShowFilter] = useState(true);
-
     const [cabangList, setCabangList] = useState([]);
     const [picList, setPicList] = useState([]);
     const [data, setData] = useState([]);
@@ -81,22 +79,69 @@ const KondisiBTT = () => {
     const [endDate, setEndDate] = useState(today);
     const [bypassTanggal, setBypassTanggal] = useState(false);
     const [selectedCabang, setSelectedCabang] = useState(isHoldingUser ? '' : currentActiveAgen.id);
+
+    // 1. Filter Cabang Berwenang + Suggest Dropdown
+    const [cabangBerwenang, setCabangBerwenang] = useState('');
+    const [showCabangBerwenangDropdown, setShowCabangBerwenangDropdown] = useState(false);
+
+    // 2. Filter Customer + Suggest Dropdown
+    const [searchCustomer, setSearchCustomer] = useState('');
+    const [customerSuggestions, setCustomerSuggestions] = useState([]);
+    const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+    const [searchingCustomer, setSearchingCustomer] = useState(false);
+
     const [bttKembali, setBttKembali] = useState('');
     const [selectedPIC, setSelectedPIC] = useState('');
-    const [searchCustomer, setSearchCustomer] = useState('');
     const [sudahInvoice, setSudahInvoice] = useState('');
     const [statusBayar, setStatusBayar] = useState('');
     const [metodeBayar, setMetodeBayar] = useState('');
     const [tglPelunasan, setTglPelunasan] = useState('');
+    const [jenisNaikTurun, setJenisNaikTurun] = useState('S'); // S = Semua, N = Naik, T = Turun
     const [showBTT, setShowBTT] = useState(true);
     const [showOrderJemput, setShowOrderJemput] = useState(true);
 
-    // Sinkronisasi cabang otomatis untuk cabang daerah
     useEffect(() => {
         if (!isHoldingUser && currentActiveAgen.id) {
             setSelectedCabang(currentActiveAgen.id);
         }
     }, [isHoldingUser, currentActiveAgen.id, cabangList]);
+
+    // Tutup dropdown suggest saat klik di luar
+    useEffect(() => {
+        const closeAllDropdowns = () => {
+            setShowCabangBerwenangDropdown(false);
+            setShowCustomerDropdown(false);
+        };
+        window.addEventListener('click', closeAllDropdowns);
+        return () => window.removeEventListener('click', closeAllDropdowns);
+    }, []);
+
+    // Live Search Autocomplete Customer
+    useEffect(() => {
+        const query = searchCustomer.trim();
+        if (query.length < 2) {
+            setCustomerSuggestions([]);
+            return;
+        }
+
+        const timer = setTimeout(async () => {
+            setSearchingCustomer(true);
+            try {
+                const token = localStorage.getItem('token');
+                const cleanKeyword = query.replace(/\./g, ' ').replace(/\s+/g, ' ').trim();
+                const res = await api.get(`/customer?search=${encodeURIComponent(cleanKeyword)}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                setCustomerSuggestions((res.data?.data || []).slice(0, 20));
+            } catch (err) {
+                console.warn('Gagal load suggest customer:', err);
+            } finally {
+                setSearchingCustomer(false);
+            }
+        }, 250);
+
+        return () => clearTimeout(timer);
+    }, [searchCustomer]);
 
     const fetchOptions = async () => {
         try {
@@ -112,25 +157,42 @@ const KondisiBTT = () => {
         }
     };
 
-    const fetchData = async () => {
+    const fetchData = async (override = null) => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
             const ptId = localStorage.getItem('pt_id') || 'C';
-            let url = `/piutang/kondisi-btt?pt_id=${ptId}&bypass_tanggal=${bypassTanggal}&show_btt=${showBTT}&show_oj=${showOrderJemput}`;
 
-            if (!bypassTanggal) {
-                url += `&start_date=${startDate}&end_date=${endDate}`;
+            const fStart = override ? override.startDate : startDate;
+            const fEnd = override ? override.endDate : endDate;
+            const fBypass = override ? override.bypassTanggal : bypassTanggal;
+            const fCabang = override ? override.selectedCabang : (!isHoldingUser ? currentActiveAgen.id : selectedCabang);
+            const fCabBerwenang = override ? override.cabangBerwenang : cabangBerwenang;
+            const fKembali = override ? override.bttKembali : bttKembali;
+            const fPic = override ? override.selectedPIC : selectedPIC;
+            const fCust = override ? override.searchCustomer : searchCustomer;
+            const fInv = override ? override.sudahInvoice : sudahInvoice;
+            const fBayar = override ? override.statusBayar : statusBayar;
+            const fMetode = override ? override.metodeBayar : metodeBayar;
+            const fLunas = override ? override.tglPelunasan : tglPelunasan;
+            const fJenis = override ? override.jenisNaikTurun : jenisNaikTurun;
+            const fShowBtt = override ? override.showBTT : showBTT;
+            const fShowOj = override ? override.showOrderJemput : showOrderJemput;
+
+            let url = `/piutang/kondisi-btt?pt_id=${ptId}&bypass_tanggal=${fBypass}&show_btt=${fShowBtt}&show_oj=${fShowOj}&jenis=${fJenis}`;
+
+            if (!fBypass && fStart && fEnd) {
+                url += `&start_date=${fStart}&end_date=${fEnd}`;
             }
-            const activeFilterCabang = !isHoldingUser ? currentActiveAgen.id : selectedCabang;
-            if (activeFilterCabang) url += `&cabang_asal=${encodeURIComponent(activeFilterCabang)}`;
-            if (bttKembali) url += `&btt_kembali=${encodeURIComponent(bttKembali)}`;
-            if (selectedPIC) url += `&pic=${encodeURIComponent(selectedPIC)}`;
-            if (searchCustomer) url += `&customer=${encodeURIComponent(searchCustomer)}`;
-            if (sudahInvoice) url += `&sudah_invoice=${encodeURIComponent(sudahInvoice)}`;
-            if (statusBayar) url += `&bayar=${encodeURIComponent(statusBayar)}`;
-            if (metodeBayar) url += `&pembayaran=${encodeURIComponent(metodeBayar)}`;
-            if (tglPelunasan) url += `&tgl_pelunasan=${encodeURIComponent(tglPelunasan)}`;
+            if (fCabang) url += `&cabang_asal=${encodeURIComponent(fCabang)}`;
+            if (fCabBerwenang) url += `&cabang_berwenang=${encodeURIComponent(fCabBerwenang)}`;
+            if (fKembali) url += `&btt_kembali=${encodeURIComponent(fKembali)}`;
+            if (fPic) url += `&pic=${encodeURIComponent(fPic)}`;
+            if (fCust) url += `&customer=${encodeURIComponent(fCust)}`;
+            if (fInv) url += `&sudah_invoice=${encodeURIComponent(fInv)}`;
+            if (fBayar) url += `&bayar=${encodeURIComponent(fBayar)}`;
+            if (fMetode) url += `&pembayaran=${encodeURIComponent(fMetode)}`;
+            if (fLunas) url += `&tgl_pelunasan=${encodeURIComponent(fLunas)}`;
 
             const res = await api.get(url, { headers: { Authorization: `Bearer ${token}` } });
             setData(res.data?.data || []);
@@ -152,24 +214,81 @@ const KondisiBTT = () => {
     };
 
     const handleResetFilter = () => {
+        const defaultCabang = isHoldingUser ? '' : currentActiveAgen.id;
         setStartDate(firstDay);
         setEndDate(today);
         setBypassTanggal(false);
-        setSelectedCabang(isHoldingUser ? '' : currentActiveAgen.id);
+        setSelectedCabang(defaultCabang);
+        setCabangBerwenang('');
         setBttKembali('');
         setSelectedPIC('');
         setSearchCustomer('');
+        setCustomerSuggestions([]);
         setSudahInvoice('');
         setStatusBayar('');
         setMetodeBayar('');
         setTglPelunasan('');
+        setJenisNaikTurun('S');
         setShowBTT(true);
         setShowOrderJemput(true);
-        fetchData();
+
+        fetchData({
+            startDate: firstDay,
+            endDate: today,
+            bypassTanggal: false,
+            selectedCabang: defaultCabang,
+            cabangBerwenang: '',
+            bttKembali: '',
+            selectedPIC: '',
+            searchCustomer: '',
+            sudahInvoice: '',
+            statusBayar: '',
+            metodeBayar: '',
+            tglPelunasan: '',
+            jenisNaikTurun: 'S',
+            showBTT: true,
+            showOrderJemput: true
+        });
     };
 
-    // ✅ 2. FUNGSI EXPORT TO EXCEL
-    const handleExportExcel = () => {
+    const formatTanggalSlash = (dateVal) => {
+        if (!dateVal) return '';
+        const str = String(dateVal).split('T')[0];
+        if (!str || str === '0001-01-01') return '';
+        const parts = str.split('-');
+        if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        return str;
+    };
+
+    // ✅ EXPORT EXCEL IDENTIK DENGAN FORMAT 30 KOLOM WEB LAWAS (kondisi BTT WEB LAMA.xlsx)
+    const getDakotaLogoBase64 = () => {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = 'Anonymous';
+            img.onload = () => {
+                try {
+                    const natW = img.naturalWidth || 160;
+                    const natH = img.naturalHeight || 115;
+                    const targetH = 36;
+                    const targetW = Math.round((natW / natH) * targetH);
+                    const canvas = document.createElement('canvas');
+                    canvas.width = natW;
+                    canvas.height = natH;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    const dataUrl = canvas.toDataURL('image/png');
+                    resolve({ b64: dataUrl.split(',')[1] || '', width: targetW, height: targetH });
+                } catch {
+                    resolve({ b64: '', width: 64, height: 46 });
+                }
+            };
+            img.onerror = () => resolve({ b64: '', width: 64, height: 46 });
+            img.src = dakotaLogo;
+        });
+    };
+
+    // ✅ EXPORT EXCEL MODERN + LOGO + KOP PERUSAHAAN + 30 KOLOM LENGKAP
+    const handleExportExcel = async () => {
         if (!data || data.length === 0) {
             Swal.fire({
                 title: 'DATA KOSONG',
@@ -180,100 +299,216 @@ const KondisiBTT = () => {
             return;
         }
 
+        const logoInfo = await getDakotaLogoBase64();
         const activeFilterCabang = !isHoldingUser ? currentActiveAgen.id : selectedCabang;
         const foundCabang = cabangList.find(c => String(c.agen_id || c.AgenID) === String(activeFilterCabang));
-        const namaCabang = activeFilterCabang
+        const namaCabangHeader = activeFilterCabang
             ? (foundCabang?.agen_nama || foundCabang?.AgenNama || `CABANG ${activeFilterCabang}`)
             : 'KONSOLIDASI (SEMUA CABANG)';
-        const periodeStr = bypassTanggal ? 'SEMUA PERIODE' : `${startDate} s/d ${endDate}`;
+        const periodeHeader = bypassTanggal
+            ? 'SEMUA PERIODE (BYPASS TANGGAL)'
+            : `${formatTanggalSlash(startDate)} - ${formatTanggalSlash(endDate)}`;
 
+        let totalPackingAll = 0;
+        let totalBiayaKirimAll = 0;
+        let totalTerbayarAll = 0;
         let totalKoliAll = 0;
         let totalBeratAll = 0;
-        let totalBiayaAll = 0;
+        let lastGroupType = '';
 
         const rowsHtml = data.map((item, idx) => {
+            const groupType = item.tipe_dokumen || 'BTT NAIK';
+            let groupBanner = '';
+            if (groupType !== lastGroupType) {
+                lastGroupType = groupType;
+                groupBanner = `
+                    <tr>
+                        <td colspan="30" style="background-color:#e0f2fe; color:#004b84; font-weight:bold; font-size:10pt; padding:6px 8px; border:1px solid #94a3b8; text-align:left;">
+                            ▸ ${groupType}
+                        </td>
+                    </tr>
+                `;
+            }
+
+            const byPacking = Number(item.by_packing || 0);
+            const byKirim = Number(item.by_kirim ?? item.total_biaya ?? 0);
+            const terbayar = Number(item.terbayar_nominal || 0);
             const koli = Number(item.koli || 0);
             const berat = Number(item.berat || 0);
-            const biaya = Number(item.total_biaya || 0);
 
+            totalPackingAll += byPacking;
+            totalBiayaKirimAll += byKirim;
+            totalTerbayarAll += terbayar;
             totalKoliAll += koli;
             totalBeratAll += berat;
-            totalBiayaAll += biaya;
 
-            const isKembali = item.btt_kembali_yn === 'Y' ? 'KEMBALI' : 'BELUM';
-            const statusFaktur = item.sudah_invoice_yn === 'Y' ? (item.no_invoice || 'FAKTUR') : 'UNBILLED';
-            const isLunas = item.terbayar_yn === 'Y' ? 'LUNAS' : 'BELUM';
-            const tglDok = String(item.tgl_dokumen || '').split('T')[0] || '-';
+            const tglDok = formatTanggalSlash(item.tgl_dokumen);
+            const tglKw = formatTanggalSlash(item.tgl_kwitansi);
+            const tglTT = formatTanggalSlash(item.tgl_tt);
+            const tglBayar = formatTanggalSlash(item.tgl_bayar);
+            const tglKembali = formatTanggalSlash(item.tgl_btt_kembali);
+            const umurBTT = item.btt_kembali_yn === 'Y' ? '' : (item.umur_btt ?? '');
+            const rowBg = idx % 2 === 1 ? '#f8fafc' : '#ffffff';
 
             return `
-                <tr>
-                    <td style="text-align:center;">${idx + 1}</td>
-                    <td style="mso-number-format:'\\@'; font-weight:bold;">${item.no_dokumen || '-'}</td>
-                    <td style="text-align:center;">${item.tipe_dokumen || '-'}</td>
+                ${groupBanner}
+                <tr style="background-color:${rowBg};">
+                    <td style="text-align:center; font-weight:bold; color:#334155;">${groupType}</td>
                     <td style="text-align:center; mso-number-format:'\\@';">${tglDok}</td>
-                    <td>${item.cust_name || '-'}</td>
-                    <td>${item.penerima || '-'}</td>
-                    <td>${item.kota_tujuan || '-'}</td>
-                    <td style="text-align:center;">${item.pic || '-'}</td>
-                    <td style="text-align:right;">${koli}</td>
-                    <td style="text-align:right;">${berat}</td>
-                    <td style="text-align:right;">${biaya}</td>
-                    <td style="text-align:center;">${item.metode_bayar || '-'}</td>
-                    <td style="text-align:center;">${isKembali}</td>
-                    <td style="text-align:center; mso-number-format:'\\@';">${statusFaktur}</td>
-                    <td style="text-align:center;">${isLunas}</td>
+                    <td style="mso-number-format:'\\@'; font-weight:bold; color:#0284c7;">${item.no_dokumen || ''}</td>
+                    <td>${item.agen_asal_nama || ''}</td>
+                    <td style="text-align:center; mso-number-format:'\\@';">${item.cust_id || ''}</td>
+                    <td style="font-weight:bold;">${item.cust_name || ''}</td>
+                    <td style="text-align:center;">${item.layanan || ''}</td>
+                    <td style="text-align:center; font-weight:bold;">${item.metode_bayar || ''}</td>
+                    <td style="mso-number-format:'\\@';">${item.packing_id || ''}</td>
+                    <td style="text-align:right; mso-number-format:'#,##0';">${byPacking}</td>
+                    <td style="mso-number-format:'\\@';">${item.no_kwitansi || ''}</td>
+                    <td style="text-align:center; mso-number-format:'\\@';">${tglKw}</td>
+                    <td style="mso-number-format:'\\@';">${item.no_tt || ''}</td>
+                    <td style="text-align:center; mso-number-format:'\\@';">${tglTT}</td>
+                    <td style="mso-number-format:'\\@';">${item.no_pembayaran || ''}</td>
+                    <td style="text-align:center; mso-number-format:'\\@';">${tglBayar}</td>
+                    <td style="text-align:right; mso-number-format:'#,##0'; font-weight:bold;">${byKirim}</td>
+                    <td style="text-align:right; mso-number-format:'#,##0';">${Number(item.uang_muka || 0) || ''}</td>
+                    <td style="text-align:right; mso-number-format:'#,##0'; color:#059669; font-weight:bold;">${terbayar}</td>
+                    <td style="text-align:right; mso-number-format:'#,##0';">${Number(item.dikembalikan || 0) || ''}</td>
+                    <td style="text-align:right; mso-number-format:'#,##0';">${koli}</td>
+                    <td style="text-align:right; mso-number-format:'#,##0.##';">${berat}</td>
+                    <td>${item.kota_tujuan || ''}</td>
+                    <td>${item.penerima || ''}</td>
+                    <td style="text-align:center; mso-number-format:'\\@';">${tglKembali}</td>
+                    <td style="mso-number-format:'\\@';">${item.no_spb || ''}</td>
+                    <td style="text-align:center;">${umurBTT}</td>
+                    <td style="mso-number-format:'\\@';">${item.btt_dbs || ''}</td>
+                    <td style="mso-number-format:'\\@';">${item.pic || ''}</td>
+                    <td style="font-weight:bold;">${item.cabang_berwenang || ''}</td>
                 </tr>
             `;
         }).join('');
 
-        const excelTemplate = `
+        const logoCellHtml = logoInfo.b64
+            ? `<td colspan="3" rowspan="4" style="text-align:center; vertical-align:middle; padding:4px 8px;">
+                <img src="http://dakota.local/logo.png" width="${logoInfo.width}" height="${logoInfo.height}" />
+            </td>`
+            : '';
+        const kopColSpan = logoInfo.b64 ? 13 : 16;
+
+        const htmlBody = `
+            <!DOCTYPE html>
             <html xmlns:o="urn:schemas-microsoft-com:office:office"
-                  xmlns:x="urn:schemas-microsoft-com:office:excel"
-                  xmlns="http://www.w3.org/TR/REC-html40">
+                  xmlns:x="urn:schemas-microsoft-com:office:excel">
             <head>
                 <meta charset="UTF-8" />
                 <style>
-                    table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 11px; }
-                    th { background-color: #0284c7; color: #ffffff; font-weight: bold; border: 1px solid #333; padding: 6px; }
-                    td { border: 1px solid #94a3b8; padding: 5px; }
-                    .title { font-size: 14px; font-weight: bold; border: none; }
-                    .sub { font-size: 11px; border: none; }
+                    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 9.5pt; color: #0f172a; }
+                    table { border-collapse: collapse; }
+                    th.tbl-hdr {
+                        background-color: #004b84;
+                        color: #ffffff;
+                        font-weight: bold;
+                        border: 1px solid #00355e;
+                        padding: 7px 6px;
+                        text-align: center;
+                        font-size: 9pt;
+                    }
+                    #tblKondisi td {
+                        border: 1px solid #cbd5e1;
+                        padding: 5px 6px;
+                        font-size: 9pt;
+                        vertical-align: middle;
+                    }
                 </style>
             </head>
             <body>
                 <table>
-                    <tr><td colspan="15" class="title">PT DAKOTA LOGISTIK INDONESIA - LAPORAN KONDISI BTT & ORDER JEMPUT</td></tr>
-                    <tr><td colspan="15" class="sub">Cabang: ${namaCabang} | Periode: ${periodeStr}</td></tr>
-                    <tr><td colspan="15" class="sub"></td></tr>
+                    <tr>
+                        ${logoCellHtml}
+                        <td colspan="${kopColSpan}" style="font-size:13pt; font-weight:bold; color:#004b84; padding-top:4px;">
+                            PT DAKOTA LOGISTIK INDONESIA
+                        </td>
+                        <td colspan="14" rowspan="4" style="text-align:right; vertical-align:middle; padding-right:8px;">
+                            <span style="font-size:15pt; font-weight:bold; color:#004b84;">KONDISI BTT &amp; ORDER JEMPUT</span><br/>
+                            <span style="font-size:9.5pt; font-weight:bold; color:#334155;">CABANG: ${namaCabangHeader}</span><br/>
+                            <span style="font-size:9.5pt; color:#475569;">PERIODE: ${periodeHeader}</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="${kopColSpan}" style="font-size:9pt; color:#475569;">
+                            Jl. Wibawa Mukti II No. 8 Jatiasih, Bekasi - Jawa Barat
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="${kopColSpan}" style="font-size:9pt; color:#475569;">
+                            BEKASI KOTA
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="${kopColSpan}" style="font-size:9pt; color:#475569; padding-bottom:6px;">
+                            Telp: (021) 8603278 / (021) 86608589
+                        </td>
+                    </tr>
+                    <tr><td colspan="30" style="height:6px; border-top:2px solid #004b84;"></td></tr>
+                </table>
+
+                <table id="tblKondisi">
+                <colgroup>
+                     <col style="width:85px;" />
+                     <col style="width:85px;" />
+                     <col style="width:145px;" />
+                     <col style="width:120px;" />
+                     <col style="width:95px;" />
+                     <col style="width:230px;" />
+                 </colgroup>
                     <thead>
                         <tr>
-                            <th>NO</th>
-                            <th>NO. DOKUMEN</th>
-                            <th>TIPE</th>
-                            <th>TANGGAL</th>
-                            <th>PELANGGAN / PENGIRIM</th>
-                            <th>PENERIMA</th>
-                            <th>KOTA TUJUAN</th>
-                            <th>PIC MARKETING</th>
-                            <th>KOLI</th>
-                            <th>BERAT (KG)</th>
-                            <th>TOTAL BIAYA (RP)</th>
-                            <th>METODE BAYAR</th>
-                            <th>BTT KEMBALI</th>
-                            <th>STATUS INVOICE</th>
-                            <th>STATUS LUNAS</th>
+                            <th class="tbl-hdr">Jenis</th>
+                            <th class="tbl-hdr">Tanggal</th>
+                            <th class="tbl-hdr">No Transaksi</th>
+                            <th class="tbl-hdr">Cabang Asal</th>
+                            <th class="tbl-hdr">Kode Pelanggan</th>
+                            <th class="tbl-hdr">Nama Pelanggan</th>
+                            <th class="tbl-hdr">Layanan</th>
+                            <th class="tbl-hdr">Bayar</th>
+                            <th class="tbl-hdr">Packing</th>
+                            <th class="tbl-hdr">By Packing</th>
+                            <th class="tbl-hdr">No Kwitansi</th>
+                            <th class="tbl-hdr">Tgl Kwitansi</th>
+                            <th class="tbl-hdr">No TT</th>
+                            <th class="tbl-hdr">Tgl TT</th>
+                            <th class="tbl-hdr">No Pembayaran</th>
+                            <th class="tbl-hdr">Tgl Bayar</th>
+                            <th class="tbl-hdr">By Kirim</th>
+                            <th class="tbl-hdr">Uang Muka</th>
+                            <th class="tbl-hdr">Terbayar</th>
+                            <th class="tbl-hdr">Dikembalikan</th>
+                            <th class="tbl-hdr">Koli</th>
+                            <th class="tbl-hdr">Berat</th>
+                            <th class="tbl-hdr">Tujuan</th>
+                            <th class="tbl-hdr">Penerima</th>
+                            <th class="tbl-hdr">Tgl BTT Kembali</th>
+                            <th class="tbl-hdr">No. SPB</th>
+                            <th class="tbl-hdr">Umur BTT</th>
+                            <th class="tbl-hdr">BTT DBS</th>
+                            <th class="tbl-hdr">PIC</th>
+                            <th class="tbl-hdr">Cabang Berwenang</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${rowsHtml}
                     </tbody>
                     <tfoot>
-                        <tr style="background-color: #f1f5f9; font-weight: bold;">
-                            <td colspan="8" style="text-align:center;">TOTAL (${data.length} TRANSAKSI)</td>
-                            <td style="text-align:right;">${totalKoliAll}</td>
-                            <td style="text-align:right;">${totalBeratAll}</td>
-                            <td style="text-align:right;">${totalBiayaAll}</td>
-                            <td colspan="4"></td>
+                        <tr style="background-color:#e2e8f0; font-weight:bold; color:#0f172a;">
+                            <td colspan="9" style="text-align:right; padding:6px 8px; color:#004b84;">TOTAL (${data.length} DATA) :</td>
+                            <td style="text-align:right; mso-number-format:'#,##0';">${totalPackingAll}</td>
+                            <td colspan="6"></td>
+                            <td style="text-align:right; mso-number-format:'#,##0'; color:#004b84;">${totalBiayaKirimAll}</td>
+                            <td></td>
+                            <td style="text-align:right; mso-number-format:'#,##0'; color:#059669;">${totalTerbayarAll}</td>
+                            <td></td>
+                            <td style="text-align:right; mso-number-format:'#,##0';">${totalKoliAll}</td>
+                            <td style="text-align:right; mso-number-format:'#,##0.##';">${totalBeratAll}</td>
+                            <td colspan="8"></td>
                         </tr>
                     </tfoot>
                 </table>
@@ -281,21 +516,37 @@ const KondisiBTT = () => {
             </html>
         `;
 
-        const blob = new Blob(['\ufeff', excelTemplate], {
-            type: 'application/vnd.ms-excel;charset=utf-8'
-        });
+        const boundary = '----=_NextPart_DAKOTA_KONDISI_001';
+        const b64Wrapped = logoInfo.b64 ? logoInfo.b64.replace(/(.{76})/g, '$1\r\n') : '';
+        const mhtml =
+            'MIME-Version: 1.0\r\n' +
+            `Content-Type: multipart/related; boundary="${boundary}"\r\n\r\n` +
+            `--${boundary}\r\n` +
+            'Content-Type: text/html; charset="utf-8"\r\n' +
+            'Content-Transfer-Encoding: 8bit\r\n\r\n' +
+            htmlBody + '\r\n\r\n' +
+            (b64Wrapped
+                ? `--${boundary}\r\n` +
+                'Content-Location: http://dakota.local/logo.png\r\n' +
+                'Content-Type: image/png\r\n' +
+                'Content-Transfer-Encoding: base64\r\n\r\n' +
+                b64Wrapped + '\r\n\r\n'
+                : '') +
+            `--${boundary}--`;
+
+        const blob = new Blob([mhtml], { type: 'application/vnd.ms-excel;charset=utf-8;' });
         const downloadUrl = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        const fileNameDate = bypassTanggal ? 'ALL_PERIODE' : `${startDate}_sd_${endDate}`;
+        const dateStamp = today.replace(/-/g, '');
         link.href = downloadUrl;
-        link.download = `Laporan_Kondisi_BTT_${fileNameDate}.xls`;
+        link.download = `Kondisi_BTT_OrderJemput_${dateStamp}.xls`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(downloadUrl);
     };
 
-    // 🖨️ CETAK LAPORAN RESMI KONDISI BTT & ORDER JEMPUT (A4 LANDSCAPE POPUP)
+    // 🖨️ CETAK LAPORAN RESMI KONDISI BTT & ORDER JEMPUT
     const handlePrintReport = async () => {
         if (!data || data.length === 0) {
             Swal.fire({
@@ -312,9 +563,8 @@ const KondisiBTT = () => {
             const logoImg = new Image();
             logoImg.src = dakotaLogo;
             await new Promise((resolve) => {
-                if (logoImg.complete) {
-                    resolve();
-                } else {
+                if (logoImg.complete) resolve();
+                else {
                     logoImg.onload = () => resolve();
                     logoImg.onerror = () => resolve();
                 }
@@ -332,17 +582,7 @@ const KondisiBTT = () => {
             base64Logo = dakotaLogo;
         }
 
-        const width = 1150;
-        const height = 800;
-        const left = Math.max(0, Math.round((window.screen.width - width) / 2));
-        const top = Math.max(0, Math.round((window.screen.height - height) / 2));
-
-        const printWindow = window.open(
-            '',
-            '_blank',
-            `width=${width},height=${height},top=${top},left=${left},scrollbars=yes,resizable=yes`
-        );
-
+        const printWindow = window.open('', '_blank', 'width=1150,height=800,scrollbars=yes,resizable=yes');
         if (!printWindow) {
             Swal.fire('Popup Diblokir', 'Mohon izinkan popup browser untuk mencetak dokumen ini.', 'warning');
             return;
@@ -477,38 +717,21 @@ const KondisiBTT = () => {
                     </tfoot>
                 </table>
 
-                <div style="margin-top: 25px; page-break-inside: avoid;">
-                    <table style="width: 100%; border: none; font-size: 11px;">
-                        <tr style="text-align: center; border: none;">
-                            <td style="width: 33%; border: none;">
-                                <div>Dibuat Oleh,</div>
-                                <div style="height: 44px;"></div>
-                                <div style="font-weight: bold; text-decoration: underline;">( Petugas Operasional / CS )</div>
-                            </td>
-                            <td style="width: 33%; border: none;">
-                                <div>Diperiksa Oleh,</div>
-                                <div style="height: 44px;"></div>
-                                <div style="font-weight: bold; text-decoration: underline;">( Koordinator Piutang )</div>
-                            </td>
-                            <td style="width: 33%; border: none;">
-                                <div>Disetujui Oleh,</div>
-                                <div style="height: 44px;"></div>
-                                <div style="font-weight: bold; text-decoration: underline;">( Kepala Cabang )</div>
-                            </td>
-                        </tr>
-                    </table>
-                </div>
-
                 <script>
-                    window.onload = () => {
-                        window.print();
-                    };
+                    window.onload = () => { window.print(); };
                 </script>
             </body>
             </html>
         `);
         printWindow.document.close();
     };
+
+    const filteredCabangBerwenang = cabangList.filter(c => {
+        const nama = String(c.agen_nama || c.AgenNama || '').toLowerCase();
+        const id = String(c.agen_id || c.AgenID || '').toLowerCase();
+        const q = cabangBerwenang.trim().toLowerCase();
+        return !q || nama.includes(q) || id.includes(q);
+    });
 
     const columns = [
         {
@@ -535,6 +758,11 @@ const KondisiBTT = () => {
                     <span className="text-[11px] text-slate-500">Tujuan: {item.penerima} ({item.kota_tujuan})</span>
                 </div>
             )
+        },
+        {
+            header: 'CABANG BERWENANG',
+            accessor: 'cabang_berwenang',
+            render: (item) => <span className="font-bold text-slate-700 uppercase text-[11px]">{item.cabang_berwenang || '-'}</span>
         },
         {
             header: 'PIC MARKETING',
@@ -598,7 +826,6 @@ const KondisiBTT = () => {
 
     return (
         <div className="space-y-5">
-            {/* ✅ Filter Panel Selalu Aktif */}
             {showFilter && (
                 <form onSubmit={handleApplyFilter} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs transition-all">
                     <div className="flex items-center justify-between">
@@ -617,8 +844,7 @@ const KondisiBTT = () => {
                                     disabled={bypassTanggal}
                                     value={startDate}
                                     onChange={(e) => setStartDate(e.target.value)}
-                                    className={`w-full p-2 border rounded-lg font-bold outline-none ${bypassTanggal ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-white text-slate-800 border-slate-300 focus:border-sky-500'
-                                        }`}
+                                    className={`w-full p-2 border rounded-lg font-bold outline-none ${bypassTanggal ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-white text-slate-800 border-slate-300 focus:border-sky-500'}`}
                                 />
                             </div>
                             <div className="flex-1">
@@ -628,13 +854,12 @@ const KondisiBTT = () => {
                                     disabled={bypassTanggal}
                                     value={endDate}
                                     onChange={(e) => setEndDate(e.target.value)}
-                                    className={`w-full p-2 border rounded-lg font-bold outline-none ${bypassTanggal ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-white text-slate-800 border-slate-300 focus:border-sky-500'
-                                        }`}
+                                    className={`w-full p-2 border rounded-lg font-bold outline-none ${bypassTanggal ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-white text-slate-800 border-slate-300 focus:border-sky-500'}`}
                                 />
                             </div>
                         </div>
 
-                        {/* Cabang Asal Filter */}
+                        {/* Cabang Asal */}
                         <div>
                             <label className="font-bold text-slate-500 block mb-1">CABANG ASAL</label>
                             <select
@@ -645,22 +870,73 @@ const KondisiBTT = () => {
                                     ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed select-none'
                                     : 'bg-white border-slate-300 text-slate-800 focus:border-sky-500 cursor-pointer'
                                     }`}
-                                title={!isHoldingUser ? 'Filter cabang terkunci sesuai lokasi login Anda' : 'Pilih cabang asal'}
                             >
-                                {isHoldingUser && (
-                                    <option value="">-- SEMUA CABANG ASAL --</option>
-                                )}
-
+                                {isHoldingUser && <option value="">-- SEMUA CABANG ASAL --</option>}
                                 {!isHoldingUser ? (
-                                    <option value={currentActiveAgen.id}>
-                                        {currentActiveAgen.nama || 'CABANG AKTIF'}
-                                    </option>
+                                    <option value={currentActiveAgen.id}>{currentActiveAgen.nama || 'CABANG AKTIF'}</option>
                                 ) : (
                                     cabangList.map((c, i) => (
                                         <option key={i} value={c.agen_id || c.AgenID}>{c.agen_nama || c.AgenNama}</option>
                                     ))
                                 )}
                             </select>
+                        </div>
+
+                        {/* 1. CABANG BERWENANG + AUTOCOMPLETE SUGGEST */}
+                        <div className="relative" onClick={(e) => e.stopPropagation()}>
+                            <label className="font-bold text-slate-500 block mb-1">CABANG BERWENANG</label>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="Ketik / pilih cabang berwenang..."
+                                    value={cabangBerwenang}
+                                    onFocus={() => setShowCabangBerwenangDropdown(true)}
+                                    onChange={(e) => {
+                                        setCabangBerwenang(e.target.value);
+                                        setShowCabangBerwenangDropdown(true);
+                                    }}
+                                    className="w-full p-2 pr-7 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500 uppercase"
+                                />
+                                {cabangBerwenang && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setCabangBerwenang('');
+                                            setShowCabangBerwenangDropdown(false);
+                                        }}
+                                        className="absolute right-2 top-2 text-slate-400 hover:text-rose-600 font-bold cursor-pointer"
+                                    >
+                                        ✕
+                                    </button>
+                                )}
+                            </div>
+                            {showCabangBerwenangDropdown && (
+                                <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-300 rounded-xl shadow-2xl max-h-56 overflow-y-auto z-50 divide-y divide-slate-100 text-xs">
+                                    {filteredCabangBerwenang.length > 0 ? (
+                                        filteredCabangBerwenang.map((c, i) => {
+                                            const nama = c.agen_nama || c.AgenNama || '';
+                                            const kode = c.agen_id || c.AgenID || '';
+                                            return (
+                                                <div
+                                                    key={i}
+                                                    onClick={() => {
+                                                        setCabangBerwenang(nama);
+                                                        setShowCabangBerwenangDropdown(false);
+                                                    }}
+                                                    className="p-2.5 hover:bg-sky-50 cursor-pointer font-bold text-slate-800 flex justify-between items-center transition"
+                                                >
+                                                    <span>{nama}</span>
+                                                    <span className="font-mono text-sky-700 bg-sky-50 px-2 py-0.5 rounded border border-sky-200 text-[10px]">
+                                                        {kode}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })
+                                    ) : (
+                                        <div className="p-3 text-center text-slate-400 italic">Cabang tidak ditemukan</div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         <div>
@@ -690,15 +966,66 @@ const KondisiBTT = () => {
                             </select>
                         </div>
 
-                        <div>
+                        {/* 2. CUSTOMER + AUTOCOMPLETE SUGGEST */}
+                        <div className="relative" onClick={(e) => e.stopPropagation()}>
                             <label className="font-bold text-slate-500 block mb-1">CUSTOMER</label>
-                            <input
-                                type="text"
-                                placeholder="Cari customer / pengirim..."
-                                value={searchCustomer}
-                                onChange={(e) => setSearchCustomer(e.target.value)}
-                                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500"
-                            />
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="Ketik minimal 2 huruf (misal: MERCK)..."
+                                    value={searchCustomer}
+                                    onFocus={() => setShowCustomerDropdown(true)}
+                                    onChange={(e) => {
+                                        setSearchCustomer(e.target.value);
+                                        setShowCustomerDropdown(true);
+                                    }}
+                                    className="w-full p-2 pr-7 border border-slate-300 rounded-lg font-bold text-slate-800 outline-none focus:border-sky-500 uppercase"
+                                />
+                                {searchCustomer && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSearchCustomer('');
+                                            setCustomerSuggestions([]);
+                                            setShowCustomerDropdown(false);
+                                        }}
+                                        className="absolute right-2 top-2 text-slate-400 hover:text-rose-600 font-bold cursor-pointer"
+                                    >
+                                        ✕
+                                    </button>
+                                )}
+                            </div>
+                            {showCustomerDropdown && searchCustomer.trim().length >= 2 && (
+                                <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-300 rounded-xl shadow-2xl max-h-60 overflow-y-auto z-50 divide-y divide-slate-100 text-xs">
+                                    {searchingCustomer ? (
+                                        <div className="p-3 text-center text-slate-400 font-bold italic animate-pulse">
+                                            Mencari customer...
+                                        </div>
+                                    ) : customerSuggestions.length > 0 ? (
+                                        customerSuggestions.map((cust, i) => {
+                                            const cName = cust.cust_name || cust.CustName || '';
+                                            const cId = cust.cust_id || cust.CustID || '';
+                                            return (
+                                                <div
+                                                    key={i}
+                                                    onClick={() => {
+                                                        setSearchCustomer(cName);
+                                                        setShowCustomerDropdown(false);
+                                                    }}
+                                                    className="p-2.5 hover:bg-sky-50 cursor-pointer font-bold text-slate-800 flex justify-between items-center gap-2 transition"
+                                                >
+                                                    <span className="truncate">{cName}</span>
+                                                    <span className="font-mono text-sky-700 bg-sky-50 px-2 py-0.5 rounded border border-sky-200 text-[10px] shrink-0">
+                                                        {cId}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })
+                                    ) : (
+                                        <div className="p-3 text-center text-slate-400 italic">Customer tidak ditemukan</div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         <div>
@@ -751,6 +1078,37 @@ const KondisiBTT = () => {
                             />
                         </div>
 
+                        {/* Barang Naik / Turun (Sesuai Web Lawas) */}
+                        <div>
+                            <label className="font-bold text-slate-500 block mb-1">BARANG NAIK / TURUN</label>
+                            <div className="flex items-center gap-3 pt-2 font-bold text-slate-700">
+                                <label className="flex items-center gap-1 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="jenis_naik_turun"
+                                        checked={jenisNaikTurun === 'S'}
+                                        onChange={() => setJenisNaikTurun('S')}
+                                    /> Semua
+                                </label>
+                                <label className="flex items-center gap-1 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="jenis_naik_turun"
+                                        checked={jenisNaikTurun === 'N'}
+                                        onChange={() => setJenisNaikTurun('N')}
+                                    /> Naik
+                                </label>
+                                <label className="flex items-center gap-1 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="jenis_naik_turun"
+                                        checked={jenisNaikTurun === 'T'}
+                                        onChange={() => setJenisNaikTurun('T')}
+                                    /> Turun
+                                </label>
+                            </div>
+                        </div>
+
                         <div className="flex items-center gap-4 mt-5">
                             <label className="flex items-center gap-1.5 cursor-pointer font-bold text-slate-700">
                                 <input
@@ -782,6 +1140,7 @@ const KondisiBTT = () => {
                         </div>
                     </div>
 
+                    {/* 3. HANYA 1 TOMBOL EXPORT EXCEL DI BAR AKSI */}
                     <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                         <button
                             type="button"
@@ -814,17 +1173,6 @@ const KondisiBTT = () => {
                 </form>
             )}
 
-            {/* Bar Tombol Tambahan (Di sebelah tombol Filter DataTableTemplate) */}
-            <div className="flex items-center gap-2">
-                <button
-                    type="button"
-                    onClick={handleExportExcel}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer"
-                >
-                    <FileSpreadsheet size={15} /> Export to Excel
-                </button>
-            </div>
-
             {/* Tabel List Monitoring */}
             <DataTableTemplate
                 title="KONDISI BTT DAN ORDER JEMPUT"
@@ -836,13 +1184,14 @@ const KondisiBTT = () => {
                 hideAddButton={true}
                 hideActions={true}
                 hideActionColumn={true}
-                onFilter={null} // ✅ Dinonaktifkan agar tombol toggle Filter tidak menyembunyikan panel filter
+                onFilter={null}
                 onEdit={(item) => {
                     Swal.fire({
                         title: `Detail Resi ${item.no_dokumen}`,
                         html: `
                             <div style="text-align: left; font-size: 12px; line-height: 1.8;">
                                 <p><strong>Pelanggan:</strong> ${item.cust_name} (${item.cust_id || '-'})</p>
+                                <p><strong>Cabang Berwenang:</strong> ${item.cabang_berwenang || '-'}</p>
                                 <p><strong>Penerima:</strong> ${item.penerima} - ${item.kota_tujuan}</p>
                                 <p><strong>Muatan:</strong> ${item.koli} Koli / ${item.berat} Kg</p>
                                 <p><strong>Total Biaya:</strong> Rp ${Number(item.total_biaya || 0).toLocaleString('id-ID')}</p>
