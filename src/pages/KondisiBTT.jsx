@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import DataTableTemplate from '../components/organisms/DataTableTemplate';
 import { useDarkMode } from '../context/DarkModeContext';
-import { Filter, CheckCircle2, XCircle, RefreshCw, Printer, FileSpreadsheet } from 'lucide-react';
 import Swal from 'sweetalert2';
 import dakotaLogo from '../assets/new_logo 2.png';
+import { Filter, CheckCircle2, XCircle, RefreshCw, Printer, FileSpreadsheet, FileText } from 'lucide-react';
 
 const KondisiBTT = () => {
     const { isDarkMode } = useDarkMode();
@@ -369,6 +369,7 @@ const KondisiBTT = () => {
                     <td style="text-align:center; mso-number-format:'\\@';">${tglTT}</td>
                     <td style="mso-number-format:'\\@';">${item.no_pembayaran || ''}</td>
                     <td style="text-align:center; mso-number-format:'\\@';">${tglBayar}</td>
+                    <td style="mso-number-format:'\\@'; font-weight:bold; color:#004b84;">${item.no_jurnal_pembayaran || ''}</td>
                     <td style="text-align:right; mso-number-format:'#,##0'; font-weight:bold;">${byKirim}</td>
                     <td style="text-align:right; mso-number-format:'#,##0';">${Number(item.uang_muka || 0) || ''}</td>
                     <td style="text-align:right; mso-number-format:'#,##0'; color:#059669; font-weight:bold;">${terbayar}</td>
@@ -376,6 +377,7 @@ const KondisiBTT = () => {
                     <td style="text-align:right; mso-number-format:'#,##0';">${koli}</td>
                     <td style="text-align:right; mso-number-format:'#,##0.##';">${berat}</td>
                     <td>${item.kota_tujuan || ''}</td>
+                    <td>${item.kecamatan || ''}</td>
                     <td>${item.penerima || ''}</td>
                     <td style="text-align:center; mso-number-format:'\\@';">${tglKembali}</td>
                     <td style="mso-number-format:'\\@';">${item.no_spb || ''}</td>
@@ -478,6 +480,7 @@ const KondisiBTT = () => {
                             <th class="tbl-hdr">Tgl TT</th>
                             <th class="tbl-hdr">No Pembayaran</th>
                             <th class="tbl-hdr">Tgl Bayar</th>
+                            <th class="tbl-hdr">No Jurnal Pembayaran</th>
                             <th class="tbl-hdr">By Kirim</th>
                             <th class="tbl-hdr">Uang Muka</th>
                             <th class="tbl-hdr">Terbayar</th>
@@ -485,6 +488,7 @@ const KondisiBTT = () => {
                             <th class="tbl-hdr">Koli</th>
                             <th class="tbl-hdr">Berat</th>
                             <th class="tbl-hdr">Tujuan</th>
+                            <th class="tbl-hdr">Kecamatan</th>
                             <th class="tbl-hdr">Penerima</th>
                             <th class="tbl-hdr">Tgl BTT Kembali</th>
                             <th class="tbl-hdr">No. SPB</th>
@@ -501,14 +505,14 @@ const KondisiBTT = () => {
                         <tr style="background-color:#e2e8f0; font-weight:bold; color:#0f172a;">
                             <td colspan="9" style="text-align:right; padding:6px 8px; color:#004b84;">TOTAL (${data.length} DATA) :</td>
                             <td style="text-align:right; mso-number-format:'#,##0';">${totalPackingAll}</td>
-                            <td colspan="6"></td>
+                            <td colspan="7"></td>
                             <td style="text-align:right; mso-number-format:'#,##0'; color:#004b84;">${totalBiayaKirimAll}</td>
                             <td></td>
                             <td style="text-align:right; mso-number-format:'#,##0'; color:#059669;">${totalTerbayarAll}</td>
                             <td></td>
                             <td style="text-align:right; mso-number-format:'#,##0';">${totalKoliAll}</td>
                             <td style="text-align:right; mso-number-format:'#,##0.##';">${totalBeratAll}</td>
-                            <td colspan="8"></td>
+                            <td colspan="9"></td>
                         </tr>
                     </tfoot>
                 </table>
@@ -544,6 +548,185 @@ const KondisiBTT = () => {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(downloadUrl);
+    };
+
+    // 📊 CETAK REKAP KONDISI BTT & ORDER JEMPUT (RINGKASAN AGREGAT PER CUSTOMER)
+    const handlePrintRekapKondisiBTT = async () => {
+        if (!data || data.length === 0) {
+            Swal.fire({
+                title: 'DATA KOSONG',
+                text: 'Tidak ada data Kondisi BTT & Order Jemput untuk dibuatkan rekap.',
+                icon: 'warning',
+                confirmButtonColor: '#0284c7'
+            });
+            return;
+        }
+
+        const logoInfo = await getDakotaLogoBase64();
+        const logoSrc = logoInfo.b64 ? `data:image/png;base64,${logoInfo.b64}` : dakotaLogo;
+
+        const printWindow = window.open('', '_blank', 'width=1300,height=850,scrollbars=yes,resizable=yes');
+        if (!printWindow) {
+            Swal.fire('Popup Diblokir', 'Mohon izinkan popup browser untuk mencetak rekap.', 'warning');
+            return;
+        }
+
+        // Grouping agregat per Customer (Kode + Nama + PIC)
+        const groupMap = new Map();
+        data.forEach((item) => {
+            const custKey = `${item.cust_id || '-'}__${item.cust_name || 'TANPA NAMA'}`;
+            if (!groupMap.has(custKey)) {
+                groupMap.set(custKey, {
+                    cust_id: item.cust_id || '-',
+                    cust_name: item.cust_name || '-',
+                    pic: item.pic || '-',
+                    jml_btt: 0,
+                    jml_kembali: 0,
+                    jml_invoice: 0,
+                    koli: 0,
+                    berat: 0,
+                    by_packing: 0,
+                    by_kirim: 0,
+                    total_tagihan: 0,
+                    terbayar: 0
+                });
+            }
+            const grp = groupMap.get(custKey);
+            const packing = Number(item.by_packing || 0);
+            const kirim = Number(item.by_kirim ?? item.total_biaya ?? 0);
+            const total = Number(item.total_biaya || (packing + kirim));
+            const bayar = Number(item.terbayar_nominal || 0);
+
+            grp.jml_btt += 1;
+            if (item.btt_kembali_yn === 'Y') grp.jml_kembali += 1;
+            if (item.sudah_invoice_yn === 'Y') grp.jml_invoice += 1;
+            grp.koli += Number(item.koli || 0);
+            grp.berat += Number(item.berat || 0);
+            grp.by_packing += packing;
+            grp.by_kirim += kirim;
+            grp.total_tagihan += total;
+            grp.terbayar += bayar;
+        });
+
+        const rekapList = Array.from(groupMap.values()).sort((a, b) => b.total_tagihan - a.total_tagihan);
+
+        let grandBTT = 0, grandKembali = 0, grandInv = 0, grandKoli = 0, grandBerat = 0;
+        let grandPacking = 0, grandKirim = 0, grandTagihan = 0, grandTerbayar = 0, grandSisa = 0;
+
+        const rowsHtml = rekapList.map((r, idx) => {
+            const sisa = Math.max(r.total_tagihan - r.terbayar, 0);
+            grandBTT += r.jml_btt;
+            grandKembali += r.jml_kembali;
+            grandInv += r.jml_invoice;
+            grandKoli += r.koli;
+            grandBerat += r.berat;
+            grandPacking += r.by_packing;
+            grandKirim += r.by_kirim;
+            grandTagihan += r.total_tagihan;
+            grandTerbayar += r.terbayar;
+            grandSisa += sisa;
+
+            return `
+             <tr style="font-size: 10px;">
+                 <td style="border:1px solid #444; padding:4px; text-align:center;">${idx + 1}</td>
+                 <td style="border:1px solid #444; padding:4px; text-align:center; font-family:monospace;">${r.cust_id}</td>
+                 <td style="border:1px solid #444; padding:4px; font-weight:bold;">${r.cust_name}</td>
+                 <td style="border:1px solid #444; padding:4px; text-align:center;">${r.pic}</td>
+                 <td style="border:1px solid #444; padding:4px; text-align:center; font-weight:bold;">${r.jml_btt}</td>
+                 <td style="border:1px solid #444; padding:4px; text-align:center; color:#059669;">${r.jml_kembali}</td>
+                 <td style="border:1px solid #444; padding:4px; text-align:center; color:#0284c7;">${r.jml_invoice}</td>
+                 <td style="border:1px solid #444; padding:4px; text-align:right; font-family:monospace;">${r.koli.toLocaleString('id-ID')}</td>
+                 <td style="border:1px solid #444; padding:4px; text-align:right; font-family:monospace;">${r.berat.toLocaleString('id-ID')}</td>
+                 <td style="border:1px solid #444; padding:4px; text-align:right; font-family:monospace;">${r.by_packing.toLocaleString('id-ID')}</td>
+                 <td style="border:1px solid #444; padding:4px; text-align:right; font-family:monospace;">${r.by_kirim.toLocaleString('id-ID')}</td>
+                 <td style="border:1px solid #444; padding:4px; text-align:right; font-family:monospace; font-weight:bold;">${r.total_tagihan.toLocaleString('id-ID')}</td>
+                 <td style="border:1px solid #444; padding:4px; text-align:right; font-family:monospace; color:#059669; font-weight:bold;">${r.terbayar.toLocaleString('id-ID')}</td>
+                 <td style="border:1px solid #444; padding:4px; text-align:right; font-family:monospace; color:#b91c1c; font-weight:bold;">${sisa.toLocaleString('id-ID')}</td>
+             </tr>
+         `;
+        }).join('');
+
+        const periodeLabel = bypassTanggal ? 'SEMUA PERIODE' : `${startDate} s/d ${endDate}`;
+
+        printWindow.document.open();
+        printWindow.document.write(`
+         <!DOCTYPE html>
+         <html>
+         <head>
+             <title>REKAP KONDISI BTT & ORDER JEMPUT - DAKOTA LOGISTIK INDONESIA</title>
+             <style>
+                 @page { size: A4 landscape; margin: 8mm; }
+                 body { font-family: Arial, sans-serif; font-size: 10px; margin: 10px; color: #000; }
+                 table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+                 th { border: 1px solid #000; background: #cbd5e1; padding: 5px 3px; text-align: center; font-size: 9px; }
+                 .btn-print { background: #16a34a; color: #fff; border: none; padding: 8px 18px; font-weight: bold; border-radius: 6px; cursor: pointer; margin-left: 6px; }
+                 @media print { .no-print { display: none !important; } }
+             </style>
+         </head>
+         <body>
+             <div class="no-print" style="margin-bottom:12px; text-align:right;">
+                 <button class="btn-print" onclick="window.print()">PRINT REKAP KONDISI BTT</button>
+                 <button class="btn-print" style="background:#e11d48;" onclick="window.close()">TUTUP</button>
+             </div>
+             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px;">
+                 <div style="display:flex; align-items:center; gap:12px;">
+                     <img src="${logoSrc}" alt="Logo Dakota" style="height:42px; object-fit:contain;" />
+                     <div>
+                         <h2 style="margin:0; font-size:14px; font-weight:900;">PT DAKOTA LOGISTIK INDONESIA</h2>
+                         <div style="font-size:10px; color:#444;">Jl. Wibawa Mukti II No. 99, Jatiasih, Bekasi</div>
+                     </div>
+                 </div>
+                 <div style="text-align:right;">
+                     <h2 style="margin:0; font-size:16px; font-weight:900; letter-spacing:0.5px;">REKAP KONDISI BTT &amp; ORDER JEMPUT</h2>
+                     <div style="font-size:10px; font-weight:bold; color:#444; margin-top:2px;">Periode : ${periodeLabel}</div>
+                 </div>
+             </div>
+             <table>
+                 <thead>
+                     <tr>
+                         <th rowspan="2" style="width:3%;">No</th>
+                         <th rowspan="2" style="width:8%;">Kode Cust</th>
+                         <th rowspan="2" style="width:18%;">Nama Customer</th>
+                         <th rowspan="2" style="width:8%;">PIC</th>
+                         <th colspan="3">Jumlah Dokumen</th>
+                         <th colspan="2">Muatan</th>
+                         <th colspan="3">Rincian Tagihan (Rp)</th>
+                         <th colspan="2">Status Pelunasan (Rp)</th>
+                     </tr>
+                     <tr>
+                         <th style="width:5%;">Total</th>
+                         <th style="width:5%;">Kembali</th>
+                         <th style="width:5%;">Faktur</th>
+                         <th style="width:5%;">Koli</th>
+                         <th style="width:6%;">Berat</th>
+                         <th style="width:7%;">Packing</th>
+                         <th style="width:8%;">Biaya Kirim</th>
+                         <th style="width:8%;">Total Biaya</th>
+                         <th style="width:8%;">Terbayar</th>
+                         <th style="width:8%;">Belum Bayar</th>
+                     </tr>
+                 </thead>
+                 <tbody>${rowsHtml}</tbody>
+                 <tfoot>
+                     <tr style="background:#cbd5e1; font-weight:bold; font-size:10px; font-family:monospace;">
+                         <td colspan="4" style="border:1px solid #444; padding:5px; text-align:right;">TOTAL KESELURUHAN (${rekapList.length} CUSTOMER) :</td>
+                         <td style="border:1px solid #444; padding:5px; text-align:center;">${grandBTT.toLocaleString('id-ID')}</td>
+                         <td style="border:1px solid #444; padding:5px; text-align:center;">${grandKembali.toLocaleString('id-ID')}</td>
+                         <td style="border:1px solid #444; padding:5px; text-align:center;">${grandInv.toLocaleString('id-ID')}</td>
+                         <td style="border:1px solid #444; padding:5px; text-align:right;">${grandKoli.toLocaleString('id-ID')}</td>
+                         <td style="border:1px solid #444; padding:5px; text-align:right;">${grandBerat.toLocaleString('id-ID')}</td>
+                         <td style="border:1px solid #444; padding:5px; text-align:right;">${grandPacking.toLocaleString('id-ID')}</td>
+                         <td style="border:1px solid #444; padding:5px; text-align:right;">${grandKirim.toLocaleString('id-ID')}</td>
+                         <td style="border:1px solid #444; padding:5px; text-align:right;">${grandTagihan.toLocaleString('id-ID')}</td>
+                         <td style="border:1px solid #444; padding:5px; text-align:right; color:#059669;">${grandTerbayar.toLocaleString('id-ID')}</td>
+                         <td style="border:1px solid #444; padding:5px; text-align:right; color:#b91c1c;">${grandSisa.toLocaleString('id-ID')}</td>
+                     </tr>
+                 </tfoot>
+             </table>
+         </body>
+         </html>
+     `);
+        printWindow.document.close();
     };
 
     // 🖨️ CETAK LAPORAN RESMI KONDISI BTT & ORDER JEMPUT
@@ -755,7 +938,9 @@ const KondisiBTT = () => {
             render: (item) => (
                 <div>
                     <span className="font-bold text-slate-800 block">{item.cust_name}</span>
-                    <span className="text-[11px] text-slate-500">Tujuan: {item.penerima} ({item.kota_tujuan})</span>
+                    <span className="text-[11px] text-slate-500">
+                        Tujuan: {item.penerima} ({item.kota_tujuan}{item.kecamatan ? ` - Kec. ${item.kecamatan}` : ''})
+                    </span>
                 </div>
             )
         },
@@ -1142,6 +1327,14 @@ const KondisiBTT = () => {
 
                     {/* 3. HANYA 1 TOMBOL EXPORT EXCEL DI BAR AKSI */}
                     <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={handlePrintRekapKondisiBTT}
+                            className="px-5 py-2 bg-sky-700 hover:bg-sky-800 text-white font-bold rounded-xl transition flex items-center gap-1.5 uppercase shadow-sm cursor-pointer"
+                            title="Cetak Ringkasan Rekap Kondisi BTT per Customer"
+                        >
+                            <FileText size={14} /> Rekap Kondisi BTT
+                        </button>
                         <button
                             type="button"
                             onClick={handleExportExcel}
